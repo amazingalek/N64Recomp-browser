@@ -1,0 +1,116 @@
+# Builds and checks the forks at the commits forks.txt names, with this repo's renderer/, frontend/ and tests/. No
+# game, so nothing links into a page and nothing draws: a recomp's own CI and runs do that.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NAGA_VERSION: "30.0.1"
+  EMSDK_VERSION: "6.0.12"
+
+jobs:
+  # plume's device thread (tests/plume_device_thread_test.cpp) against a mock backend, natively.
+  plume-device-thread:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: plume
+        run: |
+          bash tools/fetch_forks.sh lib --no-submodules rt64
+          git -C lib/rt64 submodule update --init --depth 1 src/contrib/plume
+      - name: Test
+        run: |
+          dpkg -s libx11-dev > /dev/null 2>&1 || sudo apt-get install -y --no-install-recommends libx11-dev
+          g++ -std=c++20 -O2 -Wall -pthread -Ilib/rt64/src/contrib/plume tests/plume_device_thread_test.cpp \
+            lib/rt64/src/contrib/plume/plume_device_thread.cpp -o device_thread_test
+          ./device_thread_test
+
+  # RT64's shaders as WebGPU gets them: rt64 configured natively with RT64_WGSL builds each one with dxc and naga, and
+  # tests/wgsl_check.mjs checks every one against a core WebGPU device in headless Chrome. The runner has no GPU, so
+  # Chrome's WebGPU runs on SwiftShader (Vulkan on the CPU), which has no dual-source blending: the checker skips the
+  # *DualSource variants, which naga still validates as it writes them. Only the shaders are built, not the library.
+  wgsl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # Every source of the library has to exist for CMake to generate, though only the shaders are built.
+      - name: rt64
+        run: bash tools/fetch_forks.sh lib rt64
+      - uses: actions/cache@v4
+        id: naga
+        with:
+          path: ~/.cargo/bin/naga
+          key: naga-cli-${{ env.NAGA_VERSION }}-${{ runner.os }}
+      - name: naga
+        if: steps.naga.outputs.cache-hit != 'true'
+        run: cargo install naga-cli --version "$NAGA_VERSION" --locked
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libsdl2-dev libdbus-1-dev
+      - name: Build the shaders to WGSL
+        run: |
+          cmake -S lib/rt64 -B rt64-wgsl -G Ninja -DRT64_WGSL=ON -DRT64_NAGA_EXECUTABLE="$HOME/.cargo/bin/naga" -DNFD_PORTAL=ON
+          ninja -C rt64-wgsl $(ninja -C rt64-wgsl -t targets all | grep -E '^[^:]+\.wgsl\.c:' | cut -d: -f1)
+          find rt64-wgsl -name '*.wgsl' | wc -l
+      # The checker uses Node's own WebSocket (22 and up).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check them against core WebGPU
+        env:
+          CHROME_FLAGS: --enable-unsafe-swiftshader --use-webgpu-adapter=swiftshader --enable-features=Vulkan --no-sandbox
+        run: |
+          google-chrome --version
+          CHROME="$(command -v google-chrome)" node tests/wgsl_check.mjs "$(dirname "$(find rt64-wgsl -name '*.wgsl' | head -1)")"
+
+  # Every library a page is made of, built with Emscripten from the forks (tests/build/CMakeLists.txt).
+  emscripten:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Forks
+        run: bash tools/fetch_forks.sh lib
+      - uses: actions/cache@v4
+        id: naga
+        with:
+          path: ~/.cargo/bin/naga
+          key: naga-cli-${{ env.NAGA_VERSION }}-${{ runner.os }}
+      - name: naga
+        if: steps.naga.outputs.cache-hit != 'true'
+        run: cargo install naga-cli --version "$NAGA_VERSION" --locked
+      # The forks' cmake_minimum_required are older than CMake 4 accepts.
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.31.0"
+          ninjaVersion: "^1.13.0"
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+      - name: Emscripten's SDL2 and FreeType
+        run: embuilder build sdl2-mt freetype-legacysjlj
+      - name: Build
+        run: |
+          emcmake cmake -S tests/build -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORKS_DIR="$PWD/lib" \
+            -DRT64_NAGA_EXECUTABLE="$HOME/.cargo/bin/naga"
+          ninja -C build web_libraries

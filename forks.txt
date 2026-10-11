@@ -1,0 +1,6 @@
+# The forks this release builds against, each on its web branch: <name> <repository> <commit>.
+# rt64-web's src/contrib/plume is plume-web, and N64ModernRuntime-web's N64Recomp is N64Recomp-web, at the commits
+# those pin. A recomp pins its submodules to these same commits (tools/fetch_forks.sh checks them out here).
+rt64              https://github.com/amazingalek/rt64-web               d245f95df33c0ecacaf4464c073573b60b2b9fe0
+N64ModernRuntime  https://github.com/amazingalek/N64ModernRuntime-web   0e08912a84d9645fe5b4188f2f79ef02c80e0829
+RecompFrontend    https://github.com/amazingalek/RecompFrontend-web     337b80c8e669885efc98e5d1c4393ad383e59cb1
