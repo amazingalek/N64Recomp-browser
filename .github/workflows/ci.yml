@@ -38,6 +38,27 @@ jobs:
             lib/rt64/src/contrib/plume/plume_device_thread.cpp -o device_thread_test
           ./device_thread_test
 
+  # hlslpp's WebAssembly SIMD backend, the one every build with -msimd128 uses for RT64's matrices on the CPU, against
+  # the same math in plain C++ (tests/hlslpp_wasm_test.cpp), in node.
+  hlslpp-wasm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: hlslpp
+        run: |
+          bash tools/fetch_forks.sh lib --no-submodules rt64
+          git -C lib/rt64 submodule update --init --depth 1 src/contrib/hlslpp
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+      - name: Test
+        run: |
+          em++ -O2 -std=c++17 -msimd128 -Ilib/rt64/src/contrib/hlslpp/include tests/hlslpp_wasm_test.cpp -o hlslpp_wasm_test.js
+          node hlslpp_wasm_test.js
+
   # RT64's shaders as WebGPU gets them: rt64 configured natively with RT64_WGSL builds each one with dxc and naga, and
   # tests/wgsl_check.mjs checks every one against a core WebGPU device in headless Chrome. The runner has no GPU, so
   # Chrome's WebGPU runs on SwiftShader (Vulkan on the CPU), which has no dual-source blending: the checker skips the

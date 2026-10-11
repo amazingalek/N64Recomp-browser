@@ -5,14 +5,16 @@ Web support for N64 static recompilations built on [N64Recomp](https://github.co
 and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built with Emscripten into one page that draws
 through WebGPU. It is game-agnostic. It was written for, and is tested with,
 San Francisco Rush 2049: Recompiled, which plays in Chrome at 60
-frames a second with its launcher, menus, sound, keyboard and gamepads.
+frames a second with its launcher, menus, sound, keyboard and gamepads, and Banjo-Kazooie: Recompiled
+([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web), branch `web`) plays there too.
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
 ## The forks
 
 The changes to the upstream projects are commits on a `web` branch of a fork of each, on the commit the projects pin
-upstream, shaped to be opened as pull requests there. A fork goes away once upstream takes its branch.
+upstream. They stay forks: RT64, plume, N64Recomp, N64ModernRuntime and RecompFrontend don't take code written with
+an LLM (their CONTRIBUTING.md), so none of this is offered to them.
 
 ```
 fork                                     upstream                 what the web branch adds
@@ -24,9 +26,12 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   without a guard region
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
+amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
+                                                                  CPU-side matrices use with -msimd128
 ```
 
-rt64-web's `src/contrib/plume` points at plume-web, and N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
+rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` at hlslpp-web, and
+N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
 of the forks is the upstream one. Each commit's message says what it does and why.
 
@@ -38,8 +43,9 @@ of the forks is the upstream one. Each commit's message says what it does and wh
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, the
   WebGPU device, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
-- `tests/`: the plume device thread test, the WGSL checker, and `build/`, every library of a page built with
-  Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all three.
+- `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
+  `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
+  four.
 
 ## Using it in a recomp
 
@@ -60,7 +66,7 @@ isolated: served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origi
 with `coi_serviceworker.js` beside it on a host that can't set headers (GitHub Pages). Mods are off: the live
 recompiler emits machine code, which a page can't load.
 
-What a recomp has to do itself (Rush 2049's CMakeLists.txt does each):
+What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt do each):
 
 - wasm-ld turns a call whose signature doesn't match the callee into a trap, and the recompiler's C calls a few
   functions it never declares: declare them and build the recompiled code with `-Werror=implicit-function-declaration`.
@@ -70,14 +76,23 @@ What a recomp has to do itself (Rush 2049's CMakeLists.txt does each):
 - RecompFrontend compiles recompui's shaders with the `DXC` and `DXC_*_OPTS` its parent sets, as on the desktop
   (`tests/build/CMakeLists.txt` sets the ones it needs).
 - fmt 11.1 (N64Recomp's) needs `target_compile_options(fmt PRIVATE -include cstdlib)` with Emscripten's libc++.
+- Emscripten's `<limits.h>` defines `PAGESIZE`, so a source that includes RecompFrontend's `slot_map.h` after it
+  needs `#undef PAGESIZE`.
+- No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
+  haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
+- DXC for recompui's shaders is the build machine's, not one built for the target.
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
-  `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU.
+  `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
+  are patched to sample RT64's framebuffer on the GPU, so it is off there too).
+- The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
+  overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
+  never finished and the page hung at boot.
 
 ## Changing it
 
 A change to a fork is a commit on its `web` branch, made on top of what is there (never a force-push: recomps and
 tags pin those commits). Then bump `forks.txt` here to the new commit, and to the new rt64-web or
-N64ModernRuntime-web commit too when the change was in plume-web or N64Recomp-web (their submodule pointer moves with
-it). Tag a release once a recomp has run it.
+N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or N64Recomp-web (their submodule pointer
+moves with it). Tag a release once a recomp has run it.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.
