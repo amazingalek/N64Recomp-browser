@@ -2,12 +2,14 @@
 # N64ModernRuntime, RecompFrontend's menus and input, and renderer/ and frontend/ from this repo. CI builds every
 # library here; nothing links into a page, since a page needs a game's recompiled code.
 #
-#   emcmake cmake -S tests/build -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORKS_DIR=<forks> \
+#   emcmake cmake -S tests/build -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORKS_DIR=$PWD/tests/build/lib \
 #       -DRT64_NAGA_EXECUTABLE=<naga>
 #   ninja -C <dir> web_libraries
 #
 # <forks> holds rt64, N64ModernRuntime and RecompFrontend, checked out with their submodules at the commits forks.txt
-# names (tools/fetch_forks.sh). The compile options are what every library of a page needs (frontend/CMakeLists.txt).
+# names (tools/fetch_forks.sh), and is tests/build/lib, where RecompFrontend finds the game header it includes from
+# five directories up in tests/build/patches/. The compile options are what every library of a page needs
+# (frontend/CMakeLists.txt).
 
 cmake_minimum_required(VERSION 3.20)
 project(recomp_web_build_check LANGUAGES C CXX)

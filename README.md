@@ -64,6 +64,9 @@ What a recomp has to do itself (Rush 2049's CMakeLists.txt does each):
 
 - wasm-ld turns a call whose signature doesn't match the callee into a trap, and the recompiler's C calls a few
   functions it never declares: declare them and build the recompiled code with `-Werror=implicit-function-declaration`.
+- RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
+  `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
+  function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
 - RecompFrontend compiles recompui's shaders with the `DXC` and `DXC_*_OPTS` its parent sets, as on the desktop
   (`tests/build/CMakeLists.txt` sets the ones it needs).
 - fmt 11.1 (N64Recomp's) needs `target_compile_options(fmt PRIVATE -include cstdlib)` with Emscripten's libc++.
