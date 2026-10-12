@@ -6,11 +6,10 @@ and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built wit
 through WebGPU. It is game-agnostic. It was written for, and is tested with,
 San Francisco Rush 2049: Recompiled, which plays in Chrome at 60
 frames a second with its launcher, menus, sound, keyboard and gamepads. Banjo-Kazooie: Recompiled
-([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web), branch `web`) plays there too, and so
+([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web)) plays there too, and so
 does Majora's Mask in Zelda 64: Recompiled ([amazingalek/Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web),
-branch `web`: upstream's `recomp-frontend` branch, its frames interpolated to the display's rate), and so does Donkey
-Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web),
-branch `web`).
+on upstream's `recomp-frontend` branch, its frames interpolated to the display's rate), and so does Donkey
+Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web)).
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
