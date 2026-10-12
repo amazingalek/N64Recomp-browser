@@ -26,9 +26,12 @@ amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU
                                                                   indexing, background pipeline builds, frames
                                                                   interpolated to the display's rate
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
-                                                                  declares every function the C calls
+                                                                  declares every function the C calls; a mod
+                                                                  recompiled to C ahead of time; functions a mod
+                                                                  replaces or hooks, redirected at their entry
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
-                                                                  without a guard region
+                                                                  without a guard region; built-in mods linked
+                                                                  in, their replacements and hooks as redirects
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
 amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
@@ -68,8 +71,8 @@ recomp_web_frontend_page(<the recomp's executable>)
 and build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), after
 `embuilder build sdl2-mt freetype-legacysjlj` once. The page needs a browser with WebGPU and must be cross-origin
 isolated: served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, or
-with `coi_serviceworker.js` beside it on a host that can't set headers (GitHub Pages). Mods are off: the live
-recompiler emits machine code, which a page can't load.
+with `coi_serviceworker.js` beside it on a host that can't set headers (GitHub Pages). Mods a player adds are off:
+the live recompiler emits machine code, which a page can't load. A recomp's built-in mods work (below).
 
 What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt do each):
 
@@ -90,9 +93,18 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - DXC for recompui's shaders is the build machine's, not one built for the target.
 - The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
   and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
-- Built-in mods (`recomp::mods::register_embedded_mod`) need the live recompiler too, so leave them out with
-  Emscripten. One that fails to load ends in an SDL message box, which calls `alert` from a worker, where there is
-  none, and that exception stops the page.
+- A built-in mod (`recomp::mods::register_embedded_mod`) is recompiled to C at build time and linked in:
+  `recomp_web_precompiled_mod(<target> <mod.nrm> <the recomp's syms.toml> <name>)`, with
+  `RECOMP_WEB_OFFLINE_MOD_RECOMP` set to an OfflineModRecomp built from N64Recomp-web, adds the C (OfflineModRecomp
+  `--static <name>`) to the target, and `recomp::mods::register_precompiled_mod(<name>)` beside
+  `register_embedded_mod` makes the runtime use it for that mod. The runtime matches it by a hash of the mod's code,
+  so another version of the mod the player installs isn't given the wrong code (it fails to load like any mod, with
+  no live recompiler). wasm code can't be rewritten, so the functions a mod replaces or hooks are redirected at their
+  entry instead: N64Recomp-web's C asks `RECOMP_FUNC_ENTRY` there, which is one byte read for a function nothing
+  redirects. Hooks on a function in the patches library work the same way; hooks on a built-in mod's own functions
+  don't load (`OfflineModHooked`).
+- A mod that fails to load ends in an SDL message box, which calls `alert` from a worker. Workers have none, so the
+  frontend's `worker_alert.js` sends it to the console as an error rather than letting the exception stop the page.
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
