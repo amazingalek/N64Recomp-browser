@@ -38,7 +38,15 @@ function(n64recomp_browser_frontend_page target)
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/coi_serviceworker.js"
             $<TARGET_FILE_DIR:${target}>)
+    if (N64RECOMP_BROWSER_FAST_LINK)
+        target_link_options(${target} PRIVATE -O1)
+    endif()
 endfunction()
+
+# For a build to try something: the page is linked at -O1, where Binaryen's wasm-opt doesn't optimize the whole module,
+# which is most of a link at -O3. The code is still compiled at the build's level. Rush 2049's link took 190 s at -O3
+# and 11 s at -O1 (2026-10-12, a busy host), and its wasm grew 7%. Leave it off for a page that people play.
+option(N64RECOMP_BROWSER_FAST_LINK "Link the page without Binaryen's optimizations (builds to try something)" OFF)
 
 # Links the code of a mod built into the recomp (an .nrm it embeds with recomp::mods::register_embedded_mod) into
 # <target>, recompiled ahead of time: a page has no live recompiler, which recompiles a mod's code as it loads.

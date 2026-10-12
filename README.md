@@ -67,13 +67,17 @@ Point the recomp's `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at
 ```cmake
 add_compile_options(-pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0")
 add_link_options(-pthread -fwasm-exceptions)
+include(<this repo>/frontend/build_speed.cmake)          # ccache, if it is on PATH
 # ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
 add_subdirectory(<this repo>/frontend ${CMAKE_BINARY_DIR}/web_frontend)
 n64recomp_browser_frontend_page(<the recomp's executable>)
 ```
 
 and build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), after
-`embuilder build sdl2-mt freetype-legacysjlj` once. The page needs a browser with WebGPU and must be cross-origin
+`embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another checkout
+with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
+says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
+without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and must be cross-origin
 isolated: served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, or
 with `coi_serviceworker.js` beside it on a host that can't set headers (GitHub Pages). Mods a player adds are off:
 the live recompiler emits machine code, which a page can't load. A recomp's built-in mods work (below).

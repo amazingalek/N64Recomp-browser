@@ -29,6 +29,7 @@ endif()
 add_compile_options(-pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0")
 add_link_options(-pthread -fwasm-exceptions)
 add_compile_definitions(HLSL_CPU __PRFCHWINTRIN_H)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../frontend/build_speed.cmake)
 
 set(RT64_STATIC TRUE)
 set(BUILD_SHARED_LIBS OFF)
