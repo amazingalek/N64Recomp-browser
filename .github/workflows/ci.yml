@@ -129,6 +129,9 @@ jobs:
         with:
           version: ${{ env.EMSDK_VERSION }}
           actions-cache-folder: emsdk-cache
+      # spirv-opt, which rt64 runs on the prebuilt shaders (tests/build/shaders.txt) before naga.
+      - name: SPIRV-Tools
+        run: sudo apt-get install -y --no-install-recommends spirv-tools
       - name: Emscripten's SDL2 and FreeType
         run: embuilder build sdl2-mt freetype-legacysjlj
       - name: Build
