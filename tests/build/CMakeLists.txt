@@ -12,7 +12,7 @@
 # (frontend/CMakeLists.txt).
 
 cmake_minimum_required(VERSION 3.20)
-project(recomp_web_build_check LANGUAGES C CXX)
+project(n64recomp_browser_build_check LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,4 +54,4 @@ add_subdirectory(${FORKS_DIR}/RecompFrontend ${CMAKE_BINARY_DIR}/RecompFrontend)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../renderer ${CMAKE_BINARY_DIR}/renderer)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../frontend ${CMAKE_BINARY_DIR}/frontend)
 
-add_custom_target(web_libraries DEPENDS rt64 ultramodern librecomp recompui recompinput recomp_web_renderer)
+add_custom_target(web_libraries DEPENDS rt64 ultramodern librecomp recompui recompinput n64recomp_browser_renderer)

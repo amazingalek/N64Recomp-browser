@@ -1,4 +1,4 @@
-# recomp-web
+# N64Recomp-browser
 
 Web support for N64 static recompilations built on [N64Recomp](https://github.com/N64Recomp/N64Recomp),
 [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), [RecompFrontend](https://github.com/N64Recomp/RecompFrontend)
@@ -12,14 +12,16 @@ branch `web`: upstream's `recomp-frontend` branch, its frames interpolated to th
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
+Until 2026-10-12 this repo was amazingalek/recomp-web, and GitHub still sends that address here.
+
 ## The forks
 
-The changes to the upstream projects are commits on a `web` branch of a fork of each, on top of a commit upstream
+The changes to the upstream projects are commits on the `main` branch of a fork of each (its `web` branch until 2026-10-12), on top of a commit upstream
 (newer upstream commits are merged in, never rebased onto). They stay forks: RT64, plume, N64Recomp, N64ModernRuntime
 and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), so none of this is offered to them.
 
 ```
-fork                                     upstream                 what the web branch adds
+fork                                     upstream                 what the fork adds
 amazingalek/plume-web                    renderbag/plume          a WebGPU backend, the display's rate timed from
                                                                   animation frames; any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
@@ -47,7 +49,8 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
 
 - `forks.txt`: the fork commits that work together. A tag here is a release: a recomp pins its submodules to the
   commits `forks.txt` names at that tag.
-- `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `recomp_web_frontend_page()`
+- `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
+  (`recomp_web_frontend_page()` before the rename, which still works)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, the
   WebGPU device, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
@@ -65,7 +68,7 @@ add_compile_options(-pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0
 add_link_options(-pthread -fwasm-exceptions)
 # ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
 add_subdirectory(<this repo>/frontend ${CMAKE_BINARY_DIR}/web_frontend)
-recomp_web_frontend_page(<the recomp's executable>)
+n64recomp_browser_frontend_page(<the recomp's executable>)
 ```
 
 and build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), after
@@ -94,8 +97,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
   and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
 - A built-in mod (`recomp::mods::register_embedded_mod`) is recompiled to C at build time and linked in:
-  `recomp_web_precompiled_mod(<target> <mod.nrm> <the recomp's syms.toml> <name>)`, with
-  `RECOMP_WEB_OFFLINE_MOD_RECOMP` set to an OfflineModRecomp built from N64Recomp-web, adds the C (OfflineModRecomp
+  `n64recomp_browser_precompiled_mod(<target> <mod.nrm> <the recomp's syms.toml> <name>)`, with
+  `N64RECOMP_BROWSER_OFFLINE_MOD_RECOMP` set to an OfflineModRecomp built from N64Recomp-web, adds the C (OfflineModRecomp
   `--static <name>`) to the target, and `recomp::mods::register_precompiled_mod(<name>)` beside
   `register_embedded_mod` makes the runtime use it for that mod. The runtime matches it by a hash of the mod's code,
   so another version of the mod the player installs isn't given the wrong code (it fails to load like any mod, with
@@ -115,10 +118,10 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 
 ## Changing it
 
-A change to a fork is a commit on its `web` branch, made on top of what is there (never a force-push: recomps and
+A change to a fork is a commit on its `main` branch, made on top of what is there (never a force-push: recomps and
 tags pin those commits). Then bump `forks.txt` here to the new commit, and to the new rt64-web or
 N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or N64Recomp-web (their submodule pointer
-moves with it). To move a fork to a newer upstream commit, merge that commit into `web` and say in the merge's message
+moves with it). To move a fork to a newer upstream commit, merge that commit into `main` and say in the merge's message
 what upstream brought. Tag a release once a recomp has run it.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.

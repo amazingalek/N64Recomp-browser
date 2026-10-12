@@ -1,4 +1,4 @@
-// Link with --pre-js (recomp_web_frontend does): lets SDL2 open audio from a thread. Emscripten's SDL2 port (2.32)
+// Link with --pre-js (n64recomp_browser_frontend does): lets SDL2 open audio from a thread. Emscripten's SDL2 port (2.32)
 // does all of its Web Audio work on the page's thread except one line of SDL_OpenAudioDevice, which reads
 // SDL2.audioContext.sampleRate on the calling thread, and a worker has no audio context: the open fails with "Cannot
 // read properties of undefined (reading 'audioContext')". So the page makes the context itself, at a fixed rate, and

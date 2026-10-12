@@ -1,7 +1,7 @@
 // hlslpp's WebAssembly SIMD backend (platforms/wasm.h, picked when __wasm_simd128__ is defined, so in every build with
 // -msimd128), run by CI in node against the same math written out in plain C++. RT64 does its matrix work on the CPU
 // with hlslpp, so an op that is wrong there gives wrong transforms and nothing else: Banjo-Kazooie drew a screen-wide
-// polygon over everything, Rush 2049 didn't happen to show it. hlslpp-web's web branch fixes what this found wrong:
+// polygon over everything, Rush 2049 didn't happen to show it. hlslpp-web fixes what this found wrong:
 // movehl (so transpose and inverse), dot4 (so length and the mul of every non-4x4 shape), load3 of int3, and shifts
 // by a count per lane.
 //

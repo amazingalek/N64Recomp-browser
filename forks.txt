@@ -1,4 +1,4 @@
-# The forks this release builds against, each on its web branch: <name> <repository> <commit>.
+# The forks this release builds against, each on its main branch: <name> <repository> <commit>.
 # rt64-web's src/contrib/plume is plume-web and its src/contrib/hlslpp hlslpp-web, and N64ModernRuntime-web's N64Recomp
 # is N64Recomp-web, at the commits those pin. A recomp pins its submodules to these same commits (tools/fetch_forks.sh
 # checks them out here).

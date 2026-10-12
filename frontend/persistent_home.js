@@ -1,4 +1,4 @@
-// Link with --pre-js (recomp_web_frontend does): keeps HOME, /home/web_user, in the browser's IndexedDB, so what a
+// Link with --pre-js (n64recomp_browser_frontend does): keeps HOME, /home/web_user, in the browser's IndexedDB, so what a
 // recomp writes there outlives the page. RecompFrontend's app folder is HOME/.config/<program id>: the settings, the
 // saves, and the ROM the player picked (recomp::select_rom stores a copy there), which never leaves the browser.
 //
