@@ -8,7 +8,9 @@ San Francisco Rush 2049: Recompiled, which plays in Chrome at 60
 frames a second with its launcher, menus, sound, keyboard and gamepads. Banjo-Kazooie: Recompiled
 ([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web), branch `web`) plays there too, and so
 does Majora's Mask in Zelda 64: Recompiled ([amazingalek/Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web),
-branch `web`: upstream's `recomp-frontend` branch, its frames interpolated to the display's rate).
+branch `web`: upstream's `recomp-frontend` branch, its frames interpolated to the display's rate), and so does Donkey
+Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web),
+branch `web`).
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
@@ -82,7 +84,15 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - Generate the recompiled code with N64Recomp-web (N64ModernRuntime-web's `N64Recomp`) and build it with
   `-Werror=implicit-function-declaration`. wasm-ld turns a call whose signature doesn't match the callee into a trap,
   and upstream's `funcs.h` leaves out some of what the C calls (the runtime's libultra replacements, ignored functions,
-  `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp.
+  `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp:
+  a hook whose text calls the recomp's C declares it there (Donkey Kong 64's `load_dk64_overlay`, in `us.toml`).
+  A patch's call to a libultra function goes to the runtime's `<name>_recomp`, as the game's own calls do
+  (N64Recomp-web 9eb59c4; upstream calls `osInitialize(rdram, ctx)`, which reaches ultramodern's `osInitialize(void)`).
+- A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
+  `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
+  function the patches call by its name, works on x86 by luck and traps here, and only the link says so (wasm-ld's
+  `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
+  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`.
 - RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
   `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
   function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
@@ -111,7 +121,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
-  Pictograph Box compresses the photo it took on the CPU, so it stays on there.
+  Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
+  framebuffers too, and it is left on there (not tried off).
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
   overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
   never finished and the page hung at boot.
