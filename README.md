@@ -60,6 +60,9 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
   played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice when the browser draws with
   integrated Intel graphics, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
+- `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), and `publish_page.sh` puts
+  a recomp's built page on its repo's GitHub Pages, as the only commit on an orphan `gh-pages` branch (its header says
+  how). A page holds the recompiled code, so it is built where the ROM is, never in CI.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.
