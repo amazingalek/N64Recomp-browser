@@ -76,6 +76,7 @@ Point the recomp's `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at
 add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
 add_link_options(-pthread -fwasm-exceptions -mtail-call)
 include(<this repo>/frontend/build_speed.cmake)          # ccache, if it is on PATH
+set(RT64_PREBUILT_SHADER_LIST ${CMAKE_SOURCE_DIR}/<the game's shader list>)   # required: below
 # ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
 add_subdirectory(<this repo>/frontend ${CMAKE_BINARY_DIR}/web_frontend)
 n64recomp_browser_frontend_page(<the recomp's executable>)
@@ -151,16 +152,19 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
   Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
   framebuffers too, and it is left on there (not tried off).
-- Give RT64 a list of the game's shaders, so the page builds them before the game starts. Until a shader is built
-  RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel graphics in Chrome
-  that was a frame a second for minutes. Open the page with `?record-shaders` and play everything (menus, every mode,
-  split screen): the console prints an `rt64 shader: <five hex words>` line for each new one. Put those words in a
-  file, a line each (a line starting with `#` is a comment), and set `RT64_PREBUILT_SHADER_LIST` to it
-  before adding rt64. Each one is specialized at build time (rt64-web's CMakeLists.txt says how), and the page shows
-  "Preparing graphics" with a bar from the game's first frame until they are built, on every visit (Chrome's
-  pipeline cache keeps them for no later one): 13-18 s for Rush 2049's 105 on an RTX 2070. Not in Firefox, which
-  builds a pipeline in line with everything else and so draws with the ubershader alone. A shader the list missed is
-  built in the background as before. Rush 2049's list is `src/rt64_shaders.txt` in its repo.
+- Give RT64 a list of the game's shaders, so the page builds them before the game starts. This is part of every
+  port, not an optional extra: without it the page is unplayable on most machines. Until a shader is built RT64 draws
+  with its ubershader, which costs several times as much a pixel: on a laptop's Intel graphics in Chrome that was a
+  frame a second for minutes, and Firefox, which builds a pipeline in line with everything else, drew everything with
+  it. Open the page with `?record-shaders` and play everything (menus, every mode, split screen): the console prints
+  an `rt64 shader: <five hex words>` line for each new one. Put those words in a file, a line each (a line starting
+  with `#` is a comment), and set `RT64_PREBUILT_SHADER_LIST` to it before adding rt64. Each one is specialized at
+  build time (rt64-web's CMakeLists.txt says how), with its pixel shader both with dual-source blending and without,
+  and the page shows "Preparing graphics" with a bar from the game's first frame until they are built, on every visit,
+  in every browser and on every adapter: 13-18 s for Rush 2049's 105 in Chrome on an RTX 2070 (its pipeline cache
+  keeps them for no later visit), 29-30 s in Firefox 157, whose GPU process builds them one at a time. A shader the
+  list missed is built in the background as before, except in Firefox, where it draws with the ubershader. Rush 2049's
+  list is `src/rt64_shaders.txt` in its repo.
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
   overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
   never finished and the page hung at boot.
