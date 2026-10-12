@@ -84,8 +84,8 @@ n64recomp_browser_frontend_page(<the recomp's executable>)
 
 and build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
 `PATH` (SPIRV-Tools, `apt install spirv-tools`; without it the prebuilt shaders below come out several times the
-size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another checkout
-with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
+size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
+checkout with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
 says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
 without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and must be cross-origin
 isolated: served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, or
@@ -161,7 +161,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   an `rt64 shader: <five hex words>` line for each new one, in the order the game asks for them (the page prebuilds
   none then). Put those words in a file, a line each in that order (a line starting with `#` is a comment), with a
   line reading `background` after what the game's first screens draw, and set `RT64_PREBUILT_SHADER_LIST` to it
-  before adding rt64. Each one is specialized at build time and run through `spirv-opt -O` (rt64-web's CMakeLists.txt says how), with its pixel
+  before adding rt64. Each one is specialized at build time and run through `spirv-opt -O` (rt64-web's
+  CMakeLists.txt says how), with its pixel
   shader both with dual-source blending and without, and the page shows "Preparing graphics", a one-time setup, with
   a bar and the time left from the game's first frame until those above `background` are built (all of them without
   the line), in every browser and on every adapter. They are built largest first, as many at once as the computer
