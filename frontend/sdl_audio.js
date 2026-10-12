@@ -4,7 +4,7 @@
 // read properties of undefined (reading 'audioContext')". So the page makes the context itself, at a fixed rate, and
 // SDL uses that one; each worker gets a stand-in that reports the same rate. SDL converts whatever rate the program
 // asks for to this one. A browser starts a context suspended until the player clicks or presses a key, so it is
-// resumed on the first of those.
+// resumed on the first of those. audio_output.js plays on the same context.
 const recompAudioRate = 48000;
 if (typeof document !== 'undefined') {
   Module['preRun'] = [].concat(Module['preRun'] || []);

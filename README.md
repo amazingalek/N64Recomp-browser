@@ -52,8 +52,9 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
   commits `forks.txt` names at that tag.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` before the rename, which still works)
-  (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, the
-  WebGPU device, and `coi_serviceworker.js`.
+  (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, sound
+  played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice when the browser draws with
+  integrated Intel graphics, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
@@ -104,6 +105,9 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - fmt 11.1 (N64Recomp's) needs `target_compile_options(fmt PRIVATE -include cstdlib)` with Emscripten's libc++.
 - Emscripten's `<limits.h>` defines `PAGESIZE`, so a source that includes RecompFrontend's `slot_map.h` after it
   needs `#undef PAGESIZE`.
+- Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
+  `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
+  busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
 - No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
   haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
 - DXC for recompui's shaders is the build machine's, not one built for the target.

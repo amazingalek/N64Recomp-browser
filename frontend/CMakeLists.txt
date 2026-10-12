@@ -8,6 +8,8 @@
 # - persistent_home.js: HOME (/home/web_user, where RecompFrontend keeps settings, saves and the ROM it was given)
 #   kept in the browser's IndexedDB,
 # - sdl_audio.js: SDL2's audio opened from a thread, which Emscripten's port can't do by itself,
+# - audio_output.h: sound played on the browser's audio thread, which a recomp uses instead of SDL's queue: SDL2's
+#   port plays it from the page's thread, where it breaks up whenever WebGPU keeps that thread busy,
 # - worker_alert.js: alert() on a thread (SDL's message box) logged, where a worker would throw,
 # - the page's WebGPU device (plume_webgpu_device.js).
 # A page with threads must be cross-origin isolated: served with Cross-Origin-Opener-Policy: same-origin and
@@ -22,9 +24,12 @@ target_link_options(n64recomp_browser_frontend INTERFACE
     "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$addRunDependency,$removeRunDependency"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/persistent_home.js"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/sdl_audio.js"
+    "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/audio_output.js"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/worker_alert.js"
     "--pre-js=${rt64_SOURCE_DIR}/src/contrib/plume/plume_webgpu_device.js"
     "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/shell.html")
+target_sources(n64recomp_browser_frontend INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/audio_output.cpp")
+target_include_directories(n64recomp_browser_frontend INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Makes <target> a page, <target>.html, with the service worker beside it.
 function(n64recomp_browser_frontend_page target)
@@ -33,6 +38,7 @@ function(n64recomp_browser_frontend_page target)
     # The page's scripts go into it at link time, so a change to one relinks it.
     set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/persistent_home.js" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/sdl_audio.js"
+        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/audio_output.js"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/worker_alert.js"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shell.html" "${rt64_SOURCE_DIR}/src/contrib/plume/plume_webgpu_device.js")
     add_custom_command(TARGET ${target} POST_BUILD

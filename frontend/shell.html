@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- The page of a recomp built with n64recomp_browser_frontend (CMakeLists.txt): a canvas filling the window, which SDL's window
      is and RT64 draws on (SDL follows its CSS size), and a line saying what is loading or what went wrong. The program
-     sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't. -->
+     sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't.
+     The #gpu notice says how to move the browser off integrated Intel graphics (below). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -12,12 +13,18 @@
   #canvas { display: block; width: 100vw; height: 100vh; outline: none; }
   #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center; color: #ccc;
             font: 18px system-ui, sans-serif; white-space: pre-line; pointer-events: none; }
+  #gpu { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); max-width: 46em; padding: 8px 32px 8px 12px;
+         background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif; }
+  #gpu[hidden] { display: none; }
+  #gpu button { position: absolute; right: 6px; top: 4px; border: 0; background: none; color: #aaa; font-size: 18px;
+                cursor: pointer; }
 </style>
 <script src="coi_serviceworker.js"></script>
 </head>
 <body>
 <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 <div id="status">Loading…</div>
+<div id="gpu" hidden><span></span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
   const statusLine = document.getElementById('status');
   const fail = (text) => { statusLine.textContent = text; statusLine.style.color = '#f88'; };
@@ -33,6 +40,28 @@
     onRuntimeInitialized: () => { statusLine.textContent = ''; },
     onAbort: (what) => fail('Stopped: ' + what),
   };
+  // Chrome and Edge on Windows and Linux give a page the GPU the browser itself draws with, whatever it asks for
+  // (crbug.com/369219127), and on a laptop with a graphics card too that is usually the integrated one: the game then
+  // crawls for minutes while its shaders are built, and runs slowly after. The page can't choose, so when the adapter
+  // is Intel's integrated graphics (Arc cards are the "hpg" architectures) it names the browser's flag that moves it
+  // (Windows' per-app graphics setting does too, in more steps). A Mac's Chrome takes the page's choice, so there the
+  // integrated GPU is the only one.
+  {
+  const brands = navigator.userAgentData ? navigator.userAgentData.brands.map((brand) => brand.brand) : [];
+  if (navigator.gpu && brands.includes('Chromium') && navigator.userAgentData.platform !== 'macOS') {
+    navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).then((adapter) => {
+      const info = adapter && adapter.info;
+      if (info && info.vendor === 'intel' && !/hpg/.test(info.architecture)) {
+        const notice = document.getElementById('gpu');
+        notice.firstChild.textContent = 'The browser is drawing this page with integrated Intel graphics, which is slow for ' +
+          'this game. If this computer also has a graphics card, open ' +
+          (brands.includes('Microsoft Edge') ? 'edge' : 'chrome') + '://flags/#force-high-performance-gpu, set it to ' +
+          'Enabled and relaunch the browser.';
+        notice.hidden = false;
+      }
+    });
+  }
+  }
 </script>
 {{{ SCRIPT }}}
 </body>
