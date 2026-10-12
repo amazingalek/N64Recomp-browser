@@ -5,22 +5,26 @@ Web support for N64 static recompilations built on [N64Recomp](https://github.co
 and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built with Emscripten into one page that draws
 through WebGPU. It is game-agnostic. It was written for, and is tested with,
 San Francisco Rush 2049: Recompiled, which plays in Chrome at 60
-frames a second with its launcher, menus, sound, keyboard and gamepads, and Banjo-Kazooie: Recompiled
-([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web), branch `web`) plays there too.
+frames a second with its launcher, menus, sound, keyboard and gamepads. Banjo-Kazooie: Recompiled
+([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web), branch `web`) plays there too, and so
+does Majora's Mask in Zelda 64: Recompiled ([amazingalek/Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web),
+branch `web`: upstream's `recomp-frontend` branch, its frames interpolated to the display's rate).
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
 ## The forks
 
-The changes to the upstream projects are commits on a `web` branch of a fork of each, on the commit the projects pin
-upstream. They stay forks: RT64, plume, N64Recomp, N64ModernRuntime and RecompFrontend don't take code written with
-an LLM (their CONTRIBUTING.md), so none of this is offered to them.
+The changes to the upstream projects are commits on a `web` branch of a fork of each, on top of a commit upstream
+(newer upstream commits are merged in, never rebased onto). They stay forks: RT64, plume, N64Recomp, N64ModernRuntime
+and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), so none of this is offered to them.
 
 ```
 fork                                     upstream                 what the web branch adds
-amazingalek/plume-web                    renderbag/plume          a WebGPU backend; any backend run on one thread
+amazingalek/plume-web                    renderbag/plume          a WebGPU backend, the display's rate timed from
+                                                                  animation frames; any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
-                                                                  indexing, background pipeline builds
+                                                                  indexing, background pipeline builds, frames
+                                                                  interpolated to the display's rate
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
                                                                   declares every function the C calls
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
@@ -84,9 +88,15 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
   haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
 - DXC for recompui's shaders is the build machine's, not one built for the target.
+- The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
+  and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
+- Built-in mods (`recomp::mods::register_embedded_mod`) need the live recompiler too, so leave them out with
+  Emscripten. One that fails to load ends in an SDL message box, which calls `alert` from a worker, where there is
+  none, and that exception stops the page.
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
-  are patched to sample RT64's framebuffer on the GPU, so it is off there too).
+  are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
+  Pictograph Box compresses the photo it took on the CPU, so it stays on there.
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
   overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
   never finished and the page hung at boot.
@@ -96,6 +106,7 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 A change to a fork is a commit on its `web` branch, made on top of what is there (never a force-push: recomps and
 tags pin those commits). Then bump `forks.txt` here to the new commit, and to the new rt64-web or
 N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or N64Recomp-web (their submodule pointer
-moves with it). Tag a release once a recomp has run it.
+moves with it). To move a fork to a newer upstream commit, merge that commit into `web` and say in the merge's message
+what upstream brought. Tag a release once a recomp has run it.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.
