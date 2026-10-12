@@ -3,5 +3,5 @@
 # is N64Recomp-web, at the commits those pin. A recomp pins its submodules to these same commits (tools/fetch_forks.sh
 # checks them out here).
 rt64              https://github.com/amazingalek/rt64-web               ada52316b59193665a9e8510700f8947fccb1219
-N64ModernRuntime  https://github.com/amazingalek/N64ModernRuntime-web   a7b406e4b8ff4c3b7ddba1c6833fa3b11f2d2b62
+N64ModernRuntime  https://github.com/amazingalek/N64ModernRuntime-web   af4e99c6ec087edd35e81e7162b5fe0989139558
 RecompFrontend    https://github.com/amazingalek/RecompFrontend-web     fb5dc0858fae1b194f4c951aab6be0ba985d9718

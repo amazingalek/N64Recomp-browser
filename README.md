@@ -9,7 +9,9 @@ frames a second with its launcher, menus, sound, keyboard and gamepads. Banjo-Ka
 ([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web)) plays there too, and so
 does Majora's Mask in Zelda 64: Recompiled ([amazingalek/Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web),
 on upstream's `recomp-frontend` branch, its frames interpolated to the display's rate), and so does Donkey
-Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web)).
+Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web)),
+and so does GoldenEye 007 ([amazingalek/GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web),
+cblock85's GoldenEye64Recomp moved onto RecompFrontend).
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
@@ -94,6 +96,12 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   a hook whose text calls the recomp's C declares it there (Donkey Kong 64's `load_dk64_overlay`, in `us.toml`).
   A patch's call to a libultra function goes to the runtime's `<name>_recomp`, as the game's own calls do
   (N64Recomp-web 9eb59c4; upstream calls `osInitialize(rdram, ctx)`, which reaches ultramodern's `osInitialize(void)`).
+- A game function with a C library name clashes with the library's declaration once `funcs.h` declares it:
+  GoldenEye has its own `strtol`, `strncmp`, `isalpha` and six more. List each in `[patches] renamed` in the game's
+  config and the patches' config, and it becomes `<name>_recomp` in both (N64Recomp-web ec0748e renames the patches'
+  calls to it too). N64Recomp-web also reads a jump table from the section that holds it, where upstream reads it at
+  the function's own ROM offset: GoldenEye keeps them all in a `.rodata` section of their own, and upstream read past
+  the ROM's end.
 - Build the recompiled code with `-mtail-call` (the `add_compile_options` above). The MIPS code leaves a function
   by jumping to another, a tail call, which the C writes as a call and a return. Natively clang makes that a jump; in
   wasm it stays a call, so code that chains them without returning grows the stack until the browser stops the page
@@ -105,7 +113,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
   function the patches call by its name, works on x86 by luck and traps here, and only the link says so (wasm-ld's
   `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
-  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`.
+  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and GoldenEye64Recomp-web `yield_self_1ms` in
+  `recomp_yield_self_1ms`.
 - RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
   `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
   function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
