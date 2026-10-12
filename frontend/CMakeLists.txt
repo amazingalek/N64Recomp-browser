@@ -1,6 +1,7 @@
 # n64recomp_browser_frontend: what a recomp's executable built on RecompFrontend needs to be a page, as link options. Compile
-# everything, libraries too, with -pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0" (add_compile_options;
-# the last keeps xxHash off a NEON path that doesn't compile in C++ there), and make the executable a page with
+# everything, libraries too, with -pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0"
+# (add_compile_options; -mtail-call makes the recompiled code's tail calls return_calls, recomp.h's RECOMP_TAIL_CALL,
+# and the last keeps xxHash off a NEON path that doesn't compile in C++ there), and make the executable a page with
 # n64recomp_browser_frontend_page(<target>) below, which links it with this and copies coi_serviceworker.js beside it. It brings:
 # - threads as pthreads, with main() on one of them (-sPROXY_TO_PTHREAD), so the page's own thread is free for the
 #   WebGPU device (plume_device_thread.h), the file picker and the browser's events,
@@ -18,7 +19,7 @@
 
 add_library(n64recomp_browser_frontend INTERFACE)
 target_link_options(n64recomp_browser_frontend INTERFACE
-    -pthread -fwasm-exceptions -sUSE_SDL=2 -sUSE_FREETYPE=1
+    -pthread -fwasm-exceptions -mtail-call -sUSE_SDL=2 -sUSE_FREETYPE=1
     -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=32 -sINITIAL_MEMORY=1536MB -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB
     -lidbfs.js
     "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$addRunDependency,$removeRunDependency"

@@ -26,8 +26,8 @@ if (NOT EXISTS "${FORKS_DIR}/rt64/CMakeLists.txt")
     message(FATAL_ERROR "FORKS_DIR (${FORKS_DIR}) has no rt64: run tools/fetch_forks.sh first.")
 endif()
 
-add_compile_options(-pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0")
-add_link_options(-pthread -fwasm-exceptions)
+add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
+add_link_options(-pthread -fwasm-exceptions -mtail-call)
 add_compile_definitions(HLSL_CPU __PRFCHWINTRIN_H)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../frontend/build_speed.cmake)
 

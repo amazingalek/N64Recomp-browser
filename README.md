@@ -31,7 +31,8 @@ amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
                                                                   declares every function the C calls; a mod
                                                                   recompiled to C ahead of time; functions a mod
-                                                                  replaces or hooks, redirected at their entry
+                                                                  replaces or hooks, redirected at their entry;
+                                                                  tail calls as wasm tail calls
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
                                                                   without a guard region; built-in mods linked
                                                                   in, their replacements and hooks as redirects
@@ -66,8 +67,8 @@ Point the recomp's `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at
 `forks.txt`, and add this repo as a submodule too. Then, in the recomp's CMakeLists.txt, with Emscripten:
 
 ```cmake
-add_compile_options(-pthread -fwasm-exceptions -msimd128 "-DXXH_HAS_INCLUDE(x)=0")
-add_link_options(-pthread -fwasm-exceptions)
+add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
+add_link_options(-pthread -fwasm-exceptions -mtail-call)
 include(<this repo>/frontend/build_speed.cmake)          # ccache, if it is on PATH
 # ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
 add_subdirectory(<this repo>/frontend ${CMAKE_BINARY_DIR}/web_frontend)
@@ -92,6 +93,13 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   a hook whose text calls the recomp's C declares it there (Donkey Kong 64's `load_dk64_overlay`, in `us.toml`).
   A patch's call to a libultra function goes to the runtime's `<name>_recomp`, as the game's own calls do
   (N64Recomp-web 9eb59c4; upstream calls `osInitialize(rdram, ctx)`, which reaches ultramodern's `osInitialize(void)`).
+- Build the recompiled code with `-mtail-call` (the `add_compile_options` above). The MIPS code leaves a function
+  by jumping to another, a tail call, which the C writes as a call and a return. Natively clang makes that a jump; in
+  wasm it stays a call, so code that chains them without returning grows the stack until the browser stops the page
+  ("Maximum call stack size exceeded"): Conker's Bad Fur Day did, minutes in. With the tail call feature,
+  N64Recomp-web's C forces each one to a `return_call` (`RECOMP_TAIL_CALL` in `recomp.h`, `musttail`); clang won't
+  make one by itself, past the early return `RECOMP_FUNC_ENTRY` puts in every function. Without the flag the calls
+  stay plain ones, as before.
 - A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
   `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
   function the patches call by its name, works on x86 by luck and traps here, and only the link says so (wasm-ld's
