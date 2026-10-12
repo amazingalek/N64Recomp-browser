@@ -166,8 +166,9 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   every browser and on every adapter. The game then starts, and the rest are built behind it one at a time, in the
   list's order but any the game asks for first. In Chrome 154 on an RTX 2070 (headless, the host 56-100% busy with
   other sessions) Rush 2049 waits 6.5-7 s for 45 of its 105 (the title and the first attract race), against 12-17 s
-  for all of them, and GoldenEye 10 s for 34 of its 340 (the intro and the file select), against 84-87 s. Chrome's
-  pipeline cache keeps them for no later visit. Firefox 157 builds a pipeline in line with everything else, so there
+  for all of them, and GoldenEye 10 s for 34 of its 340 (the intro and the file select), against 84-87 s. Chrome keeps
+  built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's, about 4 MB of
+  it, are then all built in 0.6-0.7 s, and GoldenEye's, about 16 MB, don't fit and take as long every time. Firefox 157 builds a pipeline in line with everything else, so there
   the page waits for the whole list (29-30 s for Rush 2049's), and a shader the list missed draws with the ubershader;
   elsewhere it is built in the background as before. Rush 2049's list is `src/rt64_shaders.txt` in its repo.
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
