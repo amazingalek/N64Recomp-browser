@@ -2,7 +2,9 @@
 <!-- The page of a recomp built with n64recomp_browser_frontend (CMakeLists.txt): a canvas filling the window, which SDL's window
      is and RT64 draws on (SDL follows its CSS size), and a line saying what is loading or what went wrong. The program
      sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't.
-     The #gpu notice says how to move the browser off integrated Intel graphics (below). -->
+     The #gpu notice says how to move the browser off integrated Intel graphics (below). #shaders is the progress of the
+     shaders RT64 builds before the game starts (RasterShaderCache::startPrebuild(), a game's RT64_PREBUILT_SHADER_LIST):
+     from the game's first frame, which stays on the screen until they are built. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -15,7 +17,11 @@
             font: 18px system-ui, sans-serif; white-space: pre-line; pointer-events: none; }
   #gpu { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); max-width: 46em; padding: 8px 32px 8px 12px;
          background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif; }
-  #gpu[hidden] { display: none; }
+  #gpu[hidden], #shaders[hidden] { display: none; }
+  #shaders { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: 22em; padding: 10px 14px;
+             background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif;
+             pointer-events: none; }
+  #shaders progress { display: block; width: 100%; margin-top: 6px; accent-color: #6af; }
   #gpu button { position: absolute; right: 6px; top: 4px; border: 0; background: none; color: #aaa; font-size: 18px;
                 cursor: pointer; }
 </style>
@@ -24,6 +30,7 @@
 <body>
 <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 <div id="status">Loading…</div>
+<div id="shaders" hidden><span></span><progress value="0"></progress></div>
 <div id="gpu" hidden><span></span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
   const statusLine = document.getElementById('status');
@@ -39,6 +46,13 @@
     setStatus: (text) => { if (!statusLine.style.color) statusLine.textContent = text; },
     onRuntimeInitialized: () => { statusLine.textContent = ''; },
     onAbort: (what) => fail('Stopped: ' + what),
+    rt64ShaderProgress: (done, count) => {
+      const box = document.getElementById('shaders');
+      box.hidden = done >= count;
+      box.firstChild.textContent = 'Preparing graphics: ' + done + ' of ' + count + ' shaders. The game starts when they are ready.';
+      box.lastChild.max = count;
+      box.lastChild.value = done;
+    },
   };
   // Chrome and Edge on Windows and Linux give a page the GPU the browser itself draws with, whatever it asks for
   // (crbug.com/369219127), and on a laptop with a graphics card too that is usually the integrated one: the game then

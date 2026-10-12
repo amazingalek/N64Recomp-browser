@@ -1,0 +1,4 @@
+# Two shader descriptions for RT64_PREBUILT_SHADER_LIST, so that CI specializes and packs prebuilt shaders as a game's
+# page does (a textured, lit 2-cycle draw and a variant): other mode L and H, color combiner L and H, flags, in hex.
+00504240 00800cef fc119623 ff2fffff 0003540b
+00504240 00800cef fc11fe23 fffff3f9 0003540b

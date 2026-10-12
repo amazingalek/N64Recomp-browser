@@ -32,6 +32,8 @@ add_compile_definitions(HLSL_CPU __PRFCHWINTRIN_H)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../frontend/build_speed.cmake)
 
 set(RT64_STATIC TRUE)
+# A game's list of shaders to prebuild (shaders.txt is two), so the build specializes them as a page's does.
+set(RT64_PREBUILT_SHADER_LIST ${CMAKE_CURRENT_SOURCE_DIR}/shaders.txt)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(${FORKS_DIR}/rt64 ${CMAKE_BINARY_DIR}/rt64)
 target_include_directories(rt64 PRIVATE ${CMAKE_BINARY_DIR}/rt64/src)
