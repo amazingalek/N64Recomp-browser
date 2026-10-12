@@ -21,7 +21,8 @@ fork                                     upstream                 what the web b
 amazingalek/plume-web                    renderbag/plume          a WebGPU backend; any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds
-amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm
+amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
+                                                                  declares every function the C calls
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
                                                                   without a guard region
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
@@ -33,7 +34,7 @@ amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the W
 rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` at hlslpp-web, and
 N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
-of the forks is the upstream one. Each commit's message says what it does and why.
+of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h`, which change nothing there. Each commit's message says what it does and why.
 
 ## This repo
 
@@ -68,8 +69,10 @@ recompiler emits machine code, which a page can't load.
 
 What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt do each):
 
-- wasm-ld turns a call whose signature doesn't match the callee into a trap, and the recompiler's C calls a few
-  functions it never declares: declare them and build the recompiled code with `-Werror=implicit-function-declaration`.
+- Generate the recompiled code with N64Recomp-web (N64ModernRuntime-web's `N64Recomp`) and build it with
+  `-Werror=implicit-function-declaration`. wasm-ld turns a call whose signature doesn't match the callee into a trap,
+  and upstream's `funcs.h` leaves out some of what the C calls (the runtime's libultra replacements, ignored functions,
+  `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp.
 - RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
   `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
   function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
