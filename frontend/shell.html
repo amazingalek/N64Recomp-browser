@@ -4,7 +4,8 @@
      sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't.
      The #gpu notice says how to move the browser off integrated Intel graphics (below). #shaders is the progress of the
      shaders RT64 builds before the game starts (RasterShaderCache::startPrebuild(), a game's RT64_PREBUILT_SHADER_LIST):
-     from the game's first frame, which stays on the screen until they are built. -->
+     from the game's first frame, which stays on the screen until they are built. The browser keeps them, so a later
+     visit builds them in under a second, and the panel shows only if they take longer than one. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -18,10 +19,15 @@
   #gpu { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); max-width: 46em; padding: 8px 32px 8px 12px;
          background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif; }
   #gpu[hidden], #shaders[hidden] { display: none; }
-  #shaders { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: 22em; padding: 10px 14px;
-             background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif;
-             pointer-events: none; }
-  #shaders progress { display: block; width: 100%; margin-top: 6px; accent-color: #6af; }
+  #shaders { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000b; }
+  #shaders > div { width: min(30em, 86vw); padding: 20px 24px; background: #1b2230; color: #ddd; border-radius: 10px;
+                   font: 15px/1.45 system-ui, sans-serif; box-shadow: 0 8px 40px #000; }
+  #shaders h2 { margin: 0; font-size: 20px; color: #fff; }
+  #shaders .once { margin: 2px 0 14px; color: #8bf; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+  #shaders progress { display: block; width: 100%; height: 14px; accent-color: #6af; }
+  #shaders .figures { display: flex; justify-content: space-between; margin: 6px 0 14px; color: #aaa;
+                      font-size: 13px; font-variant-numeric: tabular-nums; }
+  #shaders p { margin: 0; color: #bbb; font-size: 13px; }
   #gpu button { position: absolute; right: 6px; top: 4px; border: 0; background: none; color: #aaa; font-size: 18px;
                 cursor: pointer; }
 </style>
@@ -30,7 +36,15 @@
 <body>
 <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 <div id="status">Loading…</div>
-<div id="shaders" hidden><span></span><progress value="0"></progress></div>
+<div id="shaders" hidden><div>
+  <h2>Preparing graphics</h2>
+  <div class="once">One-time setup</div>
+  <progress max="1"></progress>
+  <div class="figures"><span></span><span></span></div>
+  <p>Your browser is building the shaders the game draws with, so that no menu or race waits for one later. It keeps
+    them, so next time the game starts straight away. It happens again only after an update to the game, the browser
+    or the graphics driver, or if the browser's cache is cleared.</p>
+</div></div>
 <div id="gpu" hidden><span></span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
   const statusLine = document.getElementById('status');
@@ -41,18 +55,40 @@
   } else if (!navigator.gpu) {
     fail('This browser has no WebGPU. It runs in a recent Chrome or Edge.');
   }
+  // RT64 reports each shader built, with the fraction done by size, the ones in flight counted half done
+  // (rt64ShaderProgress). The bar moves while none has finished yet, and the time left is the time so far scaled by
+  // what is left, once there is enough to go on.
+  let shaders = null;
+  const shaderProgress = (done, count, fraction) => {
+    const box = document.getElementById('shaders');
+    if (done >= count) {
+      if (shaders) { clearTimeout(shaders.show); clearInterval(shaders.tick); }
+      box.hidden = true;
+      return;
+    }
+    if (!shaders) {
+      shaders = { start: performance.now(), show: setTimeout(() => { box.hidden = false; }, 1000),
+                  tick: setInterval(() => shaders.render(), 500) };
+      shaders.render = () => {
+        const [figure, time] = box.querySelectorAll('.figures span');
+        const bar = box.querySelector('progress');
+        const seconds = (performance.now() - shaders.start) / 1000;
+        if (shaders.fraction > 0) bar.value = shaders.fraction; else bar.removeAttribute('value');
+        figure.textContent = Math.floor(shaders.fraction * 100) + '%  ·  ' + shaders.done + ' of ' + shaders.count + ' shaders';
+        time.textContent = (shaders.fraction >= 0.1) ?
+          'about ' + Math.max(1, Math.round(seconds * (1 - shaders.fraction) / shaders.fraction)) + ' s left' :
+          Math.floor(seconds) + ' s';
+      };
+    }
+    Object.assign(shaders, { done, count, fraction });
+    shaders.render();
+  };
   var Module = {
     canvas: document.getElementById('canvas'),
     setStatus: (text) => { if (!statusLine.style.color) statusLine.textContent = text; },
     onRuntimeInitialized: () => { statusLine.textContent = ''; },
     onAbort: (what) => fail('Stopped: ' + what),
-    rt64ShaderProgress: (done, count) => {
-      const box = document.getElementById('shaders');
-      box.hidden = done >= count;
-      box.firstChild.textContent = 'Preparing graphics: ' + done + ' of ' + count + ' shaders. The game starts when they are ready.';
-      box.lastChild.max = count;
-      box.lastChild.value = done;
-    },
+    rt64ShaderProgress: (done, count, fraction) => shaderProgress(done, count, fraction),
   };
   // Chrome and Edge on Windows and Linux give a page the GPU the browser itself draws with, whatever it asks for
   // (crbug.com/369219127), and on a laptop with a graphics card too that is usually the integrated one: the game then
