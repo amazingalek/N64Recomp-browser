@@ -60,7 +60,13 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   Firefox's frames came every 31 ms at the median, but 92 in two minutes took over 50 ms (Chrome's 3), its p99 62 ms
   against 32, with the Intel chip 79-89% busy against Chrome's 40-61%. On the RTX 2070 it reads
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
-  ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it.
+  ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it. Banjo runs at 20-30
+  frames a second, interpolated to the display's rate, and a GPU that falls behind drops whole presents: some game
+  frames were never shown and the rest shown one, two or three times, in both browsers. Since rt64-web e8e162e a page
+  that drops presents gives every game frame the same number of them instead (one, on a 60 Hz display, until the GPU
+  keeps up again), and plume-web 01a7bac stops the display's rate reading lower under load (it read 20-39 on a
+  60 Hz display). With a heavy pass added to every present to make the RTX 2070 slow, 4-25 game frames in every 5 s
+  were never shown, and with it every frame was shown once, in Firefox and in Chrome. Not yet on its page.
 - **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
   walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which made
   a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Since
@@ -99,7 +105,8 @@ amazingalek/plume-web                    renderbag/plume          a WebGPU backe
                                                                   any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
-                                                                  interpolated to the display's rate, a game's
+                                                                  interpolated to the display's rate and paced
+                                                                  evenly when the GPU falls behind, a game's
                                                                   shaders specialized at build time
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
                                                                   declares every function the C calls; a mod
