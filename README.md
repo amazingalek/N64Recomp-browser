@@ -30,8 +30,9 @@ sessions that ported each game saw in headless Chrome on the RTX 2070 is below.
 - **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
   Firefox on the Intel chip crawls.
 - **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
-  credits, mission select, Dam on the keyboard, sound. Slow everywhere played by hand. Every level adds shaders, and
-  its prebuilt list stops at Bunker.
+  credits, mission select, Dam on the keyboard, sound. Slow everywhere played by hand (before its shaders were built
+  a level at a time). Every level adds shaders: its prebuilt list, recorded by a script, has the menus and every
+  level's start, and the page builds each level's when the level first draws (2026-10-13; not yet played by hand).
 - **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
   interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
   pause menu.
@@ -185,33 +186,42 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
   Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
   framebuffers too, and it is left on there (not tried off).
-- Give RT64 a list of the game's shaders, so the page builds them before the game starts. This is part of every
-  port, not an optional extra: without it the page is unplayable on most machines. Until a shader is built RT64 draws
-  with its ubershader, which costs several times as much a pixel: on a laptop's Intel graphics in Chrome that was a
-  frame a second for minutes, and Firefox, which builds a pipeline in line with everything else, drew everything with
-  it. Open the page with `?record-shaders` and play everything (menus, every mode, split screen): the console prints
-  an `rt64 shader: <five hex words>` line for each new one, in the order the game asks for them (the page prebuilds
-  none then). Put those words in a file, a line each in that order (a line starting with `#` is a comment), with a
-  line reading `background` after what the game's first screens draw, and set `RT64_PREBUILT_SHADER_LIST` to it
-  before adding rt64. Each one is specialized at build time and run through `spirv-opt -O` (rt64-web's
-  CMakeLists.txt says how), with its pixel
-  shader both with dual-source blending and without, and the page shows "Preparing graphics", a one-time setup, with
-  a bar and the time left from the game's first frame until those above `background` are built (all of them without
-  the line), in every browser and on every adapter. They are built largest first, as many at once as the computer
-  has cores. The game then starts, and the rest are built behind it one at a time, in the list's order but any the
-  game asks for first. In Chrome 154 on an RTX 2070 (headless, the host 56-100% busy with other sessions) Rush 2049
-  waits 6.5-7 s for 45 of its 105 (the title and the first attract race), and 6.6-7.2 s for all of them on 12 cores,
-  largest first (12-17 s before), and GoldenEye 10 s for 34 of its 340 (the intro and the file select), against 84-87
-  s. Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush
-  2049's, about 4 MB of it, are then all built in 0.4-0.7 s and the panel never shows, and GoldenEye's, about 16 MB,
-  don't fit and take as long every time, so keep what the game waits for well inside it. Those figures are from
-  before `spirv-opt`, which took the whole list from 16.1-17.7 s to 10.0-10.8 s for Rush 2049 and from 87-91 s to
-  35-38 s for GoldenEye (6 at a time, before and after interleaved, the host 56-100% busy), GoldenEye's later visits
-  from 55-64 s to 21-22 s, and their WGSL from 17.5 MB to 5.9 MB and from 103 MB to 16 MB: many descriptions that
-  differ only in what the shaders ignore come out the same and are built once. Firefox 157 builds a
-  pipeline in line with everything else, so there
-  the page waits for the whole list (29-30 s for Rush 2049's), and a shader the list missed draws with the ubershader;
-  elsewhere it is built in the background as before. Rush 2049's list is `src/rt64_shaders.txt` in its repo.
+- Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
+  This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
+  shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
+  graphics in Chrome that was a frame a second for minutes, and Firefox, which builds a pipeline in line with
+  everything else, drew everything with it. The list is a file of shader descriptions, five hex words a line (a line
+  starting with `#` is a comment), in sections: those above the first line reading `section <name>` are built before
+  the game starts, and each section after it, a level or a part of the game, when the game first draws with its
+  shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
+  the section is built: when a frame asks for at least 4 of a section's shaders that aren't built, the game waits for
+  the whole section. A description can be in several sections. One the list missed, or a few at a time, is built
+  behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
+  one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
+  later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
+  one visit, not every one. Set
+  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
+  `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
+  and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
+  come out as the same shaders and the same pipeline state share one. A list from before sections had a
+  line reading `background`, which now starts a section of that name.
+- Record that list by code, not by playing: `tools/record_shaders.mjs` (its header says how) serves a build, opens it
+  in headless Chrome with `?record-shaders`, under which the page prebuilds nothing and prints an `rt64 shader:` line
+  for each description the game asks for, and follows a plan of the game's own, a JSON file of steps that reach each
+  level: keys, clicks, waits, and JavaScript that writes the game's memory. Each section is recorded from a fresh load
+  of the page, so it has everything its level draws, and what the boot draws goes above the first section. A plan
+  usually needs a small patch in the game that starts a level or shows a menu when the script asks, called once a
+  frame: GoldenEye's is `patches/shader_survey.c`, `tools/shader_plan.json` and `tools/record_shaders.sh` in
+  GoldenEye64Recomp-web. Why run the game at all: a shader is the RDP's state at a draw, the combiner and render
+  mode, and the game's code sets much of it as it draws, so no table in the ROM lists them. Record each level's start,
+  not the whole game: what a level draws later is mostly what its start drew, and the rest is built as it comes.
+  Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
+  105, about 4 MB, are then all built in 0.4-0.7 s and the panel never shows; a game whose list doesn't fit waits on
+  every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless,
+  the host 56-100% busy with other sessions): Rush 2049's list, which has no sections, took 6.3-7.2 s cold on 12
+  cores; `spirv-opt` took it from 16.1-17.7 s to 10.0-10.8 s 6 at a time, and its WGSL from 17.5 MB to 5.9 MB, since
+  many descriptions that differ only in what the shaders ignore come out the same. Rush 2049's list is
+  `src/rt64_shaders.txt` in its repo.
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
   overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
   never finished and the page hung at boot.

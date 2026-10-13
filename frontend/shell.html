@@ -38,12 +38,12 @@
 <div id="status">Loading…</div>
 <div id="shaders" hidden><div>
   <h2>Preparing graphics</h2>
-  <div class="once">One-time setup</div>
+  <div class="once">Building shaders</div>
   <progress max="1"></progress>
   <div class="figures"><span></span><span></span></div>
-  <p>Your browser is building the shaders the game draws with, so that no menu or race waits for one later. It keeps
-    them, so next time the game starts straight away. It happens again only after an update to the game, the browser
-    or the graphics driver, or if the browser's cache is cleared.</p>
+  <p>Your browser is building the shaders the game draws with here, so that nothing stutters while you play. It keeps
+    what it has room for, so next time this is quicker or skipped. It happens again after an update to the game, the
+    browser or the graphics driver, or if the browser's cache is cleared.</p>
 </div></div>
 <div id="gpu" hidden><span></span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
@@ -56,14 +56,17 @@
     fail('This browser has no WebGPU. It runs in a recent Chrome or Edge.');
   }
   // RT64 reports each shader built, with the fraction done by size, the ones in flight counted half done
-  // (rt64ShaderProgress). The bar moves while none has finished yet, and the time left is the time so far scaled by
-  // what is left, once there is enough to go on.
+  // (rt64ShaderProgress), once before the game starts and again whenever it goes somewhere new, a level whose shaders
+  // aren't built yet. The panel shows after a second of it, so a round the browser's cache makes quick shows nothing.
+  // The bar moves while none has finished yet, and the time left is the time so far scaled by what is left, once
+  // there is enough to go on.
   let shaders = null;
   const shaderProgress = (done, count, fraction) => {
     const box = document.getElementById('shaders');
     if (done >= count) {
       if (shaders) { clearTimeout(shaders.show); clearInterval(shaders.tick); }
       box.hidden = true;
+      shaders = null;
       return;
     }
     if (!shaders) {
@@ -83,12 +86,34 @@
     Object.assign(shaders, { done, count, fraction });
     shaders.render();
   };
+  // The shaders the game asked for that its prebuilt list missed, which RT64 builds with their section on the next visit
+  // (rt64-web's RasterShaderCache::learnPrebuild): an array of [section, five shader words] for this page and this
+  // list, kept in localStorage, the lists before it dropped.
+  const learnedKey = (list) => 'rt64-learned-shaders ' + location.pathname + ' ' + list;
+  const learnedShaders = (list) => {
+    try { return JSON.parse(localStorage.getItem(learnedKey(list)) ?? '[]'); } catch { return []; }
+  };
+  const shaderMissed = (list, entry) => {
+    const learned = learnedShaders(list);
+    if ((learned.length >= 1000) || learned.some((e) => e.join() === entry.join())) return;
+    learned.push(entry);
+    try {
+      const prefix = learnedKey('');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key.startsWith(prefix) && (key !== learnedKey(list))) localStorage.removeItem(key);
+      }
+      localStorage.setItem(learnedKey(list), JSON.stringify(learned));
+    } catch {}
+  };
   var Module = {
     canvas: document.getElementById('canvas'),
     setStatus: (text) => { if (!statusLine.style.color) statusLine.textContent = text; },
     onRuntimeInitialized: () => { statusLine.textContent = ''; },
     onAbort: (what) => fail('Stopped: ' + what),
     rt64ShaderProgress: (done, count, fraction) => shaderProgress(done, count, fraction),
+    rt64LearnedShaders: learnedShaders,
+    rt64ShaderMissed: shaderMissed,
   };
   // Chrome and Edge on Windows and Linux give a page the GPU the browser itself draws with, whatever it asks for
   // (crbug.com/369219127), and on a laptop with a graphics card too that is usually the integrated one: the game then
