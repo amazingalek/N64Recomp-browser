@@ -16,9 +16,9 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 |---|---|---|---|---|---|---|
 | San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | not retested |
 | GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59 fps* | 57-59 fps*, 23 s still at Dam | smooth | not retested (crawled before rt64-web d070e5c) |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 59 fps* | not tested | smooth | not tested |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 59 fps* | 59 fps* | smooth | not tested |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 59 fps* | 55-59 fps* | smooth | almost smooth |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 48 fps* (bar menus 32-54) | not tested | smooth | not tested |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 48 fps* (bar menus 32-54) | doesn't start* | smooth | not tested |
 | Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 59 fps* | 55-60 fps* | smooth | not tested |
 
 Played by hand from the pages on 2026-10-13: the RTX 2070 on a Windows 10 desktop, the Intel UHD the integrated
@@ -47,17 +47,24 @@ been played by hand on the current forks.
   the RTX 2070 the game stood still 23 s for Dam's 55 on its first visit.
 - **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
   interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
-  pause menu. Its 561 pipelines are all built before the game (16 s cold, 11 s on a later visit, headless Chrome).
+  pause menu. Its shader list is in sections, an area each (2026-10-13): the 39 pipelines of the boot are built
+  before the game, 2.4 s cold and 0.1 s on a later visit in headless Chrome (all 561 took 16 s and 11 s before), and
+  4.5 s in Firefox, which keeps no built pipelines between visits; Clock Town's section 1.6 s in Chrome, 14 s in Firefox.
 - **Banjo-Kazooie**: Banjo-Kazooie: Recompiled. Headless: boots, draws and plays, the intro's sound. On the Intel
   chip smooth in Chrome and almost smooth in Firefox, which needs more work (2026-10-13). On the RTX 2070 it reads
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
   ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it.
 - **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
   walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which makes
-  a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second.
+  a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Its
+  shader list is in sections, a chapter each (2026-10-13): the boot's 75 pipelines 3.0 s cold and 0.2 s later in
+  headless Chrome (7.8 and 3.2 s as one list). In Firefox it never starts: Firefox refuses the WebGPU call that takes
+  dynamic offsets as a view of the wasm heap, which Conker grows past 2 GB.
 - **Donkey Kong 64**: Donkey Kong 64: Recompiled. Headless: the DK Rap, a new game through the opening cutscenes, DK
-  walking in his house, the pause menu, sound. Its 245 pipelines are all built before the game (10 s cold in
-  headless Chrome, 26 s in Firefox, whose GPU process builds them one at a time).
+  walking in his house, the pause menu, sound. Its shader list is in sections, a world each (2026-10-13): the boot,
+  115 pipelines because every visit draws the whole DK Rap, 5.0 s cold and 0.4 s later in headless Chrome (all 245
+  took 10 and 5 s before), 15-17 s in Firefox, whose GPU process builds them one at a time and keeps none between
+  visits (26 s before); Frantic Factory's 55 about 1 s in Chrome, 3.6 s in Firefox.
 
 The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
 here are.
