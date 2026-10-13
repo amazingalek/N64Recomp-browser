@@ -34,7 +34,10 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   credits, mission select, Dam on the keyboard, sound. Every level adds shaders: its prebuilt list, recorded by a
   script, has the menus and every level's start, and the page builds each level's when the level first draws. Smooth
   in Chrome on the Intel chip, crawling in Firefox there (2026-10-13). Render to RAM stays on, and the game reads a
-  frame back 3-33 times a second (up to 120 in some scenes), each read waiting for the GPU. Firefox's GPU process
+  frame back 3-33 times a second (up to 120 in some scenes), each read waiting for the GPU. Since rt64-web 73e9ca0 a
+  list's last copy lands when the next list starts, and the list doesn't wait for it: in Dam 3.8-5.2 ms a list against
+  8.0-9.7 with the exact copy, the lamps' glare still drawn (headless Chrome 155, RTX 2070, 2026-10-13); not yet
+  played that way on the Intel chip. Firefox's GPU process
   looks for finished GPU work only after a submission or every 100 ms, so on a slow GPU a readback, or a present held
   while 2 frames are in flight, waited for that timer. Since rt64-web d070e5c (plume-web 4f0a97e) a page submits
   nothing once a millisecond while one waits. With a heavy pass added to every present to make the RTX 2070 slow,
@@ -59,8 +62,10 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
   ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it.
 - **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
-  walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which makes
-  a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Its
+  walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which made
+  a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Since
+  rt64-web 73e9ca0 the page copies a frame into RDRAM a list late, and the camera steps aside from walls the same way:
+  in Windy 10.7-11.8 ms a list against 14.8-16.4 with the exact copy (headless Chrome 155, a busy host). Its
   shader list is in sections, a chapter each (2026-10-13): the boot's 75 pipelines 3.0 s cold and 0.2 s later in
   headless Chrome (7.8 and 3.2 s as one list). Firefox refuses any view of more than 2 GB as a WebGPU
   argument, and emdawnwebgpu passed setBindGroup's dynamic offsets as the whole wasm heap, which Conker grows past
@@ -223,8 +228,9 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - If the game needs render to RAM but can take a frame one display list old, call
   `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
   lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
-  of a list waits: one that a later part of the same list reads is still made in place. Conker's Bad Fur Day in
-  headless Chrome (Windy, render to RAM on): 10.7-11.8 ms a list against 14.8-16.4 ms with the exact copy. It is
+  of a list is late: one that a later part of the same list reads is still made in place. In headless Chrome, render
+  to RAM on: Conker's Bad Fur Day in Windy 10.7-11.8 ms a list against 14.8-16.4 ms with the exact copy, GoldenEye in
+  Dam 3.8-5.2 ms against 8.0-9.7. It is
   wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
   its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
   A framebuffer the CPU writes to before its copy lands keeps what the CPU wrote, and the console says so once.
