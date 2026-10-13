@@ -18,7 +18,7 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 | GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | not retested (crawled before v0.21.0) |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | not tested |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth (1 frame in 15 over 50 ms) |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | doesn't start |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | not tested |
 | Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | not tested |
 
 How each page plays on the integrated graphics of a Windows laptop (Intel UHD, Tiger Lake), by hand or in a scripted
@@ -62,8 +62,12 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which makes
   a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Its
   shader list is in sections, a chapter each (2026-10-13): the boot's 75 pipelines 3.0 s cold and 0.2 s later in
-  headless Chrome (7.8 and 3.2 s as one list). In Firefox it never starts: Firefox refuses the WebGPU call that takes
-  dynamic offsets as a view of the wasm heap, which Conker grows past 2 GB.
+  headless Chrome (7.8 and 3.2 s as one list). Firefox refuses any view of more than 2 GB as a WebGPU
+  argument, and emdawnwebgpu passed setBindGroup's dynamic offsets as the whole wasm heap, which Conker grows past
+  that, so until rt64-web c3d781a (plume-web 94a4795, which copies them out) the page never started there. On the RTX
+  2070 in Firefox 157 the boot's section took 12.4 s and Windy's 14.7, then the bar drew 55 frames a second and
+  Windy 57 (Chrome 154 headless: 3.1 and 3.8 s, 59 and 59; 2026-10-13, a busy host). Not yet run on the Intel chip
+  in Firefox.
 - **Donkey Kong 64**: Donkey Kong 64: Recompiled. Headless: the DK Rap, a new game through the opening cutscenes, DK
   walking in his house, the pause menu, sound. Its shader list is in sections, a world each (2026-10-13): the boot,
   115 pipelines because every visit draws the whole DK Rap, 5.0 s cold and 0.4 s later in headless Chrome (all 245
