@@ -198,7 +198,9 @@ for (const section of sections) {
 fs.writeFileSync(outFile, lines.join('\n') + '\n');
 log(`${outFile}: ${all.size} shaders, ${boot.length} in section 0 and ${sections.length} sections`);
 
-await send('Browser.close');
+// Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
+const exited = new Promise((resolve) => { browser.on('exit', resolve); setTimeout(resolve, 10000); });
+send('Browser.close');
 server.close();
-await new Promise((resolve) => { browser.on('exit', resolve); setTimeout(resolve, 10000); });
+await exited;
 process.exit(0);

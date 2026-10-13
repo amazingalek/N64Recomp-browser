@@ -209,7 +209,7 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
   graphics in Chrome that is a frame a second for minutes, and Firefox, which builds a pipeline in line with
   everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
-  starting with `#` is a comment), in sections: those above the first line reading `section <name>` are built before
+  starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are built before
   the game starts, and each section after it, a level or a part of the game, when the game first draws with its
   shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
   the section is built: when a frame asks for at least 4 of a section's shaders that aren't built, the game waits for
