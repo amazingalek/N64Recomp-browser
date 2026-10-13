@@ -15,7 +15,7 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 | Game | Repo | Page | RTX 2070, Chrome | RTX 2070, Firefox | Intel UHD, Chrome | Intel UHD, Firefox |
 |---|---|---|---|---|---|---|
 | San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | not retested |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59 fps* | 57-59 fps*, 23 s still at Dam | smooth | crawls, before rt64-web d070e5c |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59 fps* | 57-59 fps*, 23 s still at Dam | smooth | not retested (crawled before rt64-web d070e5c) |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 59 fps* | not tested | smooth | not tested |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 59 fps* | 55-59 fps* | smooth | almost smooth |
 | Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 48 fps* (bar menus 32-54) | not tested | smooth | not tested |
@@ -35,23 +35,23 @@ been played by hand on the current forks.
 - **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
   credits, mission select, Dam on the keyboard, sound. Every level adds shaders: its prebuilt list, recorded by a
   script, has the menus and every level's start, and the page builds each level's when the level first draws. Smooth
-  in Chrome on the Intel chip, crawling in Firefox there (2026-10-13). Render to RAM stays on, and the game reads
-  a frame back 3-33 times a second (up to 120 in some scenes), each read waiting for the GPU. Firefox's GPU process
-  looks for finished GPU work only after a submission or every 100 ms, so on a slow GPU a readback, or a present
-  held while 2 frames are in flight, waited for that timer. Since rt64-web d070e5c (plume-web 4f0a97e) a page
-  submits nothing once a millisecond while one waits. With a heavy pass added to every present to make the RTX 2070
-  slow, Firefox went from 33-37 frames a second to 42-45 in GoldenEye, and from ~17 to 20-26 in Rush 2049 with
-  render to RAM forced on, its queue 25 ms behind instead of 45. Not yet played that way on the laptop. The boot
-  section misses about 14 of the intro's shaders, and Firefox draws those with the ubershader on a first visit
-  (about a quarter of the intro's draws), then builds them with the rest on the next. Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on the RTX 2070 the
-  game stood still 23 s for Dam's 55 on its first visit.
+  in Chrome on the Intel chip, crawling in Firefox there (2026-10-13). Render to RAM stays on, and the game reads a
+  frame back 3-33 times a second (up to 120 in some scenes), each read waiting for the GPU. Firefox's GPU process
+  looks for finished GPU work only after a submission or every 100 ms, so on a slow GPU a readback, or a present held
+  while 2 frames are in flight, waited for that timer. Since rt64-web d070e5c (plume-web 4f0a97e) a page submits
+  nothing once a millisecond while one waits. With a heavy pass added to every present to make the RTX 2070 slow,
+  Firefox went from 33-37 frames a second to 42-45 in GoldenEye, and from ~17 to 20-26 in Rush 2049 with render to RAM
+  forced on, its queue 25 ms behind instead of 45. Its page has it since 2026-10-13 (v0.21.0), not yet played that way
+  on the laptop. The boot section holds the intro and the cast credits, so a first visit builds none of their shaders
+  behind the game. Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on
+  the RTX 2070 the game stood still 23 s for Dam's 55 on its first visit.
 - **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
   interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
   pause menu. Its 561 pipelines are all built before the game (16 s cold, 11 s on a later visit, headless Chrome).
 - **Banjo-Kazooie**: Banjo-Kazooie: Recompiled. Headless: boots, draws and plays, the intro's sound. On the Intel
   chip smooth in Chrome and almost smooth in Firefox, which needs more work (2026-10-13). On the RTX 2070 it reads
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
-  ~600 draws a frame.
+  ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it.
 - **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
   walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which makes
   a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second.
