@@ -16,7 +16,7 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 
 | Game | Repo | Page | RTX 2070, Chrome | RTX 2070, Firefox | Intel UHD, Chrome | Intel UHD, Firefox |
 |---|---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | ~1 fps |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | ~1 fps (before the frame cap) |
 | GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | ~10 fps | ~10 fps | ~1 fps | ~10 fps |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | not tested | not tested | not tested | not tested |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | not tested | not tested | not tested | not tested |
@@ -28,7 +28,9 @@ graphics of a Windows laptop (Tiger Lake). "Not tested" means nobody has played 
 sessions that ported each game saw in headless Chrome on the RTX 2070 is below.
 
 - **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
-  Firefox on the Intel chip crawls.
+  Firefox on the Intel chip crawled: it takes every frame a page presents, so the queue grew seconds behind a GPU
+  that couldn't keep up. Since rt64-web b8bdd0d (plume-web 0ddac9b) a page keeps at most 2 frames in flight and
+  skips presents when the GPU falls behind, as Chrome makes it; not yet played on the laptop since (2026-10-13).
 - **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
   credits, mission select, Dam on the keyboard, sound. Slow everywhere played by hand (before its shaders were built
   a level at a time). Every level adds shaders: its prebuilt list, recorded by a script, has the menus and every
@@ -59,7 +61,8 @@ and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), 
 ```
 fork                                     upstream                 what the fork adds
 amazingalek/plume-web                    renderbag/plume          a WebGPU backend, the display's rate timed from
-                                                                  animation frames; any backend run on one thread
+                                                                  animation frames, at most 2 frames in flight;
+                                                                  any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
                                                                   interpolated to the display's rate, a game's
@@ -81,7 +84,8 @@ amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the W
 rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` at hlslpp-web, and
 N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
-of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h`, which change nothing there. Each commit's message says what it does and why.
+of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
+`RenderSwapChain::isWaitReady()` (always true but on WebGPU), which change nothing there. Each commit's message says what it does and why.
 
 ## This repo
 
