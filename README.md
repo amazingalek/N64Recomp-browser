@@ -94,8 +94,8 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` before the rename, which still works)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, sound
-  played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice when the browser draws with
-  integrated Intel graphics, and `coi_serviceworker.js`.
+  played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
+  or Edge, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
 - `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), and `publish_page.sh` puts
   a recomp's built page on its repo's GitHub Pages, as the only commit on an orphan `gh-pages` branch (its header says

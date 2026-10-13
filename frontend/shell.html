@@ -2,7 +2,7 @@
 <!-- The page of a recomp built with n64recomp_browser_frontend (CMakeLists.txt): a canvas filling the window, which SDL's window
      is and RT64 draws on (SDL follows its CSS size), and a line saying what is loading or what went wrong. The program
      sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't.
-     The #gpu notice says how to move the browser off integrated Intel graphics (below). #shaders is the progress of the
+     The #gpu notice recommends Chrome or Edge in Firefox (below). #shaders is the progress of the
      shaders RT64 builds before the game starts (RasterShaderCache::startPrebuild(), a game's RT64_PREBUILT_SHADER_LIST):
      from the game's first frame, which stays on the screen until they are built. The browser keeps them, so a later
      visit builds them in under a second, and the panel shows only if they take longer than one. -->
@@ -45,7 +45,8 @@
     what it has room for, so next time this is quicker or skipped. It happens again after an update to the game, the
     browser or the graphics driver, or if the browser's cache is cleared.</p>
 </div></div>
-<div id="gpu" hidden><span></span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
+<div id="gpu" hidden><span>This game plays best in Chrome or Edge. Firefox draws it slowly on many computers,
+  integrated graphics above all.</span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
   const statusLine = document.getElementById('status');
   const fail = (text) => { statusLine.textContent = text; statusLine.style.color = '#f88'; };
@@ -115,28 +116,11 @@
     rt64LearnedShaders: learnedShaders,
     rt64ShaderMissed: shaderMissed,
   };
-  // Chrome and Edge on Windows and Linux give a page the GPU the browser itself draws with, whatever it asks for
-  // (crbug.com/369219127), and on a laptop with a graphics card too that is usually the integrated one: the game then
-  // crawls for minutes while its shaders are built, and runs slowly after. The page can't choose, so when the adapter
-  // is Intel's integrated graphics (Arc cards are the "hpg" architectures) it names the browser's flag that moves it
-  // (Windows' per-app graphics setting does too, in more steps). A Mac's Chrome takes the page's choice, so there the
-  // integrated GPU is the only one.
-  {
-  const brands = navigator.userAgentData ? navigator.userAgentData.brands.map((brand) => brand.brand) : [];
-  if (navigator.gpu && brands.includes('Chromium') && navigator.userAgentData.platform !== 'macOS') {
-    navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).then((adapter) => {
-      const info = adapter && adapter.info;
-      if (info && info.vendor === 'intel' && !/hpg/.test(info.architecture)) {
-        const notice = document.getElementById('gpu');
-        notice.firstChild.textContent = 'The browser is drawing this page with integrated Intel graphics, which is slow for ' +
-          'this game. If this computer also has a graphics card, open ' +
-          (brands.includes('Microsoft Edge') ? 'edge' : 'chrome') + '://flags/#force-high-performance-gpu, set it to ' +
-          'Enabled and relaunch the browser.';
-        notice.hidden = false;
-      }
-    });
-  }
-  }
+  // Firefox (157) builds a pipeline on its GPU process in line with its other work and costs a present about twice
+  // what Chrome's does, so on integrated graphics the games here crawl or stutter there and play smoothly in Chrome
+  // and Edge. Its WebGPU adapter's info is empty, so the page can't tell what it draws with: in Firefox it always
+  // recommends Chrome or Edge. Without WebGPU the status line already says so.
+  if (navigator.gpu && /Firefox\//.test(navigator.userAgent)) document.getElementById('gpu').hidden = false;
 </script>
 {{{ SCRIPT }}}
 </body>
