@@ -102,6 +102,7 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   in, their replacements and hooks as redirects
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
+                                                                  and its copy a display list late as another
 amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
                                                                   CPU-side matrices use with -msimd128
 ```
@@ -215,6 +216,14 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
   Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
   framebuffers too, and it is left on there (not tried off).
+- If the game needs render to RAM but can take a frame one display list old, call
+  `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
+  lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
+  of a list waits: one that a later part of the same list reads is still made in place. Conker's Bad Fur Day in
+  headless Chrome (Windy, render to RAM on): 10.7-11.8 ms a list against 14.8-16.4 ms with the exact copy. It is
+  wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
+  its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
+  A framebuffer the CPU writes to before its copy lands keeps what the CPU wrote, and the console says so once.
 - Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
