@@ -6,9 +6,7 @@ and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built wit
 through WebGPU. It is game-agnostic. It was written for San Francisco Rush 2049: Recompiled, and five more recomps
 build a page with it, each from a fork of its own: the table under Games says where each one is and how it plays.
 
-> Written almost entirely by AI sessions, like the recomp it came from.
-
-Until 2026-10-12 this repo was amazingalek/recomp-web, and GitHub still sends that address here.
+> Written almost entirely by AI (Claude), like the recomp it came from.
 
 ## Games
 
@@ -16,7 +14,7 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 
 | Game | Repo | Page | RTX 2070, Chrome | RTX 2070, Firefox | Intel UHD, Chrome | Intel UHD, Firefox |
 |---|---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | ~1 fps (before the frame cap) |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | not retested |
 | GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59 fps* | 57-59 fps*, 23 s still at Dam | smooth | crawls |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 59 fps* | not tested | smooth | not tested |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 59 fps* | 55-59 fps* | smooth | almost smooth |
@@ -24,21 +22,21 @@ Each game's repo builds its page from these forks; a page holds no ROM, the play
 | Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 59 fps* | 55-60 fps* | smooth | not tested |
 
 Played by hand from the pages on 2026-10-13: the RTX 2070 on a Windows 10 desktop, the Intel UHD the integrated
-graphics of a Windows laptop (Tiger Lake). A cell marked * is frames a second from a session's unattended run on the
+graphics of a Windows laptop (Tiger Lake). A cell marked * is frames a second from an unattended scripted run on the
 RTX 2070 the same day, after the shaders were built (Chrome 154 headless; Firefox 157 in a window of its own driven
-over WebDriver BiDi), not play by hand. "Not tested" means neither has run there yet.
+over WebDriver BiDi), not play by hand. "Not tested" means neither has run there yet, "not retested" that it hasn't
+been played by hand on the current forks.
 
 - **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
-  Firefox on the Intel chip crawled: it takes every frame a page presents, so the queue grew seconds behind a GPU
-  that couldn't keep up. Since rt64-web b8bdd0d (plume-web 0ddac9b) a page keeps at most 2 frames in flight and
-  skips presents when the GPU falls behind, as Chrome makes it: in Firefox on the RTX 2070 a frame waits 5-8 ms for
-  the GPU instead of seconds, at 57-59 frames a second. Not yet played on the laptop's Firefox since (2026-10-13).
+  Firefox takes every frame a page presents, so its queue grows seconds behind a GPU that can't keep up. A page
+  keeps at most 2 frames in flight and skips presents when the GPU falls behind, as Chrome makes it (rt64-web
+  b8bdd0d, plume-web 0ddac9b): in Firefox on the RTX 2070 a frame waits 5-8 ms for the GPU instead of seconds, at
+  57-59 frames a second. Not yet played by hand that way on the laptop's Firefox (2026-10-13).
 - **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
   credits, mission select, Dam on the keyboard, sound. Every level adds shaders: its prebuilt list, recorded by a
-  script, has the menus and every level's start, and the page builds each level's when the level first draws. Slow
-  everywhere played by hand until then; since, smooth in Chrome on the Intel chip and still crawling in Firefox there
-  (2026-10-13). The boot section misses a few of the intro's shaders, which a first visit builds behind the game.
-  Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on the RTX 2070 the
+  script, has the menus and every level's start, and the page builds each level's when the level first draws. Smooth
+  in Chrome on the Intel chip, still crawling in Firefox there (2026-10-13). The boot section misses a few of the
+  intro's shaders, which a first visit builds behind the game. Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on the RTX 2070 the
   game stood still 23 s for Dam's 55 on its first visit.
 - **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
   interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
@@ -61,7 +59,7 @@ a row before its port lands.
 
 ## The forks
 
-The changes to the upstream projects are commits on the `main` branch of a fork of each (its `web` branch until 2026-10-12), on top of a commit upstream
+The changes to the upstream projects are commits on the `main` branch of a fork of each, on top of a commit upstream
 (newer upstream commits are merged in, never rebased onto). They stay forks: RT64, plume, N64Recomp, N64ModernRuntime
 and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), so none of this is offered to them.
 
@@ -99,7 +97,7 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
 - `forks.txt`: the fork commits that work together. A tag here is a release: a recomp pins its submodules to the
   commits `forks.txt` names at that tag.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
-  (`recomp_web_frontend_page()` before the rename, which still works)
+  (`recomp_web_frontend_page()` works too)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
   or Edge, and `coi_serviceworker.js`.
@@ -149,18 +147,18 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   GoldenEye has its own `strtol`, `strncmp`, `isalpha` and six more. List each in `[patches] renamed` in the game's
   config and the patches' config, and it becomes `<name>_recomp` in both (N64Recomp-web ec0748e renames the patches'
   calls to it too). N64Recomp-web also reads a jump table from the section that holds it, where upstream reads it at
-  the function's own ROM offset: GoldenEye keeps them all in a `.rodata` section of their own, and upstream read past
-  the ROM's end.
+  the function's own ROM offset: GoldenEye keeps them all in a `.rodata` section of their own, so upstream's read
+  lands past the ROM's end.
 - Build the recompiled code with `-mtail-call` (the `add_compile_options` above). The MIPS code leaves a function
   by jumping to another, a tail call, which the C writes as a call and a return. Natively clang makes that a jump; in
   wasm it stays a call, so code that chains them without returning grows the stack until the browser stops the page
-  ("Maximum call stack size exceeded"): Conker's Bad Fur Day did, minutes in. With the tail call feature,
+  ("Maximum call stack size exceeded"): Conker's Bad Fur Day does, minutes in. With the tail call feature,
   N64Recomp-web's C forces each one to a `return_call` (`RECOMP_TAIL_CALL` in `recomp.h`, `musttail`); clang won't
   make one by itself, past the early return `RECOMP_FUNC_ENTRY` puts in every function. Without the flag the calls
-  stay plain ones, as before.
+  stay plain ones.
 - A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
   `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
-  function the patches call by its name, works on x86 by luck and traps here, and only the link says so (wasm-ld's
+  function the patches call by its name, happens to work on x86 and traps in wasm, and only the link says so (wasm-ld's
   `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
   `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and GoldenEye64Recomp-web `yield_self_1ms` in
   `recomp_yield_self_1ms`.
@@ -200,8 +198,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
 - Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
-  graphics in Chrome that was a frame a second for minutes, and Firefox, which builds a pipeline in line with
-  everything else, drew everything with it. The list is a file of shader descriptions, five hex words a line (a line
+  graphics in Chrome that is a frame a second for minutes, and Firefox, which builds a pipeline in line with
+  everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
   starting with `#` is a comment), in sections: those above the first line reading `section <name>` are built before
   the game starts, and each section after it, a level or a part of the game, when the game first draws with its
   shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
@@ -214,8 +212,8 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
   `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
   and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
-  come out as the same shaders and the same pipeline state share one. A list from before sections had a
-  line reading `background`, which now starts a section of that name.
+  come out as the same shaders and the same pipeline state share one. A line reading `background` also
+  starts a section of that name.
 - Record that list by code, not by playing: `tools/record_shaders.mjs` (its header says how) serves a build, opens it
   in headless Chrome with `?record-shaders`, under which the page prebuilds nothing and prints an `rt64 shader:` line
   for each description the game asks for, and follows a plan of the game's own, a JSON file of steps that reach each
@@ -228,10 +226,10 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   not the whole game: what a level draws later is mostly what its start drew, and the rest is built as it comes.
   Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
   105, about 4 MB, are then all built in 0.4-0.7 s and the panel never shows; a game whose list doesn't fit waits on
-  every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless,
-  the host 56-100% busy with other sessions): Rush 2049's list, which has no sections, took 6.3-7.2 s cold on 12
-  cores; `spirv-opt` took it from 16.1-17.7 s to 10.0-10.8 s 6 at a time, and its WGSL from 17.5 MB to 5.9 MB, since
-  many descriptions that differ only in what the shaders ignore come out the same. Rush 2049's list is
+  every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
+  Rush 2049's list, which has no sections, takes 6.3-7.2 s cold on 12 cores; 6 at a time it takes 10.0-10.8 s with
+  `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
+  differ only in what the shaders ignore come out the same. Rush 2049's list is
   `src/rt64_shaders.txt` in its repo.
 - The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
   overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it

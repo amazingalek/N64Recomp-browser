@@ -52,7 +52,7 @@ endfunction()
 
 # For a build to try something: the page is linked at -O1, where Binaryen's wasm-opt doesn't optimize the whole module,
 # which is most of a link at -O3. The code is still compiled at the build's level. Rush 2049's link took 190 s at -O3
-# and 11 s at -O1 (2026-10-12, a busy host), and its wasm grew 7%. Leave it off for a page that people play.
+# and 11 s at -O1 (2026-10-12), and its wasm grew 7%. Leave it off for a page that people play.
 option(N64RECOMP_BROWSER_FAST_LINK "Link the page without Binaryen's optimizations (builds to try something)" OFF)
 
 # Links the code of a mod built into the recomp (an .nrm it embeds with recomp::mods::register_embedded_mod) into
@@ -79,8 +79,8 @@ function(n64recomp_browser_precompiled_mod target nrm syms name)
         INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:N64Recomp,INTERFACE_INCLUDE_DIRECTORIES>")
 endfunction()
 
-# The names from before this repo was renamed from recomp-web, for a recomp that moves its submodule here without
-# changing its calls.
+# The same functions as recomp_web_frontend_page and recomp_web_precompiled_mod (with RECOMP_WEB_OFFLINE_MOD_RECOMP),
+# for a recomp that still calls them by those names.
 function(recomp_web_frontend_page target)
     n64recomp_browser_frontend_page(${target})
 endfunction()

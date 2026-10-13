@@ -8,9 +8,9 @@
 #   every file that reads a generated header (the shaders, half of them) misses. On Windows em++.exe is a launcher that
 #   stays the same from one Emscripten to the next, so the version is the compiler's identity. Depend mode reads what a
 #   file included from the compile's own .d file, instead of running emcc a second time to preprocess it.
-#   Measured on 2026-10-12, a fresh build dir after a build of the same sources: Rush 2049's page on Windows (12 cores,
-#   busy with other work) 587 s -> 116 s with N64RECOMP_BROWSER_FAST_LINK, 636 of 636 hits; tests/build's libraries on
-#   Linux (16 cores) 47 s -> 5 s.
+#   Measured on 2026-10-12, a fresh build dir after a build of the same sources: Rush 2049's page on Windows (12 cores)
+#   587 s -> 116 s with N64RECOMP_BROWSER_FAST_LINK, 636 of 636 hits; tests/build's libraries on Linux
+#   (16 cores) 47 s -> 5 s.
 # - No precompiled headers (RmlUi's): ccache won't cache what includes one, and one holds absolute paths anyway.
 #
 # A build to try something can also link without Binaryen's optimizations: N64RECOMP_BROWSER_FAST_LINK

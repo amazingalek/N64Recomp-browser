@@ -2,8 +2,8 @@
 // n64recomp_browser::audio: a recomp's sound output on a page, played by an AudioWorklet on the browser's audio thread
 // from a ring in the program's own memory (audio_output.js). Use it in place of SDL_QueueAudio and
 // SDL_GetQueuedAudioSize on Emscripten. SDL2's port plays through a ScriptProcessorNode, whose callback runs on the
-// page's thread, which is also where WebGPU's work runs (plume_device_thread.h), so its sound broke up whenever that
-// thread was busy for more than one of SDL's buffers; the audio thread here waits for nobody.
+// page's thread, which is also where WebGPU's work runs (plume_device_thread.h), so its sound breaks up whenever that
+// thread is busy for more than one of SDL's buffers; the audio thread here waits for nobody.
 #include <cstddef>
 #include <cstdint>
 
