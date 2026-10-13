@@ -83,7 +83,11 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   walking in his house, the pause menu, sound. Its shader list is in sections, a world each (2026-10-13): the boot,
   115 pipelines because every visit draws the whole DK Rap, 5.0 s cold and 0.4 s later in headless Chrome (all 245
   took 10 and 5 s before), 15-17 s in Firefox, whose GPU process builds them one at a time and keeps none between
-  visits (26 s before); Frantic Factory's 55 about 1 s in Chrome, 3.6 s in Firefox.
+  visits (26 s before); Frantic Factory's 55 about 1 s in Chrome, 3.6 s in Firefox. Render to RAM stays on, with
+  the exact copy (v0.23.0, 2026-10-13): a Banana Fairy photo is a patch of the frame the CPU copies out of RDRAM. The
+  copy a list late took a list from 6.0-7.2 ms to 2.1-2.2 in DK Isles (headless Chrome 155) and its photos came out
+  right, but the boot crashed with it (2 boots in about 26, the audio microcode jumping nowhere, none in about 12
+  exact): the game reuses a framebuffer's memory once the RDP is done with it, and a late copy can land on it after.
 
 The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
 here are.
@@ -231,7 +235,7 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
   Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
-  framebuffers too, and it is left on there (not tried off).
+  framebuffers too (a Banana Fairy photo), and it is left on there (not tried off).
 - If the game needs render to RAM but can take a frame one display list old, call
   `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
   lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
@@ -240,7 +244,9 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   Dam 3.8-5.2 ms against 8.0-9.7. It is
   wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
   its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
-  A framebuffer the CPU writes to before its copy lands keeps what the CPU wrote, and the console says so once.
+  A framebuffer the CPU writes to before its copy lands keeps what the CPU wrote, and the console says so once, but
+  that check races the game thread: Donkey Kong 64 puts other data in a framebuffer's memory as soon as the RDP is
+  done, a late copy landing there crashed its boot now and then, and it keeps the exact copy too.
 - Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
