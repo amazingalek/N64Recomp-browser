@@ -12,20 +12,18 @@ build a page with it, each from a fork of its own: the table under Games says wh
 
 Each game's repo builds its page from these forks; a page holds no ROM, the player loads their own.
 
-| Game | Repo | Page | RTX 2070, Chrome | RTX 2070, Firefox | Intel UHD, Chrome | Intel UHD, Firefox |
-|---|---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | not retested |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59 fps* | 57-59 fps*, 23 s still at Dam | smooth | not retested (crawled before rt64-web d070e5c) |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 59 fps* | 59 fps* | smooth | not tested |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 59 fps* | 55-59 fps* | smooth | almost smooth |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 48 fps* (bar menus 32-54) | doesn't start* | smooth | not tested |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 59 fps* | 55-60 fps* | smooth | not tested |
+| Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox |
+|---|---|---|---|---|
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | not retested |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | not retested (crawled before v0.21.0) |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | not tested |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth (1 frame in 15 over 50 ms) |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | doesn't start |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | not tested |
 
-Played by hand from the pages on 2026-10-13: the RTX 2070 on a Windows 10 desktop, the Intel UHD the integrated
-graphics of a Windows laptop (Tiger Lake). A cell marked * is frames a second from an unattended scripted run on the
-RTX 2070 the same day, after the shaders were built (Chrome 154 headless; Firefox 157 in a window of its own driven
-over WebDriver BiDi), not play by hand. "Not tested" means neither has run there yet, "not retested" that it hasn't
-been played by hand on the current forks.
+How each page plays on the integrated graphics of a Windows laptop (Intel UHD, Tiger Lake), by hand or in a scripted
+run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both browsers, so the table leaves it out.
+"Not tested" means the page hasn't run there yet in that browser, "not retested" that it hasn't on its current forks.
 
 - **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
   Firefox takes every frame a page presents, so its queue grows seconds behind a GPU that can't keep up. A page
@@ -42,7 +40,11 @@ been played by hand on the current forks.
   nothing once a millisecond while one waits. With a heavy pass added to every present to make the RTX 2070 slow,
   Firefox went from 33-37 frames a second to 42-45 in GoldenEye, and from ~17 to 20-26 in Rush 2049 with render to RAM
   forced on, its queue 25 ms behind instead of 45. Its page has it since 2026-10-13 (v0.21.0), not yet played that way
-  on the laptop. The boot section holds the intro and the cast credits, so a first visit builds none of their shaders
+  on the laptop. Before it, on the laptop in Firefox (scripted runs, a first visit): the intro's blood overlay,
+  whose shaders the boot section didn't hold yet, drew ~180 draws a frame with the ubershader, which halved the
+  frame rate there, and in 3 of 3 runs that reached it the game then fell to about a frame a second for good, each
+  frame waiting on its readback. Submitting while it waits, as v0.21.0 does, kept those runs at 28-45 frames a
+  second, and a second visit never fell. The boot section holds the intro and the cast credits, so a first visit builds none of their shaders
   behind the game. Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on
   the RTX 2070 the game stood still 23 s for Dam's 55 on its first visit.
 - **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
@@ -51,7 +53,9 @@ been played by hand on the current forks.
   before the game, 2.4 s cold and 0.1 s on a later visit in headless Chrome (all 561 took 16 s and 11 s before), and
   4.5 s in Firefox, which keeps no built pipelines between visits; Clock Town's section 1.6 s in Chrome, 14 s in Firefox.
 - **Banjo-Kazooie**: Banjo-Kazooie: Recompiled. Headless: boots, draws and plays, the intro's sound. On the Intel
-  chip smooth in Chrome and almost smooth in Firefox, which needs more work (2026-10-13). On the RTX 2070 it reads
+  chip smooth in Chrome and almost smooth in Firefox (2026-10-13): with no readback and no ubershader there,
+  Firefox's frames came every 31 ms at the median, but 92 in two minutes took over 50 ms (Chrome's 3), its p99 62 ms
+  against 32, with the Intel chip 79-89% busy against Chrome's 40-61%. On the RTX 2070 it reads
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
   ~600 draws a frame. Its page is on v0.21.0 too (2026-10-13), not yet played by hand on it.
 - **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
