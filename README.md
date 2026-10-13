@@ -3,19 +3,51 @@
 Web support for N64 static recompilations built on [N64Recomp](https://github.com/N64Recomp/N64Recomp),
 [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), [RecompFrontend](https://github.com/N64Recomp/RecompFrontend)
 and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built with Emscripten into one page that draws
-through WebGPU. It is game-agnostic. It was written for, and is tested with,
-San Francisco Rush 2049: Recompiled, which plays in Chrome at 60
-frames a second with its launcher, menus, sound, keyboard and gamepads. Banjo-Kazooie: Recompiled
-([amazingalek/BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web)) plays there too, and so
-does Majora's Mask in Zelda 64: Recompiled ([amazingalek/Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web),
-on upstream's `recomp-frontend` branch, its frames interpolated to the display's rate), and so does Donkey
-Kong 64: Recompiled ([amazingalek/Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web)),
-and so does GoldenEye 007 ([amazingalek/GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web),
-cblock85's GoldenEye64Recomp moved onto RecompFrontend).
+through WebGPU. It is game-agnostic. It was written for San Francisco Rush 2049: Recompiled, and five more recomps
+build a page with it, each from a fork of its own: the table under Games says where each one is and how it plays.
 
 > Written almost entirely by AI sessions, like the recomp it came from.
 
 Until 2026-10-12 this repo was amazingalek/recomp-web, and GitHub still sends that address here.
+
+## Games
+
+Each game's repo builds its page from these forks; a page holds no ROM, the player loads their own.
+
+| Game | Repo | Page | RTX 2070, Chrome | RTX 2070, Firefox | Intel UHD, Chrome | Intel UHD, Firefox |
+|---|---|---|---|---|---|---|
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth | smooth | ~1 fps |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | ~10 fps | ~10 fps | ~1 fps | ~10 fps |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | not tested | not tested | not tested | not tested |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | not tested | not tested | not tested | not tested |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | not tested | not tested | not tested | not tested |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | not tested | not tested | not tested | not tested |
+
+Played by hand from the pages on 2026-10-13: the RTX 2070 on a Windows 10 desktop, the Intel UHD the integrated
+graphics of a Windows laptop (Tiger Lake). "Not tested" means nobody has played it there by hand yet; what the
+sessions that ported each game saw in headless Chrome on the RTX 2070 is below.
+
+- **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
+  Firefox on the Intel chip crawls.
+- **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
+  credits, mission select, Dam on the keyboard, sound. Slow everywhere played by hand. Every level adds shaders, and
+  its prebuilt list stops at Bunker.
+- **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
+  interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
+  pause menu.
+- **Banjo-Kazooie**: Banjo-Kazooie: Recompiled. Headless: boots, draws and plays, the intro's sound.
+- **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
+  walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which makes
+  a display list take 20-27 ms on the page against 7-11 without it.
+- **Donkey Kong 64**: Donkey Kong 64: Recompiled. Headless: the DK Rap, a new game through the opening cutscenes, DK
+  walking in his house, the pause menu, sound.
+
+The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
+here are.
+
+**Keep this table current.** Whoever plays a page by hand, or changes something that moves how a game plays (a
+fork, a game's page, its shader list), updates that game's row and the date in the same commit, and a new game gets
+a row before its port lands.
 
 ## The forks
 
