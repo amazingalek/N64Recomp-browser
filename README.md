@@ -66,7 +66,7 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   argument, and emdawnwebgpu passed setBindGroup's dynamic offsets as the whole wasm heap, which Conker grows past
   that, so until rt64-web c3d781a (plume-web 94a4795, which copies them out) the page never started there. On the RTX
   2070 in Firefox 157 the boot's section took 12.4 s and Windy's 14.7, then the bar drew 55 frames a second and
-  Windy 57 (Chrome 154 headless: 3.1 and 3.8 s, 59 and 59; 2026-10-13, a busy host). Not yet run on the Intel chip
+  Windy 57 (Chrome 155 headless: 3.1 and 3.8 s, 59 and 59; 2026-10-13, a busy host). Not yet run on the Intel chip
   in Firefox.
 - **Donkey Kong 64**: Donkey Kong 64: Recompiled. Headless: the DK Rap, a new game through the opening cutscenes, DK
   walking in his house, the pause menu, sound. Its shader list is in sections, a world each (2026-10-13): the boot,
