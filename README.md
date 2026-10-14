@@ -110,16 +110,20 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   already held looks untouched, though, and gets the frame, so it is also wrong for a game that puts code or data in
   a framebuffer's memory once the RDP is done: Donkey Kong 64 inflates its main code and data over the framebuffers
   of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too.
-- Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
+- Give RT64 a list of the game's shaders, so the page builds them before the game draws with them.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
   graphics in Chrome that is a frame a second for minutes, and Firefox, which builds a pipeline in line with
   everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
-  starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are built before
-  the game starts, and each section after it, a level or a part of the game, when the game first draws with its
-  shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
-  the section is built: when a frame asks for at least 4 of a section's shaders that aren't built, the game waits for
-  the whole section. A description can be in several sections. One the list missed, or a few at a time, is built
+  starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are the boot, and
+  each section after it a level or a part of the game. In Chrome, which builds pipelines on threads of its own, the
+  page builds the whole list behind the game from its first draw, in the list's order, the boot on half the cores and
+  the rest one at a time, and the game waits only when a frame asks for at least 4 shaders of one section that aren't
+  built, for those, holding its frame under a small "Preparing graphics" indicator in a corner; the rest of that
+  section is built next. Rush 2049's page, cold, never waits: its 75 pipelines are built 7 s after Start Game, behind
+  the logos and the title. Firefox waits instead, since anything built behind the game stalls its frames: for the
+  boot before the game's first frame, and for a whole section when a frame first asks for 4 of its shaders. A
+  description can be in several sections. One the list missed, or a few at a time, is built
   behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
   later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
@@ -140,7 +144,7 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   mode, and the game's code sets much of it as it draws, so no table in the ROM lists them. Record each level's start,
   not the whole game: what a level draws later is mostly what its start drew, and the rest is built as it comes.
   Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
-  105, about 4 MB, are then all built in 0.4-0.7 s and the panel never shows; a game whose list doesn't fit waits on
+  105, about 4 MB, are then all built in 0.4-0.7 s and the indicator never shows; a game whose list doesn't fit waits on
   every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
   Rush 2049's list, which has no sections, takes 6.3-7.2 s cold on 12 cores; 6 at a time it takes 10.0-10.8 s with
   `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
