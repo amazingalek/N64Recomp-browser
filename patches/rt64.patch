@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 673474746cc1117afff8b8a3b7fa8cd974858a6c
+rt64: https://github.com/amazingalek/rt64-web 0fda0895ea7379bf527e321b6cc24bb2ddc669b0
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -643,7 +643,7 @@ index 7b38b8e..2a5c6c0 100644
          std::unique_ptr<FramebufferReadChangesDescriptorChangesSet> readChangesSet;
          bool used;
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..a87a199 100644
+index 3227ab1..3771919 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -114,6 +114,12 @@ namespace RT64 {
@@ -659,7 +659,7 @@ index 3227ab1..a87a199 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -416,6 +422,107 @@ namespace RT64 {
+@@ -416,6 +422,110 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -677,11 +677,20 @@ index 3227ab1..a87a199 100644
 +    void PresentQueue::pace(bool presentDropped) {
 +        const uint32_t targetRate = ext.sharedResources->targetRate;
 +        const uint32_t originalRate = ext.sharedResources->viOriginalRate;
++        auto setPacedRate = [&](uint32_t pacedRate) {
++            if ((pacedRate == 0) != (ext.sharedResources->pacedRate == 0)) {
++                const char *what = (pacedRate > 0) ? "paced to the game's frames while the GPU falls behind" : "back at the display's rate";
++                printf("RT64: presents %s (the game at %u frames a second)\n", what, originalRate);
++            }
++
++            ext.sharedResources->pacedRate = pacedRate;
++        };
++
 +        if ((targetRate == 0) || (originalRate == 0) || (targetRate <= originalRate)) {
 +            pacingMultiple = 0;
 +            pacingPresents.clear();
 +            pacingDropped = 0;
-+            ext.sharedResources->pacedRate = 0;
++            setPacedRate(0);
 +            return;
 +        }
 +
@@ -755,19 +764,13 @@ index 3227ab1..a87a199 100644
 +        }
 +
 +        // The game's rate may have moved since the number was picked, so it is the even number at most that large.
-+        const uint32_t pacedRate = (pacingMultiple > 0) ? (pacedMultipleAtMost(pacingMultiple) * originalRate) : 0;
-+        if ((pacedRate == 0) != (ext.sharedResources->pacedRate == 0)) {
-+            const char *what = (pacedRate > 0) ? "paced to the game's frames while the GPU falls behind" : "back at the display's rate";
-+            printf("RT64: presents %s (the game at %u frames a second)\n", what, originalRate);
-+        }
-+
-+        ext.sharedResources->pacedRate = pacedRate;
++        setPacedRate((pacingMultiple > 0) ? (pacedMultipleAtMost(pacingMultiple) * originalRate) : 0);
 +    }
 +
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +617,10 @@ namespace RT64 {
+@@ -510,6 +620,10 @@ namespace RT64 {
                      continue;
                  }
  
