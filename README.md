@@ -123,9 +123,12 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   page builds the whole list behind the game from its first draw, in the list's order, the boot on half the cores and
   the rest one at a time, and the game waits only when a frame asks for at least 4 shaders of one section that aren't
   built, for those, holding its frame under a small "Preparing graphics" indicator in a corner; the rest of that
-  section is built next. Rush 2049's page, cold, never waits: its 75 pipelines are built 7 s after Start Game, behind
-  the logos and the title. Firefox waits instead, since anything built behind the game stalls its frames: for the
-  boot before the game's first frame, and for a whole section when a frame first asks for 4 of its shaders. A
+  section is built next. Rush 2049's page, cold, builds its 75 pipelines ~9 s after Start Game, behind the logos and
+  the title, waiting at most half a second. Firefox waits instead, since anything built behind the game stalls its
+  frames: for the boot before the game's first frame, and for a whole section when a frame first asks for 4 of its
+  shaders. So a list's boot is what the game shows before its first level, and the rest goes in sections: Rush
+  2049's boot (logos, title, menus) is 21 pipelines and 2 s in Firefox, against 75 and 9.8 s as one list, and its
+  race section's 41 take 7 s when the first race starts. A
   description can be in several sections. One the list missed, or a few at a time, is built
   behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
@@ -149,7 +152,7 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
   105, about 4 MB, are then all built in 0.4-0.7 s and the indicator never shows; a game whose list doesn't fit waits on
   every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
-  Rush 2049's list, which has no sections, takes 6.3-7.2 s cold on 12 cores; 6 at a time it takes 10.0-10.8 s with
+  Rush 2049's list, then without sections, took 6.3-7.2 s cold on 12 cores; 6 at a time it took 10.0-10.8 s with
   `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
   differ only in what the shaders ignore come out the same. Rush 2049's list is
   `src/rt64_shaders.txt` in its repo.
