@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web be0524c3832c9958580713f3d10dd12df04daf83
+plume: https://github.com/amazingalek/plume-web 19881763140380cd29189cb9b3c55162c0ebefa8
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2166,7 +2166,7 @@ index 2048557..20a519b 100644
          virtual bool needsResize() const = 0;
          virtual void setVsyncEnabled(bool vsyncEnabled) = 0;
 diff --git a/plume_render_interface_types.h b/plume_render_interface_types.h
-index 9dcfedf..efa6420 100644
+index 9dcfedf..b352bb6 100644
 --- a/plume_render_interface_types.h
 +++ b/plume_render_interface_types.h
 @@ -39,6 +39,9 @@ namespace plume {
@@ -2200,7 +2200,7 @@ index 9dcfedf..efa6420 100644
      };
  
      struct RenderRaytracingPipelineLibrarySymbol {
-@@ -1786,10 +1794,18 @@ namespace plume {
+@@ -1786,10 +1794,23 @@ namespace plume {
          // Samplers.
          bool samplerMirrorClampToEdge = false;
  
@@ -2211,6 +2211,11 @@ index 9dcfedf..efa6420 100644
          bool presentWait = false;
          bool displayTiming = false;
  
++        // The format a swap chain presents in at least cost, for whoever creates one and draws into it. On WebGPU it's
++        // the browser's preferred canvas format, which it presents without a copy (Firefox copies any other one through
++        // the CPU).
++        RenderFormat preferredSwapChainFormat = RenderFormat::B8G8R8A8_UNORM;
++
 +        // Pipelines.
 +        // A pipeline built with buildInBackground leaves the device's other work running while it builds. Not so on
 +        // WebGPU in Firefox, whose GPU process builds it in line and presents nothing meanwhile.
@@ -2221,10 +2226,10 @@ index 9dcfedf..efa6420 100644
  
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..1653ad4
+index 0000000..c217ac3
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,2783 @@
+@@ -0,0 +1,2792 @@
 +//
 +// plume
 +//
@@ -2254,6 +2259,14 @@ index 0000000..1653ad4
 +    }
 +    console.log('plume: pipelines are built in line with the device here (Firefox)');
 +    return 0;
++});
++
++// Whether the browser's preferred canvas format is bgra8unorm (rgba8unorm otherwise): the one it presents a canvas in
++// without a copy. Firefox (158, Windows) hands a canvas to its compositor as a shared texture only in bgra8unorm, and
++// reads any other format's frames back to the CPU and uploads them again: Rush 2049's page at 3840x2000 took its GPU
++// process 1.2 cores instead of 0.5 and the GPU 80% busy instead of 43% (RTX 2070). Chrome cost the same either way.
++EM_JS(int, plume_webgpu_bgra_swap_chain, (), {
++    return navigator.gpu.getPreferredCanvasFormat() === 'bgra8unorm' ? 1 : 0;
 +});
 +
 +namespace plume {
@@ -4687,6 +4700,7 @@ index 0000000..1653ad4
 +        capabilities.presentWait = true;
 +        capabilities.displayTiming = true;
 +        capabilities.backgroundPipelineBuilds = (plume_webgpu_background_pipeline_builds() != 0);
++        capabilities.preferredSwapChainFormat = (plume_webgpu_bgra_swap_chain() != 0) ? RenderFormat::B8G8R8A8_UNORM : RenderFormat::R8G8B8A8_UNORM;
 +        description.name = "WebGPU";
 +    }
 +

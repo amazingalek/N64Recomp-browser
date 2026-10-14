@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 918deb375d255871e291372a0151e7d56759eee0
+rt64: https://github.com/amazingalek/rt64-web e46bf1943eae13f7e7e9a772fa6eb610667a0c57
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -466,7 +466,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..2f124c1 100644
+index 785de27..839b243 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -523,7 +523,7 @@ index 785de27..2f124c1 100644
          RenderSwapChainDesc swapChainDesc;
          swapChainDesc.renderWindow = appWindow->windowHandle;
 -        swapChainDesc.format = RenderFormat::B8G8R8A8_UNORM;
-+        swapChainDesc.format = ShaderLibrary::SwapChainFormat;
++        swapChainDesc.format = device->getCapabilities().preferredSwapChainFormat;
          swapChainDesc.textureCount = (userConfig.displayBuffering == UserConfiguration::DisplayBuffering::Triple) ? 3 : 2;
  
          // Enable present wait if supported by the device. We specify a max latency of 1 as we use it to wait right before the next
@@ -3062,7 +3062,7 @@ index 25c0cf9..3260fa0 100644
          RSPProcessor(RenderDevice *device);
          ~RSPProcessor();
 diff --git a/src/render/rt64_shader_library.cpp b/src/render/rt64_shader_library.cpp
-index d1c5273..3855c66 100644
+index d1c5273..e68011b 100644
 --- a/src/render/rt64_shader_library.cpp
 +++ b/src/render/rt64_shader_library.cpp
 @@ -4,54 +4,104 @@
@@ -3474,7 +3474,7 @@ index d1c5273..3855c66 100644
              pipelineDesc.vertexShader = fullScreenVertexShader.get();
              pipelineDesc.pixelShader = regularShader.get();
 -            pipelineDesc.renderTargetFormat[0] = RenderFormat::B8G8R8A8_UNORM; // TODO: Use whatever format the swap chain was created with.
-+            pipelineDesc.renderTargetFormat[0] = SwapChainFormat;
++            pipelineDesc.renderTargetFormat[0] = device->getCapabilities().preferredSwapChainFormat;
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
              pipelineDesc.renderTargetCount = 1;
              pipelineDesc.pipelineLayout = videoInterfaceNearest.pipelineLayout.get();
@@ -3597,26 +3597,6 @@ index d1c5273..3855c66 100644
              rspVertexTestZMS.pipeline = device->createComputePipeline(RenderComputePipelineDesc(rspVertexTestZMS.pipelineLayout.get(), computeShaderMS.get(), 1, 1, 1));
          }
  
-diff --git a/src/render/rt64_shader_library.h b/src/render/rt64_shader_library.h
-index 641f3ec..d16cc1a 100644
---- a/src/render/rt64_shader_library.h
-+++ b/src/render/rt64_shader_library.h
-@@ -13,6 +13,15 @@ namespace RT64 {
-     };
- 
-     struct ShaderLibrary {
-+        // The swap chain's format. A browser's canvas takes rgba8unorm or bgra8unorm, and Firefox (157 on Windows 10)
-+        // keeps every frame a bgra8unorm canvas presented in video memory, about 13 MB a frame at 1080p, until the GPU
-+        // runs out and the frame rate collapses. With rgba8unorm it frees them.
-+#if defined(__EMSCRIPTEN__)
-+        static constexpr RenderFormat SwapChainFormat = RenderFormat::R8G8B8A8_UNORM;
-+#else
-+        static constexpr RenderFormat SwapChainFormat = RenderFormat::B8G8R8A8_UNORM;
-+#endif
-+
-         SamplerLibrary samplerLibrary;
-         bool usesHDR = false;
-         bool usesHardwareResolve = false;
 diff --git a/src/render/rt64_texture_cache.cpp b/src/render/rt64_texture_cache.cpp
 index 0848f3e..193f7f2 100644
 --- a/src/render/rt64_texture_cache.cpp
