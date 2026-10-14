@@ -1,14 +1,18 @@
 // Plays a recomp's page in Chrome or Firefox by a plan and measures it: presents a second, sound frames short, WebGPU
 // errors, the prebuilt shader waits, and the GPU's and the browser's load, for a fork's notes and the games table.
 //
-//   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] [--size <w>x<h>]
-//     [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>] [--browser <path>]
+//   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
+//     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
+//     [--browser <path>]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
-// the page is, a GitHub Pages one say, and plan.page is taken relative to it. The browser starts with a profile of its
-// own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
+// the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
+// (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). The browser starts with
+// a profile of its own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
-// clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). --query is added to the page's URL.
+// clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
+// another size a click goes where recompui puts the same spot: it lays its launcher and menus out by the viewport's
+// height, about the centre. --query is added to the page's URL.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -20,7 +24,9 @@
 //     "play": [steps]                  what is measured: e.g. a wait while the attract demo runs, keys to reach a level
 //   }
 //
-// a step one of page_driver.mjs's. A shader plan's own section plays with --section <name> in place of "play".
+// a step one of page_driver.mjs's. A shader plan's own section plays with --section <name> in place of "play", and
+// --play <s> plays nothing but lets the game run by itself that long (an attract demo; the stand-in's runs). --shot
+// takes a screenshot of the page when the play steps end.
 //
 // Every console line goes to stdout as it comes, with the seconds since start (rt64 shader: lines aside), and every
 // --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the sound frames the
@@ -39,6 +45,8 @@ const args = process.argv.slice(2);
 const port = Number(option(args, '--port', '8937'));
 const profileOption = option(args, '--profile', null);
 const section = option(args, '--section', null);
+const playFor = option(args, '--play', null);
+const shotFile = option(args, '--shot', null);
 const size = option(args, '--size', '1256x645').split('x').map(Number);
 const interval = Number(option(args, '--interval', '5'));
 const query = option(args, '--query', '');
@@ -46,12 +54,18 @@ const jsonFile = option(args, '--json', null);
 const executable = option(args, '--browser', undefined);
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
-    '[--size <w>x<h>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>] [--browser <path>]');
+    '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
+    '[--json <file>] [--browser <path>]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
-const play = section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
+// A plan's clicks and ROM clicks, from 1256x645 to the size asked for.
+const scale = size[1] / 645;
+const place = (steps) => steps?.map((s) => (s[0] === 'click' || s[0] === 'rom')
+  ? [s[0], Math.round(size[0] / 2 + (s[1] - 628) * scale), Math.round(size[1] / 2 + (s[2] - 322.5) * scale), ...s.slice(3)]
+  : s);
+const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
   console.error(section ? `the plan has no section ${section}` : 'the plan has no "play" steps (or give --section)');
   process.exit(1);
@@ -148,6 +162,7 @@ const procCpu = () => {
 
 const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
+const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
   preload, onLine, log });
 log(`${browser} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
@@ -199,12 +214,12 @@ const finish = async (code) => {
 };
 let audioBefore = null;
 try {
-  await page.navigate(base + (plan.page ?? '') + query);
-  await page.run([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]);
+  await page.navigate(pageUrl);
+  await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]));
   audioBefore = last?.audio ?? null;
   playing = true;
   log('play');
-  await page.run(play);
+  await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play));
   await sample();
   playing = false;
 } catch (error) {
@@ -216,7 +231,7 @@ const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
 const audioAfter = last?.audio ?? null;
 const summary = {
-  browser, page: base + (plan.page ?? '') + query, size: `${size[0]}x${size[1]}`, freshProfile, seconds: Math.round(seconds()),
+  browser, page: pageUrl, size: `${size[0]}x${size[1]}`, freshProfile, seconds: Math.round(seconds()),
   presents: presents.length ? { median: median(presents), min: Math.min(...presents), max: Math.max(...presents) } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
   shaderWaits, webgpuErrors: errors, exceptions,
