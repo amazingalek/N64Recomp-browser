@@ -13,50 +13,17 @@ beside them, and its web build patches their checkouts (Using it in a recomp). I
 
 Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own.
 
-| Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox |
-|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | not retested |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | not retested (crawled before v0.21.0) |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | not tested |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth (1 frame in 15 over 50 ms) |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | not tested |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | not tested |
+| Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played there |
+|---|---|---|---|---|---|
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | not yet on this version | 2026-10-13 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | not yet on this version | 2026-10-13 |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | not yet | 2026-10-13 |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth | 2026-10-13 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | not yet | 2026-10-13 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | not yet | 2026-10-13 |
 
-How each page plays on the integrated graphics of a Windows laptop (Intel UHD, Tiger Lake), by hand or in a scripted
-run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both browsers, so the table leaves it out.
-"Not tested" means the page hasn't run there yet in that browser, "not retested" that it hasn't on its current forks.
-What else each page was checked with, and its measurements, are in its repo.
-
-- **San Francisco Rush 2049**: launcher, menus, races, sound, keyboard and gamepads. Not played on the laptop in
-  Firefox since pages keep at most 2 frames in flight (2026-10-13).
-- **GoldenEye 007**: built from upstream rt64, N64ModernRuntime and RecompFrontend with `patches/`, at the commits the
-  forks are built on (its own upstream predates RecompFrontend), headless Chrome through the intro, mission select and
-  Dam on the keyboard, with sound (2026-10-14). On the laptop it crawled in Firefox before v0.21.0, and hasn't been
-  played there since.
-- **Majora's Mask**: built from Zelda 64: Recompiled's own submodules with `patches/`, headless Chrome through the
-  attract demo, file select, the intro, Link walking and the pause menu (2026-10-14).
-- **Banjo-Kazooie**: built from Banjo: Recompiled's own submodules with `patches/`, headless Chrome to the intro
-  (2026-10-14). The laptop's results are from before that, on the forks (2026-10-13).
-- **Conker's Bad Fur Day**: built from Conker's Bad Fur Day: Recompiled's own `tools/` submodules and its own patches
-  to them, with `patches/` on top (N64Recomp's without `src/analysis.cpp`), headless Chrome through the intro, the bar
-  and Conker walking in Hungover, with sound (2026-10-14). Firefox 157 on a desktop GPU (RTX 2070), the same build:
-  the boot's shaders in 10.4 s, then the intro and the bar, with sound and no WebGPU errors (2026-10-14); 55-57 frames
-  a second in the bar and Windy on the forks (2026-10-13).
-- **Donkey Kong 64**: built from Donkey Kong 64: Recompiled's own submodules (Killklli's runtime and RecompFrontend,
-  its mod store off) with `patches/`, headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house
-  and the pause menu, with sound (2026-10-14). The laptop's results are from before that, on the forks. Its sound
-  went silent for good in most Chrome boots until its main 9341ea7. After that, headless Chrome 155 and Firefox 158
-  on a desktop GPU (RTX 2070) played the boot and the DK Rap with sound in every boot, 10 and 3 (2026-10-14).
-
-Every page is on v0.24.0 since 2026-10-14: when the GPU falls behind, each game frame is shown once instead of some
-never and others two or three times. None has been played that way on the laptop yet.
-
-The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
-here are.
-
-**Keep this table current.** Whoever plays a page by hand, or changes something that moves how a game plays (a
-fork, a game's page, its shader list), updates that game's row, its line and the date in the same commit, and a new
-game gets a row before its port lands. Measurements go in the game's own repo.
+How each page plays on a Windows laptop's integrated graphics; a desktop GPU plays all of them in both browsers.
+The goal is every one smooth in both. What else a page was played on, and how, is in its repo.
 
 ## Using it in a recomp
 
