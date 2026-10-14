@@ -37,8 +37,9 @@ What else each page was checked with, and its measurements, are in its repo.
   (2026-10-14). The laptop's results are from before that, on the forks (2026-10-13).
 - **Conker's Bad Fur Day**: headless Chrome through the intro, the bar and Conker walking outside it, with sound;
   Firefox on a desktop GPU 55-57 frames a second in the bar and Windy (2026-10-13).
-- **Donkey Kong 64**: headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house and the pause
-  menu, with sound (2026-10-13).
+- **Donkey Kong 64**: built from Donkey Kong 64: Recompiled's own submodules (Killklli's runtime and RecompFrontend,
+  its mod store off) with `patches/`, headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house
+  and the pause menu, with sound (2026-10-14). The laptop's results are from before that, on the forks.
 
 Every page is on v0.24.0 since 2026-10-14: when the GPU falls behind, each game frame is shown once instead of some
 never and others two or three times. None has been played that way on the laptop yet.
@@ -252,7 +253,11 @@ Banjo-Kazooie's. What to expect from a recomp's own commits:
   in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye).
 - Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
   changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
-  not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop.
+  not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop. A recomp's own fork of a
+  submodule can also want a library a page hasn't got: Donkey Kong 64's RecompFrontend (Killklli's) has a mod store
+  that fetches with curl, found with `find_package(CURL REQUIRED)`. The store stays off on the page, so
+  Donkey-Kong-64-Recompiled-web puts a `FindCURL.cmake` of its own first on `CMAKE_MODULE_PATH` with Emscripten, with a
+  `curl/curl.h` whose every call fails (`web/curl`), rather than patching the store.
 
 ### Or pin the forks
 
