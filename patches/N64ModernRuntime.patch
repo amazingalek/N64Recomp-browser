@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web af4e99c6ec087edd35e81e7162b5fe0989139558
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 0df83343b7bf3076b0a35bec5d2d33d867275aa6
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -511,6 +511,21 @@ index ea1c49b..f621182 100644
  void recomp::mods::register_deprecated_mod(const std::string& mod_id, recomp::mods::DeprecationStatus deprecation_status, const Version& maximum_version) {
      std::lock_guard<std::mutex> lock(mod_context_mutex);
      mod_context->register_deprecated_mod(mod_id, deprecation_status, maximum_version);
+diff --git a/ultramodern/CMakeLists.txt b/ultramodern/CMakeLists.txt
+index 5593172..30d4f51 100644
+--- a/ultramodern/CMakeLists.txt
++++ b/ultramodern/CMakeLists.txt
+@@ -39,3 +39,10 @@ target_compile_options(ultramodern PRIVATE
+ if (WIN32)
+     add_compile_definitions(NOMINMAX)
+ endif()
++
++# osStopThread on another thread, and osStartThread on a thread stopped while it waited on a message queue, as libultra
++# does them (threads.cpp); without it, stopping another thread asserts.
++option(ULTRAMODERN_LIBULTRA_THREAD_STOP "osStopThread/osStartThread on another thread as libultra does them (always on with Emscripten)" OFF)
++if (ULTRAMODERN_LIBULTRA_THREAD_STOP OR EMSCRIPTEN)
++    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_LIBULTRA_THREAD_STOP=1)
++endif()
 diff --git a/ultramodern/include/ultramodern/renderer_context.hpp b/ultramodern/include/ultramodern/renderer_context.hpp
 index d60c4ec..c543624 100644
 --- a/ultramodern/include/ultramodern/renderer_context.hpp
@@ -524,8 +539,34 @@ index d60c4ec..c543624 100644
          using WindowHandle = SDL_Window*;
  #elif defined(__APPLE__)
          struct WindowHandle {
+diff --git a/ultramodern/src/threadqueue.cpp b/ultramodern/src/threadqueue.cpp
+index f9c0fa1..2e376eb 100644
+--- a/ultramodern/src/threadqueue.cpp
++++ b/ultramodern/src/threadqueue.cpp
+@@ -43,14 +43,15 @@ PTR(OSThread) ultramodern::thread_queue_pop(RDRAM_ARG PTR(PTR(OSThread)) queue_)
+ bool ultramodern::thread_queue_remove(RDRAM_ARG PTR(PTR(OSThread)) queue_, PTR(OSThread) t_) {
+     debug_printf("[Thread Queue] Removing thread %d from queue 0x%08X\n", TO_PTR(OSThread, t_)->id, (uintptr_t)queue_);
+ 
+-    PTR(PTR(OSThread)) cur = queue_;
+-    while (cur != NULLPTR) {
+-        PTR(OSThread)* cur_ptr = queue_to_ptr(PASS_RDRAM queue_);
+-        if (*cur_ptr == t_) {
+-            *cur_ptr = TO_PTR(OSThread, *cur_ptr)->next;
++    PTR(OSThread)* cur = queue_to_ptr(PASS_RDRAM queue_);
++    while (*cur != NULLPTR) {
++        OSThread* cur_thread = TO_PTR(OSThread, *cur);
++        if (*cur == t_) {
++            *cur = cur_thread->next;
++            cur_thread->next = NULLPTR;
+             return true;
+         }
+-        cur = TO_PTR(OSThread, *cur_ptr)->next;
++        cur = &cur_thread->next;
+     }
+ 
+     return false;
 diff --git a/ultramodern/src/threads.cpp b/ultramodern/src/threads.cpp
-index 6e3ed18..5bce061 100644
+index 6e3ed18..b78b8a2 100644
 --- a/ultramodern/src/threads.cpp
 +++ b/ultramodern/src/threads.cpp
 @@ -147,6 +147,15 @@ void ultramodern::set_native_thread_name(const std::string& name) {
@@ -544,3 +585,59 @@ index 6e3ed18..5bce061 100644
  void ultramodern::set_native_thread_priority(ThreadPriority pri) {}
  #endif
  
+@@ -237,7 +246,26 @@ extern "C" void osStartThread(RDRAM_ARG PTR(OSThread) t_) {
+ 
+     // If this is a game thread, insert the new thread into the running queue and then check the running queue.
+     if (thread_self) {
++#if ULTRAMODERN_LIBULTRA_THREAD_STOP
++        // Only a stopped thread can be started (libultra ignores the call otherwise).
++        if (t->state != OSThreadState::STOPPED) {
++            return;
++        }
++        // A thread stopped by another thread while it was blocked on a message queue goes back on that queue,
++        // and the queue's first waiter is made runnable so that it rechecks the queue, like libultra does.
++        // Messages that arrived while the thread was stopped are picked up that way.
++        if (t->queue != NULLPTR && t->queue != ultramodern::running_queue) {
++            PTR(PTR(OSThread)) waiting_queue = t->queue;
++            ultramodern::thread_queue_insert(PASS_RDRAM waiting_queue, t_);
++            t->state = OSThreadState::BLOCKED;
++            ultramodern::schedule_running_thread(PASS_RDRAM ultramodern::thread_queue_pop(PASS_RDRAM waiting_queue));
++        }
++        else {
++            ultramodern::schedule_running_thread(PASS_RDRAM t_);
++        }
++#else
+         ultramodern::schedule_running_thread(PASS_RDRAM t_);
++#endif
+         ultramodern::check_running_queue(PASS_RDRAM1);
+     }
+     // Otherwise, immediately start the thread and terminate this one.
+@@ -278,9 +306,28 @@ extern "C" void osStopThread(RDRAM_ARG PTR(OSThread) t_) {
+     if (t_ == thread_self) {
+         ultramodern::run_next_thread_and_wait(PASS_RDRAM1);
+     }
++#if ULTRAMODERN_LIBULTRA_THREAD_STOP
++    // Stopping another thread: it is either waiting in the running queue or blocked on a message queue (only one
++    // game thread runs at a time). Take it off that queue so nothing schedules it until osStartThread, but keep
++    // t->queue so that osStartThread can put a blocked thread back where it was waiting.
++    else {
++        OSThread* t = TO_PTR(OSThread, t_);
++        if (t->state == OSThreadState::STOPPED) {
++            return;
++        }
++        if (t->queue != NULLPTR) {
++            ultramodern::thread_queue_remove(PASS_RDRAM t->queue, t_);
++        }
++        if (t->queue == ultramodern::running_queue) {
++            t->queue = NULLPTR;
++        }
++        t->state = OSThreadState::STOPPED;
++    }
++#else
+     else {
+         assert(false);
+     }
++#endif
+ }
+ 
+ extern "C" void osDestroyThread(RDRAM_ARG PTR(OSThread) t_) {
