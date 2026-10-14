@@ -172,8 +172,9 @@ cmake -P lib/N64Recomp-browser/patches/apply.cmake lib     # the folder holding 
 ```
 
 The patches change nothing in a desktop build (The forks). They are made on the upstream commits in `patches.txt`, and
-CI applies them to the ones Banjo-Kazooie, Majora's Mask, Donkey Kong 64 (Killklli's runtime and RecompFrontend) and
-Conker's Bad Fur Day pin (`patches/pins.txt`), and builds every library from Banjo-Kazooie's. Where a recomp's commit
+CI applies them to the ones Banjo-Kazooie, Majora's Mask, Donkey Kong 64 (Killklli's runtime and RecompFrontend),
+Conker's Bad Fur Day and GoldenEye 007 pin (`patches/pins.txt`; GoldenEye's upstream predates RecompFrontend, so its
+web fork pins the commits the forks are built on), and builds every library from Banjo-Kazooie's. Where a recomp's commit
 differs too much around a change for `git apply`, `apply.cmake` merges three ways against the upstream commit the
 patch was made on, fetched from the fork (Donkey Kong 64's RecompFrontend). One too far from them, before or after,
 may not apply at all (rt64's, plume's and hlslpp's newest upstream commits don't), or may build only with the game's
