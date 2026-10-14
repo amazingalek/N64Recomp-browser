@@ -15,12 +15,12 @@ Each game's repo builds its page with this repo; a page holds no ROM, the player
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | stutters (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | presents erratic, video memory fills (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | smooth, sound drops (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | stutters at first (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth | 2026-10-13, stand-in 2026-10-14 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | stutters (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | 30 fps at times (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | smooth, device lost in Windy (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | smooth (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 
 How each page plays on a Windows laptop's integrated graphics, or on a stand-in for one (a desktop GPU drawing a
 3840x2000 canvas), which finds problems but is gentler than a laptop. The goal is every one smooth in both browsers.
