@@ -31,8 +31,8 @@ What else each page was checked with, and its measurements, are in its repo.
   Firefox since pages keep at most 2 frames in flight (2026-10-13).
 - **GoldenEye 007**: headless Chrome through the intro, the menus and Dam on the keyboard, with sound. On the laptop
   it crawled in Firefox before v0.21.0, and hasn't been played there since (2026-10-13).
-- **Majora's Mask**: headless Chrome through the attract demo, file select, the intro, Link walking and the pause
-  menu (2026-10-13).
+- **Majora's Mask**: built from Zelda 64: Recompiled's own submodules with `patches/`, headless Chrome through the
+  attract demo, file select, the intro, Link walking and the pause menu (2026-10-14).
 - **Banjo-Kazooie**: built from Banjo: Recompiled's own submodules with `patches/`, headless Chrome to the intro
   (2026-10-14). The laptop's results are from before that, on the forks (2026-10-13).
 - **Conker's Bad Fur Day**: headless Chrome through the intro, the bar and Conker walking outside it, with sound;
@@ -239,7 +239,8 @@ Banjo-Kazooie's. What to expect from a recomp's own commits:
 
 - Near those: they apply. Where the code around a change differs too much for `git apply`, `apply.cmake` merges three
   ways against the commit the patch was made on, fetched from the fork, and says so (Donkey Kong 64's RecompFrontend
-  needs that).
+  needs that). On those very commits (Majora's Mask's `recomp-frontend` branch) every patch applies as it is, and the
+  recomp's own code builds unchanged.
 - Far from them, older or newer: a patch may not apply at all. `apply.cmake` then stops and names the files that
   conflict. rt64's, plume's and hlslpp's newest upstream commits don't take theirs today. Moving that one submodule
   to a commit nearer `patches.txt`'s (that commit itself always works), or pinning the forks (below), gets past it.
