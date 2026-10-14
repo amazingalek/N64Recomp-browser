@@ -61,7 +61,8 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   Firefox's frames came every 31 ms at the median, but 92 in two minutes took over 50 ms (Chrome's 3), its p99 62 ms
   against 32, with the Intel chip 79-89% busy against Chrome's 40-61%. On the RTX 2070 it reads
   no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
-  ~600 draws a frame. Its page is on v0.24.0 (2026-10-14), not yet played by hand on it. Banjo runs at 20-30
+  ~600 draws a frame. Since 2026-10-14 its page is built from Banjo: Recompiled's own upstream submodules with `patches/` applied (the
+  forks of v0.24.0, rt64-web at cb75c5c), checked in headless Chrome to the intro, not yet played by hand or on the laptop. Banjo runs at 20-30
   frames a second, interpolated to the display's rate, and a GPU that falls behind drops whole presents: some game
   frames were never shown and the rest shown one, two or three times, in both browsers. Since rt64-web e8e162e a page
   that drops presents gives every game frame the same number of them instead (one, on a 60 Hz display, until the GPU
