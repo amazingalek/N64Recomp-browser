@@ -1,0 +1,13 @@
+# One patch per project, <name>.patch here, made by tools/export_patches.sh from that project's fork: everything the
+# fork's main adds to the upstream commit it is on, but its README, .gitmodules and submodule pointers.
+#
+# <name> <folder in a recomp, from the one holding rt64, N64ModernRuntime and RecompFrontend> <fork> <upstream commit>
+#
+# The fork commit is the one forks.txt names, or for a fork inside another the one that fork's commit points at. The
+# upstream commit is the last one merged into the fork's main: move it when upstream is merged in again.
+rt64              rt64                        https://github.com/amazingalek/rt64-web              5473732a822a4423b5696e7cb18fecc425a59875
+plume             rt64/src/contrib/plume      https://github.com/amazingalek/plume-web             d890ac899e505fb30040e037a4037cdeca68f033
+hlslpp            rt64/src/contrib/hlslpp     https://github.com/amazingalek/hlslpp-web            6f5274c66132e8f951c400103d897582b8f21491
+N64ModernRuntime  N64ModernRuntime            https://github.com/amazingalek/N64ModernRuntime-web  589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1
+N64Recomp         N64ModernRuntime/N64Recomp  https://github.com/amazingalek/N64Recomp-web         81213c1831fab2521a6a5459c67b63437d67e253
+RecompFrontend    RecompFrontend              https://github.com/amazingalek/RecompFrontend-web    b2c5c18d73054416c844486611fd2c2b9d8a4927

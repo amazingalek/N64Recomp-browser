@@ -1,0 +1,499 @@
+RecompFrontend: https://github.com/amazingalek/RecompFrontend-web 06468f9a0d3cd68d008fa144f0960f4e41f6b757
+on upstream b2c5c18d73054416c844486611fd2c2b9d8a4927 (tools/export_patches.sh)
+
+diff --git a/recompinput/CMakeLists.txt b/recompinput/CMakeLists.txt
+index 899372b..9cd1199 100644
+--- a/recompinput/CMakeLists.txt
++++ b/recompinput/CMakeLists.txt
+@@ -44,6 +44,10 @@ if (WIN32)
+     target_include_directories(recompinput PRIVATE ${sdl2_SOURCE_DIR}/include)
+ elseif (APPLE OR CMAKE_SYSTEM_NAME MATCHES "Linux")
+     target_include_directories(recompinput PRIVATE ${SDL2_INCLUDE_DIRS})
++elseif (EMSCRIPTEN)
++    # Emscripten's port of SDL2.
++    target_compile_options(recompinput PRIVATE -sUSE_SDL=2)
++    target_include_directories(recompinput PRIVATE ${EMSCRIPTEN_SYSROOT}/include/SDL2)
+ endif()
+ 
+ target_compile_options(recompinput PRIVATE
+diff --git a/recompinput/src/input_state.cpp b/recompinput/src/input_state.cpp
+index 03ed871..ebbc5c7 100644
+--- a/recompinput/src/input_state.cpp
++++ b/recompinput/src/input_state.cpp
+@@ -68,6 +68,67 @@ void recompinput::poll_inputs() {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++#include <chrono>
++#include <string>
++#include <emscripten.h>
++#include <emscripten/threading.h>
++
++// Emscripten's SDL2 has no rumble (SDL_JoystickRumble is unsupported there), so on a page it goes to the browser's
++// Gamepad API, on the main thread where that is: vibrationActuator.playEffect("dual-rumble") on the gamepad behind
++// the joystick, its weak (high frequency) motor as SDL_JoystickRumble's is driven. SDL names a browser gamepad after
++// its id with the spaces tidied, so the gamepad is the k-th whose id reads as the joystick's name, for the k-th
++// joystick of that name in the order SDL saw them connect (instance id).
++EM_JS(void, recompinput_web_rumble, (const char *name_ptr, int rank, int strength), {
++    const tidy = (s) => s.replace(/\s+/g, ' ').trim();
++    const name = tidy(UTF8ToString(name_ptr));
++    for (const pad of navigator.getGamepads ? navigator.getGamepads() : []) {
++        if (!pad || tidy(pad.id) !== name || rank-- > 0) {
++            continue;
++        }
++        const actuator = pad.vibrationActuator;
++        if (actuator && strength > 0) {
++            actuator.playEffect('dual-rumble', { duration: 5000, strongMagnitude: 0, weakMagnitude: strength / 65535 })
++                .catch(() => {});
++        } else if (actuator) {
++            actuator.reset().catch(() => {});
++        }
++        return;
++    }
++});
++
++// Called every retrace for every pad. Only a change of strength goes to the page, and, since a browser ends an effect
++// after 5 seconds at most, a rumble still on once a second.
++static int web_rumble(SDL_Joystick* joystick, uint16_t strength) {
++    struct Played {
++        std::string name; // the page reads it after this returns, so it stays here
++        uint16_t strength = 0;
++        std::chrono::steady_clock::time_point at;
++    };
++    static std::unordered_map<SDL_JoystickID, Played> played;
++    SDL_JoystickID id = SDL_JoystickInstanceID(joystick);
++    auto now = std::chrono::steady_clock::now();
++    auto [it, added] = played.try_emplace(id);
++    Played &p = it->second;
++    if (!added && strength == p.strength && (strength == 0 || now - p.at < std::chrono::seconds(1))) {
++        return 0;
++    }
++    if (added) {
++        const char *name = SDL_JoystickName(joystick);
++        p.name = name ? name : "";
++    }
++    p.strength = strength;
++    p.at = now;
++    int rank = 0;
++    for (int i = 0; i < SDL_NumJoysticks(); i++) {
++        const char *name = SDL_JoystickNameForIndex(i);
++        rank += SDL_JoystickGetDeviceInstanceID(i) < id && p.name == (name ? name : "");
++    }
++    emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_VIII, recompinput_web_rumble, p.name.c_str(), rank, int(strength));
++    return 0;
++}
++#endif
++
+ void recompinput::set_rumble(int controller_num, bool on) {
+     InputState.rumble_active[controller_num] = on;
+ }
+@@ -88,7 +149,11 @@ void recompinput::update_rumble() {
+         if (state.rumble_failed) {
+            return;
+         }
++#ifdef __EMSCRIPTEN__
++        int err = web_rumble(joystick, rumble_strength);
++#else
+         int err = SDL_JoystickRumble(joystick, 0, rumble_strength, duration);
++#endif
+         if (err != 0) {
+             state.rumble_failed = true;
+         }
+diff --git a/recompui/CMakeLists.txt b/recompui/CMakeLists.txt
+index 4dce8e0..dd78891 100644
+--- a/recompui/CMakeLists.txt
++++ b/recompui/CMakeLists.txt
+@@ -55,6 +55,12 @@ add_compile_definitions(
+     __PRFCHWINTRIN_H
+ )
+ 
++if (EMSCRIPTEN)
++    # RmlUi's FreeType is Emscripten's port, in the build of it whose setjmp matches -fwasm-exceptions (legacy wasm
++    # exceptions, Emscripten's default); the plain build's setjmp needs JavaScript exceptions. Build it, and its headers,
++    # once with "embuilder build freetype-legacysjlj".
++    set(FREETYPE_LIBRARY "${EMSCRIPTEN_SYSROOT}/lib/wasm32-emscripten/libfreetype-legacysjlj.a" CACHE FILEPATH "")
++endif()
+ add_subdirectory(lib/RmlUi)
+ target_compile_definitions(rmlui_core PRIVATE LUNASVG_BUILD_STATIC)
+ 
+@@ -99,6 +105,14 @@ target_include_directories(recompui PUBLIC
+     ${CMAKE_BINARY_DIR}/shaders
+ )
+ 
++# With Emscripten, RT64 builds its shaders as WGSL (RT64_WGSL), and so do these: what its build_*_shader functions need
++# to do that, which RT64 sets for its own directory only.
++if (EMSCRIPTEN)
++    set(RT64_WGSL ON)
++    set(RT64_PLUME_WGSL "${RECOMP_FRONTEND_RT64_PATH}/src/contrib/plume/examples/cmake/modules/PlumeWGSL.cmake")
++    target_compile_definitions(recompui PRIVATE RT64_WGSL=1)
++endif()
++
+ build_vertex_shader(recompui "shaders/InterfaceVS.hlsl" "shaders/InterfaceVS.hlsl")
+ build_pixel_shader(recompui "shaders/InterfacePS.hlsl" "shaders/InterfacePS.hlsl")
+ 
+@@ -108,6 +122,11 @@ if (WIN32)
+     target_include_directories(recompui PRIVATE ${sdl2_SOURCE_DIR}/include)
+ elseif (APPLE OR CMAKE_SYSTEM_NAME MATCHES "Linux")
+     target_include_directories(recompui PRIVATE ${SDL2_INCLUDE_DIRS})
++elseif (EMSCRIPTEN)
++    # Emscripten's ports of SDL2 and FreeType (for RmlUi).
++    target_compile_options(recompui PUBLIC -sUSE_SDL=2 -sUSE_FREETYPE=1)
++    target_link_options(recompui PUBLIC -sUSE_SDL=2 -sUSE_FREETYPE=1)
++    target_include_directories(recompui PRIVATE ${EMSCRIPTEN_SYSROOT}/include/SDL2)
+ endif()
+ 
+ target_compile_options(recompui PRIVATE
+diff --git a/recompui/include/recompui/renderer.h b/recompui/include/recompui/renderer.h
+index 33f79ab..878d0f4 100644
+--- a/recompui/include/recompui/renderer.h
++++ b/recompui/include/recompui/renderer.h
+@@ -45,6 +45,15 @@ namespace recompui {
+ 
+         std::unique_ptr<ultramodern::renderer::RendererContext> create_render_context(uint8_t *rdram, ultramodern::renderer::WindowHandle window_handle, ultramodern::renderer::PresentationMode presentation_mode, bool developer_mode);
+ 
++        // Whether RT64 copies each frame it draws back into RDRAM (its render to RAM, on unless turned off), which a game
++        // that reads its own frames on the CPU needs. A render context reads it when it is made. It costs a second draw
++        // of the frame at the N64's resolution, and in a browser a wait of 5-6 ms per display list for the copy.
++        void set_render_to_ram(bool enabled);
++
++        // Whether that copy reaches RDRAM a display list late (RT64's renderToRAMLate, off unless turned on), so a list
++        // doesn't wait for it. A game whose CPU reads a frame it has just drawn reads the one before then.
++        void set_render_to_ram_late(bool late);
++
+         RT64::UserConfiguration::Antialiasing RT64MaxMSAA();
+         bool RT64SamplePositionsSupported();
+         bool RT64HighPrecisionFBEnabled();
+diff --git a/recompui/src/base/ui_launcher.h b/recompui/src/base/ui_launcher.h
+index eb8833e..cdac768 100644
+--- a/recompui/src/base/ui_launcher.h
++++ b/recompui/src/base/ui_launcher.h
+@@ -42,8 +42,11 @@ namespace recompui {
+             add_start_game_or_load_rom_option();
+             add_setup_controls_option();
+             add_settings_option();
++#ifndef __EMSCRIPTEN__
++            // A page has no mods (the live recompiler emits machine code), and a program that ends leaves it dead.
+             add_mods_option();
+             add_exit_option();
++#endif
+         }
+ 
+         std::vector<GameOption *> &get_options() { return options; }
+diff --git a/recompui/src/base/ui_state.cpp b/recompui/src/base/ui_state.cpp
+index 277a421..c50a769 100644
+--- a/recompui/src/base/ui_state.cpp
++++ b/recompui/src/base/ui_state.cpp
+@@ -1015,7 +1015,10 @@ void recompui::release_image(const std::string &src) {
+ }
+ 
+ void recompui::drop_files(const std::list<std::filesystem::path> &file_list) {
+-    // Prevent mod installation after the game has started.
++    // Prevent mod installation after the game has started, and on a page, where mods are off.
++#ifdef __EMSCRIPTEN__
++    return;
++#endif
+     if (ultramodern::is_game_started()) {
+         return;
+     }
+diff --git a/recompui/src/composites/ui_mod_installer.cpp b/recompui/src/composites/ui_mod_installer.cpp
+index 1f98b3c..5b9ee59 100644
+--- a/recompui/src/composites/ui_mod_installer.cpp
++++ b/recompui/src/composites/ui_mod_installer.cpp
+@@ -15,6 +15,9 @@ namespace recompui {
+         return file_path.extension() == ".so" || file_path.filename().string().find(".so.") != std::string::npos;
+ #elif defined(__APPLE__)
+         return file_path.extension() == ".dylib";
++#elif defined(__EMSCRIPTEN__)
++        // A page can't load a native library, and mods are off there anyway.
++        return false;
+ #else
+         static_assert(false, "Unimplemented for this platform.");
+ #endif
+diff --git a/recompui/src/composites/ui_mod_menu.cpp b/recompui/src/composites/ui_mod_menu.cpp
+index 02455fd..4683572 100644
+--- a/recompui/src/composites/ui_mod_menu.cpp
++++ b/recompui/src/composites/ui_mod_menu.cpp
+@@ -298,6 +298,9 @@ void ModMenu::open_mods_folder() {
+ #elif defined(__APPLE__)
+     std::string command = "open \"" + mods_directory.string() + "\"";
+     std::system(command.c_str());
++#elif defined(__EMSCRIPTEN__)
++    // A page has no folders to show; mods are off there anyway.
++    (void)mods_directory;
+ #else
+     static_assert(false, "Not implemented for this platform.");
+ #endif
+diff --git a/recompui/src/config/ui_config.cpp b/recompui/src/config/ui_config.cpp
+index 6c84c05..1e857c3 100644
+--- a/recompui/src/config/ui_config.cpp
++++ b/recompui/src/config/ui_config.cpp
+@@ -154,6 +154,8 @@ namespace recompui {
+         }
+         config_modal->set_selected_tab(0);
+         auto header_right = config_modal->get_header()->get_right();
++#ifndef __EMSCRIPTEN__
++        // On a page, ending the program leaves it dead: a reload or closing the tab is the way out there.
+         auto quit_button = config_modal->modal_root_context.create_element<IconButton>(header_right, "icons/Quit.svg", ButtonStyle::Basic);
+         quit_button->add_pressed_callback([]() {
+             if (ultramodern::is_game_started()) {
+@@ -162,6 +164,7 @@ namespace recompui {
+                 ultramodern::quit();
+             }
+         });
++#endif
+         auto close_button = config_modal->modal_root_context.create_element<IconButton>(header_right, "icons/X.svg", ButtonStyle::Basic);
+         close_button->add_pressed_callback([]() {
+             config::close();
+diff --git a/recompui/src/config/ui_config_tab_mods.cpp b/recompui/src/config/ui_config_tab_mods.cpp
+index 227e06d..10d95fe 100644
+--- a/recompui/src/config/ui_config_tab_mods.cpp
++++ b/recompui/src/config/ui_config_tab_mods.cpp
+@@ -15,6 +15,10 @@ void config::create_mods_tab(const std::string &name) {
+             context.create_element<ModMenu>(parent);
+         }
+     );
++#ifdef __EMSCRIPTEN__
++    // Mods are off on a page (the live recompiler emits machine code), so the tab is there for its id but not shown.
++    config::set_tab_visible(config::mods::id, false);
++#endif
+ 
+     recompui::update_mod_list(false);
+ }
+diff --git a/recompui/src/core/ui_context.cpp b/recompui/src/core/ui_context.cpp
+index e99229a..d732a2b 100644
+--- a/recompui/src/core/ui_context.cpp
++++ b/recompui/src/core/ui_context.cpp
+@@ -3,6 +3,11 @@
+ #include <unordered_map>
+ #include <fstream>
+ 
++#include <climits>
++#ifdef __EMSCRIPTEN__
++// Emscripten's <limits.h> defines PAGESIZE, the name of one of slot_map's template parameters.
++#undef PAGESIZE
++#endif
+ #include "slot_map.h"
+ #include "RmlUi/Core/StreamMemory.h"
+ #include "RmlUi/../../Source/Core/DocumentHeader.h"
+diff --git a/recompui/src/renderer/rt64_render_context.cpp b/recompui/src/renderer/rt64_render_context.cpp
+index a7954c7..afbf038 100644
+--- a/recompui/src/renderer/rt64_render_context.cpp
++++ b/recompui/src/renderer/rt64_render_context.cpp
+@@ -20,6 +20,8 @@ using namespace recompui;
+ static RT64::UserConfiguration::Antialiasing device_max_msaa = RT64::UserConfiguration::Antialiasing::None;
+ static bool sample_positions_supported = false;
+ static bool high_precision_fb_enabled = false;
++static bool render_to_ram = true;
++static bool render_to_ram_late = false;
+ 
+ static uint8_t DMEM[0x1000];
+ static uint8_t IMEM[0x1000];
+@@ -227,6 +229,9 @@ renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::Window
+     appCore.window = window_handle.window;
+ #elif defined(__linux__) || defined(__ANDROID__)
+     appCore.window = window_handle;
++#elif defined(__EMSCRIPTEN__)
++    // RT64 draws on the page's canvas, the one SDL's window is.
++    appCore.window = "#canvas";
+ #elif defined(__APPLE__)
+     appCore.window.window = window_handle.window;
+     appCore.window.view = window_handle.view;
+@@ -272,6 +277,8 @@ renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::Window
+ 
+     // Create the RT64 application.
+     app = std::make_unique<RT64::Application>(appCore, appConfig);
++    app->emulatorConfig.framebuffer.renderToRAM = render_to_ram;
++    app->emulatorConfig.framebuffer.renderToRAMLate = render_to_ram_late;
+ 
+     // Set initial user config settings based on the current settings.
+     auto& cur_config = ultramodern::renderer::get_graphics_config();
+@@ -498,6 +505,14 @@ std::unique_ptr<ultramodern::renderer::RendererContext> renderer::create_render_
+     return std::make_unique<renderer::RT64Context>(rdram, window_handle, presentation_mode, developer_mode);
+ }
+ 
++void renderer::set_render_to_ram(bool enabled) {
++    render_to_ram = enabled;
++}
++
++void renderer::set_render_to_ram_late(bool late) {
++    render_to_ram_late = late;
++}
++
+ bool renderer::RT64SamplePositionsSupported() {
+     return sample_positions_supported;
+ }
+diff --git a/recompui/src/renderer/ui_renderer.cpp b/recompui/src/renderer/ui_renderer.cpp
+index 5ca5349..960e8b6 100644
+--- a/recompui/src/renderer/ui_renderer.cpp
++++ b/recompui/src/renderer/ui_renderer.cpp
+@@ -15,12 +15,19 @@
+ 
+ #include "ui_renderer.h"
+ 
++#if defined(RT64_WGSL)
++// WebGPU (RT64's WGSL build, always on with Emscripten): the shaders are WGSL only.
++#   include "InterfaceVS.hlsl.wgsl.h"
++#   include "InterfacePS.hlsl.wgsl.h"
++#else
+ // TODO: Forced game includes
+ #include "InterfaceVS.hlsl.spirv.h"
+ // TODO: Forced game includes
+ #include "InterfacePS.hlsl.spirv.h"
++#endif
+ 
+-#ifdef _WIN32
++#if defined(RT64_WGSL)
++#elif defined(_WIN32)
+ // TODO: Forced game includes
+ #   include "InterfaceVS.hlsl.dxil.h"
+ // TODO: Forced game includes
+@@ -32,7 +39,12 @@
+ #   include "InterfacePS.hlsl.metal.h"
+ #endif
+ 
+-#ifdef _WIN32
++#if defined(RT64_WGSL)
++#    define GET_SHADER_BLOB(name, format) \
++        ((format) == plume::RenderShaderFormat::WGSL ? name##BlobWGSL : nullptr)
++#    define GET_SHADER_SIZE(name, format) \
++        ((format) == plume::RenderShaderFormat::WGSL ? std::size(name##BlobWGSL) : 0)
++#elif defined(_WIN32)
+ #    define GET_SHADER_BLOB(name, format) \
+         ((format) == plume::RenderShaderFormat::SPIRV ? name##BlobSPIRV : \
+         (format) == plume::RenderShaderFormat::DXIL ? name##BlobDXIL : nullptr)
+@@ -109,7 +121,13 @@ class RmlRenderInterface_RT64_impl : public Rml::RenderInterfaceCompatibility {
+     static constexpr uint32_t initial_index_buffer_size = 1024 * sizeof(int);
+     static constexpr plume::RenderFormat RmlTextureFormat = plume::RenderFormat::R8G8B8A8_UNORM;
+     static constexpr plume::RenderFormat RmlTextureFormatBgra = plume::RenderFormat::B8G8R8A8_UNORM;
++    // RT64's swap chain format (ShaderLibrary::SwapChainFormat), which the menus draw into: rgba8unorm in a browser,
++    // where Firefox never frees a bgra8unorm canvas's frames.
++#if defined(__EMSCRIPTEN__)
++    static constexpr plume::RenderFormat SwapChainFormat = plume::RenderFormat::R8G8B8A8_UNORM;
++#else
+     static constexpr plume::RenderFormat SwapChainFormat = plume::RenderFormat::B8G8R8A8_UNORM;
++#endif
+     static constexpr uint32_t RmlTextureFormatBytesPerPixel = RenderFormatSize(RmlTextureFormat);
+     static_assert(RenderFormatSize(RmlTextureFormatBgra) == RmlTextureFormatBytesPerPixel);
+     plume::RenderInterface* interface_;
+diff --git a/recompui/src/util/file.cpp b/recompui/src/util/file.cpp
+index 7ee84ed..9b0eb43 100644
+--- a/recompui/src/util/file.cpp
++++ b/recompui/src/util/file.cpp
+@@ -1,7 +1,9 @@
+ #include "file.h"
+ 
+ #include <SDL.h>
++#ifndef __EMSCRIPTEN__
+ #include "nfd.h"
++#endif
+ #include "RmlUi/Core.h"
+ 
+ #include "recompui/program_config.h"
+@@ -17,9 +19,88 @@
+ #include <pwd.h>
+ #elif defined(__APPLE__)
+ #include "apple/rt64_apple.h"
++#elif defined(__EMSCRIPTEN__)
++#include <atomic>
++#include <cmath>
++#include <emscripten.h>
++#include <emscripten/threading.h>
+ #endif
+ 
+ namespace recompui {
++#if defined(__EMSCRIPTEN__)
++    // A browser has no file dialogs, only the page's file picker (an <input type="file">), and it hands over a file's
++    // bytes, not its path. So the main thread, where the page is, opens the picker, writes what is picked to
++    // /tmp/picked-<n>/ in the in-memory file system, and wakes the thread that asked, which gets those paths: the same
++    // as a native dialog that blocks until it closes. A browser only opens a picker on a click or a key the player
++    // has just pressed. If the click on the menu's button no longer counts as one by the time the request reaches the
++    // page, the page shows a button of its own for it.
++    EM_JS(void, recompui_web_pick_files, (int multiple, const char *folder_ptr, int32_t *state_ptr), {
++        const folder = UTF8ToString(folder_ptr), state = state_ptr >> 2;
++        const finish = (result) => { Atomics.store(HEAP32, state, result); Atomics.notify(HEAP32, state); };
++        const input = document.createElement('input');
++        input.type = 'file';
++        input.multiple = !!multiple;
++        input.addEventListener('cancel', () => finish(2));
++        input.addEventListener('change', async () => {
++            FS.mkdirTree(folder);
++            for (const file of input.files) {
++                FS.writeFile(folder + '/' + file.name, new Uint8Array(await file.arrayBuffer()));
++            }
++            finish(input.files.length > 0 ? 1 : 2);
++        });
++        if (!navigator.userActivation || navigator.userActivation.isActive) {
++            input.click();
++            return;
++        }
++        const prompt = document.createElement('div');
++        prompt.style.cssText = 'position:fixed;inset:0;display:flex;gap:1em;align-items:center;justify-content:center;' +
++            'background:rgba(0,0,0,0.6);z-index:1000';
++        const button = (text, action) => {
++            const b = document.createElement('button');
++            b.textContent = text;
++            b.style.cssText = 'font-size:1.2em;padding:0.6em 1.2em';
++            b.onclick = () => { prompt.remove(); action(); };
++            prompt.appendChild(b);
++        };
++        button(multiple ? 'Choose files' : 'Choose a file', () => input.click());
++        button('Cancel', () => finish(2));
++        document.body.appendChild(prompt);
++    });
++
++    static std::list<std::filesystem::path> pick_files(bool multiple) {
++        static int pick_count = 0;
++        const std::string folder = "/tmp/picked-" + std::to_string(++pick_count);
++        std::atomic<int32_t> state{0}; // 1 picked, 2 cancelled
++        emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_VIII, recompui_web_pick_files, int(multiple), folder.c_str(),
++            reinterpret_cast<int32_t *>(&state));
++        while (state.load() == 0) {
++            emscripten_futex_wait(&state, 0, INFINITY);
++        }
++        std::list<std::filesystem::path> paths;
++        if (state.load() == 1) {
++            for (const auto& entry : std::filesystem::directory_iterator(folder)) {
++                paths.push_back(entry.path());
++            }
++        }
++        return paths;
++    }
++
++    static void perform_file_dialog_operation(const std::function<void(bool, const std::filesystem::path&)>& callback) {
++        std::list<std::filesystem::path> paths = pick_files(false);
++        callback(!paths.empty(), paths.empty() ? std::filesystem::path{} : paths.front());
++        for (const auto& path : paths) {
++            std::filesystem::remove(path); // a copy in memory, of a file the callback has read or copied by now
++        }
++    }
++
++    static void perform_file_dialog_operation_multiple(const std::function<void(bool, const std::list<std::filesystem::path>&)>& callback) {
++        std::list<std::filesystem::path> paths = pick_files(true);
++        callback(!paths.empty(), paths);
++        for (const auto& path : paths) {
++            std::filesystem::remove(path);
++        }
++    }
++#else
+     static void perform_file_dialog_operation(const std::function<void(bool, const std::filesystem::path&)>& callback) {
+         nfdnchar_t* native_path = nullptr;
+         nfdresult_t result = NFD_OpenDialogN(&native_path, nullptr, 0, nullptr);
+@@ -57,6 +138,7 @@ namespace recompui {
+ 
+         callback(success, paths);
+     }
++#endif
+ 
+     std::filesystem::path file::get_app_folder_path() {
+         // directly check for portable.txt (windows and native linux binary)
+@@ -83,7 +165,8 @@ namespace recompui {
+         }
+ 
+         CoTaskMemFree(known_path);
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
++        // In a browser, HOME is /home/web_user, which the page keeps in its IndexedDB.
+         // check for APP_FOLDER_PATH env var
+         if (getenv("APP_FOLDER_PATH") != nullptr) {
+             return std::filesystem::path{getenv("APP_FOLDER_PATH")};

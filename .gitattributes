@@ -1,0 +1,2 @@
+# Applied byte for byte: a checkout with core.autocrlf must not give them CRLF line endings.
+patches/*.patch -text
