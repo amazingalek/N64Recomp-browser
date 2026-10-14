@@ -11,7 +11,9 @@ beside them, and its web build patches their checkouts (Using it in a recomp). I
 
 ## Games
 
-Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own.
+Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own. Rush 2049 aside,
+the games are here to build out and test the web support on more than one game: what one of them or one browser turns
+up is fixed in this repo or the forks unless it really is that game's own, so every game and both browsers get it.
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
