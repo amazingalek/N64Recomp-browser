@@ -7,7 +7,8 @@
 #   ninja -C <dir> web_libraries
 #
 # <forks> holds rt64, N64ModernRuntime and RecompFrontend, checked out with their submodules at the commits forks.txt
-# names (tools/fetch_forks.sh), and is tests/build/lib, where RecompFrontend finds the game header it includes from
+# names (tools/fetch_forks.sh) or at a recomp's own upstream commits with the patches in (tools/fetch_pins.sh
+# --all-submodules), and is tests/build/lib, where RecompFrontend finds the game header it includes from
 # five directories up in tests/build/patches/. The compile options are what every library of a page needs
 # (frontend/CMakeLists.txt).
 
@@ -23,7 +24,7 @@ if (NOT EMSCRIPTEN)
 endif()
 set(FORKS_DIR "" CACHE PATH "The checked out forks (tools/fetch_forks.sh)")
 if (NOT EXISTS "${FORKS_DIR}/rt64/CMakeLists.txt")
-    message(FATAL_ERROR "FORKS_DIR (${FORKS_DIR}) has no rt64: run tools/fetch_forks.sh first.")
+    message(FATAL_ERROR "FORKS_DIR (${FORKS_DIR}) has no rt64: run tools/fetch_forks.sh or tools/fetch_pins.sh first.")
 endif()
 
 add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")

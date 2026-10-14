@@ -1,0 +1,16 @@
+# The commits recomps built on RecompFrontend pin, which CI patches (tools/fetch_pins.sh, patches/apply.cmake), and
+# builds every library of a page from for the first: <recomp> <folder> <repository> <commit>. Each one's plume,
+# hlslpp and N64Recomp are the ones those commits point at, and an N64Recomp row is a recomp's own, beside them.
+Banjo-Kazooie       rt64              https://github.com/rt64/rt64                          6f1c2d99a4ea571c139f449c326fd176ba8f3496
+Banjo-Kazooie       N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         ca568b6ad79b9029d14077f0c3ffa757727c5559
+Banjo-Kazooie       RecompFrontend    https://github.com/N64Recomp/RecompFrontend           d0d90ba49f46f4896aaeda362056c21b1e342561
+Majoras-Mask        rt64              https://github.com/rt64/rt64                          5473732a822a4423b5696e7cb18fecc425a59875
+Majoras-Mask        N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1
+Majoras-Mask        RecompFrontend    https://github.com/N64Recomp/RecompFrontend           b2c5c18d73054416c844486611fd2c2b9d8a4927
+Donkey-Kong-64      rt64              https://github.com/rt64/rt64                          e437f2a5010b813cf5827b84fa249997ea910903
+Donkey-Kong-64      N64ModernRuntime  https://github.com/Killklli/N64ModernRuntime          8fe786b52177d087821cf3affb85296f663b508d
+Donkey-Kong-64      RecompFrontend    https://github.com/Killklli/RecompFrontend            57939cca97ba5892726c1787f5c048bcb5155324
+Conkers-Bad-Fur-Day rt64              https://github.com/rt64/rt64                          43373749dac9bbc1b653e6a02aed40a9e1783bed
+Conkers-Bad-Fur-Day N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         cdf5abbd5026fef5c364c676e4667c45e42b6863
+Conkers-Bad-Fur-Day RecompFrontend    https://github.com/N64Recomp/RecompFrontend           b1a1477c6556aeb7ed45defbfb5924f721efebc1
+Conkers-Bad-Fur-Day N64Recomp         https://github.com/N64Recomp/N64Recomp                ffb39cdad1da5de07eaaa48bd1db4a89a7986771

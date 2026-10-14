@@ -25,6 +25,13 @@
 
 set(N64RECOMP_BROWSER_PATCHES_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
+# A hash of a checkout's changes to its files (under <sub>, in a repository it shares).
+function(_n64recomp_browser_changes top sub out)
+    execute_process(COMMAND git diff HEAD --binary -- "./${sub}" WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE diff)
+    string(SHA1 hash "${diff}")
+    set(${out} ${hash} PARENT_SCOPE)
+endfunction()
+
 # Patches one project's checkout, <dir>, with <name>.patch.
 function(n64recomp_browser_apply_patch name dir)
     set(patch "${N64RECOMP_BROWSER_PATCHES_DIR}/${name}.patch")
@@ -47,11 +54,24 @@ function(n64recomp_browser_apply_patch name dir)
         list(APPEND apply "--directory=${sub}")
     endif()
 
+    # Patched already: the patch comes out again, or the checkout's changes are what they were when it went in (a
+    # three-way merge, which the reverse can't take out), kept in the checkout's git dir.
     execute_process(COMMAND ${apply} --reverse --check "${patch}" WORKING_DIRECTORY "${top}"
         RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
     if (result EQUAL 0)
         return()
     endif()
+    execute_process(COMMAND git rev-parse --path-format=absolute --git-path "n64recomp-browser-${name}"
+        WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE stamp OUTPUT_STRIP_TRAILING_WHITESPACE)
+    file(SHA1 "${patch}" patch_hash)
+    _n64recomp_browser_changes("${top}" "${sub}" changes)
+    if (EXISTS "${stamp}")
+        file(READ "${stamp}" stamped)
+        if (stamped STREQUAL "${patch_hash} ${changes}")
+            return()
+        endif()
+    endif()
+
     execute_process(COMMAND ${apply} "${patch}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result ERROR_VARIABLE plain)
     if (result EQUAL 0)
         message(STATUS "N64Recomp-browser: patched ${name} (${dir})")
@@ -66,11 +86,18 @@ function(n64recomp_browser_apply_patch name dir)
     message(STATUS "N64Recomp-browser: ${name} needs a three-way merge, fetching ${base} from ${fork}")
     execute_process(COMMAND git fetch -q --depth 1 "${fork}" "${base}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result)
     if (result EQUAL 0)
-        execute_process(COMMAND ${apply} --3way "${patch}" WORKING_DIRECTORY "${top}"
+        # --3way merges against the index, so it works in an index of its own holding the checkout's files as they
+        # are (its own changes included), and the checkout's index stays as it was.
+        set(index "${stamp}.index")
+        set(env ${CMAKE_COMMAND} -E env "GIT_INDEX_FILE=${index}")
+        execute_process(COMMAND ${env} git read-tree HEAD WORKING_DIRECTORY "${top}")
+        execute_process(COMMAND ${env} git add -u -- "./${sub}" WORKING_DIRECTORY "${top}")
+        execute_process(COMMAND ${env} ${apply} --3way "${patch}" WORKING_DIRECTORY "${top}"
             RESULT_VARIABLE result ERROR_VARIABLE merged)
-        # --3way stages what it merged; leave the index as the recomp had it.
-        execute_process(COMMAND git reset -q WORKING_DIRECTORY "${top}")
+        file(REMOVE "${index}")
         if (result EQUAL 0)
+            _n64recomp_browser_changes("${top}" "${sub}" changes)
+            file(WRITE "${stamp}" "${patch_hash} ${changes}")
             message(STATUS "N64Recomp-browser: patched ${name} (${dir}) with a three-way merge")
             return()
         endif()

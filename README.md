@@ -10,7 +10,8 @@ build a page with it, each from a fork of its own: the table under Games says wh
 
 ## Games
 
-Each game's repo builds its page from these forks; a page holds no ROM, the player loads their own.
+Each game's repo builds its page from these forks, pinned as its submodules or, for Banjo-Kazooie, patched into the
+upstream submodules it already has (Using it in a recomp); a page holds no ROM, the player loads their own.
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox |
 |---|---|---|---|---|
@@ -133,17 +134,24 @@ change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default
 of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
 `RenderSwapChain::isWaitReady()` (always true but on WebGPU), which change nothing there. Each commit's message says what it does and why.
 
+`patches/` holds each fork as one patch, everything its `main` adds to the upstream commit it is on, so a recomp can
+take the web support without moving its submodules to the forks (Using it in a recomp).
+
 ## This repo
 
 - `forks.txt`: the fork commits that work together. A tag here is a release: a recomp pins its submodules to the
-  commits `forks.txt` names at that tag.
+  commits `forks.txt` names at that tag, or applies the patches at that tag.
+- `patches/`: each fork at `forks.txt`'s commit as a patch on the upstream commit it is on (`patches.txt`), made by
+  `tools/export_patches.sh`; `apply.cmake`, which patches a recomp's own checkouts with them (its header says how);
+  and `pins.txt`, the upstream commits recomps pin, which CI patches.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` works too)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
   or Edge, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
-- `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), and `publish_page.sh` puts
+- `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), `fetch_pins.sh` a recomp's
+  own commits in `patches/pins.txt`, patched, and `publish_page.sh` puts
   a recomp's built page on its repo's GitHub Pages, as the only commit on an orphan `gh-pages` branch (its header says
   how). A page holds the recompiled code, so it is built where the ROM is, never in CI.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
@@ -152,10 +160,27 @@ of the forks is the upstream one, but for the declarations N64Recomp-web adds to
 
 ## Using it in a recomp
 
-Point the recomp's `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at the forks, at the commits in
-`forks.txt`, and add this repo as a submodule too. Then, in the recomp's CMakeLists.txt, with Emscripten:
+Add this repo as a submodule, and keep the recomp's own `rt64`, `N64ModernRuntime` and `RecompFrontend`: the web
+build patches their checkouts. Before building N64Recomp from the recomp's `N64ModernRuntime/N64Recomp` (the page
+needs the code the patched one writes, below), from the recomp's folder:
+
+```bash
+cmake -P lib/N64Recomp-browser/patches/apply.cmake lib     # the folder holding rt64, N64ModernRuntime, RecompFrontend
+```
+
+The patches change nothing in a desktop build (The forks). They are made on the upstream commits in `patches.txt`, and
+CI applies them to the ones Banjo-Kazooie, Majora's Mask, Donkey Kong 64 (Killklli's runtime and RecompFrontend) and
+Conker's Bad Fur Day pin (`patches/pins.txt`), and builds every library from Banjo-Kazooie's. Where a recomp's commit
+differs too much around a change for `git apply`, `apply.cmake` merges three ways against the upstream commit the
+patch was made on, fetched from the fork (Donkey Kong 64's RecompFrontend). One too far from them, before or after,
+may not apply at all (rt64's, plume's and hlslpp's newest upstream commits don't), or may build only with the game's
+own code changed: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes
+arguments, not a `recomp::Configuration`. A recomp can pin its submodules to the forks at `forks.txt`'s commits
+instead, as Rush 2049 and the other games do. Then, in the recomp's CMakeLists.txt, with Emscripten:
 
 ```cmake
+include(<this repo>/patches/apply.cmake)                 # patches the checkouts, if they aren't already
+n64recomp_browser_apply_patches(<the folder holding them>)
 add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
 add_link_options(-pthread -fwasm-exceptions -mtail-call)
 include(<this repo>/frontend/build_speed.cmake)          # ccache, if it is on PATH
@@ -177,7 +202,7 @@ the live recompiler emits machine code, which a page can't load. A recomp's buil
 
 What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt do each):
 
-- Generate the recompiled code with N64Recomp-web (N64ModernRuntime-web's `N64Recomp`) and build it with
+- Generate the recompiled code with N64Recomp-web (N64ModernRuntime-web's `N64Recomp`, or the recomp's own patched) and build it with
   `-Werror=implicit-function-declaration`. wasm-ld turns a call whose signature doesn't match the callee into a trap,
   and upstream's `funcs.h` leaves out some of what the C calls (the runtime's libultra replacements, ignored functions,
   `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp:
@@ -293,6 +318,8 @@ A change to a fork is a commit on its `main` branch, made on top of what is ther
 tags pin those commits). Then bump `forks.txt` here to the new commit, and to the new rt64-web or
 N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or N64Recomp-web (their submodule pointer
 moves with it). To move a fork to a newer upstream commit, merge that commit into `main` and say in the merge's message
-what upstream brought. Tag a release once a recomp has run it.
+what upstream brought, and move its upstream commit in `patches/patches.txt`. With every change to either, run
+`tools/export_patches.sh` and commit the patches with it: CI checks that they match. A patch that stops applying to a
+recomp's commits in `patches/pins.txt` means the fork has to change. Tag a release once a recomp has run it.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.

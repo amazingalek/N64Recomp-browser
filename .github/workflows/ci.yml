@@ -101,17 +101,44 @@ jobs:
           google-chrome --version
           CHROME="$(command -v google-chrome)" node tests/wgsl_check.mjs "$(dirname "$(find rt64-wgsl -name '*.wgsl' | head -1)")"
 
-  # Every library a page is made of, built with Emscripten from the forks (tests/build/CMakeLists.txt).
+  # The patches (patches/) are the forks at forks.txt's commits, and patches/apply.cmake patches every recomp's own
+  # upstream commits in patches/pins.txt with them.
+  patches:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: The patches match the forks
+        run: |
+          bash tools/export_patches.sh "$RUNNER_TEMP/forks"
+          git diff --exit-code --stat -- patches/ || { echo "run tools/export_patches.sh and commit patches/"; exit 1; }
+      - name: They apply to every recomp's commits
+        run: |
+          for recomp in $(grep -v '^#' patches/pins.txt | awk '{ print $1 }' | sort -u); do
+            bash tools/fetch_pins.sh "$RUNNER_TEMP/pins/$recomp" "$recomp"
+            cmake -P patches/apply.cmake "$RUNNER_TEMP/pins/$recomp"   # a second time changes nothing
+          done
+
+  # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
+  # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [forks, Banjo-Kazooie]
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       # In tests/build/lib, for the header RecompFrontend takes from its game (tests/build/patches/ui_funcs.h).
-      - name: Forks
-        run: bash tools/fetch_forks.sh tests/build/lib
+      - name: ${{ matrix.source }}
+        run: |
+          if [ "${{ matrix.source }}" = forks ]; then bash tools/fetch_forks.sh tests/build/lib
+          else bash tools/fetch_pins.sh tests/build/lib "${{ matrix.source }}" --all-submodules; fi
       - uses: actions/cache@v4
         id: naga
         with:
