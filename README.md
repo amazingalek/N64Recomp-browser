@@ -29,8 +29,10 @@ What else each page was checked with, and its measurements, are in its repo.
 
 - **San Francisco Rush 2049**: launcher, menus, races, sound, keyboard and gamepads. Not played on the laptop in
   Firefox since pages keep at most 2 frames in flight (2026-10-13).
-- **GoldenEye 007**: headless Chrome through the intro, the menus and Dam on the keyboard, with sound. On the laptop
-  it crawled in Firefox before v0.21.0, and hasn't been played there since (2026-10-13).
+- **GoldenEye 007**: built from upstream rt64, N64ModernRuntime and RecompFrontend with `patches/`, at the commits the
+  forks are built on (its own upstream predates RecompFrontend), headless Chrome through the intro, mission select and
+  Dam on the keyboard, with sound (2026-10-14). On the laptop it crawled in Firefox before v0.21.0, and hasn't been
+  played there since.
 - **Majora's Mask**: built from Zelda 64: Recompiled's own submodules with `patches/`, headless Chrome through the
   attract demo, file select, the intro, Link walking and the pause menu (2026-10-14).
 - **Banjo-Kazooie**: built from Banjo: Recompiled's own submodules with `patches/`, headless Chrome to the intro
