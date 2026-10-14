@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web e46bf1943eae13f7e7e9a772fa6eb610667a0c57
+rt64: https://github.com/amazingalek/rt64-web c6cf6c4d34f71dd18bda5dec879dbf551605b0d1
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -4718,24 +4718,27 @@ index dcc88b2..5e56d4b 100644
      const bool oddColumn = (texelInt.x & 1);
      const bool isRgba32 = and(fmt == G_IM_FMT_RGBA, siz == G_IM_SIZ_32b);
 diff --git a/src/shaders/TextureSampler.hlsli b/src/shaders/TextureSampler.hlsli
-index 1ceb2ce..2da4614 100644
+index 1ceb2ce..ec3f828 100644
 --- a/src/shaders/TextureSampler.hlsli
 +++ b/src/shaders/TextureSampler.hlsli
-@@ -24,6 +24,59 @@
+@@ -24,6 +24,62 @@
  #define USE_FOR_LOOPS 0
  #endif
  
 +// Where a tile's texture is. With descriptor indexing, textureIndex is the texture cache index of the tile's texture
 +// (set 1) or of its TMEM (set 2). Without it (PER_DRAW_TEXTURES), the renderer binds each draw's textures in a set of
 +// their own, one slot per tile of the draw, so a texture is picked by the tile's number within its draw, which
-+// drawGPUTile() puts in the bits of textureIndex above the cache index. The cache index still finds the TMEM, in
-+// gTMEMPool. A switch picks the slot, since core WebGPU can't index bindings.
++// drawGPUTile() puts in drawSlot. The cache index still finds the TMEM, in gTMEMPool. A switch picks the slot, since
++// core WebGPU can't index bindings. The slot is never read from a buffer, so a specialized shader that knows the
++// tile's number (one without mip LOD) knows its slot, and spirv-opt keeps only that case. In the bits of textureIndex,
++// every texture read stayed a switch of 8 reads: a prebuilt pixel shader without LOD is a third of the WGSL without
++// it, and in Firefox 158, which builds pipelines one at a time, Majora's Mask's Clock Town took 9.3-10.4 s against
++// 15.1-18.2 s and Rush 2049's boot 11.9-12.6 s against 13.6-14.6 s (RTX 2070). Shaders with LOD keep the switch.
 +#ifdef PER_DRAW_TEXTURES
-+#define TILE_SLOT_SHIFT 28
-+#define tileTMEM(gpuTile) (((gpuTile).textureIndex & ((1U << TILE_SLOT_SHIFT) - 1U)) * RDP_TMEM_BYTES)
++#define tileTMEM(gpuTile) ((gpuTile).textureIndex * RDP_TMEM_BYTES)
 +
 +#define TILE_TEXTURE_SWITCH(gpuTile, TEXTURE_CALL) \
-+    switch ((gpuTile).textureIndex >> TILE_SLOT_SHIFT) { \
++    switch ((gpuTile).drawSlot) { \
 +    case 0: return TEXTURE_CALL(gTileTexture0); \
 +    case 1: return TEXTURE_CALL(gTileTexture1); \
 +    case 2: return TEXTURE_CALL(gTileTexture2); \
@@ -4748,7 +4751,7 @@ index 1ceb2ce..2da4614 100644
 +
 +// The same with the slot's sampler (gTileSampler0 to 7), for a linear sample.
 +#define TILE_TEXTURE_SAMPLER_SWITCH(gpuTile, TEXTURE_SAMPLER_CALL) \
-+    switch ((gpuTile).textureIndex >> TILE_SLOT_SHIFT) { \
++    switch ((gpuTile).drawSlot) { \
 +    case 0: return TEXTURE_SAMPLER_CALL(gTileTexture0, gTileSampler0); \
 +    case 1: return TEXTURE_SAMPLER_CALL(gTileTexture1, gTileSampler1); \
 +    case 2: return TEXTURE_SAMPLER_CALL(gTileTexture2, gTileSampler2); \
@@ -4767,7 +4770,7 @@ index 1ceb2ce..2da4614 100644
 +GPUTile drawGPUTile(uint rdpTileIndex, uint tileIndex) {
 +    GPUTile gpuTile = GPUTiles[rdpTileIndex + tileIndex];
 +#ifdef PER_DRAW_TEXTURES
-+    gpuTile.textureIndex |= tileIndex << TILE_SLOT_SHIFT;
++    gpuTile.drawSlot = tileIndex;
 +#endif
 +    return gpuTile;
 +}
@@ -4781,7 +4784,7 @@ index 1ceb2ce..2da4614 100644
  void computeLOD(OtherMode otherMode, uint rdpTileCount, float2 primLOD, float resLodScale, float2 ddxUV, float2 ddyUV, inout int tileIndex0, inout int tileIndex1, out float lodFraction) {
      const bool usesLOD = (otherMode.textLOD() == G_TL_LOD);
      if (usesLOD) {
-@@ -101,20 +154,37 @@ float4 clampWrapMirrorSample(const RDPTile rdpTile, const GPUTile gpuTile, float
+@@ -101,20 +157,37 @@ float4 clampWrapMirrorSample(const RDPTile rdpTile, const GPUTile gpuTile, float
  
      // Check if tile requires TMEM decoding and sample using dynamic decoding.
      if (gpuTileUsesTMEM) {
@@ -4822,7 +4825,7 @@ index 1ceb2ce..2da4614 100644
      // Choose the native sampler that was determined to be compatible.
      switch (nativeSampler) {
          case NATIVE_SAMPLER_WRAP_WRAP:
-@@ -138,6 +208,57 @@ float4 sampleTextureNative(Texture2D texture, uint nativeSampler, int2 texelBase
+@@ -138,6 +211,57 @@ float4 sampleTextureNative(Texture2D texture, uint nativeSampler, int2 texelBase
              return texture.SampleLevel(gNearestClampClampSampler, nativeUVCoord, 0.0f);
      }
  }
@@ -4880,7 +4883,7 @@ index 1ceb2ce..2da4614 100644
  
  float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool filterBilerp, bool filterAverage, bool linearFiltering, float2 uvCoord, uint tlut, bool canDecodeTMEM, uint mipLevel, bool usesHDR) {
      float2 tcScale = gpuTile.tcScale;
-@@ -168,20 +289,19 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
+@@ -168,20 +292,19 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
  #endif
      }
      else {
@@ -4906,7 +4909,7 @@ index 1ceb2ce..2da4614 100644
          }
  #endif
      }
-@@ -272,8 +392,6 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+@@ -272,8 +395,6 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
  
      // Determine the RDP sample count and mip levels.
      if (flagHasMipmaps) {
@@ -4915,7 +4918,7 @@ index 1ceb2ce..2da4614 100644
          if (nativeSampler == NATIVE_SAMPLER_NONE) {
              float2 ddxUVScaled = ddxUV * gpuTile.tcScale;
              float2 ddyUVScaled = ddyUV * gpuTile.tcScale;
-@@ -292,28 +410,7 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+@@ -292,28 +413,7 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
              float2 ddxUVNorm = ddxUV / originalSize;
              float2 ddyUVNorm = ddyUV / originalSize;
              
@@ -5080,10 +5083,10 @@ index 0000000..3b0d71c
 +void storeUintSiz(RWBuffer<uint> buffer, uint index, uint value, uint siz) { buffer[index] = value; }
 +#endif
 diff --git a/src/shared/rt64_gpu_tile.h b/src/shared/rt64_gpu_tile.h
-index 4548f15..54c634b 100644
+index 4548f15..11ffa56 100644
 --- a/src/shared/rt64_gpu_tile.h
 +++ b/src/shared/rt64_gpu_tile.h
-@@ -55,10 +55,16 @@ namespace interop {
+@@ -55,10 +55,19 @@ namespace interop {
          float2 tcScale;
          uint2 texelShift;
          uint2 texelMask;
@@ -5093,7 +5096,10 @@ index 4548f15..54c634b 100644
          float3 textureDimensions;
 +        uint textureIndex;
          GPUTileFlags flags;
-+        uint pad[3];
++        // Set by the shader in its copy, never on the CPU: the tile's slot in its draw's texture set (PER_DRAW_TEXTURES,
++        // TextureSampler.hlsli).
++        uint drawSlot;
++        uint pad[2];
      };
 +#ifdef HLSL_CPU
 +    static_assert(sizeof(GPUTile) == 64, "GPUTile must keep the layout WGSL gives it.");
