@@ -12,10 +12,14 @@
 // That works whether the page is served here or comes from elsewhere (GitHub Pages), which can't fetch from here.
 //
 // A step is one of: ["wait", ms], ["until", regex, ms] (a console line), ["click", x, y] (CSS pixels in the
-// viewport), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["eval", js] (awaited; the page has
+// viewport), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
+// ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
 // n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
-// ["rom", x, y] (clicks there and gives the page the ROM) and ["shot", file] (a screenshot of the page). A tool can
-// add its own (record_shaders.mjs's "keep").
+// ["rom", x, y] (clicks there and gives the page the ROM), ["shot", file] (a screenshot of the page) and
+// ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
+// JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
+// press while it animates, is passed without timing the presses). A tool can add its own (record_shaders.mjs's
+// "keep").
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -117,6 +121,18 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'click') await page.click(a[0], a[1]);
       else if (op === 'key') { await page.key('down', a); await page.key('up', a); }
       else if (op === 'hold') { await page.key('down', a); await sleep(a[3]); await page.key('up', a); }
+      else if (op === 'down' || op === 'up') await page.key(op, a);
+      else if (op === 'pressUntil') {
+        const [code, key, keyCode, holdMs, everyMs, test, timeoutMs] = a;
+        await page.evaluate(rdramHelpers);
+        const end = Date.now() + timeoutMs;
+        const done = async () => { try { return await page.evaluate(`!!(${test})`) === true; } catch { return false; } };
+        while (!(await done())) {
+          if (Date.now() > end) { log(`timed out pressing ${key} until ${test}`); break; }
+          await page.key('down', [code, key, keyCode]); await sleep(holdMs); await page.key('up', [code, key, keyCode]);
+          await sleep(everyMs);
+        }
+      }
       else if (op === 'eval' || op === 'evalFile') {
         const js = (op === 'eval') ? a[0] : fs.readFileSync(path.resolve(planDir, a[0]), 'utf8');
         let value;
