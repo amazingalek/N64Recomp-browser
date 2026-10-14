@@ -19,7 +19,7 @@ Each game's repo builds its page with this repo; a page holds no ROM, the player
 | GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | erratic after its waits, sound drops (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | stutters (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth | 2026-10-13, stand-in 2026-10-14 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | smooth, device lost in Windy (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | smooth (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | erratic after its waits (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 
 How each page plays on a Windows laptop's integrated graphics, or on a stand-in for one (a desktop GPU drawing a
