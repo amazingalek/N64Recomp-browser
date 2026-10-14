@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 16e608ac5422a42b7391bbbf608c4c636e9b09a9
+plume: https://github.com/amazingalek/plume-web 97f4e64fa525b286b41317f27131cc1f6c9b211a
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2226,10 +2226,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..f280081
+index 0000000..cf8edbf
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,2834 @@
+@@ -0,0 +1,2887 @@
 +//
 +// plume
 +//
@@ -2242,6 +2242,7 @@ index 0000000..f280081
 +#include "plume_webgpu.h"
 +
 +#include <algorithm>
++#include <atomic>
 +#include <cmath>
 +#include <cstdio>
 +#include <cstring>
@@ -2271,6 +2272,13 @@ index 0000000..f280081
 +
 +namespace plume {
 +    static const uint32_t PushConstantsAlignment = 256;
++
++    // Unique to each WebGPU handle made, never reused as a handle's address can be: what the device's bind group cache
++    // knows a resource by.
++    static uint64_t newHandleSerial() {
++        static std::atomic<uint64_t> serial = 0;
++        return ++serial;
++    }
 +
 +    static WGPUStringView toStringView(const std::string &str) {
 +        return { str.c_str(), str.size() };
@@ -2607,6 +2615,7 @@ index 0000000..f280081
 +        }
 +
 +        buffer = wgpuDeviceCreateBuffer(device->device, &bufferDesc);
++        handleSerial = newHandleSerial();
 +        if ((desc.heapType == RenderHeapType::UPLOAD) || (desc.heapType == RenderHeapType::GPU_UPLOAD) || (desc.heapType == RenderHeapType::READBACK)) {
 +            shadow.resize(bufferDesc.size, 0);
 +        }
@@ -2807,6 +2816,7 @@ index 0000000..f280081
 +        }
 +
 +        texture = wgpuDeviceCreateTexture(device->device, &textureDesc);
++        handleSerial = newHandleSerial();
 +    }
 +
 +    WebGPUTexture::~WebGPUTexture() {
@@ -2880,6 +2890,7 @@ index 0000000..f280081
 +        }
 +
 +        view = wgpuTextureCreateView(texture->texture, &viewDesc);
++        handleSerial = newHandleSerial();
 +    }
 +
 +    WebGPUTextureView::~WebGPUTextureView() {
@@ -2914,6 +2925,7 @@ index 0000000..f280081
 +        const bool allLinear = (samplerDesc.magFilter == WGPUFilterMode_Linear) && (samplerDesc.minFilter == WGPUFilterMode_Linear) && (samplerDesc.mipmapFilter == WGPUMipmapFilterMode_Linear);
 +        samplerDesc.maxAnisotropy = (desc.anisotropyEnabled && allLinear) ? uint16_t(std::clamp(desc.maxAnisotropy, 1U, 16U)) : 1;
 +        sampler = wgpuDeviceCreateSampler(device->device, &samplerDesc);
++        handleSerial = newHandleSerial();
 +    }
 +
 +    WebGPUSampler::~WebGPUSampler() {
@@ -3089,6 +3101,7 @@ index 0000000..f280081
 +        layoutEntries.clear();
 +        groupEntries.clear();
 +        std::string key;
++        std::string entriesKey;
 +        for (const Binding &binding : bindings) {
 +            WGPUBindGroupLayoutEntry layoutEntry = WGPU_BIND_GROUP_LAYOUT_ENTRY_INIT;
 +            WGPUBindGroupEntry groupEntry = WGPU_BIND_GROUP_ENTRY_INIT;
@@ -3206,6 +3219,16 @@ index 0000000..f280081
 +
 +            key += entryKey;
 +            key += "v" + std::to_string(uint64_t(layoutEntry.visibility)) + ";";
++
++            // What the entry binds, for the device's bind group cache: a texture without a view binds its default one.
++            uint64_t serial = 0;
++            if (groupEntry.buffer != nullptr) serial = binding.buffer->handleSerial;
++            else if (groupEntry.sampler != nullptr) serial = binding.sampler->handleSerial;
++            else if (binding.textureView != nullptr) serial = binding.textureView->handleSerial;
++            else serial = binding.texture->handleSerial;
++            char boundKey[96];
++            snprintf(boundKey, sizeof(boundKey), "%u:%llu:%llu:%llu;", binding.binding, (unsigned long long)serial, (unsigned long long)groupEntry.offset, (unsigned long long)groupEntry.size);
++            entriesKey += boundKey;
 +            layoutEntries.emplace_back(layoutEntry);
 +            groupEntries.emplace_back(groupEntry);
 +        }
@@ -3219,11 +3242,11 @@ index 0000000..f280081
 +            wgpuBindGroupRelease(bindGroup);
 +        }
 +
-+        WGPUBindGroupDescriptor groupDesc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
-+        groupDesc.layout = layout;
-+        groupDesc.entryCount = groupEntries.size();
-+        groupDesc.entries = groupEntries.data();
-+        bindGroup = wgpuDeviceCreateBindGroup(device->device, &groupDesc);
++        // A layout lives as long as the device, so its address names it.
++        char layoutName[32];
++        snprintf(layoutName, sizeof(layoutName), "%p|", (void *)layout);
++        groupKey = layoutName + entriesKey;
++        bindGroup = device->getBindGroup(groupKey, layout, groupEntries);
 +        dirty = false;
 +    }
 +
@@ -3250,11 +3273,8 @@ index 0000000..f280081
 +            entry.buffer = buffer;
 +            entry.size = bindingSize;
 +            entries.emplace_back(entry);
-+            WGPUBindGroupDescriptor groupDesc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
-+            groupDesc.layout = getLayoutWithPushConstants();
-+            groupDesc.entryCount = entries.size();
-+            groupDesc.entries = entries.data();
-+            group = wgpuDeviceCreateBindGroup(device->device, &groupDesc);
++            const std::string key = groupKey + "pushConstants:" + std::to_string(chunkId) + ":" + std::to_string(bindingSize);
++            group = device->getBindGroup(key, getLayoutWithPushConstants(), entries);
 +        }
 +
 +        return group;
@@ -3836,6 +3856,7 @@ index 0000000..f280081
 +        WebGPUTexture *texture = textures[nextTextureIndex].get();
 +        texture->releaseHandle();
 +        texture->texture = surfaceTexture.texture;
++        texture->handleSerial = newHandleSerial();
 +        *textureIndex = nextTextureIndex;
 +        nextTextureIndex = (nextTextureIndex + 1) % textures.size();
 +        return true;
@@ -4765,6 +4786,10 @@ index 0000000..f280081
 +            wgpuPipelineLayoutRelease(it.second);
 +        }
 +
++        for (auto &it : bindGroups) {
++            wgpuBindGroupRelease(it.second.first);
++        }
++
 +        for (auto &it : bindGroupLayouts) {
 +            wgpuBindGroupLayoutRelease(it.second);
 +        }
@@ -4790,6 +4815,34 @@ index 0000000..f280081
 +        WGPUBindGroupLayout layout = wgpuDeviceCreateBindGroupLayout(device, &layoutDesc);
 +        bindGroupLayouts[key] = layout;
 +        return layout;
++    }
++
++    // A bind group with this key (the layout and what each entry binds) made before, or a new one, with a reference for
++    // the caller. The least recently used is released once there are more than BindGroupCacheSize.
++    WGPUBindGroup WebGPUDevice::getBindGroup(const std::string &key, WGPUBindGroupLayout layout, const std::vector<WGPUBindGroupEntry> &entries) {
++        auto it = bindGroups.find(key);
++        if (it != bindGroups.end()) {
++            bindGroupUses.splice(bindGroupUses.begin(), bindGroupUses, it->second.second);
++            wgpuBindGroupAddRef(it->second.first);
++            return it->second.first;
++        }
++
++        WGPUBindGroupDescriptor groupDesc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
++        groupDesc.layout = layout;
++        groupDesc.entryCount = entries.size();
++        groupDesc.entries = entries.data();
++        WGPUBindGroup group = wgpuDeviceCreateBindGroup(device, &groupDesc);
++        bindGroupUses.push_front(key);
++        bindGroups[key] = { group, bindGroupUses.begin() };
++        if (bindGroups.size() > BindGroupCacheSize) {
++            auto oldest = bindGroups.find(bindGroupUses.back());
++            wgpuBindGroupRelease(oldest->second.first);
++            bindGroups.erase(oldest);
++            bindGroupUses.pop_back();
++        }
++
++        wgpuBindGroupAddRef(group);
++        return group;
 +    }
 +
 +    WGPUPipelineLayout WebGPUDevice::getPipelineLayout(const std::vector<WGPUBindGroupLayout> &layouts) {
@@ -5066,10 +5119,10 @@ index 0000000..f280081
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..6273498
+index 0000000..078f0df
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,592 @@
 +//
 +// plume
 +//
@@ -5089,6 +5142,12 @@ index 0000000..6273498
 +// - Bind group layouts need each texture's sample type and each sampler's filtering, which plume's descriptor
 +//   ranges don't carry. So a descriptor set derives its layout from what is bound in it, and a pipeline is created
 +//   at draw time for the layouts of the sets bound then, and cached per pipeline layout.
++// - A bind group can't be destroyed: the browser frees one once JavaScript has collected it. A renderer that rewrites
++//   its descriptor sets every frame makes thousands a second, and Firefox (158, D3D12) collected them only after
++//   ~150k had piled up, holding ~700k descriptors of its heap's million; past it, creating one fails with Out of
++//   Memory and the device is lost. Most of them bind what a set held a frame or two before, so the device keeps bind
++//   groups by their layout and what they bind (each handle's handleSerial, never reused), the most recently used
++//   BindGroupCacheSize of them, and a set takes its group from there (WebGPUDevice::getBindGroup()).
 +// - Building a pipeline holds up the browser's GPU process (a large WGSL shader can take seconds), so a graphics
 +//   pipeline created with buildInBackground is built with createRenderPipelineAsync for the WebGPU layouts draws
 +//   with its plume layout have resolved to, and isReady() is false until every build has called back. Created before
@@ -5164,6 +5223,7 @@ index 0000000..6273498
 +
 +#include "plume_render_interface.h"
 +
++#include <list>
 +#include <map>
 +#include <set>
 +#include <unordered_map>
@@ -5173,6 +5233,7 @@ index 0000000..6273498
 +namespace plume {
 +    static const uint32_t PushConstantsGroup = 3;
 +    static const uint32_t PushConstantsBinding = 999;
++    static const size_t BindGroupCacheSize = 4096;
 +
 +    struct WebGPUBuffer;
 +    struct WebGPUCommandQueue;
@@ -5202,6 +5263,7 @@ index 0000000..6273498
 +
 +    struct WebGPUBuffer : RenderBuffer {
 +        WGPUBuffer buffer = nullptr;
++        uint64_t handleSerial = 0;
 +        WebGPUDevice *device = nullptr;
 +        RenderBufferDesc desc;
 +        std::vector<uint8_t> shadow;
@@ -5225,6 +5287,7 @@ index 0000000..6273498
 +    struct WebGPUTexture : RenderTexture {
 +        WGPUTexture texture = nullptr;
 +        WGPUTextureView defaultView = nullptr;
++        uint64_t handleSerial = 0;
 +        WebGPUDevice *device = nullptr;
 +        RenderTextureDesc desc;
 +        bool ownsTexture = true;
@@ -5240,6 +5303,7 @@ index 0000000..6273498
 +
 +    struct WebGPUTextureView : RenderTextureView {
 +        WGPUTextureView view = nullptr;
++        uint64_t handleSerial = 0;
 +        const WebGPUTexture *texture = nullptr;
 +        RenderTextureViewDesc desc;
 +
@@ -5249,6 +5313,7 @@ index 0000000..6273498
 +
 +    struct WebGPUSampler : RenderSampler {
 +        WGPUSampler sampler = nullptr;
++        uint64_t handleSerial = 0;
 +        RenderSamplerDesc desc;
 +
 +        WebGPUSampler(WebGPUDevice *device, const RenderSamplerDesc &desc);
@@ -5284,6 +5349,7 @@ index 0000000..6273498
 +        std::vector<WGPUBindGroupLayoutEntry> layoutEntries;
 +        std::vector<WGPUBindGroupEntry> groupEntries;
 +        std::string layoutKey;
++        std::string groupKey;
 +        WGPUBindGroupLayout layoutWithPushConstants = nullptr;
 +        std::map<std::pair<uint64_t, uint32_t>, WGPUBindGroup> groupsWithPushConstants;
 +        uint64_t bindingStagesRevision = 0;
@@ -5591,6 +5657,8 @@ index 0000000..6273498
 +        WGPUBindGroupLayoutEntry pushConstantsEntry = {};
 +        WGPUBindGroupLayout pushConstantsLayout = nullptr;
 +        std::unordered_map<std::string, WGPUBindGroupLayout> bindGroupLayouts;
++        std::unordered_map<std::string, std::pair<WGPUBindGroup, std::list<std::string>::iterator>> bindGroups;
++        std::list<std::string> bindGroupUses;
 +        std::unordered_map<uint32_t, WGPUShaderStage> bindingStages;
 +        uint64_t bindingStagesRevision = 0;
 +        std::map<std::vector<WGPUBindGroupLayout>, WGPUPipelineLayout> pipelineLayouts;
@@ -5626,6 +5694,7 @@ index 0000000..6273498
 +        bool beginCapture() override;
 +        bool endCapture() override;
 +        WGPUBindGroupLayout getBindGroupLayout(const std::string &key, const std::vector<WGPUBindGroupLayoutEntry> &entries);
++        WGPUBindGroup getBindGroup(const std::string &key, WGPUBindGroupLayout layout, const std::vector<WGPUBindGroupEntry> &entries);
 +        WGPUPipelineLayout getPipelineLayout(const std::vector<WGPUBindGroupLayout> &layouts);
 +        void pollQueue();
 +        void flushMappedBuffers();
