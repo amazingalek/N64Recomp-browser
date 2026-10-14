@@ -12,6 +12,8 @@
 # - audio_output.h: sound played on the browser's audio thread, which a recomp uses instead of SDL's queue: SDL2's
 #   port plays it from the page's thread, where it breaks up whenever WebGPU keeps that thread busy,
 # - worker_alert.js: alert() on a thread (SDL's message box) logged, where a worker would throw,
+# - thread_stdio.js: a thread's stdout and stderr printed without waiting for the page's thread, which Emscripten
+#   otherwise makes every printed line do,
 # - the page's WebGPU device (plume_webgpu_device.js),
 # - a link that fails on any wasm-ld warning (--fatal-warnings), for the one that matters: a call to a function whose
 #   signature doesn't match the call (`function signature mismatch`) links as a trap, which stops the page only when
@@ -34,6 +36,7 @@ target_link_options(n64recomp_browser_frontend INTERFACE
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/audio_output.js"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/worker_alert.js"
     "--pre-js=${rt64_SOURCE_DIR}/src/contrib/plume/plume_webgpu_device.js"
+    "--js-library=${CMAKE_CURRENT_SOURCE_DIR}/thread_stdio.js"
     "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/shell.html")
 target_sources(n64recomp_browser_frontend INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/audio_output.cpp")
 target_include_directories(n64recomp_browser_frontend INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -49,7 +52,7 @@ function(n64recomp_browser_frontend_page target)
     set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/persistent_home.js" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/sdl_audio.js"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/audio_output.js"
-        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/worker_alert.js"
+        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/worker_alert.js" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/thread_stdio.js"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shell.html" "${rt64_SOURCE_DIR}/src/contrib/plume/plume_webgpu_device.js")
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/coi_serviceworker.js"

@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 0df83343b7bf3076b0a35bec5d2d33d867275aa6
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 53b558364a089654b52ab98514e5423388214142
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -539,6 +539,22 @@ index d60c4ec..c543624 100644
          using WindowHandle = SDL_Window*;
  #elif defined(__APPLE__)
          struct WindowHandle {
+diff --git a/ultramodern/include/ultramodern/ultra64.h b/ultramodern/include/ultramodern/ultra64.h
+index 31eb106..50e8244 100644
+--- a/ultramodern/include/ultramodern/ultra64.h
++++ b/ultramodern/include/ultramodern/ultra64.h
+@@ -103,6 +103,11 @@ typedef struct OSThread_t {
+     uint16_t state;
+     OSId id;
+     int32_t pad3;
++#if UINTPTR_MAX == UINT32_MAX
++    // libultra's thprof, which a game may write (Banjo-Tooie does, creating its threads). A 64-bit host's pointer is
++    // aligned past it; a 32-bit one's (wasm) would sit here without this.
++    int32_t pad4;
++#endif
+     UltraThreadContext* context; // An actual pointer regardless of platform
+     int32_t sp;
+ } OSThread;
 diff --git a/ultramodern/src/threadqueue.cpp b/ultramodern/src/threadqueue.cpp
 index f9c0fa1..2e376eb 100644
 --- a/ultramodern/src/threadqueue.cpp

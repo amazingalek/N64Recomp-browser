@@ -103,6 +103,12 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   GoldenEye's main loop waited for its next frame that way, and its audio thread waited behind it: ~0.4 s of sound
   short at a time in Firefox, ~20% for ~40 s while Chrome built shaders. GoldenEye64Recomp-web's `patches/fps.c`
   yields in each poll (`recomp_yield_self_1ms`). A trace of count calls a second finds such a loop.
+- Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
+  stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
+  there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
+  for as long as a frame's work. Banjo-Tooie's upstream prints ~100 lines a second: on its title screen in headless
+  Chrome its sound was 12,900-13,400 frames short of ~2.1 million without it, 235-1,325 with it. A write to a file
+  still goes to the page's thread.
 - If the game needs render to RAM but can take a frame one display list old, call
   `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
   lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
@@ -278,7 +284,9 @@ amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU roundi
                                                                   tail calls as wasm tail calls
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
                                                                   without a guard region; built-in mods linked
-                                                                  in, their replacements and hooks as redirects
+                                                                  in, their replacements and hooks as redirects;
+                                                                  OSThread's context past libultra's thprof on
+                                                                  a 32-bit host
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
                                                                   and its copy a display list late as another
@@ -304,7 +312,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   and `pins.txt`, the upstream commits recomps pin, which CI patches.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` works too)
-  (its header says what each part does): threads, the page, HOME kept in IndexedDB, SDL2 audio from a thread, sound
+  (its header says what each part does): threads, the page, HOME kept in IndexedDB, a thread's prints without
+  waiting for the page's thread, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
   or Edge, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
@@ -315,7 +324,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   prebuilt shader list by a plan, and `play_page.mjs` plays a page, a build or one on Pages, by the same kind of plan in
   Chrome or Firefox and measures it: presents a second, sound frames short, WebGPU errors, the shader waits, the GPU's
   load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table.
-  `page_driver.mjs` drives both browsers for them (each header says how).
+  `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
+  of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.

@@ -54,7 +54,8 @@ const defaultExecutable = {
   firefox: process.platform === 'win32' ? 'C:/Program Files/Mozilla Firefox/firefox.exe' : 'firefox',
 };
 
-// A JSON-over-WebSocket protocol (CDP and BiDi both are): send(method, params) resolves to the reply.
+// A JSON-over-WebSocket protocol (CDP and BiDi both are): send(method, params) resolves to the reply, and
+// send(method, params, sessionId) goes to one of CDP's attached targets (a worker).
 const connect = async (url, onEvent) => {
   const ws = new WebSocket(url);
   await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
@@ -64,10 +65,10 @@ const connect = async (url, onEvent) => {
     const m = JSON.parse(event.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } else onEvent(m);
   };
-  return (method, params = {}) => new Promise((resolve) => {
+  return (method, params = {}, sessionId = undefined) => new Promise((resolve) => {
     const i = ++id;
     pending.set(i, resolve);
-    ws.send(JSON.stringify({ id: i, method, params }));
+    ws.send(JSON.stringify({ id: i, method, params, sessionId }));
   });
 };
 
@@ -161,13 +162,27 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   }
   if (!targets) throw new Error('Chrome never answered on its debugging port');
   let fileChooser = null;
-  const send = await connect(targets.find((t) => t.type === 'page').webSocketDebuggerUrl, (m) => {
+  // The game's threads are workers, and an exception on one reaches the page only as an ErrorEvent without its stack,
+  // so each worker is attached to as it starts and its exceptions are reported from there, stack and all (a wasm
+  // frame names its function if the page was linked with --profiling-funcs). Its console lines come through the page
+  // already, so only its exceptions are taken.
+  let send;
+  send = await connect(targets.find((t) => t.type === 'page').webSocketDebuggerUrl, (m) => {
+    if (m.method === 'Target.attachedToTarget') {
+      const session = m.params.sessionId;
+      send('Runtime.enable', {}, session).then(() => send('Runtime.runIfWaitingForDebugger', {}, session));
+      return;
+    }
     if (m.method === 'Page.fileChooserOpened') fileChooser = m.params;
-    if (m.method === 'Runtime.consoleAPICalled') line(m.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
+    if (m.method === 'Runtime.consoleAPICalled' && !m.sessionId) {
+      line(m.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
+    }
     if (m.method === 'Runtime.exceptionThrown') {
-      line('exception: ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text));
+      line((m.sessionId ? 'exception on a worker: ' : 'exception: ') +
+        (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text));
     }
   });
+  await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
