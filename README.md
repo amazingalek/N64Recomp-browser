@@ -88,8 +88,10 @@ run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both
   visits (26 s before); Frantic Factory's 55 about 1 s in Chrome, 3.6 s in Firefox. Render to RAM stays on, with
   the exact copy (v0.23.0, 2026-10-13): a Banana Fairy photo is a patch of the frame the CPU copies out of RDRAM. The
   copy a list late took a list from 6.0-7.2 ms to 2.1-2.2 in DK Isles (headless Chrome 155) and its photos came out
-  right, but the boot crashed with it (2 boots in about 26, the audio microcode jumping nowhere, none in about 12
-  exact): the game reuses a framebuffer's memory once the RDP is done with it, and a late copy can land on it after.
+  right, but the boot inflates the game's main code and data over the two framebuffers its logos drew, and a late
+  copy landing there crashed 6 boots in 72 (a function table out of bounds, or the audio microcode jumping
+  nowhere), with rt64-web cb75c5c too, which keeps every word the CPU changed: what it corrupts are words written
+  with the value they already held. None crashed with the copy taken late but never written, or exact.
 
 The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
 here are.
@@ -270,9 +272,13 @@ What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt
   Dam 3.8-5.2 ms against 8.0-9.7. It is
   wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
   its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
-  A framebuffer the CPU writes to before its copy lands keeps what the CPU wrote, and the console says so once, but
-  that check races the game thread: Donkey Kong 64 puts other data in a framebuffer's memory as soon as the RDP is
-  done, a late copy landing there crashed its boot now and then, and it keeps the exact copy too.
+  The game runs while a late copy is pending, so the copy keeps every word the CPU wrote to the framebuffer before or
+  while it lands (rt64-web cb75c5c) and the console reports each such write: run the page through the game's levels
+  with it and read those lines. Conker's CPU writes to framebuffers with a pending copy in every chapter, 89 times
+  over its shader plan, and the page plays the same; GoldenEye's never does. A word the CPU writes with the value it
+  already held looks untouched, though, and gets the frame, so it is also wrong for a game that puts code or data in
+  a framebuffer's memory once the RDP is done: Donkey Kong 64 inflates its main code and data over the framebuffers
+  of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too.
 - Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
