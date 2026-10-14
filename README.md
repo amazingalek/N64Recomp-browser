@@ -3,15 +3,15 @@
 Web support for N64 static recompilations built on [N64Recomp](https://github.com/N64Recomp/N64Recomp),
 [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), [RecompFrontend](https://github.com/N64Recomp/RecompFrontend)
 and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built with Emscripten into one page that draws
-through WebGPU. It is game-agnostic. It was written for San Francisco Rush 2049: Recompiled, and five more recomps
-build a page with it, each from a fork of its own: the table under Games says where each one is and how it plays.
+through WebGPU. It is game-agnostic. A recomp keeps its own submodules at the commits it pins and adds this repo
+beside them, and its web build patches their checkouts (Using it in a recomp). It was written for San Francisco Rush
+2049: Recompiled, and five more recomps build a page with it (Games).
 
 > Written almost entirely by AI (Claude), like the recomp it came from.
 
 ## Games
 
-Each game's repo builds its page from these forks, pinned as its submodules or, for Banjo-Kazooie, patched into the
-upstream submodules it already has (Using it in a recomp); a page holds no ROM, the player loads their own.
+Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own.
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox |
 |---|---|---|---|---|
@@ -25,80 +25,235 @@ upstream submodules it already has (Using it in a recomp); a page holds no ROM, 
 How each page plays on the integrated graphics of a Windows laptop (Intel UHD, Tiger Lake), by hand or in a scripted
 run of the page, as of 2026-10-13. A desktop GPU plays every one of them in both browsers, so the table leaves it out.
 "Not tested" means the page hasn't run there yet in that browser, "not retested" that it hasn't on its current forks.
+What else each page was checked with, and its measurements, are in its repo.
 
-- **San Francisco Rush 2049**: what this repo was written for. Launcher, menus, races, sound, keyboard and gamepads.
-  Firefox takes every frame a page presents, so its queue grows seconds behind a GPU that can't keep up. A page
-  keeps at most 2 frames in flight and skips presents when the GPU falls behind, as Chrome makes it (rt64-web
-  b8bdd0d, plume-web 0ddac9b): in Firefox on the RTX 2070 a frame waits 5-8 ms for the GPU instead of seconds, at
-  57-59 frames a second. Not yet played by hand that way on the laptop's Firefox (2026-10-13).
-- **GoldenEye 007**: cblock85's GoldenEye64Recomp moved onto RecompFrontend. Headless: the gun-barrel intro, the
-  credits, mission select, Dam on the keyboard, sound. Every level adds shaders: its prebuilt list, recorded by a
-  script, has the menus and every level's start, and the page builds each level's when the level first draws. Smooth
-  in Chrome on the Intel chip, crawling in Firefox there (2026-10-13). Render to RAM stays on, and the game reads a
-  frame back 3-33 times a second (up to 120 in some scenes), each read waiting for the GPU. Since rt64-web 73e9ca0 a
-  list's last copy lands when the next list starts, and the list doesn't wait for it: in Dam 3.8-5.2 ms a list against
-  8.0-9.7 with the exact copy, the lamps' glare still drawn (headless Chrome 155, RTX 2070, 2026-10-13); not yet
-  played that way on the Intel chip. Firefox's GPU process
-  looks for finished GPU work only after a submission or every 100 ms, so on a slow GPU a readback, or a present held
-  while 2 frames are in flight, waited for that timer. Since rt64-web d070e5c (plume-web 4f0a97e) a page submits
-  nothing once a millisecond while one waits. With a heavy pass added to every present to make the RTX 2070 slow,
-  Firefox went from 33-37 frames a second to 42-45 in GoldenEye, and from ~17 to 20-26 in Rush 2049 with render to RAM
-  forced on, its queue 25 ms behind instead of 45. Its page has it since 2026-10-13 (v0.21.0), not yet played that way
-  on the laptop. Before it, on the laptop in Firefox (scripted runs, a first visit): the intro's blood overlay,
-  whose shaders the boot section didn't hold yet, drew ~180 draws a frame with the ubershader, which halved the
-  frame rate there, and in 3 of 3 runs that reached it the game then fell to about a frame a second for good, each
-  frame waiting on its readback. Submitting while it waits, as v0.21.0 does, kept those runs at 28-45 frames a
-  second, and a second visit never fell. The boot section holds the intro and the cast credits, so a first visit builds none of their shaders
-  behind the game. Firefox's GPU process builds a section's shaders one at a time and presents nothing meanwhile: on
-  the RTX 2070 the game stood still 23 s for Dam's 55 on its first visit.
-- **Majora's Mask**: Zelda 64: Recompiled on upstream's `recomp-frontend` branch, its 20 frames a second
-  interpolated to the display's rate. Headless: the attract demo, title, file select, the intro, Link walking, the
-  pause menu. Its shader list is in sections, an area each (2026-10-13): the 39 pipelines of the boot are built
-  before the game, 2.4 s cold and 0.1 s on a later visit in headless Chrome (all 561 took 16 s and 11 s before), and
-  4.5 s in Firefox, which keeps no built pipelines between visits; Clock Town's section 1.6 s in Chrome, 14 s in Firefox.
-- **Banjo-Kazooie**: Banjo-Kazooie: Recompiled. Headless: boots, draws and plays, the intro's sound. On the Intel
-  chip smooth in Chrome and almost smooth in Firefox (2026-10-13): with no readback and no ubershader there,
-  Firefox's frames came every 31 ms at the median, but 92 in two minutes took over 50 ms (Chrome's 3), its p99 62 ms
-  against 32, with the Intel chip 79-89% busy against Chrome's 40-61%. On the RTX 2070 it reads
-  no frame back and draws nothing with the ubershader, so neither of GoldenEye's causes is Banjo's; it issues up to
-  ~600 draws a frame. Since 2026-10-14 its page is built from Banjo: Recompiled's own upstream submodules with `patches/` applied (the
-  forks of v0.24.0, rt64-web at cb75c5c), checked in headless Chrome to the intro, not yet played by hand or on the laptop. Banjo runs at 20-30
-  frames a second, interpolated to the display's rate, and a GPU that falls behind drops whole presents: some game
-  frames were never shown and the rest shown one, two or three times, in both browsers. Since rt64-web e8e162e a page
-  that drops presents gives every game frame the same number of them instead (one, on a 60 Hz display, until the GPU
-  keeps up again), and plume-web 01a7bac stops the display's rate reading lower under load (it read 20-39 on a
-  60 Hz display). With a heavy pass added to every present to make the RTX 2070 slow, 4-25 game frames in every 5 s
-  were never shown, and with it every frame was shown once, in Firefox and in Chrome. Every game's page has it since 2026-10-14 (v0.24.0).
-- **Conker's Bad Fur Day**: sciaschi's Conker's Bad Fur Day: Recompiled. Headless: the intro, the bar, Conker
-  walking outside it, sound. Render to RAM stays on (the camera and lens flares read the depth buffer), which made
-  a display list take 20-27 ms on the page against 7-11 without it, and the bar's menus 32-54 frames a second. Since
-  rt64-web 73e9ca0 the page copies a frame into RDRAM a list late, and the camera steps aside from walls the same way:
-  in Windy 10.7-11.8 ms a list against 14.8-16.4 with the exact copy (headless Chrome 155, a busy host). Its
-  shader list is in sections, a chapter each (2026-10-13): the boot's 75 pipelines 3.0 s cold and 0.2 s later in
-  headless Chrome (7.8 and 3.2 s as one list). Firefox refuses any view of more than 2 GB as a WebGPU
-  argument, and emdawnwebgpu passed setBindGroup's dynamic offsets as the whole wasm heap, which Conker grows past
-  that, so until rt64-web c3d781a (plume-web 94a4795, which copies them out) the page never started there. On the RTX
-  2070 in Firefox 157 the boot's section took 12.4 s and Windy's 14.7, then the bar drew 55 frames a second and
-  Windy 57 (Chrome 155 headless: 3.1 and 3.8 s, 59 and 59; 2026-10-13, a busy host). Not yet run on the Intel chip
-  in Firefox.
-- **Donkey Kong 64**: Donkey Kong 64: Recompiled. Headless: the DK Rap, a new game through the opening cutscenes, DK
-  walking in his house, the pause menu, sound. Its shader list is in sections, a world each (2026-10-13): the boot,
-  115 pipelines because every visit draws the whole DK Rap, 5.0 s cold and 0.4 s later in headless Chrome (all 245
-  took 10 and 5 s before), 15-17 s in Firefox, whose GPU process builds them one at a time and keeps none between
-  visits (26 s before); Frantic Factory's 55 about 1 s in Chrome, 3.6 s in Firefox. Render to RAM stays on, with
-  the exact copy (v0.23.0, 2026-10-13): a Banana Fairy photo is a patch of the frame the CPU copies out of RDRAM. The
-  copy a list late took a list from 6.0-7.2 ms to 2.1-2.2 in DK Isles (headless Chrome 155) and its photos came out
-  right, but the boot inflates the game's main code and data over the two framebuffers its logos drew, and a late
-  copy landing there crashed 6 boots in 72 (a function table out of bounds, or the audio microcode jumping
-  nowhere), with rt64-web cb75c5c too, which keeps every word the CPU changed: what it corrupts are words written
-  with the value they already held. None crashed with the copy taken late but never written, or exact.
+- **San Francisco Rush 2049**: launcher, menus, races, sound, keyboard and gamepads. Not played on the laptop in
+  Firefox since pages keep at most 2 frames in flight (2026-10-13).
+- **GoldenEye 007**: headless Chrome through the intro, the menus and Dam on the keyboard, with sound. On the laptop
+  it crawled in Firefox before v0.21.0, and hasn't been played there since (2026-10-13).
+- **Majora's Mask**: headless Chrome through the attract demo, file select, the intro, Link walking and the pause
+  menu (2026-10-13).
+- **Banjo-Kazooie**: built from Banjo: Recompiled's own submodules with `patches/`, headless Chrome to the intro
+  (2026-10-14). The laptop's results are from before that, on the forks (2026-10-13).
+- **Conker's Bad Fur Day**: headless Chrome through the intro, the bar and Conker walking outside it, with sound;
+  Firefox on a desktop GPU 55-57 frames a second in the bar and Windy (2026-10-13).
+- **Donkey Kong 64**: headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house and the pause
+  menu, with sound (2026-10-13).
+
+Every page is on v0.24.0 since 2026-10-14: when the GPU falls behind, each game frame is shown once instead of some
+never and others two or three times. None has been played that way on the laptop yet.
 
 The goal is every game here smooth in Chrome and Firefox, on integrated graphics too. No game is added until those
 here are.
 
 **Keep this table current.** Whoever plays a page by hand, or changes something that moves how a game plays (a
-fork, a game's page, its shader list), updates that game's row and the date in the same commit, and a new game gets
-a row before its port lands.
+fork, a game's page, its shader list), updates that game's row, its line and the date in the same commit, and a new
+game gets a row before its port lands. Measurements go in the game's own repo.
+
+## Using it in a recomp
+
+This is for a recomp built on RecompFrontend that already builds for the desktop. Its dependencies stay as they are:
+`rt64`, `N64ModernRuntime` and `RecompFrontend` remain its own submodules at the commits it pins, this repo is added
+beside them, and the web build patches their checkouts with `patches/`. The patches change nothing in a desktop build
+(The forks), and the changes stay in the checkouts, uncommitted.
+
+### 1. Add this repo
+
+```bash
+git submodule add https://github.com/amazingalek/N64Recomp-browser lib/N64Recomp-browser
+git -C lib/N64Recomp-browser checkout v0.25.0       # a tag: forks.txt and the patches/ made from it
+```
+
+### 2. Patch the checkouts
+
+From the recomp's folder, before building N64Recomp from its `N64ModernRuntime/N64Recomp` (the page needs the code
+the patched one writes, step 5):
+
+```bash
+cmake -P lib/N64Recomp-browser/patches/apply.cmake lib     # the folder holding rt64, N64ModernRuntime, RecompFrontend
+```
+
+That patches rt64 with the plume and hlslpp inside it, N64ModernRuntime with its N64Recomp, and RecompFrontend, on
+top of any changes the recomp makes to them itself, and leaves one that is patched already as it is. A project kept
+somewhere else is patched by name: `cmake -P lib/N64Recomp-browser/patches/apply.cmake N64Recomp tools/N64Recomp`.
+`apply.cmake`'s header says how to take a patch out again.
+
+### 3. The web build in CMakeLists.txt
+
+In the recomp's CMakeLists.txt, in an `if (EMSCRIPTEN)` block (the desktop build doesn't change):
+
+```cmake
+include(lib/N64Recomp-browser/patches/apply.cmake)       # patches the checkouts, if they aren't already
+n64recomp_browser_apply_patches(${CMAKE_SOURCE_DIR}/lib)
+add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
+add_link_options(-pthread -fwasm-exceptions -mtail-call)
+include(lib/N64Recomp-browser/frontend/build_speed.cmake)   # ccache, if it is on PATH
+set(RT64_PREBUILT_SHADER_LIST ${CMAKE_SOURCE_DIR}/<the game's shader list>)   # required: step 4
+# ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
+add_subdirectory(lib/N64Recomp-browser/frontend ${CMAKE_BINARY_DIR}/web_frontend)
+n64recomp_browser_frontend_page(<the recomp's executable>)
+```
+
+Build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
+`PATH` (SPIRV-Tools, `apt install spirv-tools`; without it the prebuilt shaders below come out several times the
+size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
+checkout with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
+says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
+without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and
+must be cross-origin isolated: served with `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`, or with `coi_serviceworker.js` beside it on a host that can't set
+headers (GitHub Pages). Mods a player adds are off: the live recompiler emits machine code, which a page can't load.
+A recomp's built-in mods work (step 5). BanjoRecomp-web's CMakeLists.txt and BUILDING.md are a whole port done this
+way.
+
+### 4. The recomp's own code
+
+What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
+
+- Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
+  `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
+  busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
+- No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
+  haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
+- RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
+  `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
+  are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
+  Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
+  framebuffers too (a Banana Fairy photo), and it is left on there (not tried off).
+- If the game needs render to RAM but can take a frame one display list old, call
+  `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
+  lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
+  of a list is late: one that a later part of the same list reads is still made in place. In headless Chrome, render
+  to RAM on: Conker's Bad Fur Day in Windy 10.7-11.8 ms a list against 14.8-16.4 ms with the exact copy, GoldenEye in
+  Dam 3.8-5.2 ms against 8.0-9.7. It is
+  wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
+  its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
+  The game runs while a late copy is pending, so the copy keeps every word the CPU wrote to the framebuffer before or
+  while it lands (rt64-web cb75c5c) and the console reports each such write: run the page through the game's levels
+  with it and read those lines. Conker's CPU writes to framebuffers with a pending copy in every chapter, 89 times
+  over its shader plan, and the page plays the same; GoldenEye's never does. A word the CPU writes with the value it
+  already held looks untouched, though, and gets the frame, so it is also wrong for a game that puts code or data in
+  a framebuffer's memory once the RDP is done: Donkey Kong 64 inflates its main code and data over the framebuffers
+  of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too.
+- Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
+  This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
+  shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
+  graphics in Chrome that is a frame a second for minutes, and Firefox, which builds a pipeline in line with
+  everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
+  starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are built before
+  the game starts, and each section after it, a level or a part of the game, when the game first draws with its
+  shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
+  the section is built: when a frame asks for at least 4 of a section's shaders that aren't built, the game waits for
+  the whole section. A description can be in several sections. One the list missed, or a few at a time, is built
+  behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
+  one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
+  later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
+  one visit, not every one. Set
+  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
+  `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
+  and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
+  come out as the same shaders and the same pipeline state share one. A line reading `background` also
+  starts a section of that name.
+- Record that list by code, not by playing: `tools/record_shaders.mjs` (its header says how) serves a build, opens it
+  in headless Chrome with `?record-shaders`, under which the page prebuilds nothing and prints an `rt64 shader:` line
+  for each description the game asks for, and follows a plan of the game's own, a JSON file of steps that reach each
+  level: keys, clicks, waits, and JavaScript that writes the game's memory. Each section is recorded from a fresh load
+  of the page, so it has everything its level draws, and what the boot draws goes above the first section. A plan
+  usually needs a small patch in the game that starts a level or shows a menu when the script asks, called once a
+  frame: GoldenEye's is `patches/shader_survey.c`, `tools/shader_plan.json` and `tools/record_shaders.sh` in
+  GoldenEye64Recomp-web. Why run the game at all: a shader is the RDP's state at a draw, the combiner and render
+  mode, and the game's code sets much of it as it draws, so no table in the ROM lists them. Record each level's start,
+  not the whole game: what a level draws later is mostly what its start drew, and the rest is built as it comes.
+  Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
+  105, about 4 MB, are then all built in 0.4-0.7 s and the panel never shows; a game whose list doesn't fit waits on
+  every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
+  Rush 2049's list, which has no sections, takes 6.3-7.2 s cold on 12 cores; 6 at a time it takes 10.0-10.8 s with
+  `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
+  differ only in what the shaders ignore come out the same. Rush 2049's list is
+  `src/rt64_shaders.txt` in its repo.
+
+### 5. What the build needs
+
+The rest is what a link or a run of the page shows when it is missing:
+
+- Generate the recompiled code with the N64Recomp built from the patched `N64ModernRuntime/N64Recomp` (or
+  N64Recomp-web), and build it with `-Werror=implicit-function-declaration`. wasm-ld turns a call whose signature doesn't match the callee into a trap,
+  and upstream's `funcs.h` leaves out some of what the C calls (the runtime's libultra replacements, ignored functions,
+  `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp:
+  a hook whose text calls the recomp's C declares it there (Donkey Kong 64's `load_dk64_overlay`, in `us.toml`).
+  A patch's call to a libultra function goes to the runtime's `<name>_recomp`, as the game's own calls do
+  (N64Recomp-web 9eb59c4; upstream calls `osInitialize(rdram, ctx)`, which reaches ultramodern's `osInitialize(void)`).
+- A game function with a C library name clashes with the library's declaration once `funcs.h` declares it:
+  GoldenEye has its own `strtol`, `strncmp`, `isalpha` and six more. List each in `[patches] renamed` in the game's
+  config and the patches' config, and it becomes `<name>_recomp` in both (N64Recomp-web ec0748e renames the patches'
+  calls to it too). N64Recomp-web also reads a jump table from the section that holds it, where upstream reads it at
+  the function's own ROM offset: GoldenEye keeps them all in a `.rodata` section of their own, so upstream's read
+  lands past the ROM's end.
+- Build the recompiled code with `-mtail-call` (the `add_compile_options` above). The MIPS code leaves a function
+  by jumping to another, a tail call, which the C writes as a call and a return. Natively clang makes that a jump; in
+  wasm it stays a call, so code that chains them without returning grows the stack until the browser stops the page
+  ("Maximum call stack size exceeded"): Conker's Bad Fur Day does, minutes in. With the tail call feature,
+  N64Recomp-web's C forces each one to a `return_call` (`RECOMP_TAIL_CALL` in `recomp.h`, `musttail`); clang won't
+  make one by itself, past the early return `RECOMP_FUNC_ENTRY` puts in every function. Without the flag the calls
+  stay plain ones.
+- A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
+  `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
+  function the patches call by its name, happens to work on x86 and traps in wasm, and only the link says so (wasm-ld's
+  `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
+  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and GoldenEye64Recomp-web `yield_self_1ms` in
+  `recomp_yield_self_1ms`.
+- The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
+  and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
+- A built-in mod (`recomp::mods::register_embedded_mod`) is recompiled to C at build time and linked in:
+  `n64recomp_browser_precompiled_mod(<target> <mod.nrm> <the recomp's syms.toml> <name>)`, with
+  `N64RECOMP_BROWSER_OFFLINE_MOD_RECOMP` set to an OfflineModRecomp built from N64Recomp-web, adds the C (OfflineModRecomp
+  `--static <name>`) to the target, and `recomp::mods::register_precompiled_mod(<name>)` beside
+  `register_embedded_mod` makes the runtime use it for that mod. The runtime matches it by a hash of the mod's code,
+  so another version of the mod the player installs isn't given the wrong code (it fails to load like any mod, with
+  no live recompiler). wasm code can't be rewritten, so the functions a mod replaces or hooks are redirected at their
+  entry instead: N64Recomp-web's C asks `RECOMP_FUNC_ENTRY` there, which is one byte read for a function nothing
+  redirects. Hooks on a function in the patches library work the same way; hooks on a built-in mod's own functions
+  don't load (`OfflineModHooked`).
+- A mod that fails to load ends in an SDL message box, which calls `alert` from a worker. Workers have none, so the
+  frontend's `worker_alert.js` sends it to the console as an error rather than letting the exception stop the page.
+- RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
+  `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
+  function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
+- RecompFrontend compiles recompui's shaders with the `DXC` and `DXC_*_OPTS` its parent sets, as on the desktop
+  (`tests/build/CMakeLists.txt` sets the ones it needs).
+- DXC for recompui's shaders is the build machine's, not one built for the target.
+- fmt 11.1 (N64Recomp's) needs `target_compile_options(fmt PRIVATE -include cstdlib)` with Emscripten's libc++.
+- Emscripten's `<limits.h>` defines `PAGESIZE`, so a source that includes RecompFrontend's `slot_map.h` after it
+  needs `#undef PAGESIZE`.
+- The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
+  overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
+  never finished and the page hung at boot.
+
+### When the recomp's commits are far from the patches'
+
+The patches are made on the upstream commits in `patches/patches.txt`, the ones the forks are built on. On every push
+CI applies them to the commits the recomps here pin (`patches/pins.txt`: Banjo-Kazooie, Majora's Mask, Donkey Kong 64
+with Killklli's runtime and RecompFrontend, Conker's Bad Fur Day, and GoldenEye 007, whose upstream predates
+RecompFrontend, so its web fork pins the commits the forks are built on), and builds every library of a page from
+Banjo-Kazooie's. What to expect from a recomp's own commits:
+
+- Near those: they apply. Where the code around a change differs too much for `git apply`, `apply.cmake` merges three
+  ways against the commit the patch was made on, fetched from the fork, and says so (Donkey Kong 64's RecompFrontend
+  needs that).
+- Far from them, older or newer: a patch may not apply at all. `apply.cmake` then stops and names the files that
+  conflict. rt64's, plume's and hlslpp's newest upstream commits don't take theirs today. Moving that one submodule
+  to a commit nearer `patches.txt`'s (that commit itself always works), or pinning the forks (below), gets past it.
+  The forks merge newer upstream commits in over time (Changing it), and each tag's patches move with them.
+- Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
+  changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
+  not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop.
+
+### Or pin the forks
+
+A recomp can instead point its `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at the forks (The forks), at
+the commits `forks.txt` names at a tag, and leave out the `apply.cmake` lines: the web support is then in the
+submodules' history, not in their working trees. Rush 2049 does that. It moves the recomp off upstream's commits,
+and every new tag moves its submodules again.
 
 ## The forks
 
@@ -160,165 +315,6 @@ take the web support without moving its submodules to the forks (Using it in a r
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.
-
-## Using it in a recomp
-
-Add this repo as a submodule, and keep the recomp's own `rt64`, `N64ModernRuntime` and `RecompFrontend`: the web
-build patches their checkouts. Before building N64Recomp from the recomp's `N64ModernRuntime/N64Recomp` (the page
-needs the code the patched one writes, below), from the recomp's folder:
-
-```bash
-cmake -P lib/N64Recomp-browser/patches/apply.cmake lib     # the folder holding rt64, N64ModernRuntime, RecompFrontend
-```
-
-The patches change nothing in a desktop build (The forks). They are made on the upstream commits in `patches.txt`, and
-CI applies them to the ones Banjo-Kazooie, Majora's Mask, Donkey Kong 64 (Killklli's runtime and RecompFrontend),
-Conker's Bad Fur Day and GoldenEye 007 pin (`patches/pins.txt`; GoldenEye's upstream predates RecompFrontend, so its
-web fork pins the commits the forks are built on), and builds every library from Banjo-Kazooie's. Where a recomp's commit
-differs too much around a change for `git apply`, `apply.cmake` merges three ways against the upstream commit the
-patch was made on, fetched from the fork (Donkey Kong 64's RecompFrontend). One too far from them, before or after,
-may not apply at all (rt64's, plume's and hlslpp's newest upstream commits don't), or may build only with the game's
-own code changed: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes
-arguments, not a `recomp::Configuration`. A recomp can pin its submodules to the forks at `forks.txt`'s commits
-instead, as Rush 2049 and the other games do. Then, in the recomp's CMakeLists.txt, with Emscripten:
-
-```cmake
-include(<this repo>/patches/apply.cmake)                 # patches the checkouts, if they aren't already
-n64recomp_browser_apply_patches(<the folder holding them>)
-add_compile_options(-pthread -fwasm-exceptions -msimd128 -mtail-call "-DXXH_HAS_INCLUDE(x)=0")
-add_link_options(-pthread -fwasm-exceptions -mtail-call)
-include(<this repo>/frontend/build_speed.cmake)          # ccache, if it is on PATH
-set(RT64_PREBUILT_SHADER_LIST ${CMAKE_SOURCE_DIR}/<the game's shader list>)   # required: below
-# ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
-add_subdirectory(<this repo>/frontend ${CMAKE_BINARY_DIR}/web_frontend)
-n64recomp_browser_frontend_page(<the recomp's executable>)
-```
-
-and build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
-`PATH` (SPIRV-Tools, `apt install spirv-tools`; without it the prebuilt shaders below come out several times the
-size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
-checkout with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
-says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
-without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and must be cross-origin
-isolated: served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, or
-with `coi_serviceworker.js` beside it on a host that can't set headers (GitHub Pages). Mods a player adds are off:
-the live recompiler emits machine code, which a page can't load. A recomp's built-in mods work (below).
-
-What a recomp has to do itself (Rush 2049's and BanjoRecomp-web's CMakeLists.txt do each):
-
-- Generate the recompiled code with N64Recomp-web (N64ModernRuntime-web's `N64Recomp`, or the recomp's own patched) and build it with
-  `-Werror=implicit-function-declaration`. wasm-ld turns a call whose signature doesn't match the callee into a trap,
-  and upstream's `funcs.h` leaves out some of what the C calls (the runtime's libultra replacements, ignored functions,
-  `recomp_trigger_event`); N64Recomp-web's declares all of it, so only a hook's own calls are left to the recomp:
-  a hook whose text calls the recomp's C declares it there (Donkey Kong 64's `load_dk64_overlay`, in `us.toml`).
-  A patch's call to a libultra function goes to the runtime's `<name>_recomp`, as the game's own calls do
-  (N64Recomp-web 9eb59c4; upstream calls `osInitialize(rdram, ctx)`, which reaches ultramodern's `osInitialize(void)`).
-- A game function with a C library name clashes with the library's declaration once `funcs.h` declares it:
-  GoldenEye has its own `strtol`, `strncmp`, `isalpha` and six more. List each in `[patches] renamed` in the game's
-  config and the patches' config, and it becomes `<name>_recomp` in both (N64Recomp-web ec0748e renames the patches'
-  calls to it too). N64Recomp-web also reads a jump table from the section that holds it, where upstream reads it at
-  the function's own ROM offset: GoldenEye keeps them all in a `.rodata` section of their own, so upstream's read
-  lands past the ROM's end.
-- Build the recompiled code with `-mtail-call` (the `add_compile_options` above). The MIPS code leaves a function
-  by jumping to another, a tail call, which the C writes as a call and a return. Natively clang makes that a jump; in
-  wasm it stays a call, so code that chains them without returning grows the stack until the browser stops the page
-  ("Maximum call stack size exceeded"): Conker's Bad Fur Day does, minutes in. With the tail call feature,
-  N64Recomp-web's C forces each one to a `return_call` (`RECOMP_TAIL_CALL` in `recomp.h`, `musttail`); clang won't
-  make one by itself, past the early return `RECOMP_FUNC_ENTRY` puts in every function. Without the flag the calls
-  stay plain ones.
-- A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
-  `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
-  function the patches call by its name, happens to work on x86 and traps in wasm, and only the link says so (wasm-ld's
-  `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
-  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and GoldenEye64Recomp-web `yield_self_1ms` in
-  `recomp_yield_self_1ms`.
-- RecompFrontend includes `patches/ui_funcs.h` from five directories above `recompui/src/api/`, so from
-  `<recomp>/patches/` when it sits in `<recomp>/lib/`: the declaration of `recomp_run_ui_callbacks`, the patch
-  function that runs UI callbacks (`tests/build/patches/ui_funcs.h` is a stand-in).
-- RecompFrontend compiles recompui's shaders with the `DXC` and `DXC_*_OPTS` its parent sets, as on the desktop
-  (`tests/build/CMakeLists.txt` sets the ones it needs).
-- fmt 11.1 (N64Recomp's) needs `target_compile_options(fmt PRIVATE -include cstdlib)` with Emscripten's libc++.
-- Emscripten's `<limits.h>` defines `PAGESIZE`, so a source that includes RecompFrontend's `slot_map.h` after it
-  needs `#undef PAGESIZE`.
-- Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
-  `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
-  busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
-- No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
-  haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
-- DXC for recompui's shaders is the build machine's, not one built for the target.
-- The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
-  and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
-- A built-in mod (`recomp::mods::register_embedded_mod`) is recompiled to C at build time and linked in:
-  `n64recomp_browser_precompiled_mod(<target> <mod.nrm> <the recomp's syms.toml> <name>)`, with
-  `N64RECOMP_BROWSER_OFFLINE_MOD_RECOMP` set to an OfflineModRecomp built from N64Recomp-web, adds the C (OfflineModRecomp
-  `--static <name>`) to the target, and `recomp::mods::register_precompiled_mod(<name>)` beside
-  `register_embedded_mod` makes the runtime use it for that mod. The runtime matches it by a hash of the mod's code,
-  so another version of the mod the player installs isn't given the wrong code (it fails to load like any mod, with
-  no live recompiler). wasm code can't be rewritten, so the functions a mod replaces or hooks are redirected at their
-  entry instead: N64Recomp-web's C asks `RECOMP_FUNC_ENTRY` there, which is one byte read for a function nothing
-  redirects. Hooks on a function in the patches library work the same way; hooks on a built-in mod's own functions
-  don't load (`OfflineModHooked`).
-- A mod that fails to load ends in an SDL message box, which calls `alert` from a worker. Workers have none, so the
-  frontend's `worker_alert.js` sends it to the console as an error rather than letting the exception stop the page.
-- RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
-  `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
-  are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
-  Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
-  framebuffers too (a Banana Fairy photo), and it is left on there (not tried off).
-- If the game needs render to RAM but can take a frame one display list old, call
-  `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
-  lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
-  of a list is late: one that a later part of the same list reads is still made in place. In headless Chrome, render
-  to RAM on: Conker's Bad Fur Day in Windy 10.7-11.8 ms a list against 14.8-16.4 ms with the exact copy, GoldenEye in
-  Dam 3.8-5.2 ms against 8.0-9.7. It is
-  wrong for a game whose CPU reads a frame it has only just drawn: Majora's Mask flushes its task queue and then reads
-  its pictograph and its pause menu's background at once, and would get the frame before, so it keeps the exact copy.
-  The game runs while a late copy is pending, so the copy keeps every word the CPU wrote to the framebuffer before or
-  while it lands (rt64-web cb75c5c) and the console reports each such write: run the page through the game's levels
-  with it and read those lines. Conker's CPU writes to framebuffers with a pending copy in every chapter, 89 times
-  over its shader plan, and the page plays the same; GoldenEye's never does. A word the CPU writes with the value it
-  already held looks untouched, though, and gets the frame, so it is also wrong for a game that puts code or data in
-  a framebuffer's memory once the RDP is done: Donkey Kong 64 inflates its main code and data over the framebuffers
-  of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too.
-- Give RT64 a list of the game's shaders, so the page builds them while the player waits, never while they play.
-  This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
-  shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
-  graphics in Chrome that is a frame a second for minutes, and Firefox, which builds a pipeline in line with
-  everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
-  starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are built before
-  the game starts, and each section after it, a level or a part of the game, when the game first draws with its
-  shaders. Each time the game holds its frame under a "Building shaders" panel, with a bar and the time left, until
-  the section is built: when a frame asks for at least 4 of a section's shaders that aren't built, the game waits for
-  the whole section. A description can be in several sections. One the list missed, or a few at a time, is built
-  behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
-  one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
-  later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
-  one visit, not every one. Set
-  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
-  `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
-  and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
-  come out as the same shaders and the same pipeline state share one. A line reading `background` also
-  starts a section of that name.
-- Record that list by code, not by playing: `tools/record_shaders.mjs` (its header says how) serves a build, opens it
-  in headless Chrome with `?record-shaders`, under which the page prebuilds nothing and prints an `rt64 shader:` line
-  for each description the game asks for, and follows a plan of the game's own, a JSON file of steps that reach each
-  level: keys, clicks, waits, and JavaScript that writes the game's memory. Each section is recorded from a fresh load
-  of the page, so it has everything its level draws, and what the boot draws goes above the first section. A plan
-  usually needs a small patch in the game that starts a level or shows a menu when the script asks, called once a
-  frame: GoldenEye's is `patches/shader_survey.c`, `tools/shader_plan.json` and `tools/record_shaders.sh` in
-  GoldenEye64Recomp-web. Why run the game at all: a shader is the RDP's state at a draw, the combiner and render
-  mode, and the game's code sets much of it as it draws, so no table in the ROM lists them. Record each level's start,
-  not the whole game: what a level draws later is mostly what its start drew, and the rest is built as it comes.
-  Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
-  105, about 4 MB, are then all built in 0.4-0.7 s and the panel never shows; a game whose list doesn't fit waits on
-  every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
-  Rush 2049's list, which has no sections, takes 6.3-7.2 s cold on 12 cores; 6 at a time it takes 10.0-10.8 s with
-  `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
-  differ only in what the shaders ignore come out the same. Rush 2049's list is
-  `src/rt64_shaders.txt` in its repo.
-- The page is 32-bit. Code that gets away with a length that wraps around in a 64-bit build doesn't here: Banjo's
-  overlay decompression gave inflate `end - start` with `end` before `start`, and `next_in + avail_in` wrapped, so it
-  never finished and the page hung at boot.
 
 ## Changing it
 
