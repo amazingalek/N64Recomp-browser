@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web c6cf6c4d34f71dd18bda5dec879dbf551605b0d1
+rt64: https://github.com/amazingalek/rt64-web 673474746cc1117afff8b8a3b7fa8cd974858a6c
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -643,7 +643,7 @@ index 7b38b8e..2a5c6c0 100644
          std::unique_ptr<FramebufferReadChangesDescriptorChangesSet> readChangesSet;
          bool used;
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..fd06ba5 100644
+index 3227ab1..a87a199 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -114,6 +114,12 @@ namespace RT64 {
@@ -659,24 +659,28 @@ index 3227ab1..fd06ba5 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -416,6 +422,95 @@ namespace RT64 {
+@@ -416,6 +422,107 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
 +    // Frames interpolated to the display's rate are drawn for evenly spaced moments, so motion looks even only if each
 +    // is presented. When the GPU can't keep up, a game frame whose present is still waiting behind the next one is
 +    // dropped whole, and the rest get one, two or three presents: some frames shown three times, some never. That
-+    // happens in Chrome and Firefox alike on a laptop's integrated graphics. So while frames are being dropped (2 in a
-+    // second), each game frame gets fewer presents, a number that divides the display's rate evenly (a 30 fps game on
-+    // a 60 Hz display: 1, at 30 a second), and a while later it tries the number above again: after 10 s, twice as long
-+    // each time it falls straight back (2 min at most). The number is kept, not the rate, since a game's own rate moves
-+    // (Banjo-Kazooie's between 20 and 30).
++    // happens in Chrome and Firefox alike on a laptop's integrated graphics. So while frames are being dropped (one
++    // present in ten or more over 2 s, 4 at least), each game frame gets fewer presents, a number that divides the
++    // display's rate evenly (a 30 fps game on a 60 Hz display: 1, at 30 a second), and a while later it tries the
++    // number above again: after 10 s, twice as long each time it falls straight back (2 min at most). The number is
++    // kept, not the rate, since a game's own rate moves (Banjo-Kazooie's between 20 and 30). A present dropped now and
++    // then is not the GPU falling behind: a pipeline built behind the game (Chrome) drops one every second or two, and
++    // counting those (2 in a second) held GoldenEye's cast credits, 8-12 game frames a second, at one present a frame
++    // for 10-30 s.
 +    void PresentQueue::pace(bool presentDropped) {
 +        const uint32_t targetRate = ext.sharedResources->targetRate;
 +        const uint32_t originalRate = ext.sharedResources->viOriginalRate;
 +        if ((targetRate == 0) || (originalRate == 0) || (targetRate <= originalRate)) {
 +            pacingMultiple = 0;
-+            pacingSkips.clear();
++            pacingPresents.clear();
++            pacingDropped = 0;
 +            ext.sharedResources->pacedRate = 0;
 +            return;
 +        }
@@ -712,23 +716,24 @@ index 3227ab1..fd06ba5 100644
 +            pacingChanged = now;
 +        }
 +
-+        if (presentDropped) {
-+            pacingSkips.emplace_back(now);
++        pacingPresents.emplace_back(now, presentDropped);
++        pacingDropped += presentDropped ? 1 : 0;
++        while (Timer::deltaMicroseconds(pacingPresents.front().first, now) > 2'000'000) {
++            pacingDropped -= pacingPresents.front().second ? 1 : 0;
++            pacingPresents.pop_front();
 +        }
 +
-+        while (!pacingSkips.empty() && (Timer::deltaMicroseconds(pacingSkips.front(), now) > 1'000'000)) {
-+            pacingSkips.erase(pacingSkips.begin());
-+        }
-+
++        const bool fallingBehind = (pacingDropped >= 4) && ((pacingDropped * 10) >= pacingPresents.size());
 +        const int64_t sinceChange = Timer::deltaMicroseconds(pacingChanged, now);
-+        if ((pacingSkips.size() >= 2) && (pacingMultiple != 1)) {
++        if (fallingBehind && (pacingMultiple != 1)) {
 +            pacingMultiple = pacedMultipleAtMost((pacingMultiple > 0) ? (pacingMultiple - 1) : (targetRate / originalRate));
 +
 +            if ((pacingRaised != Timestamp()) && (Timer::deltaMicroseconds(pacingRaised, now) < fallBackMicro)) {
 +                pacingRetryMicro = std::min(pacingRetryMicro * 2, maxRetryMicro);
 +            }
 +
-+            pacingSkips.clear();
++            pacingPresents.clear();
++            pacingDropped = 0;
 +            pacingChanged = now;
 +        }
 +        else if ((pacingMultiple > 0) && (sinceChange >= pacingRetryMicro)) {
@@ -740,7 +745,8 @@ index 3227ab1..fd06ba5 100644
 +                pacingMultiple = 0;
 +            }
 +
-+            pacingSkips.clear();
++            pacingPresents.clear();
++            pacingDropped = 0;
 +            pacingChanged = now;
 +            pacingRaised = now;
 +        }
@@ -749,13 +755,19 @@ index 3227ab1..fd06ba5 100644
 +        }
 +
 +        // The game's rate may have moved since the number was picked, so it is the even number at most that large.
-+        ext.sharedResources->pacedRate = (pacingMultiple > 0) ? (pacedMultipleAtMost(pacingMultiple) * originalRate) : 0;
++        const uint32_t pacedRate = (pacingMultiple > 0) ? (pacedMultipleAtMost(pacingMultiple) * originalRate) : 0;
++        if ((pacedRate == 0) != (ext.sharedResources->pacedRate == 0)) {
++            const char *what = (pacedRate > 0) ? "paced to the game's frames while the GPU falls behind" : "back at the display's rate";
++            printf("RT64: presents %s (the game at %u frames a second)\n", what, originalRate);
++        }
++
++        ext.sharedResources->pacedRate = pacedRate;
 +    }
 +
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +605,10 @@ namespace RT64 {
+@@ -510,6 +617,10 @@ namespace RT64 {
                      continue;
                  }
  
@@ -767,22 +779,32 @@ index 3227ab1..fd06ba5 100644
                      skipInterpolation();
                      notifyPresentId(present);
 diff --git a/src/hle/rt64_present_queue.h b/src/hle/rt64_present_queue.h
-index e08b02c..f0d91aa 100644
+index e08b02c..1ea890c 100644
 --- a/src/hle/rt64_present_queue.h
 +++ b/src/hle/rt64_present_queue.h
-@@ -57,6 +57,11 @@ namespace RT64 {
+@@ -4,6 +4,8 @@
+ 
+ #pragma once
+ 
++#include <deque>
++
+ #include "common/rt64_profiling_timer.h"
+ #include "gui/rt64_inspector.h"
+ #include "render/rt64_vi_renderer.h"
+@@ -57,6 +59,12 @@ namespace RT64 {
          Timestamp presentTimestamp;
          VIHistory viHistory;
          bool presentWaitEnabled = false;
 +        uint32_t pacingMultiple = 0;
-+        std::vector<Timestamp> pacingSkips;
++        std::deque<std::pair<Timestamp, bool>> pacingPresents;
++        uint32_t pacingDropped = 0;
 +        Timestamp pacingChanged;
 +        Timestamp pacingRaised;
 +        int64_t pacingRetryMicro = 0;
  
          PresentQueue();
          ~PresentQueue();
-@@ -69,6 +74,7 @@ namespace RT64 {
+@@ -69,6 +77,7 @@ namespace RT64 {
          void setup(const External &ext);
          void threadPresent(const Present &present, bool &swapChainValid);
          void skipInterpolation();
