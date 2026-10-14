@@ -44,7 +44,9 @@ What else each page was checked with, and its measurements, are in its repo.
   a second in the bar and Windy on the forks (2026-10-13).
 - **Donkey Kong 64**: built from Donkey Kong 64: Recompiled's own submodules (Killklli's runtime and RecompFrontend,
   its mod store off) with `patches/`, headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house
-  and the pause menu, with sound (2026-10-14). The laptop's results are from before that, on the forks.
+  and the pause menu, with sound (2026-10-14). The laptop's results are from before that, on the forks. Its sound
+  went silent for good in most Chrome boots until its main 9341ea7. After that, headless Chrome 155 and Firefox 158
+  on a desktop GPU (RTX 2070) played the boot and the DK Rap with sound in every boot, 10 and 3 (2026-10-14).
 
 Every page is on v0.24.0 since 2026-10-14: when the GPU falls behind, each game frame is shown once instead of some
 never and others two or three times. None has been played that way on the laptop yet.
