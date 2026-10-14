@@ -1,6 +1,7 @@
 # The forks built with Emscripten as a recomp's page builds them, with no game: RT64 on WebGPU (its shaders to WGSL),
 # N64ModernRuntime, RecompFrontend's menus and input, and renderer/ and frontend/ from this repo. CI builds every
-# library here; nothing links into a page, since a page needs a game's recompiled code.
+# library here; nothing links into a page, since a page needs a game's recompiled code, but two pages with no game check
+# frontend/'s link options (link_check/).
 #
 #   emcmake cmake -S tests/build -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORKS_DIR=$PWD/tests/build/lib \
 #       -DRT64_NAGA_EXECUTABLE=<naga>
@@ -57,5 +58,13 @@ add_subdirectory(${FORKS_DIR}/RecompFrontend ${CMAKE_BINARY_DIR}/RecompFrontend)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../renderer ${CMAKE_BINARY_DIR}/renderer)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../frontend ${CMAKE_BINARY_DIR}/frontend)
+
+# frontend/'s link options (link_check/, CI): a page with its own -sINITIAL_MEMORY gets it, not frontend/'s, and a page
+# with a call to a function whose signature doesn't match the call fails to link.
+add_executable(frontend_link_check link_check/main.c)
+n64recomp_browser_frontend_page(frontend_link_check)
+target_link_options(frontend_link_check PRIVATE -sINITIAL_MEMORY=1600MB)
+add_executable(frontend_signature_mismatch EXCLUDE_FROM_ALL link_check/patch.c link_check/native.c)
+n64recomp_browser_frontend_page(frontend_signature_mismatch)
 
 add_custom_target(web_libraries DEPENDS rt64 ultramodern librecomp recompui recompinput n64recomp_browser_renderer)

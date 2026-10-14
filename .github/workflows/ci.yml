@@ -166,3 +166,13 @@ jobs:
           emcmake cmake -S tests/build -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORKS_DIR="$PWD/tests/build/lib" \
             -DRT64_NAGA_EXECUTABLE="$HOME/.cargo/bin/naga"
           ninja -C build web_libraries
+      # frontend/'s link options (tests/build/link_check): a page's own -sINITIAL_MEMORY wins, and a call whose signature
+      # doesn't match the function's fails the link.
+      - name: Link a page
+        run: |
+          ninja -C build frontend_link_check
+          grep -q 1677721600 build/frontend_link_check.js
+          if ninja -C build frontend_signature_mismatch > mismatch.log 2>&1; then
+            echo "frontend_signature_mismatch linked"; exit 1
+          fi
+          grep "function signature mismatch: native" mismatch.log

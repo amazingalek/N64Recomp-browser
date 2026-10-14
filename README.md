@@ -69,6 +69,7 @@ set(RT64_PREBUILT_SHADER_LIST ${CMAKE_SOURCE_DIR}/<the game's shader list>)   # 
 # ... add rt64 (RT64_STATIC), N64ModernRuntime and RecompFrontend as for the desktop ...
 add_subdirectory(lib/N64Recomp-browser/frontend ${CMAKE_BINARY_DIR}/web_frontend)
 n64recomp_browser_frontend_page(<the recomp's executable>)
+target_link_options(<the recomp's executable> PRIVATE -sINITIAL_MEMORY=2GB)   # if 1536MB, frontend/'s, isn't enough
 ```
 
 Build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
@@ -179,10 +180,10 @@ The rest is what a link or a run of the page shows when it is missing:
   stay plain ones.
 - A patch calls a native (a symbol at an address in the patches' `syms.ld`) as it calls a recompiled function, with
   `(uint8_t* rdram, recomp_context* ctx)`, so the native has to take that. One with its own arguments, or a runtime
-  function the patches call by its name, happens to work on x86 and traps in wasm, and only the link says so (wasm-ld's
-  `function signature mismatch` warning): Donkey-Kong-64-Recompiled-web wraps `load_dk64_overlay` and ultramodern's
-  `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and GoldenEye64Recomp-web `yield_self_1ms` in
-  `recomp_yield_self_1ms`.
+  function the patches call by its name, happens to work on x86 and traps in wasm, and only the link says so: wasm-ld's
+  `function signature mismatch`, which `frontend/` makes an error (`--fatal-warnings`). Donkey-Kong-64-Recompiled-web
+  wraps `load_dk64_overlay` and ultramodern's `yield_self` in `dk64_load_overlay` and `dk64_yield_self`, and
+  GoldenEye64Recomp-web `yield_self_1ms` in `recomp_yield_self_1ms`.
 - The patches library's generated C is built like the recompiled code: with `-Werror=implicit-function-declaration`,
   and `funcs.h` included if it doesn't include it itself (Zelda64Recomp-web's `PatchesLib`).
 - A built-in mod (`recomp::mods::register_embedded_mod`) is recompiled to C at build time and linked in:

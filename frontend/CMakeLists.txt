@@ -12,7 +12,13 @@
 # - audio_output.h: sound played on the browser's audio thread, which a recomp uses instead of SDL's queue: SDL2's
 #   port plays it from the page's thread, where it breaks up whenever WebGPU keeps that thread busy,
 # - worker_alert.js: alert() on a thread (SDL's message box) logged, where a worker would throw,
-# - the page's WebGPU device (plume_webgpu_device.js).
+# - the page's WebGPU device (plume_webgpu_device.js),
+# - a link that fails on any wasm-ld warning (--fatal-warnings), for the one that matters: a call to a function whose
+#   signature doesn't match the call (`function signature mismatch`) links as a trap, which stops the page only when
+#   the call is made, perhaps minutes in (a patch calling a native that doesn't take (rdram, ctx), README),
+# - a heap of 1536MB, 1 MB stacks and 32 threads made at the start, which a recomp's own target_link_options(<target>
+#   PRIVATE -sINITIAL_MEMORY=...) and the like override: they go first on the link line, and Emscripten takes a
+#   setting's last value.
 # A page with threads must be cross-origin isolated: served with Cross-Origin-Opener-Policy: same-origin and
 # Cross-Origin-Embedder-Policy: require-corp, or from a host that can't set headers (GitHub Pages) with
 # coi_serviceworker.js beside it, which adds them.
@@ -20,7 +26,7 @@
 add_library(n64recomp_browser_frontend INTERFACE)
 target_link_options(n64recomp_browser_frontend INTERFACE
     -pthread -fwasm-exceptions -mtail-call -sUSE_SDL=2 -sUSE_FREETYPE=1
-    -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=32 -sINITIAL_MEMORY=1536MB -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB
+    -sPROXY_TO_PTHREAD -Wl,--fatal-warnings
     -lidbfs.js
     "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$addRunDependency,$removeRunDependency"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/persistent_home.js"
@@ -35,6 +41,9 @@ target_include_directories(n64recomp_browser_frontend INTERFACE "${CMAKE_CURRENT
 # Makes <target> a page, <target>.html, with the service worker beside it.
 function(n64recomp_browser_frontend_page target)
     target_link_libraries(${target} PRIVATE n64recomp_browser_frontend)
+    # The target's own options, first: an interface library's come after them, where they would win.
+    target_link_options(${target} BEFORE PRIVATE
+        -sINITIAL_MEMORY=1536MB -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB -sPTHREAD_POOL_SIZE=32)
     set_target_properties(${target} PROPERTIES SUFFIX ".html")
     # The page's scripts go into it at link time, so a change to one relinks it.
     set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
