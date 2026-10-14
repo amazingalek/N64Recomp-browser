@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web cb75c5c378cae452c7396344cc37a4e7b4b05167
+rt64: https://github.com/amazingalek/rt64-web 03b9dcc342330bd0a900cc90470a8815cd16ebfe
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -316,17 +316,16 @@ index 1fdd873..8586085 100644
  
          Dither dither;
 diff --git a/src/common/rt64_hlslpp.h b/src/common/rt64_hlslpp.h
-index 1450565..e1744cf 100644
+index 1450565..047ddd9 100644
 --- a/src/common/rt64_hlslpp.h
 +++ b/src/common/rt64_hlslpp.h
-@@ -10,4 +10,6 @@
- #define HLSLPP_SCALAR
- #endif
- 
+@@ -1,3 +1,6 @@
 +// The scalar fallback (WebAssembly builds) calls labs() without including what declares it.
 +#include <cstdlib>
- #include "hlsl++.h"
-\ No newline at end of file
++
+ // Disable SIMD on GCC due to UB when compiling with optimizations.
+ 
+ #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 diff --git a/src/common/rt64_thread.cpp b/src/common/rt64_thread.cpp
 index c4b080b..a7de6b4 100644
 --- a/src/common/rt64_thread.cpp
@@ -804,25 +803,24 @@ index 8858dac..97bafdf 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..7fbafbf 100644
+index 2970e71..61f2ace 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
-@@ -4,8 +4,14 @@
- 
- #include "rt64_state.h"
- 
-+#include <algorithm>
+@@ -7,6 +7,13 @@
  #include <cassert>
  #include <cinttypes>
+ 
++#include <algorithm>
 +#include <cstring>
 +
 +#if defined(_MSC_VER) && !defined(__clang__)
 +#   include <intrin.h>
 +#endif
- 
++
  #include "im3d/im3d.h"
  #include "im3d/im3d_math.h"
-@@ -83,6 +89,8 @@ namespace RT64 {
+ #include "imgui/imgui.h"
+@@ -83,6 +90,8 @@ namespace RT64 {
          displayListAddress = 0;
          displayListCounter = 0;
          rdramCheckPending = true;
@@ -831,7 +829,7 @@ index 2970e71..7fbafbf 100644
          workloadCounter = 0;
          lastScreenHash = 0;
          lastScreenFactorCounter = 0;
-@@ -617,6 +625,8 @@ namespace RT64 {
+@@ -617,6 +626,8 @@ namespace RT64 {
      }
      
      void State::checkRDRAM() {
@@ -840,7 +838,7 @@ index 2970e71..7fbafbf 100644
          if (!rdramCheckPending) {
              return;
          }
-@@ -781,6 +791,120 @@ namespace RT64 {
+@@ -781,6 +792,120 @@ namespace RT64 {
          }
      }
      
@@ -961,7 +959,7 @@ index 2970e71..7fbafbf 100644
      void State::listProcessBegin() {
          dlCpuProfiler.start();
      }
-@@ -790,6 +914,7 @@ namespace RT64 {
+@@ -790,6 +915,7 @@ namespace RT64 {
      }
  
      void State::fullSync() {
@@ -969,7 +967,7 @@ index 2970e71..7fbafbf 100644
          flush();
          submitFramebufferPair(FramebufferPair::FlushReason::ProcessDisplayListsEnd);
  
-@@ -1254,6 +1379,10 @@ namespace RT64 {
+@@ -1254,6 +1380,10 @@ namespace RT64 {
                              resizedTargets.emplace(colorDepthPair.second);
                          }
                      }
@@ -980,7 +978,7 @@ index 2970e71..7fbafbf 100644
                  }
  
                  for (RenderTarget *renderTarget : resizedTargets) {
-@@ -1264,6 +1393,9 @@ namespace RT64 {
+@@ -1264,6 +1394,9 @@ namespace RT64 {
              };
  
              auto renderAndSynchronize = [&](uint32_t maxFramebufferPair) {
@@ -990,7 +988,7 @@ index 2970e71..7fbafbf 100644
                  // Preprocess all the framebuffer operations.
                  uint32_t pairCursor = framebufferPairCursor;
                  while (pairCursor < maxFramebufferPair) {
-@@ -1346,7 +1478,7 @@ namespace RT64 {
+@@ -1346,7 +1479,7 @@ namespace RT64 {
                  }
  
                  // Record all setup previous to drawing any of the recorded framebuffers.
@@ -999,7 +997,7 @@ index 2970e71..7fbafbf 100644
                  framebufferRenderer->recordSetup(ext.framebufferGraphicsWorker, bufferUploaders, queuedProcessor, nullptr, &workload.outputBuffers, false);
  
                  // Record the command list for the framebuffer pairs.
-@@ -1471,15 +1603,26 @@ namespace RT64 {
+@@ -1471,15 +1604,26 @@ namespace RT64 {
                  ext.framebufferGraphicsWorker->commandList->end();
                  framebufferRenderer->waitForUploaders();
                  ext.framebufferGraphicsWorker->execute();
@@ -1029,7 +1027,7 @@ index 2970e71..7fbafbf 100644
                          }
                      }
  
-@@ -1836,6 +1979,10 @@ namespace RT64 {
+@@ -1836,6 +1980,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1040,7 +1038,7 @@ index 2970e71..7fbafbf 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2056,7 @@ namespace RT64 {
+@@ -1909,6 +2057,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {

@@ -11,6 +11,10 @@
 #                                                                    RecompFrontend, with plume, hlslpp and N64Recomp
 #                                                                    where they keep them
 #   cmake -P lib/N64Recomp-browser/patches/apply.cmake N64Recomp tools/N64Recomp      one project, anywhere
+#   cmake -P lib/N64Recomp-browser/patches/apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp
+#                                                                    leaving out a file (a path in the project) whose
+#                                                                    change the recomp's own patch already makes its own
+#                                                                    way, where the two would conflict
 #
 # and again from the recomp's CMakeLists.txt when it configures for the web, before adding them, which does nothing if
 # they are patched already:
@@ -32,7 +36,7 @@ function(_n64recomp_browser_changes top sub out)
     set(${out} ${hash} PARENT_SCOPE)
 endfunction()
 
-# Patches one project's checkout, <dir>, with <name>.patch.
+# Patches one project's checkout, <dir>, with <name>.patch, but the files named after it (paths in the project).
 function(n64recomp_browser_apply_patch name dir)
     set(patch "${N64RECOMP_BROWSER_PATCHES_DIR}/${name}.patch")
     get_filename_component(dir "${dir}" ABSOLUTE)
@@ -53,6 +57,13 @@ function(n64recomp_browser_apply_patch name dir)
     if (sub)
         list(APPEND apply "--directory=${sub}")
     endif()
+    # --exclude matches a path with --directory's folder already prepended.
+    foreach (file IN LISTS ARGN)
+        if (sub)
+            set(file "${sub}/${file}")
+        endif()
+        list(APPEND apply "--exclude=${file}")
+    endforeach()
 
     # Patched already: the patch comes out again, or the checkout's changes are what they were when it went in (a
     # three-way merge, which the reverse can't take out), kept in the checkout's git dir.
@@ -64,6 +75,7 @@ function(n64recomp_browser_apply_patch name dir)
     execute_process(COMMAND git rev-parse --path-format=absolute --git-path "n64recomp-browser-${name}"
         WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE stamp OUTPUT_STRIP_TRAILING_WHITESPACE)
     file(SHA1 "${patch}" patch_hash)
+    string(SHA1 patch_hash "${patch_hash} ${ARGN}")
     _n64recomp_browser_changes("${top}" "${sub}" changes)
     if (EXISTS "${stamp}")
         file(READ "${stamp}" stamped)
@@ -125,9 +137,16 @@ endfunction()
 if (CMAKE_SCRIPT_MODE_FILE AND CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
     if (CMAKE_ARGC EQUAL 4)
         n64recomp_browser_apply_patches("${CMAKE_ARGV3}")
-    elseif (CMAKE_ARGC EQUAL 5)
-        n64recomp_browser_apply_patch("${CMAKE_ARGV3}" "${CMAKE_ARGV4}")
+    elseif (CMAKE_ARGC GREATER_EQUAL 5)
+        set(excluded "")
+        math(EXPR last "${CMAKE_ARGC} - 1")
+        if (last GREATER_EQUAL 5)
+            foreach (i RANGE 5 ${last})
+                list(APPEND excluded "${CMAKE_ARGV${i}}")
+            endforeach()
+        endif()
+        n64recomp_browser_apply_patch("${CMAKE_ARGV3}" "${CMAKE_ARGV4}" ${excluded})
     else()
-        message(FATAL_ERROR "cmake -P apply.cmake <folder> | <name> <folder>")
+        message(FATAL_ERROR "cmake -P apply.cmake <folder> | <name> <folder> [<file left out>...]")
     endif()
 endif()

@@ -245,6 +245,11 @@ Banjo-Kazooie's. What to expect from a recomp's own commits:
   conflict. rt64's, plume's and hlslpp's newest upstream commits don't take theirs today. Moving that one submodule
   to a commit nearer `patches.txt`'s (that commit itself always works), or pinning the forks (below), gets past it.
   The forks merge newer upstream commits in over time (Changing it), and each tag's patches move with them.
+- On top of the recomp's own patches to the same lines: they conflict. The forks keep their changes off the lines a
+  recomp's own patch is known to touch (Conker's Bad Fur Day adds includes to rt64 beside theirs). Where both make the
+  same change their own way, the recomp leaves that file out, as a path in the project after its name:
+  `cmake -P .../apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp` (Conker's own patch already finds a jump table
+  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye).
 - Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
   changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
   not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop.
