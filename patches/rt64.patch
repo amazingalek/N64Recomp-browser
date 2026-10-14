@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 58fc4e450a13fb83c7c15c1026a6fdaa6f8b4235
+rt64: https://github.com/amazingalek/rt64-web 9ed449d36c8d531e3c9a0a431c97abe93b602687
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1011,7 +1011,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..641de92 100644
+index 3227ab1..62a3ef7 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -114,6 +114,12 @@ namespace RT64 {
@@ -1027,7 +1027,7 @@ index 3227ab1..641de92 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -416,6 +422,116 @@ namespace RT64 {
+@@ -416,6 +422,131 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1045,8 +1045,11 @@ index 3227ab1..641de92 100644
 +    // after, and the GPU is busy for a moment with what it was given, so drops are counted over a whole 2 s of presents,
 +    // never fewer: judged on the first few dozen after a wait, or after a try of the number above (which starts the count
 +    // again), 4 dropped were enough, and Donkey Kong 64 in Firefox went to 30 presents a second right after its boot's
-+    // wait and stayed there for 70 s, each try falling straight back. A game at about the display's rate (a launcher's
-+    // 60 on a 59-61 Hz display) has nothing to be paced to, and its drops while a page loads aren't counted either.
++    // wait and stayed there for 70 s, each try falling straight back. And the count starts again a second after any such
++    // wait ends: a wait shorter than 2 s left presents from before it in the count beside the burst after it, and
++    // Banjo-Kazooie in Chrome went to 30 a second 0.4 s after its 1.5 s wait, for 10 s. A game at about the display's
++    // rate (a launcher's 60 on a 59-61 Hz display) has nothing to be paced to, and its drops while a page loads aren't
++    // counted either.
 +    void PresentQueue::pace(bool presentDropped) {
 +        const uint32_t targetRate = ext.sharedResources->targetRate;
 +        const uint32_t originalRate = ext.sharedResources->viOriginalRate;
@@ -1098,6 +1101,18 @@ index 3227ab1..641de92 100644
 +            pacingChanged = now;
 +        }
 +
++        const uint32_t prebuildWaits = ext.sharedResources->prebuildWaits;
++        if (prebuildWaits != pacingPrebuildWaits) {
++            pacingPrebuildWaits = prebuildWaits;
++            pacingPrebuildWaited = now;
++        }
++
++        if ((pacingPrebuildWaited != Timestamp()) && (Timer::deltaMicroseconds(pacingPrebuildWaited, now) < 1'000'000)) {
++            pacingPresents.clear();
++            pacingDropped = 0;
++            return;
++        }
++
 +        pacingPresents.emplace_back(now, presentDropped);
 +        pacingDropped += presentDropped ? 1 : 0;
 +        while (Timer::deltaMicroseconds(pacingPresents.front().first, now) > 2'000'000) {
@@ -1144,7 +1159,7 @@ index 3227ab1..641de92 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +626,10 @@ namespace RT64 {
+@@ -510,6 +641,10 @@ namespace RT64 {
                      continue;
                  }
  
@@ -1156,7 +1171,7 @@ index 3227ab1..641de92 100644
                      skipInterpolation();
                      notifyPresentId(present);
 diff --git a/src/hle/rt64_present_queue.h b/src/hle/rt64_present_queue.h
-index e08b02c..1ea890c 100644
+index e08b02c..30a6ba5 100644
 --- a/src/hle/rt64_present_queue.h
 +++ b/src/hle/rt64_present_queue.h
 @@ -4,6 +4,8 @@
@@ -1168,7 +1183,7 @@ index e08b02c..1ea890c 100644
  #include "common/rt64_profiling_timer.h"
  #include "gui/rt64_inspector.h"
  #include "render/rt64_vi_renderer.h"
-@@ -57,6 +59,12 @@ namespace RT64 {
+@@ -57,6 +59,14 @@ namespace RT64 {
          Timestamp presentTimestamp;
          VIHistory viHistory;
          bool presentWaitEnabled = false;
@@ -1178,10 +1193,12 @@ index e08b02c..1ea890c 100644
 +        Timestamp pacingChanged;
 +        Timestamp pacingRaised;
 +        int64_t pacingRetryMicro = 0;
++        uint32_t pacingPrebuildWaits = 0;
++        Timestamp pacingPrebuildWaited;
  
          PresentQueue();
          ~PresentQueue();
-@@ -69,6 +77,7 @@ namespace RT64 {
+@@ -69,6 +79,7 @@ namespace RT64 {
          void setup(const External &ext);
          void threadPresent(const Present &present, bool &swapChainValid);
          void skipInterpolation();
@@ -1190,14 +1207,15 @@ index e08b02c..1ea890c 100644
          void threadAdvanceBarrier();
          void threadLoop();
 diff --git a/src/hle/rt64_shared_queue_resources.h b/src/hle/rt64_shared_queue_resources.h
-index 8858dac..97bafdf 100644
+index 8858dac..933b80e 100644
 --- a/src/hle/rt64_shared_queue_resources.h
 +++ b/src/hle/rt64_shared_queue_resources.h
-@@ -32,6 +32,7 @@ namespace RT64 {
+@@ -32,6 +32,8 @@ namespace RT64 {
          uint32_t swapChainRate = 0;
          hlslpp::float2 resolutionScale = 1.0f;
          uint32_t targetRate = 0;
 +        std::atomic<uint32_t> pacedRate = 0;
++        std::atomic<uint32_t> prebuildWaits = 0;
          UserConfiguration userConfig;
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
@@ -1488,7 +1506,7 @@ index 7a8c13b..019e41d 100644
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..28d36b2 100644
+index 5a331aa..b225845 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -1536,12 +1554,15 @@ index 5a331aa..28d36b2 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -902,6 +916,9 @@ namespace RT64 {
+@@ -902,6 +916,12 @@ namespace RT64 {
              }
  
              if (processCursor >= 0) {
 +                // The game waits for the prebuilt shaders (RasterShaderCache::startPrebuild()) here, past its first frame.
-+                ext.rasterShaderCache->waitForPrebuild();
++                // The present queue counts the waits, to leave the burst of presents after one out of its pacing.
++                if (ext.rasterShaderCache->waitForPrebuild()) {
++                    ext.sharedResources->prebuildWaits++;
++                }
 +
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  Workload &workload = workloads[processCursor];
@@ -2573,7 +2594,7 @@ index 3b991ff..49a0d8f 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..7cd54fc 100644
+index bf7b669..afec91d 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,51 @@
@@ -2653,7 +2674,7 @@ index bf7b669..7cd54fc 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +159,479 @@ namespace RT64 {
+@@ -105,13 +159,482 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -3063,16 +3084,18 @@ index bf7b669..7cd54fc 100644
 +    }
 +
 +    // Before each frame: holds it until the round is built, and then, if the last frame wanted prebuilt shaders,
-+    // decides what builds them (startPrebuild() says how).
-+    void RasterShaderCache::waitForPrebuild() {
++    // decides what builds them (startPrebuild() says how). Returns whether the game was held.
++    bool RasterShaderCache::waitForPrebuild() {
++        bool held = false;
 +#   if defined(RT64_PREBUILT_SHADERS)
 +        // Until something has drawn, no WebGPU layout has been resolved for the prebuilt shaders to be built for.
 +        if (!prebuildDrawn) {
-+            return;
++            return false;
 +        }
 +
 +        std::unique_lock<std::mutex> lock(prebuildMutex);
 +        while (true) {
++            held = held || prebuildRoundHeld;
 +            prebuildChanged.wait(lock, [this]() { return !prebuildRoundHeld; });
 +            if (prebuildWanted.empty()) {
 +                break;
@@ -3111,6 +3134,7 @@ index bf7b669..7cd54fc 100644
 +            }
 +        }
 +#   endif
++        return held;
 +    }
 +
 +    // A draw asked for a prebuilt shader that isn't built yet.
@@ -3133,7 +3157,7 @@ index bf7b669..7cd54fc 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +645,22 @@ namespace RT64 {
+@@ -125,6 +648,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -3156,7 +3180,7 @@ index bf7b669..7cd54fc 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +701,18 @@ namespace RT64 {
+@@ -165,6 +704,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
@@ -3176,7 +3200,7 @@ index bf7b669..7cd54fc 100644
          }
  
 diff --git a/src/render/rt64_raster_shader_cache.h b/src/render/rt64_raster_shader_cache.h
-index 5c40c18..2762108 100644
+index 5c40c18..bdf6569 100644
 --- a/src/render/rt64_raster_shader_cache.h
 +++ b/src/render/rt64_raster_shader_cache.h
 @@ -4,15 +4,24 @@
@@ -3273,7 +3297,7 @@ index 5c40c18..2762108 100644
 +        void prebuildLoop(uint32_t thread);
 +        void wantPrebuild(uint64_t shaderHash);
 +        void reportPrebuild(uint32_t done, uint32_t count, uint64_t sizeDone, uint64_t sizeStarted, uint64_t size);
-+        void waitForPrebuild();
++        bool waitForPrebuild();
 +        void learnPrebuild();
 +        void reportMissed(const ShaderDescription &desc);
          void destroyAll();
