@@ -18,7 +18,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
 | San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth after its wait (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | smooth after its wait, sound drops (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | smooth after its wait (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | smooth after its waits (stand-in) | 2026-10-13, stand-in 2026-10-14 |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth | 2026-10-13, stand-in 2026-10-14 |
 | Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | smooth (stand-in) | 2026-10-13, stand-in 2026-10-14 |
@@ -98,6 +98,11 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
   Pictograph Box compresses the photo it took on the CPU, so it stays on there. Donkey Kong 64's code reads its
   framebuffers too (a Banana Fairy photo), and it is left on there (not tried off).
+- A loop that waits by polling the count (`osGetCount`) or memory, with no OS call inside, holds every other game
+  thread for as long as it spins: ultramodern runs one game thread at a time and switches only in an OS call.
+  GoldenEye's main loop waited for its next frame that way, and while Chrome built shaders its audio thread got no
+  turn for ~0.4 s at a time; GoldenEye64Recomp-web's `patches/fps.c` yields in each poll
+  (`recomp_yield_self_1ms`). A trace of count calls a second finds such a loop.
 - If the game needs render to RAM but can take a frame one display list old, call
   `recompui::renderer::set_render_to_ram_late(true)` too (rt64-web's `renderToRAMLate`): a list's copy into RDRAM then
   lands when the next list starts, or at a VI once the GPU has it, and the list doesn't wait for it. Only the last copy
