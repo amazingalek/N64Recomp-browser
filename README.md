@@ -64,7 +64,7 @@ beside them, and the web build patches their checkouts with `patches/`. The patc
 
 ```bash
 git submodule add https://github.com/amazingalek/N64Recomp-browser lib/N64Recomp-browser
-git -C lib/N64Recomp-browser checkout v0.25.0       # a tag: forks.txt and the patches/ made from it
+git -C lib/N64Recomp-browser checkout <the newest v0.x.0 tag>   # forks.txt and the patches/ made from it
 ```
 
 ### 2. Patch the checkouts
