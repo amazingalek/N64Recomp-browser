@@ -39,8 +39,9 @@ What else each page was checked with, and its measurements, are in its repo.
   (2026-10-14). The laptop's results are from before that, on the forks (2026-10-13).
 - **Conker's Bad Fur Day**: built from Conker's Bad Fur Day: Recompiled's own `tools/` submodules and its own patches
   to them, with `patches/` on top (N64Recomp's without `src/analysis.cpp`), headless Chrome through the intro, the bar
-  and Conker walking in Hungover, with sound (2026-10-14). Firefox on a desktop GPU 55-57 frames a second in the bar
-  and Windy, on the forks (2026-10-13).
+  and Conker walking in Hungover, with sound (2026-10-14). Firefox 157 on a desktop GPU (RTX 2070), the same build:
+  the boot's shaders in 10.4 s, then the intro and the bar, with sound and no WebGPU errors (2026-10-14); 55-57 frames
+  a second in the bar and Windy on the forks (2026-10-13).
 - **Donkey Kong 64**: built from Donkey Kong 64: Recompiled's own submodules (Killklli's runtime and RecompFrontend,
   its mod store off) with `patches/`, headless Chrome through the DK Rap, a new game's opening cutscenes, DK's house
   and the pause menu, with sound (2026-10-14). The laptop's results are from before that, on the forks.
