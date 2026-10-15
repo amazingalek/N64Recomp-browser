@@ -19,7 +19,6 @@ a { color: #9cc0ff; }
 
 header { max-width: 1200px; margin: 0 auto; padding: 24px 24px 0; }
 h1 { margin: 0 0 4px; font-size: 32px; letter-spacing: -0.02em; }
-h1 span { display: block; font-size: 18px; font-weight: 500; color: var(--dim); letter-spacing: 0; }
 header p { color: var(--dim); margin: 8px 0; }
 
 main { max-width: 1200px; margin: 0 auto; padding: 12px 24px 32px; }
