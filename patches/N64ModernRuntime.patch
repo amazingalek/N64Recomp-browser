@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 53b558364a089654b52ab98514e5423388214142
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web f0e08844ec3f0f84181085947065785a14db7460
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -556,11 +556,18 @@ index 31eb106..50e8244 100644
      int32_t sp;
  } OSThread;
 diff --git a/ultramodern/src/threadqueue.cpp b/ultramodern/src/threadqueue.cpp
-index f9c0fa1..2e376eb 100644
+index f9c0fa1..f522697 100644
 --- a/ultramodern/src/threadqueue.cpp
 +++ b/ultramodern/src/threadqueue.cpp
-@@ -43,14 +43,15 @@ PTR(OSThread) ultramodern::thread_queue_pop(RDRAM_ARG PTR(PTR(OSThread)) queue_)
+@@ -41,16 +41,22 @@ PTR(OSThread) ultramodern::thread_queue_pop(RDRAM_ARG PTR(PTR(OSThread)) queue_)
+ }
+ 
  bool ultramodern::thread_queue_remove(RDRAM_ARG PTR(PTR(OSThread)) queue_, PTR(OSThread) t_) {
++    // osDestroyThread passes a thread that isn't stopped but is on no queue (one that ran and returned) with a null
++    // queue: there is nothing to take it off, as upstream's loop never started for one.
++    if (queue_ == NULLPTR) {
++        return false;
++    }
      debug_printf("[Thread Queue] Removing thread %d from queue 0x%08X\n", TO_PTR(OSThread, t_)->id, (uintptr_t)queue_);
  
 -    PTR(PTR(OSThread)) cur = queue_;
