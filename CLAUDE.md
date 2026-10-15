@@ -457,7 +457,7 @@ rt64 0034023), in every browser and on every adapter (rt64 bfe07cb).
 
 - In sections (rt64 657c222): `section <name>` lines, the first the boot. A section's name is one word: rt64's shader
   specializer reads no further. A game with many levels has a section a level or an area (GoldenEye, Majora's Mask,
-  Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64).
+  Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64, Mario Kart 64).
 - In Chrome the whole list is built behind the game from its first draw, and a frame that wants 4 or more unbuilt
   shaders of a section holds the game, for those, under the "Preparing graphics" indicator (rt64 950188f). Firefox
   builds nothing behind the game, so it waits for a list's boot before the first frame and for a section when the game
