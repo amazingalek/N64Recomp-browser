@@ -959,18 +959,18 @@ hung for 11 retraces and stopped on its debug screen, so a hook of the page's st
 recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
-page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C).
-It plays at 20 frames a second all the same, its game's own rate, not RT64's (the
-cells' †): the base's Framerate is Original by default, so RT64 interpolates nothing, and the game's own Frame Rate
-setting is Original too, 30 dropping to 20 when a frame runs long, which every frame does on the page: the game sends
-two display lists a frame, each 10-12 ms in RT64 with the exact copy, about 6 of it the readback (4-5 ms with the late
-copy, with which a test build held 30). A local build before its publish (v0.49.0's patches, Chrome 155 headless and
-Firefox 158, RTX 2070, a quiet host, cold, `tools/play_plan.json`, the first room of every planet in 160 s): Chrome
-19.6-19.8 presents a second at 1256x645 and 3840x2000 uncapped, no shader waits, 13,000-14,000 sound frames short
-(250,000-300,000 before the early release); Firefox 20.8-21.2, 8.9-9.4 s of waits (the boot's 35 in 2.9-3.2 s, a
-planet's 72 in 3.1-3.3 s), its sound short in and after them; no WebGPU errors. From Pages (main 6ddeb6d, N64Recomp-browser v0.49.0), the same plan, a quiet host: Chrome 155
-headless 19.4-19.8, no shader waits, 12,000-19,000 sound frames short; Firefox 158 21.4-22.0, 8.4-9.3 s of waits;
-no WebGPU errors.
+page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). It plays
+at 20 frames a second all the same, its game's own rate, not RT64's (the cells' †): the base's Framerate is Original by
+default, so RT64 interpolates nothing, and the game's own Frame Rate setting is Original too, 30 dropping to 20 when a
+frame runs long, which every frame does on the page: the game sends two display lists a frame, each 10-12 ms in RT64
+with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). A local
+build before its publish (v0.49.0's patches, Chrome 155 headless and Firefox 158, RTX 2070, a quiet host, cold,
+`tools/play_plan.json`, the first room of every planet in 160 s): Chrome 19.6-19.8 presents a second at 1256x645 and
+3840x2000 uncapped, no shader waits, 13,000-14,000 sound frames short (250,000-300,000 before the early release);
+Firefox 20.8-21.2, 8.9-9.4 s of waits (the boot's 35 in 2.9-3.2 s, a planet's 72 in 3.1-3.3 s), its sound short in and
+after them; no WebGPU errors. From Pages (main 6ddeb6d, N64Recomp-browser v0.49.0), the same plan, a quiet host: Chrome
+155 headless 19.4-19.8, no shader waits, 12,000-19,000 sound frames short; Firefox 158 21.4-22.0, 8.4-9.3 s of waits; no
+WebGPU errors.
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
