@@ -26,6 +26,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
 | Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
+| Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60* | 59* | 2026-10-15 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -112,6 +113,10 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   stopped soon after Firefox's boot wait (a palette load past the end of memory, a texture 8404 texels wide):
   pilotwings-64-recomp-web's `patches/sched.c` takes those timeouts out. Look for a retrace handler that counts
   retraces while the RSP or RDP is busy.
+- A recomp's patches that move the display lists into a larger buffer of their own have to move every one, the boot's
+  first included. Mario Kart 64's pointed every task at its larger pool but left the boot's first list in the game's
+  pool, so RT64 read zeros on into the pool where the game was already writing the next frame, and about one boot in
+  twenty on the page hung or crashed. MarioKart64Recomp-web's `patches/gfx_config.c` patches `rendering_init` too.
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
