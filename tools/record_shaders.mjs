@@ -3,6 +3,7 @@
 // each level, and the page, opened with ?record-shaders, prints every shader RT64 meets.
 //
 //   node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...]
+//       [--from <load>]
 //
 // The build dir is served on 127.0.0.1 with the cross-origin headers a threaded page needs, on a fixed port (8917
 // unless --port: the ROM and saves are kept per origin, port included), and Chrome (headless, muted, WebGPU on) is
@@ -25,7 +26,10 @@
 // level on its way to a screen after it). What a load prints before its section's steps start (the
 // launcher, the game's boot, the "start" steps) is the list's section 0, built before the game starts; a section
 // holds what it printed after, less section 0. A section with "boot": true goes into section 0 too, for screens the
-// game shows before its levels that a plan reaches by code (GoldenEye's menus). Console lines go to stdout as they come, with the seconds since start.
+// game shows before its levels that a plan reaches by code (GoldenEye's menus). Sections that share a name are one
+// section of the list, recorded a load each: a world whose levels the plan can reach only one a load (Diddy Kong
+// Racing's). Console lines go to stdout as they come, with the seconds since start, and the list is written after every
+// section, so one stopped partway holds what was recorded until then.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -37,9 +41,10 @@ const profileOption = option(args, '--profile', null);
 const freshProfile = (profileOption === null) || !fs.existsSync(profileOption);
 const profile = profileOption ?? fs.mkdtempSync(path.join(os.tmpdir(), 'record-shaders-'));
 const only = option(args, '--only', null)?.split(',');
+const from = Number(option(args, '--from', '1'));
 const chrome = option(args, '--chrome', undefined);
 if (args.length !== 4) {
-  console.error('usage: node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...] [--chrome <path>]');
+  console.error('usage: node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...] [--from <load>] [--chrome <path>]');
   process.exit(1);
 }
 const [planFile, buildDir, rom, outFile] = args;
@@ -60,10 +65,32 @@ const run = (steps) => page.run(steps, { keep: (value) => { keep = value; } });
 const boot = [];
 const sections = [];
 const addNew = (list, shaders) => { for (const s of shaders) if (!list.includes(s)) list.push(s); };
+// The list so far, written after every section too, so a recording stopped partway keeps what it had; returns how
+// many shaders it holds.
+const write = () => {
+  const lines = [...(plan.header ?? []).map((line) => `# ${line}`.trimEnd()), ...boot];
+  const all = new Set(boot);
+  for (const section of sections) {
+    const own = section.shaders.filter((s) => !boot.includes(s));
+    own.forEach((s) => all.add(s));
+    lines.push(`section ${section.name}`, ...own);
+  }
+  fs.writeFileSync(outFile, lines.join('\n') + '\n');
+  return all.size;
+};
+// --from <n> goes on with a list stopped partway: the out list as it was written, and the plan's loads from the nth
+// (the log numbers them).
+if (from > 1) {
+  for (const line of fs.readFileSync(outFile, 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('section ')) sections.push({ name: line.slice(8), shaders: [] });
+    else (sections.length ? sections[sections.length - 1].shaders : boot).push(line);
+  }
+}
 let first = true;
-for (const section of plan.sections) {
-  if (only && !only.includes(section.name)) continue;
-  log(`section ${section.name}`);
+for (const [index, section] of plan.sections.entries()) {
+  if (index + 1 < from || (only && !only.includes(section.name))) continue;
+  log(`section ${section.name} (load ${index + 1} of ${plan.sections.length})`);
   printed = [];
   keep = true;
   await page.navigate(`http://127.0.0.1:${port}/${plan.page}?record-shaders`);
@@ -72,19 +99,13 @@ for (const section of plan.sections) {
   addNew(boot, printed);
   printed = [];
   await run(section.steps);
-  if (section.boot) addNew(boot, printed); else sections.push({ name: section.name, shaders: [...printed] });
+  const same = sections.find((s) => s.name === section.name);
+  if (section.boot) addNew(boot, printed); else if (same) addNew(same.shaders, printed);
+  else sections.push({ name: section.name, shaders: [...printed] });
   log(`section ${section.name}: ${printed.length} shaders`);
+  write();
 }
-
-const lines = [...(plan.header ?? []).map((line) => `# ${line}`.trimEnd()), ...boot];
-const all = new Set(boot);
-for (const section of sections) {
-  const own = section.shaders.filter((s) => !boot.includes(s));
-  own.forEach((s) => all.add(s));
-  lines.push(`section ${section.name}`, ...own);
-}
-fs.writeFileSync(outFile, lines.join('\n') + '\n');
-log(`${outFile}: ${all.size} shaders, ${boot.length} in section 0 and ${sections.length} sections`);
+log(`${outFile}: ${write()} shaders, ${boot.length} in section 0 and ${sections.length} sections`);
 
 await page.close();
 server.close();
