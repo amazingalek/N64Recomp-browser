@@ -275,6 +275,10 @@ rt64 008f380           on WebGPU a pixel shader with mip LOD samples its two lev
                        them per pixel, in loops the shader keeps: ~70 KB of WGSL instead of 185, and Firefox's waits for
                        GoldenEye's Dam and Pilotwings 64's menus less than half; the prebuilt shaders specialized by
                        spirv-opt alone (re-spirv can't take a loop), so a page's build needs it
+plume 904b26c          ?uncapped: the display reported at 360 Hz (?uncapped=<60-1000>), 4 presents in flight, and RT64
+rt64 e408ed4           interpolating to it without pacing, so with the browser's frames uncapped too (play_page.mjs
+                       --uncapped) a page presents as fast as the GPU, its thread and the GPU process take: every page
+                       read ~60 on a desktop GPU at the display's rate, which told no browser or build from another
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -398,12 +402,16 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
   stand-in for one, marked `*`: the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
-  the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play
-  25`). A desktop GPU at a normal size plays every page, so it never fills a cell. The stand-in is gentler than a
-  laptop: Banjo played 59-60 on it in Firefox and 20-30 on the laptop, so it finds a problem but can't clear one, and a
-  laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence: the median presents a
-  second after the waits as of its date ("58", "60*"), `†` beside one that is the game's own frame rate ("20†"), a
-  laptop's and the stand-in's both when the stand-in has a newer one ("20†; 60*"), words only where there is no number
+  the pixels of a laptop's window, in both browsers at one CSS pixel a pixel, uncapped (`play_page.mjs --uncapped
+  --size 3840x2000 --play 25`, Playing a page). At the display's rate every page read about 60 on the stand-in, which
+  told neither browser nor any build apart; uncapped, its presents a second are what the page can make, so a higher
+  number is a cheaper frame, 342 or more is the uncapped rate's ceiling, and the retest's runs are compared with
+  earlier uncapped runs only (the first has none). A desktop GPU at a normal size plays every page, so it never fills a
+  cell. The stand-in is gentler than a laptop and sees cost only: Banjo played 59-60 on it in Firefox and 20-30 on the
+  laptop, where callbacks that come back late and the browser's own frames held it back, so it finds a problem but
+  can't clear one, and a laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence:
+  the median presents a second after the waits as of its date ("58", "240*"), `†` beside one that is the game's own
+  frame rate ("20†"), a laptop's and the stand-in's both when the stand-in has a newer one ("20†; 240*"), words only where there is no number
   ("never boots", "not yet"), never "smooth" and never against an earlier result ("the crash is gone"). One whose laptop
   result a fix was made for gives the stand-in's number until it is played there again. A cell below 60 without a `†` has work filed
   to make it 60. A
@@ -438,7 +446,12 @@ A new game gets a row in the same work as its port.
   Look at a page with CDP `Page.captureScreenshot` of that page.
 - What the page says about itself: `Module.recompAudioStats()` gives frames played and frames short;
   `?present-stats` (plume 90ef8e5) prints presents a second and how late each one's onSubmittedWorkDone comes back, and
-  `?presents-in-flight=<1-8>` fixes the cap (otherwise 2, raised to 4 at most while it holds presents back); `?record-shaders` prints the shaders the game asks for; the console reports
+  `?presents-in-flight=<1-8>` fixes the cap (otherwise 2, raised to 4 at most while it holds presents back); `?uncapped`
+  (plume 904b26c, rt64 e408ed4) presents as fast as the page can, which needs the browser's animation frames uncapped
+  too (Chrome `--disable-frame-rate-limit`, Firefox `layout.frame_rate` 0; `play_page.mjs --uncapped` sets both): a
+  number to compare by, not what a player sees, since a player's browser holds the page to the display; it costs
+  video memory, an interpolated frame's color target per present a game frame (~530 MB for a 20 fps game at
+  3840x2000); `?record-shaders` prints the shaders the game asks for; the console reports
   each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode`
   in a preload, take `processorOptions.ring` and sample its two counters every few ms.
 - Read video memory from the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` counter and nvidia-smi, not the
@@ -457,6 +470,29 @@ A new game gets a row in the same work as its port.
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+
+## Frame rates
+
+- Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
+  setting, Display by default in every game, interpolates between the game's frames to the display's rate, each
+  interpolated frame a full redraw, so a page presents 60 a second on a 60 Hz display (144 on a 144 Hz one) whatever
+  the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
+  RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
+- The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
+  Original 30), Pilotwings 64 60 (a variable timestep), and the other seven their cartridge's: Majora's Mask 20,
+  Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
+  races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
+- A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
+  a game fork carrying web support only. Weigh it first: a game's logic at 60 gives lower input lag, motion the game
+  computes rather than RT64 interpolates, and the few things interpolation misses (some particles and 2D), but no
+  more presents, and it doubles the game's CPU work and RT64's per display list (4-12 ms each on a page, The game forks), which a
+  laptop's CPU pays for. For the frame rate on screen, or to measure a page, it buys nothing.
+- To measure what a page can do past the display, play it uncapped (`play_page.mjs --uncapped`, Playing a page). That
+  measures cost: the GPU's, the page's thread's WebGPU calls and the browser's GPU process's, for each present. It
+  doesn't see what held Firefox at 20-30 on a laptop's Intel UHD while the GPU idled: done callbacks coming back 20-40
+  ms late, its refresh driver's frames, the compositor. Uncapped turns the last two off, and a fast GPU's callbacks
+  come back early. So a higher uncapped number on a desktop GPU is a cheaper frame everywhere, but it doesn't clear a
+  laptop result.
 
 ## Prebuilt shader lists
 
