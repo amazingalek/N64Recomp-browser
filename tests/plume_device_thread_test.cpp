@@ -486,6 +486,9 @@ int main() {
         thread.join();
     }
 
+    // The threads' objects are deleted on the device thread, which logs it: wait for that before reading the log.
+    deviceThread->runSync([]() {});
+
     // Each thread's list replayed what that thread recorded, in its order, with copies of its arguments.
     for (int t = 0; t < threadCount; t++) {
         const std::string id = std::to_string(t);
@@ -687,9 +690,10 @@ int main() {
     readback->unmap();
     deviceThread->runSync([]() {});
     check(sameData && (eventsStartingWith("map readback").size() == mapsBefore), "map() of a READBACK buffer whose data has arrived takes the device thread's map");
+    // The device thread answers on its own once the copy is replayed and the data is there.
     copyIntoReadback(0);
-    pollMapReady();
     deviceThread->runSync([]() {});
+    check(readback->isMapReady(), "a READBACK buffer whose data arrived is ready without being asked");
     firstEvent = events.size();
     copyIntoReadback(0);
     deviceThread->runSync([]() {});
