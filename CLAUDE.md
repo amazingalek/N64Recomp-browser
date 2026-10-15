@@ -29,16 +29,16 @@ the code: a finding that explains code goes beside that code.
 
 ## How work lands
 
-A task here (a card on this repo's board) ends in one pull request on this repo: `forks.txt` and `patches/`,
+A change here ends in one pull request on this repo: `forks.txt` and `patches/`,
 `frontend/`, `renderer/`, `tests/`, `tools/`, the README, this file. CI runs on it, and it merges once CI is green and
 what it changes has been played (Changing it).
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks (below) take no pull requests and have never had one: a change there is a commit pushed straight to the
 fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`forks.txt` here, a game fork's submodule).
-`rush-2049-recomp` is the one game with a repo of its own that works by pull requests, on a board of its own: what it
-needs from a change here (moving its `lib/N64Recomp-browser`, publishing its page) is a card on that board, not a
-commit from here.
+`rush-2049-recomp` is the one game with a repo of its own that works by pull requests: what it needs from a change here
+(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, which builds, publishes and
+plays its page, not a commit from here.
 
 ## Rules
 
@@ -291,16 +291,16 @@ script), so commit to a fork from a separate clone of it:
    release: a recomp checks this repo out at one), then move the pins.
 
 **The pins.** A change reaches the builds whose code it changes. A change to what a page runs (a fork, or anything
-here a page is built from: `forks.txt`, `patches/`, `frontend/`) reaches every game in the same work, never a later
-card: the agent moves every game fork's N64Recomp-browser onto the new commit (a commit pushed to each fork's
+here a page is built from: `forks.txt`, `patches/`, `frontend/`) reaches every game in the same work, never
+later: the agent moves every game fork's N64Recomp-browser onto the new commit (a commit pushed to each fork's
 `main`), rebuilds and republishes each page, plays each one in Chrome and Firefox, and updates the games table, before
 calling it done. Rush 2049 is the one exception: its `lib/N64Recomp-browser` moves in a pull request on its own repo,
-so the agent files that as a card on its board, which builds, publishes and plays its page there.
+which builds, publishes and plays its page there.
 
 That holds until a script rebuilds the pages: one that builds every game's page from main, publishes only those whose
-output changed and lists them to play (its own card on this board). Once it exists, the agent bumps the pins
-(scripted, a few minutes), rebuilding and publishing go through the script, and playing the pages whose output changed
-is a card the agent files. The PR that adds the script rewrites this paragraph to say so.
+output changed and lists them to play. Once it exists, the agent bumps the pins
+(scripted, a few minutes), rebuilding and publishing go through the script, and the pages whose output changed are played
+as work of their own. The PR that adds the script rewrites this paragraph to say so.
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
