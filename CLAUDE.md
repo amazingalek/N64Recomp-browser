@@ -938,7 +938,8 @@ page is built by `tools/build_web.sh` in `web-build/`: that base project again, 
 and `lib/N64Recomp` moved to the commits in `patches/patches.txt` and patched by `apply.cmake`, then the base's and
 the game's own changes to them made again for those commits (`patches/web/rt64.patch`, `N64ModernRuntime.patch`), and
 the base's frontend made a page (`patches/web/dkr.patch`: the canvas, the menus' shaders as WGSL, `audio_output.h`, the
-file picker, HOME kept in IndexedDB, rumble through the Gamepad API, no mods, Exit, debug window or F10 toolbar, the
+file picker, HOME kept in IndexedDB, rumble through the Gamepad API, no mods, texture packs, Exit, debug window or F10
+toolbar, the
 dummy frame kept out of RDRAM as RecompFrontend 75fe596 does). The game's recompiled code is made again with the
 web-patched N64Recomp, which has no call tracking, so the hooks' `recomp_exit_function()` calls come out of the copy
 of its config it reads. The game binds draw buffers the workload hasn't made before the first one does, which WebGPU
@@ -956,7 +957,15 @@ recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
 page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C).
-<!-- jfg measurements -->
+It plays at 20 frames a second all the same, its game's own rate, not RT64's (the
+cells' †): the base's Framerate is Original by default, so RT64 interpolates nothing, and the game's own Frame Rate
+setting is Original too, 30 dropping to 20 when a frame runs long, which every frame does on the page: the game sends
+two display lists a frame, each 10-12 ms in RT64 with the exact copy, about 6 of it the readback (4-5 ms with the late
+copy, with which a test build held 30). A local build before its publish (v0.49.0's patches, Chrome 155 headless and
+Firefox 158, RTX 2070, a quiet host, cold, `tools/play_plan.json`, the first room of every planet in 160 s): Chrome
+19.6-19.8 presents a second at 1256x645 and 3840x2000 uncapped, no shader waits, 13,000-14,000 sound frames short
+(250,000-300,000 before the early release); Firefox 20.8-21.2, 8.9-9.4 s of waits (the boot's 35 in 2.9-3.2 s, a
+planet's 72 in 3.1-3.3 s), its sound short in and after them; no WebGPU errors.<!-- jfg pages -->
 
 ## WebGPU in Chrome and Firefox
 
