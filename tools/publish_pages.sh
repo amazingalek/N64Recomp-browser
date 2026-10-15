@@ -173,7 +173,7 @@ build_cbfd() {
     # Conker's own patches, then the web's on top (tools/web_patch.sh): only into a checkout the sync left clean (it
     # resets one that moved), and all of them again from clean when Conker's patches changed since the last build here.
     local tool patch state
-    state="$(cat recomp/*.patch tools/web_patch.sh tools/web_rt64_game_frame.patch | git hash-object --stdin)"
+    state="$(cat recomp/*.patch tools/web_patch.sh tools/web_*.patch | git hash-object --stdin)"
     if [[ "$(cat ../cbfd-patched 2> /dev/null)" != "$state" ]]; then
         for tool in tools/N64Recomp tools/N64ModernRuntime tools/rt64 tools/RecompFrontend; do
             git -C $tool submodule foreach --recursive -q 'git reset -q --hard && git clean -fdq'
