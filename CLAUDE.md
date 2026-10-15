@@ -264,6 +264,13 @@ plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_
                        Dam: the display list thread's waits 2.3 s → 0.15 s in 13 s, the page's thread 47% → 32% busy)
 plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present: RT64's
 rt64 a5bc25d           present thread asks both before every present (its waits 963 → 106 ms in 13 s)
+rt64 29f50e6           the prebuilt shaders' phi variables (naga's `var phi_<n>_` in a function) moved to module scope as
+                       var<private>: Chrome parses a module on the thread that takes the page's presents, a 180 KB
+                       RasterPS in 100-120 ms, ~30 after; Pilotwings 64's page, while its list built behind the game in
+                       Chrome 155, 17-19 frame gaps over 100 ms → 4 on a quiet host, Firefox's waits no longer
+rt64 f01c3a6           with Emscripten a workload's RDP params, tiles, GPU tiles and render params bound as a zeroed buffer
+                       until it makes its own: a set's layout is built from what is bound, so a pipeline whose pixel shader
+                       reads GPUTiles failed ("Binding doesn't exist") on a workload with no tile yet (Mario Kart 64's logo)
 rt64 RTXXXXX           on WebGPU a pixel shader with mip LOD samples its two levels, and its two tiles where LOD picks
                        them per pixel, in loops the shader keeps: ~70 KB of WGSL instead of 185, and Firefox's waits for
                        GoldenEye's Dam and Pilotwings 64's menus less than half; the prebuilt shaders specialized by
@@ -822,6 +829,13 @@ changing it:
   boot ran at 17-20 display lists a second for ~10 s and about one run in fifteen froze for good. One compilation
   thread: six at once took ~9 cores and halved the frame rate. The wasm grows from 7.3 to 16.6 MB (the spec
   constant shaders).
+- Chrome parses and validates a shader module (Tint) in `createShaderModule`, on that same main thread, even for a
+  pipeline it then builds async, in a time that grows faster than the WGSL (0.16 ms a KB at 24 KB, 0.56 at 180 KB,
+  1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
+  RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the boot's few pipelines
+  made with `createRenderPipeline`/`createComputePipeline` (DXC on that thread, 13-64 ms each) and the spec constant
+  shaders' modules at setup (713 KB, ~0.7 s each). Dawn reuses a module whose WGSL matches one still alive, but
+  keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
   Firefox painting a handful in between, so menus and races sat below a frame a second for minutes, until every
