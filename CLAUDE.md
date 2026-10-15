@@ -754,7 +754,8 @@ it by the fork's `tools/web_rt64_game_frame.patch`. Upstream's save states sign 
 stack, which wasm can't walk at every wait: `tools/web_save_states.patch` builds that file without one and the page sets
 up no save states. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
 it records what it left patched (`.git/patched-tools`) and patches from scratch when that changes. rt64-web 03b9dcc
-keeps rt64's web includes off the lines Conker's rt64 patch adds to. In headless Chrome: launcher, Add ROM, the intro,
+and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a game's
+patch adds none, or the next retest's Conker build stops on it. In headless Chrome: launcher, Add ROM, the intro,
 the bar, Conker walking outside it, sound. Its code runs TLB-mapped (`.game` at 0x15000000), and the host copies those
 pages to `rdram + vram + 0x80000000`, ~2.4 GB past RDRAM, inside the desktop's 4 GB reservation; on a page RDRAM is an
 allocation in the wasm heap, so `overlays.cpp` moves the heap's break past them (`sbrk`) and the page links with
