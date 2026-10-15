@@ -17,18 +17,18 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth (58) | smooth after its waits (56) | 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth (stand-in, 59); not yet on a laptop | smooth after its waits (stand-in, 59); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | the game's 20 on a laptop; smooth on the stand-in (60) | the game's 20 on a laptop; smooth after its waits on the stand-in (60) | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth (stand-in, 60); not yet on a laptop | smooth after its waits (stand-in, 60); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth (stand-in, 60); not yet on a laptop | smooth after its waits (stand-in, 60); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth (the game's 30) | boots with the laptop's late GPU reports reproduced; smooth on the stand-in (60) after 0.5 s before its first frame and 7 s as the DK Rap begins; not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | smooth (stand-in, 60) | smooth after its waits (stand-in, 60) | stand-in 2026-10-15, v0.46.0 |
-| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | smooth (stand-in, 58) | smooth (stand-in, 60) after a 4.5 s wait before its first frame and ~10 s after Start | stand-in 2026-10-15, v0.46.0 |
-| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | smooth (stand-in, 60); the game's own 10-30 in some later worlds, as on the desktop | smooth after its waits (stand-in, 59); the game's own 10-30 in some later worlds | stand-in 2026-10-15, v0.46.0 |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
+| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 
-How each page plays on a Windows laptop's integrated graphics (median presents a second after the shader waits), or on
-a stand-in for one (a desktop GPU drawing a 3840x2000 canvas), which is gentler. The goal is every one smooth in both.
+Median presents a second after the shader waits on a Windows laptop's Intel UHD; * on a stand-in for one (a desktop GPU
+drawing a 3840x2000 canvas, which is gentler), not yet on a laptop; † the game's own frame rate. The goal is 60 in both.
 
 ## Using it in a recomp
 
