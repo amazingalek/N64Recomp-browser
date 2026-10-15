@@ -884,6 +884,37 @@ headless waited for nothing and drew 59.6 presents a second; Firefox 158 waited 
 twos through the menus (wanted shaders under a section's 4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000
 59.6 and 59.0; no WebGPU errors, sound short only in Firefox's course wait.
 
+`amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an
+interface of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`), the desktop build D3D12 only. Its
+`lib/rt64` and `lib/N64ModernRuntime` are upstream's at its commits (Conker's, so `pins.txt`'s rows cover them),
+patched by `apply.cmake`; `rt64-patches/` (ray
+tracing, the video recorder) is D3D12 work and stays out of the page. `web/page.cmake` is the page's CMake, included in
+place of the rest of CMakeLists.txt with Emscripten, and `web/stubs.cpp` stands in for the crash handler, installer,
+update check, signature check and video recorder. With no RecompFrontend it has no file picker of its own, so this repo's
+`frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's for its ROM row and Load ROM. Upstream
+shapes its window to the launcher and to the game's aspect; on a page `SDL_SetWindowSize` sets only the canvas's
+backing size under CSS that keeps it at the page's size, which stretched the picture, so the page leaves the window
+alone. The game reads the keyboard once a frame at its 20 a second, so a script holds a key 150-300 ms. Upstream
+starts a first run at the console's picture, 320x240 and the game's 20 presented as 20; a page starts at Match the
+window and Match the display (`machine_defaults`), as the other pages draw. Render to RAM stays on with the exact copy: the pause menu's background flushes the task queue and filters
+the copied frame on the CPU at once (`z_play.c`, `PreRender_ApplyFilters`), as in Majora's Mask. Its list,
+`src/rt64_shaders.txt`, 544 descriptions in 24 sections (the boot 69: launcher, logos, title), is recorded by code:
+`tools/shader_survey.js` loads File 1 from the title (name entry on a new profile), clears a new file's opening
+cutscene as play begins (`gSaveContext.cutsceneIndex` and `nextCutsceneIndex`, written at the file select's hand-over,
+since clearing them mid-cutscene hung the game on a black screen), and warps through `Module._oot_web_warp`
+(`web/survey.cpp`, upstream's own `--warp`, taken by `patches/harness_warp.c` in play) as a child or an adult (the play
+state's `linkAgeOnLoad`, which `Player_Destroy` copies into the save; the save's `linkAge` alone is overwritten).
+While a cutscene index is set a warp lands in the entrance's cutscene layer, another place. Its launcher's sizes are
+dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at least), so the launcher fills a 3840x2000
+canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
+busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
+Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
+(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. In Chrome a scene's
+first load can hold the picture 3-8 s: one present's onSubmittedWorkDone comes back seconds late (3.3 s with
+`?present-stats`) with the page's thread free and the sound playing on, while a later load of the same scene, and 100
+s at the title with the whole list building behind it, show no gap over 50 ms: something Chrome's GPU process does in
+line the first time (a sync pipeline, a texture's first clear), not the list's build.
+
 ## WebGPU in Chrome and Firefox
 
 Shaders go HLSL → SPIR-V (dxc, without `-fvk-invert-y`: WebGPU's clip space is D3D's) → WGSL (naga

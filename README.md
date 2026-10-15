@@ -27,6 +27,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60* | 59* | 2026-10-15 |
+| The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60*; holds 3-8 s at a scene's first load | 59* | 2026-10-15 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -94,8 +95,9 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
-- No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
-  haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
+- No native file dialog (nfd: RecompFrontend asks the page; a recomp with menus of its own calls
+  `n64recomp_browser::pick_files`, `frontend/file_picker.h`, and gets the picked files' paths) and no `SDL_INIT_HAPTIC`
+  (Emscripten's SDL2 has no haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
@@ -336,8 +338,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   (`recomp_web_frontend_page()` works too)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, a thread's prints without
   waiting for the page's thread, SDL2 audio from a thread, sound
-  played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
-  or Edge, and `coi_serviceworker.js`.
+  played on the browser's audio thread (`audio_output.h`), the browser's file picker for a recomp with menus of its own
+  (`file_picker.h`), the WebGPU device, a notice in Firefox recommending Chrome or Edge, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
 - `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), `fetch_pins.sh` a recomp's
   own commits in `patches/pins.txt`, patched, and `publish_page.sh` puts

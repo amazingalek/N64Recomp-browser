@@ -71,6 +71,7 @@ wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
 pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
 mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web
+oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -243,6 +244,9 @@ build_mk64() {
     n64recomp N64RecompCLI RSPRecomp
     keep_times RecompiledFuncs rsp -- bash -c './N64Recomp us.toml > /dev/null && ./RSPRecomp aspMain.us.toml > /dev/null'
     web MarioKart64Recompiled
+}
+build_oot() {
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 
 # --- Here ---
