@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 90ef8e5767c463109212fc40e1243ec362e30aaf
+plume: https://github.com/amazingalek/plume-web 009957c7a43e535502b0f65556f4ce3b2d986b48
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2226,10 +2226,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..e9acc67
+index 0000000..498c58e
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,2968 @@
+@@ -0,0 +1,3028 @@
 +//
 +// plume
 +//
@@ -3722,6 +3722,7 @@ index 0000000..e9acc67
 +        const int presentsInFlightQuery = plume_webgpu_query_number("presents-in-flight");
 +        if ((presentsInFlightQuery >= 1) && (presentsInFlightQuery <= 8)) {
 +            maxPresentsInFlight = uint32_t(presentsInFlightQuery);
++            presentsInFlightFixed = true;
 +        }
 +
 +        presentStats = (plume_webgpu_query_number("present-stats") >= 0);
@@ -3776,6 +3777,11 @@ index 0000000..e9acc67
 +            reportPresentStats();
 +        }
 +
++        if (!presentsInFlightFixed) {
++            capWindowPresents++;
++            adaptPresentsInFlight();
++        }
++
 +        if (!canWait()) {
 +            return true;
 +        }
@@ -3807,7 +3813,9 @@ index 0000000..e9acc67
 +    bool WebGPUSwapChain::isWaitReady() {
 +        if (presentState->inFlight < maxPresentsInFlight) {
 +            if (waitStartTime > 0.0) {
-+                statsWaitMs += emscripten_get_now() - waitStartTime;
++                const double waitedMs = emscripten_get_now() - waitStartTime;
++                statsWaitMs += waitedMs;
++                capWaitMs += waitedMs;
 +                waitStartTime = 0.0;
 +            }
 +
@@ -3820,6 +3828,58 @@ index 0000000..e9acc67
 +
 +        commandQueue->device->pollQueue();
 +        return false;
++    }
++
++    // Every 2 s: while wait() held presents for more than 5% of the time and they fell short of the display's rate, one
++    // more in flight is tried, and kept if presents rose by 8% or reached the display's rate. A GPU that is the limit
++    // gains nothing from it, only a deeper queue, so it goes back, and the next try comes after 10 s, twice as long
++    // each time (2 min at most). A done signal that comes back late gains from it. A number kept stays: a GPU that
++    // later becomes the limit is left with at most 2 more frames queued than before.
++    static const uint32_t kMaxPresentsInFlight = 4;
++
++    void WebGPUSwapChain::adaptPresentsInFlight() {
++        const double now = emscripten_get_now();
++        if (capWindowStart == 0.0) {
++            capWindowStart = now;
++            capWindowPresents = 0;
++            capWaitMs = 0.0;
++            return;
++        }
++
++        const double seconds = (now - capWindowStart) / 1000.0;
++        if (seconds < 2.0) {
++            return;
++        }
++
++        const double rate = capWindowPresents / seconds;
++        const double displayRate = frameTimer->refreshRate;
++        const bool held = (capWaitMs > (50.0 * seconds)) && (rate < (displayRate * 0.95));
++        if (capTrying) {
++            capTrying = false;
++            if ((rate >= (capTryRate * 1.08)) || (rate >= (displayRate * 0.95))) {
++                capRetryMs = 10000.0;
++                printf("plume: %u presents in flight (%.1f a second, from %.1f)\n", maxPresentsInFlight, rate, capTryRate);
++            }
++            else {
++                if (presentStats) {
++                    printf("plume: back to %u presents in flight (%.1f a second with one more, %.1f without)\n",
++                        maxPresentsInFlight - 1, rate, capTryRate);
++                }
++
++                maxPresentsInFlight--;
++                capNextTry = now + capRetryMs;
++                capRetryMs = std::min(capRetryMs * 2.0, 120000.0);
++            }
++        }
++        else if (held && (maxPresentsInFlight < kMaxPresentsInFlight) && (now >= capNextTry)) {
++            capTryRate = rate;
++            capTrying = true;
++            maxPresentsInFlight++;
++        }
++
++        capWindowStart = now;
++        capWindowPresents = 0;
++        capWaitMs = 0.0;
 +    }
 +
 +    // present-stats' line, every 5 s.
@@ -5200,10 +5260,10 @@ index 0000000..e9acc67
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..b49e412
+index 0000000..6dcb436
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,613 @@
+@@ -0,0 +1,630 @@
 +//
 +// plume
 +//
@@ -5274,10 +5334,16 @@ index 0000000..b49e412
 +//   are, and isWaitReady() says whether it would. Behind plume_device_thread.h the calling thread polls isWaitReady(),
 +//   as it does isMapReady(); without threads, wait() waits when the build can. Not 1: Firefox calls back late, and with
 +//   one frame in flight a GPU that could finish ~54 frames a second gave 38, against 46 with two and 47 with three
-+//   (whose queue sat 50 ms behind against 33). The page's query can set that number (presents-in-flight=<1-8>), and
++//   (whose queue sat 50 ms behind against 33). Nor always 2: where the callback comes back later than two frames, two
++//   in flight hold presents below the display's rate with the GPU idle, and RT64 reads the presents it skips as the GPU
++//   falling behind and paces them to the game's frames. With each callback held 20-40 ms (an RTX 2070's Firefox gives
++//   11-16 ms; a laptop's Intel graphics is suspected of more), Firefox 158 drew Banjo-Kazooie at 20 a second with 2 in
++//   flight, 58 with 3 and 59 with 4. The callbacks alone can't tell a late callback from a slow GPU, but only the first
++//   gains from one more in flight, so while wait() holds presents a swap chain tries one more, up to 4, and keeps it if
++//   presents rise (adaptPresentsInFlight()). The page's query can fix the number (presents-in-flight=<1-8>), and
 +//   present-stats prints a line every 5 s: presents a second, how long after its present each frame's onSubmittedWorkDone
-+//   came back, the time wait() held presents, and the animation frames a second. On a GPU at hand, that says whether the
-+//   GPU, the callbacks or the browser's frames hold presents back.
++//   came back, the time wait() held presents, and the animation frames a second, and each try that goes back. On a GPU
++//   at hand, that says whether the GPU, the callbacks or the browser's frames hold presents back.
 +// - The browser doesn't say what the display's refresh rate is, so a swap chain times the animation frames with a
 +//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming.
 +// - Every call must come from the thread that owns the device's JavaScript object: WebGPU objects can't be shared
@@ -5574,6 +5640,16 @@ index 0000000..b49e412
 +        uint32_t maxPresentsInFlight = 2;
 +        double waitStartTime = 0.0;
 +
++        // The number in flight tried one higher while wait() holds presents, and kept only if presents rise with it.
++        bool presentsInFlightFixed = false;
++        double capWindowStart = 0.0;
++        uint32_t capWindowPresents = 0;
++        double capWaitMs = 0.0;
++        double capTryRate = 0.0;
++        bool capTrying = false;
++        double capNextTry = 0.0;
++        double capRetryMs = 10000.0;
++
 +        // present-stats: what happened since statsStartTime.
 +        bool presentStats = false;
 +        double statsStartTime = 0.0;
@@ -5600,6 +5676,7 @@ index 0000000..b49e412
 +        uint32_t getRefreshRate() const override;
 +        void getCanvasSize(uint32_t &width, uint32_t &height) const;
 +        void reportPresentStats();
++        void adaptPresentsInFlight();
 +    };
 +
 +    struct WebGPUFramebuffer : RenderFramebuffer {

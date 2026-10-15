@@ -271,8 +271,8 @@ Banjo-Kazooie's. What to expect from a recomp's own commits:
 
 A recomp can instead point its `rt64`, `N64ModernRuntime` and `RecompFrontend` submodules at the forks (The forks), at
 the commits `forks.txt` names at a tag, and leave out the `apply.cmake` lines: the web support is then in the
-submodules' history, not in their working trees. Rush 2049 does that. It moves the recomp off upstream's commits,
-and every new tag moves its submodules again.
+submodules' history, not in their working trees. None of the games here does: it moves the recomp off upstream's
+commits, and every new tag moves its submodules again.
 
 ## The forks
 
@@ -283,8 +283,9 @@ and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), 
 ```
 fork                                     upstream                 what the fork adds
 amazingalek/plume-web                    renderbag/plume          a WebGPU backend, the display's rate timed from
-                                                                  animation frames, at most 2 frames in flight
-                                                                  (?presents-in-flight=<n>; ?present-stats prints
+                                                                  animation frames, 2 frames in flight (up to 4
+                                                                  where the GPU reports them done late;
+                                                                  ?presents-in-flight=<n>; ?present-stats prints
                                                                   what holds presents back every 5 s);
                                                                   any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
