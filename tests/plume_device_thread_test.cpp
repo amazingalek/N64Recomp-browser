@@ -1,9 +1,10 @@
-// plume's device thread layer (plume-web, plume_device_thread.cpp), run by CI against a mock backend
-// that logs every call: every call reaches the backend on the device thread, in the order it was made; command lists
-// recorded on several threads at once replay their commands with the backend's objects and with copies of what their
-// arguments pointed at; push constants of size 0 take the size of their range; a swap chain's present() copies the
-// texture drawn into the backend's swap chain texture; map() of a buffer whose data isn't there yet waits for it on
-// the calling side (WebGPU readback); and every backend object is destroyed on the device thread.
+// plume's device thread layer (plume-web, plume_device_thread.cpp), run by CI against a mock backend that logs every
+// call: every call reaches the backend on the device thread, in the order it was made; command lists recorded on
+// several threads at once replay their commands with the backend's objects and with copies of what their arguments
+// pointed at; push constants of size 0 take the size of their range; a swap chain's present() copies the texture drawn
+// into the backend's swap chain texture, and its needsResize() and getRefreshRate() don't wait for the device thread;
+// map() of a buffer whose data isn't there yet waits for it on the calling side (WebGPU readback), and asking whether
+// it's there doesn't wait for the device thread; and every backend object is destroyed on the device thread.
 
 #include <atomic>
 #include <condition_variable>
@@ -81,6 +82,10 @@ struct QueueThread : DeviceThread {
         runAsync([&]() { work(); done.set_value(); });
         done.get_future().wait();
     }
+
+    bool isCurrent() const override {
+        return std::this_thread::get_id() == thread.get_id();
+    }
 };
 
 // The mock backend. Every call checks it is on the device thread and is logged there, so the log needs no lock.
@@ -111,6 +116,9 @@ std::string nextName(const char *kind) { return std::string(kind) + std::to_stri
 // How many times the next buffer created answers isMapReady() with false.
 int nextBufferNotReady = 0;
 
+struct MockBuffer;
+MockBuffer *lastBuffer = nullptr;
+
 template<typename T>
 std::string nameOfT(const T *object) {
     return (object != nullptr) ? dynamic_cast<const Named *>(object)->name : "null";
@@ -119,7 +127,7 @@ std::string nameOfT(const T *object) {
 struct MockBuffer : RenderBuffer, Named {
     std::vector<uint8_t> memory = std::vector<uint8_t>(256, 0);
     int notReady = nextBufferNotReady;
-    MockBuffer() : Named(nextName("buffer")) { }
+    MockBuffer() : Named(nextName("buffer")) { lastBuffer = this; }
     bool isMapReady() override { call("isMapReady " + name); return (notReady == 0) || (notReady-- == 0); }
     void *map(uint32_t, const RenderRange *) override { call("map " + name); return memory.data(); }
     void unmap(uint32_t, const RenderRange *range) override { call("unmap " + name + " " + std::to_string(range ? range->end : 0) + " " + std::to_string(memory[0])); }
@@ -236,17 +244,21 @@ struct MockCommandList : RenderCommandList, Named {
     void writeTimestamp(const RenderQueryPool *, uint32_t) override { }
 };
 
+struct MockSwapChain;
+MockSwapChain *lastSwapChain = nullptr;
+
 struct MockSwapChain : RenderSwapChain, Named {
     std::vector<std::unique_ptr<MockTexture>> textures;
-    uint32_t width = 0, height = 0, next = 0;
+    uint32_t width = 0, height = 0, next = 0, canvasWidth = 640, refreshRate = 60;
     MockSwapChain() : Named("swapChain") {
+        lastSwapChain = this;
         textures.emplace_back(std::make_unique<MockTexture>("canvas0"));
         textures.emplace_back(std::make_unique<MockTexture>("canvas1"));
     }
     bool present(uint32_t index, RenderCommandSemaphore **waits, uint32_t count) override { call("present " + std::to_string(index) + " waits " + std::to_string(count)); return true; }
     void wait() override { }
-    bool resize() override { call("resize"); width = 640; height = 480; return true; }
-    bool needsResize() const override { call("needsResize"); return width == 0; }
+    bool resize() override { call("resize"); width = canvasWidth; height = 480; return true; }
+    bool needsResize() const override { call("needsResize"); return width != canvasWidth; }
     void setVsyncEnabled(bool) override { }
     bool isVsyncEnabled() const override { return true; }
     uint32_t getWidth() const override { return width; }
@@ -256,7 +268,7 @@ struct MockSwapChain : RenderSwapChain, Named {
     bool acquireTexture(RenderCommandSemaphore *, uint32_t *index) override { call("acquire"); *index = next; next = (next + 1) % 2; return true; }
     RenderWindow getWindow() const override { return {}; }
     bool isEmpty() const override { return width == 0; }
-    uint32_t getRefreshRate() const override { return 60; }
+    uint32_t getRefreshRate() const override { return refreshRate; }
 };
 
 struct MockQueue : RenderCommandQueue, Named {
@@ -478,6 +490,9 @@ int main() {
         thread.join();
     }
 
+    // The threads' objects are deleted on the device thread, which logs it: wait for that before reading the log.
+    deviceThread->runSync([]() {});
+
     // Each thread's list replayed what that thread recorded, in its order, with copies of its arguments.
     for (int t = 0; t < threadCount; t++) {
         const std::string id = std::to_string(t);
@@ -600,15 +615,111 @@ int main() {
     check(sameTexture, "the texture a frame is drawn into is the one present() copies");
     check(eventsStartingWith("execute").size() >= 3 && contains("execute signal semaphore" + std::to_string(counter - 3) + " waits 0 fence null"), "acquireTexture() signals the caller's semaphore");
 
+    // needsResize() and getRefreshRate() don't wait for the device thread: they answer what the backend said last, and
+    // a refresh they queue brings the answer up to date.
+    MockSwapChain *swapChainInner = lastSwapChain;
+    deviceThread->runSync([&]() { swapChainInner->canvasWidth = 800; swapChainInner->refreshRate = 144; });
+    std::promise<void> swapChainGate;
+    std::shared_future<void> swapChainGateOpen = swapChainGate.get_future().share();
+    deviceThread->runAsync([swapChainGateOpen]() { swapChainGateOpen.wait(); });
+    std::future<bool> lastAnswer = std::async(std::launch::async, [&]() { return !swapChain->needsResize() && (swapChain->getRefreshRate() == 60); });
+    const bool answeredWithoutWaiting = (lastAnswer.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    swapChainGate.set_value();
+    const bool lastAnswerKept = lastAnswer.get();
+    deviceThread->runSync([]() {});
+    const bool refreshed = swapChain->needsResize() && (swapChain->getRefreshRate() == 144);
+    check(answeredWithoutWaiting && lastAnswerKept && refreshed, "needsResize() and getRefreshRate() answer without waiting for the device thread, and a refresh later the backend's answer");
+    check(swapChain->resize() && !swapChain->needsResize() && (swapChain->getWidth() == 800), "needsResize() answers false right after resize()");
+
     // A buffer whose data arrives late: map() asks isMapReady() from the calling side until it's true, then maps.
     nextBufferNotReady = 3;
     std::unique_ptr<RenderBuffer> readback = device->createBuffer(RenderBufferDesc::ReadbackBuffer(256));
     nextBufferNotReady = 0;
+    MockBuffer *readbackInner = lastBuffer;
     readback->setName("readback");
     const void *mapped = readback->map();
     deviceThread->runSync([]() {});
     std::vector<std::string> readbackEvents = eventsStartingWith("isMapReady readback");
     check((mapped != nullptr) && (readbackEvents.size() == 4) && (eventsStartingWith("map readback").size() == 1), "map() waits on the calling side until isMapReady(), then maps once");
+    readback->unmap();
+
+    // isMapReady() of a READBACK buffer doesn't wait for the device thread, and an answer counts only if it was asked
+    // after the last execution that copies into the buffer.
+    std::unique_ptr<RenderBuffer> source = device->createBuffer(RenderBufferDesc::UploadBuffer(256));
+    std::unique_ptr<RenderCommandList> copyList = queue->createCommandList();
+    auto copyIntoReadback = [&](int notReady) {
+        deviceThread->runSync([&]() { readbackInner->notReady = notReady; });
+        copyList->begin();
+        copyList->copyBufferRegion(readback->at(0), source->at(0), 16);
+        copyList->end();
+        const RenderCommandList *copyLists[] = { copyList.get() };
+        queue->executeCommandLists(copyLists, 1);
+    };
+
+    // Whether every event starting with prefix since first comes after the first starting with after, and one does.
+    auto allAfter = [](size_t first, const std::string &after, const std::string &prefix) {
+        size_t afterIndex = SIZE_MAX, found = 0;
+        for (size_t i = first; i < events.size(); i++) {
+            if ((afterIndex == SIZE_MAX) && (events[i].compare(0, after.size(), after) == 0)) {
+                afterIndex = i;
+            }
+            else if (events[i].compare(0, prefix.size(), prefix) == 0) {
+                if (afterIndex == SIZE_MAX) {
+                    return false;
+                }
+
+                found++;
+            }
+        }
+
+        return found > 0;
+    };
+
+    auto pollMapReady = [&]() {
+        for (int i = 0; i < 100000; i++) {
+            if (readback->isMapReady()) {
+                return true;
+            }
+
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+
+        return false;
+    };
+
+    deviceThread->runSync([]() {});
+    size_t firstEvent = events.size();
+    copyIntoReadback(2);
+    const bool answerBeforeCopyIgnored = !readback->isMapReady();
+    std::promise<void> gate;
+    std::shared_future<void> gateOpen = gate.get_future().share();
+    deviceThread->runAsync([gateOpen]() { gateOpen.wait(); });
+    std::future<bool> asked = std::async(std::launch::async, [&]() { return readback->isMapReady(); });
+    const bool askedWithoutWaiting = (asked.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    gate.set_value();
+    const bool notReadyYet = !asked.get();
+    const bool readyAfterAll = pollMapReady();
+    deviceThread->runSync([]() {});
+    check(answerBeforeCopyIgnored && askedWithoutWaiting && notReadyYet && readyAfterAll, "isMapReady() of a READBACK buffer doesn't wait for the device thread, and an answer from before a copy into it doesn't count");
+    check(allAfter(firstEvent, "execute", "isMapReady readback"), "the questions after a copy into a READBACK buffer reach the backend after the copy's execution");
+
+    // The device thread mapped the buffer when its data arrived: map() takes that, and a buffer the caller never mapped
+    // is unmapped before the next copy into it.
+    const size_t mapsBefore = eventsStartingWith("map readback").size();
+    const bool sameData = (readback->map() == mapped);
+    readback->unmap();
+    deviceThread->runSync([]() {});
+    check(sameData && (eventsStartingWith("map readback").size() == mapsBefore), "map() of a READBACK buffer whose data has arrived takes the device thread's map");
+    // The device thread answers on its own once the copy is replayed and the data is there.
+    copyIntoReadback(0);
+    deviceThread->runSync([]() {});
+    check(readback->isMapReady(), "a READBACK buffer whose data arrived is ready without being asked");
+    firstEvent = events.size();
+    copyIntoReadback(0);
+    deviceThread->runSync([]() {});
+    check(allAfter(firstEvent, "unmap readback", "execute"), "a READBACK buffer mapped when its data arrived is unmapped before the next copy into it");
+    copyList.reset();
+    source.reset();
     readback.reset();
 
     // Everything is destroyed on the device thread, the interface last.
