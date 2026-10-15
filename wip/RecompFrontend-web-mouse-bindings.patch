@@ -1,0 +1,369 @@
+From 973d76b392dccc6802e3c15dd8000b35c7bbd411 Mon Sep 17 00:00:00 2001
+From: Eivind FRITZEN <eivind.fritzen@cappelendamm.no>
+Date: Thu, 15 Oct 2026 11:44:00 +0200
+Subject: [PATCH] Mouse buttons and the wheel as bindings, and extra inputs a
+ game defines
+
+A keyboard profile binds the mouse's buttons (SDL's numbers) and each way of its wheel like keys: a binding being
+scanned for the keyboard takes the next button pressed or notch turned. A wheel binding reads as held for 60 ms a
+notch, released 60 ms between two, so a game that reads its controller once a frame sees each notch as a press; at
+most 3 wait, and a notch turned while a menu holds the input is the menu's.
+
+EXTRA_1-EXTRA_8 are actions a game defines beyond the N64's buttons (a reload or crouch key, previous and next weapon):
+hidden and unbound until a game names and enables one and gives it defaults, read by its patches through
+profiles::get_extra_inputs (bit n for EXTRA_<n+1>). A profile saved before has them at their defaults.
+
+GeneralTabOptions takes a game's own default and description for Mouse Sensitivity, for a game played with mouse
+look; without them the stock ones (off by default) as before.
+
+On every build: nothing changes for a game that binds no mouse input and enables no extra input.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ recompinput/include/recompinput/input_types.h | 29 ++++++++++
+ recompinput/include/recompinput/profiles.h    |  2 +
+ recompinput/src/input_events.cpp              | 22 +++++++-
+ recompinput/src/input_state.cpp               | 53 ++++++++++++++++---
+ recompinput/src/input_types.cpp               | 22 +++++++-
+ recompinput/src/profiles.cpp                  | 23 ++++++++
+ recompui/include/recompui/config.h            |  4 ++
+ recompui/src/config/ui_config_tab_general.cpp |  2 +
+ 8 files changed, 149 insertions(+), 8 deletions(-)
+
+diff --git a/recompinput/include/recompinput/input_types.h b/recompinput/include/recompinput/input_types.h
+index f5ed6c0..235b619 100644
+--- a/recompinput/include/recompinput/input_types.h
++++ b/recompinput/include/recompinput/input_types.h
+@@ -29,6 +29,20 @@ namespace recompinput {
+         DEFINE_INPUT(X_AXIS_NEG, 0, "Left") \
+         DEFINE_INPUT(X_AXIS_POS, 0, "Right") \
+ 
++    // Actions a game defines for itself, beyond the N64's buttons (a reload or crouch key, previous and next weapon).
++    // Hidden from the Controls tab and unbound until a game names and enables one (set_game_input_name,
++    // set_game_input_disabled(input, false)) and gives it defaults; its patches read them with
++    // profiles::get_extra_inputs, bit n for EXTRA_<n+1>.
++    #define DEFINE_EXTRA_INPUTS() \
++        DEFINE_INPUT(EXTRA_1, 0, "Extra 1") \
++        DEFINE_INPUT(EXTRA_2, 0, "Extra 2") \
++        DEFINE_INPUT(EXTRA_3, 0, "Extra 3") \
++        DEFINE_INPUT(EXTRA_4, 0, "Extra 4") \
++        DEFINE_INPUT(EXTRA_5, 0, "Extra 5") \
++        DEFINE_INPUT(EXTRA_6, 0, "Extra 6") \
++        DEFINE_INPUT(EXTRA_7, 0, "Extra 7") \
++        DEFINE_INPUT(EXTRA_8, 0, "Extra 8")
++
+     #define DEFINE_RECOMP_UI_INPUTS() \
+         DEFINE_INPUT(TOGGLE_MENU, 0, "Toggle Menu") \
+         DEFINE_INPUT(ACCEPT_MENU, 0, "Accept (Menu)") \
+@@ -40,6 +54,7 @@ namespace recompinput {
+     #define DEFINE_ALL_INPUTS() \
+         DEFINE_N64_AXIS_INPUTS() \
+         DEFINE_N64_BUTTON_INPUTS() \
++        DEFINE_EXTRA_INPUTS() \
+         DEFINE_RECOMP_UI_INPUTS()
+ 
+     #define DEFINE_INPUT(name, value, readable) name,
+@@ -54,6 +69,8 @@ namespace recompinput {
+         N64_BUTTON_COUNT = C_RIGHT - N64_BUTTON_START + 1,
+         N64_AXIS_START = X_AXIS_NEG,
+         N64_AXIS_COUNT = Y_AXIS_POS - N64_AXIS_START + 1,
++        EXTRA_START = EXTRA_1,
++        EXTRA_COUNT = EXTRA_8 - EXTRA_START + 1,
+     };
+     #undef DEFINE_INPUT
+ 
+@@ -67,6 +84,10 @@ namespace recompinput {
+     };
+ 
+     
++    // A Mouse input's input_id: SDL's button number (SDL_BUTTON_LEFT and on), or a notch of the wheel.
++    constexpr int32_t mouse_wheel_up = 0x100;
++    constexpr int32_t mouse_wheel_down = 0x101;
++
+     // A single input. Combines the source of the input (see InputType) and a specific key/button/axis.
+     struct InputField {
+         InputType input_type;
+@@ -79,6 +100,14 @@ namespace recompinput {
+             return InputField{ InputType::Keyboard, static_cast<int32_t>(key) };
+         }
+ 
++        static InputField mouse_button(int button) {
++            return InputField{ InputType::Mouse, button };
++        }
++
++        static InputField mouse_wheel(bool up) {
++            return InputField{ InputType::Mouse, up ? mouse_wheel_up : mouse_wheel_down };
++        }
++
+         static InputField controller_digital(SDL_GameControllerButton button) {
+             return InputField{ InputType::ControllerDigital, static_cast<int32_t>(button) };
+         }
+diff --git a/recompinput/include/recompinput/profiles.h b/recompinput/include/recompinput/profiles.h
+index 45bedd1..7e46fd9 100644
+--- a/recompinput/include/recompinput/profiles.h
++++ b/recompinput/include/recompinput/profiles.h
+@@ -62,6 +62,8 @@ namespace recompinput {
+         int get_or_create_mp_keyboard_profile_index(int player_index);
+         std::string get_string_from_controller_guid(ControllerGUID guid);
+         bool get_n64_input(int player_index, uint16_t* buttons_out, float* x_out, float* y_out);
++        // The game's extra inputs held now (input_types.h, DEFINE_EXTRA_INPUTS): bit n for EXTRA_<n+1>.
++        uint32_t get_extra_inputs(int player_index);
+ 
+         bool load_controls_config(const std::filesystem::path& path);
+         bool save_controls_config(const std::filesystem::path& path);
+diff --git a/recompinput/src/input_events.cpp b/recompinput/src/input_events.cpp
+index c76a1dc..a828e48 100644
+--- a/recompinput/src/input_events.cpp
++++ b/recompinput/src/input_events.cpp
+@@ -117,10 +117,30 @@ bool sdl_event_filter(void* userdata, SDL_Event* event) {
+     case SDL_EventType::SDL_MOUSEWHEEL:
+     {
+         SDL_MouseWheelEvent* wheel_event = &event->wheel;
+-        recompinput::add_mouse_wheel_delta(wheel_event->y * (wheel_event->direction == SDL_MOUSEWHEEL_FLIPPED ? -1 : 1));
++        int32_t delta = wheel_event->y * (wheel_event->direction == SDL_MOUSEWHEEL_FLIPPED ? -1 : 1);
++        if (binding::is_binding()) {
++            if (delta != 0 && binding::get_scanning_device() == InputDevice::Keyboard) {
++                binding::set_scanned_input(InputField::mouse_wheel(delta > 0));
++            }
++            break;
++        }
++        // Scrolling a menu turns no notches for the game.
++        if (delta != 0 && !recompinput::game_input_disabled()) {
++            recompinput::add_mouse_wheel_delta(delta);
++        }
+     }
+     queue_if_enabled(event);
+     break;
++    case SDL_EventType::SDL_MOUSEBUTTONDOWN:
++        // Mouse buttons bind beside the keyboard's keys.
++        if (binding::is_binding()) {
++            if (binding::get_scanning_device() == InputDevice::Keyboard) {
++                binding::set_scanned_input(InputField::mouse_button(event->button.button));
++            }
++            break;
++        }
++        queue_if_enabled(event);
++        break;
+     case SDL_EventType::SDL_CONTROLLERBUTTONDOWN:
+         if (binding::is_binding() && binding::is_controller_being_bound(event->cbutton.which)) {
+             // TODO: Needs the controller profile index.
+diff --git a/recompinput/src/input_state.cpp b/recompinput/src/input_state.cpp
+index ebbc5c7..6e52a25 100644
+--- a/recompinput/src/input_state.cpp
++++ b/recompinput/src/input_state.cpp
+@@ -2,6 +2,7 @@
+ #include <mutex>
+ #include <span>
+ #include <atomic>
++#include <chrono>
+ 
+ #include "recompinput/recompinput.h"
+ #include "recompinput/input_state.h"
+@@ -18,7 +19,13 @@ static struct {
+     const Uint8* keys = nullptr;
+     SDL_Keymod keymod = SDL_Keymod::KMOD_NONE;
+     int numkeys = 0;
+-    std::atomic_int32_t mouse_wheel_pos = 0;
++    Uint32 mouse_buttons = 0;
++    std::mutex wheel_mutex;
++    // A wheel binding reads as held for each notch, wheel_press long, with wheel_release between two notches, so a
++    // game that reads its controller once a frame sees every one as a press of its own: {up, down}.
++    std::array<int, 2> wheel_pending{};
++    std::array<bool, 2> wheel_held{};
++    std::array<std::chrono::steady_clock::time_point, 2> wheel_changed{};
+     std::mutex controllers_mutex;
+     std::vector<SDL_GameController*> detected_controllers{};
+     std::unordered_map<SDL_JoystickID, ControllerState> controller_states;
+@@ -34,6 +41,7 @@ static struct {
+ void recompinput::poll_inputs() {
+     InputState.keys = SDL_GetKeyboardState(&InputState.numkeys);
+     InputState.keymod = SDL_GetModState();
++    InputState.mouse_buttons = SDL_GetMouseState(nullptr, nullptr);
+     static bool first_poll = true;
+ 
+     {
+@@ -269,6 +277,37 @@ float controller_axis_state(int controller_num, int32_t input_id, bool allow_sup
+     return false;
+ }
+ 
++static bool mouse_wheel_state(int direction) {
++    constexpr auto wheel_press = std::chrono::milliseconds(60);
++    constexpr auto wheel_release = std::chrono::milliseconds(60);
++    std::lock_guard lock{ InputState.wheel_mutex };
++    auto now = std::chrono::steady_clock::now();
++    auto since = now - InputState.wheel_changed[direction];
++    if (InputState.wheel_held[direction]) {
++        if (since >= wheel_press) {
++            InputState.wheel_held[direction] = false;
++            InputState.wheel_changed[direction] = now;
++        }
++    }
++    else if (InputState.wheel_pending[direction] > 0 && since >= wheel_release) {
++        InputState.wheel_pending[direction]--;
++        InputState.wheel_held[direction] = true;
++        InputState.wheel_changed[direction] = now;
++    }
++    return InputState.wheel_held[direction];
++}
++
++static bool mouse_input_state(int32_t input_id) {
++    switch (input_id) {
++    case recompinput::mouse_wheel_up:
++        return mouse_wheel_state(0);
++    case recompinput::mouse_wheel_down:
++        return mouse_wheel_state(1);
++    default:
++        return input_id > 0 && input_id <= 32 && (InputState.mouse_buttons & SDL_BUTTON(input_id)) != 0;
++    }
++}
++
+ bool recompinput::should_override_keystate(SDL_Scancode key, SDL_Keymod mod) {
+     // Override Enter when Alt is held.
+     if (key == SDL_Scancode::SDL_SCANCODE_RETURN) {
+@@ -295,8 +334,7 @@ float recompinput::get_input_analog(int controller_num, const InputField& field)
+     case InputType::ControllerAnalog:
+         return controller_axis_state(controller_num, field.input_id, true);
+     case InputType::Mouse:
+-        // TODO mouse support
+-        return 0.0f;
++        return mouse_input_state(field.input_id) ? 1.0f : 0.0f;
+     case InputType::None:
+         return false;
+     }
+@@ -326,8 +364,7 @@ bool recompinput::get_input_digital(int controller_num, const InputField& field)
+         // TODO adjustable threshold
+         return controller_axis_state(controller_num, field.input_id, true) >= recompinput::axis_digital_threshold;
+     case InputType::Mouse:
+-        // TODO mouse support
+-        return false;
++        return mouse_input_state(field.input_id);
+     case InputType::None:
+         return false;
+     }
+@@ -477,5 +514,9 @@ void recompinput::add_mouse_deltas(float delta_x, float delta_y) {
+     InputState.pending_mouse_delta[1] += delta_y;
+ }
+ void recompinput::add_mouse_wheel_delta(int32_t delta) {
+-    InputState.mouse_wheel_pos.fetch_add(delta);
++    // At most a few notches wait, so a fast spin doesn't keep a wheel binding pressing for seconds after.
++    constexpr int max_pending = 3;
++    std::lock_guard lock{ InputState.wheel_mutex };
++    int &pending = InputState.wheel_pending[delta > 0 ? 0 : 1];
++    pending = std::min(pending + std::abs(delta), max_pending);
+ }
+diff --git a/recompinput/src/input_types.cpp b/recompinput/src/input_types.cpp
+index c6786e6..4281f73 100644
+--- a/recompinput/src/input_types.cpp
++++ b/recompinput/src/input_types.cpp
+@@ -35,7 +35,12 @@ static const std::array<std::string, num_game_inputs> game_input_enum_names = {
+ };
+ #undef DEFINE_INPUT
+ 
+-static std::unordered_set<GameInput> disabled_game_inputs = {};
++// A game's extra inputs stay hidden until it enables them.
++#define DEFINE_INPUT(name, value, readable) GameInput::name,
++static std::unordered_set<GameInput> disabled_game_inputs = {
++    DEFINE_EXTRA_INPUTS()
++};
++#undef DEFINE_INPUT
+ 
+ const std::string& get_game_input_name(GameInput input) {
+     return game_input_names.at(static_cast<size_t>(input));
+@@ -227,6 +232,19 @@ static std::string keyboard_input_to_string(SDL_Scancode key) {
+     return recompinput::unknown_device_input;
+ }
+ 
++static std::string mouse_input_to_string(int32_t input_id) {
++    switch (input_id) {
++    case SDL_BUTTON_LEFT: return PF_MOUSE_1;
++    case SDL_BUTTON_RIGHT: return PF_MOUSE_2;
++    case SDL_BUTTON_MIDDLE: return PF_MOUSE_3;
++    case SDL_BUTTON_X1: return PF_MOUSE_4;
++    case SDL_BUTTON_X2: return PF_MOUSE_5;
++    case recompinput::mouse_wheel_up: return PF_MOUSE_SCROLL_UP;
++    case recompinput::mouse_wheel_down: return PF_MOUSE_SCROLL_DOWN;
++    default: return recompinput::unknown_device_input;
++    }
++}
++
+ static std::string controller_axis_to_string(int axis) {
+     bool positive = axis > 0;
+     SDL_GameControllerAxis actual_axis = SDL_GameControllerAxis(abs(axis) - 1);
+@@ -260,6 +278,8 @@ std::string recompinput::InputField::to_string() const {
+         return controller_axis_to_string(input_id);
+     case InputType::Keyboard:
+         return keyboard_input_to_string((SDL_Scancode)input_id);
++    case InputType::Mouse:
++        return mouse_input_to_string(input_id);
+     default:
+         return recompinput::unknown_device_input;
+     }
+diff --git a/recompinput/src/profiles.cpp b/recompinput/src/profiles.cpp
+index c89956e..51f520f 100644
+--- a/recompinput/src/profiles.cpp
++++ b/recompinput/src/profiles.cpp
+@@ -414,6 +414,29 @@ namespace recompinput {
+         return true;
+     }
+ 
++    uint32_t profiles::get_extra_inputs(int player_index) {
++        uint32_t held = 0;
++        if (recompinput::game_input_disabled()) {
++            return held;
++        }
++        auto check_extras = [&](int profile_index) {
++            if (profile_index < 0) {
++                return;
++            }
++            const input_mapping_array &mappings = input_profiles[profile_index].mappings;
++            for (size_t i = 0; i < (size_t)GameInput::EXTRA_COUNT; i++) {
++                GameInput input = static_cast<GameInput>((size_t)GameInput::EXTRA_START + i);
++                if (!recompinput::get_game_input_disabled(input) && recompinput::get_input_digital(player_index, mappings[(size_t)input])) {
++                    held |= 1u << i;
++                }
++            }
++        };
++        bool single_player = players::is_single_player_mode();
++        check_extras(single_player ? profiles::get_sp_controller_profile_index() : players_input_profile_indices[player_index].first);
++        check_extras(single_player ? profiles::get_sp_keyboard_profile_index() : players_input_profile_indices[player_index].second);
++        return held;
++    }
++
+     static void add_input_bindings(json& out, int profile_index, GameInput input) {
+         const std::string& input_name = recompinput::get_game_input_enum_name(input);
+         json& out_array = out[input_name];
+diff --git a/recompui/include/recompui/config.h b/recompui/include/recompui/config.h
+index 38b84f5..5bfda5e 100644
+--- a/recompui/include/recompui/config.h
++++ b/recompui/include/recompui/config.h
+@@ -116,6 +116,10 @@ namespace recompui {
+             bool has_rumble_strength = true;
+             bool has_gyro_sensitivity = false;
+             bool has_mouse_sensitivity = false;
++            // A game played with the mouse (mouse look) can turn it on by default and say what it does: below 0 and
++            // empty, the stock default (off, 50% on a Steam Deck) and description.
++            double mouse_sensitivity_default = -1.0;
++            std::string mouse_sensitivity_description;
+         };
+ 
+         // Prefab config tabs.
+diff --git a/recompui/src/config/ui_config_tab_general.cpp b/recompui/src/config/ui_config_tab_general.cpp
+index 296ce0e..0ce15e4 100644
+--- a/recompui/src/config/ui_config_tab_general.cpp
++++ b/recompui/src/config/ui_config_tab_general.cpp
+@@ -114,10 +114,12 @@ namespace config {
+             config.add_percent_number_option(
+                 general::options::mouse_sensitivity,
+                 "Mouse Sensitivity",
++                !options.mouse_sensitivity_description.empty() ? options.mouse_sensitivity_description :
+                 "Controls the sensitivity of mouse aiming when using items in first person. <b>Setting this to zero will disable mouse aiming.</b>"
+                 "<br />"
+                 "<br />"
+                 "<b>Note: This option does not allow mouse buttons to activate items. Mouse aiming is intended to be used with inputs that are mapped to mouse movement, such as gyro on Steam Deck.</b>",
++                options.mouse_sensitivity_default >= 0.0 ? options.mouse_sensitivity_default :
+                 is_steam_deck() ? 50.0 : 0.0 // steam deck overrides default to 50%
+             );
+         }
+-- 
+2.55.0.windows.5
+
