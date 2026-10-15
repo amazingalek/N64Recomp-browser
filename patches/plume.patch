@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 7a7e3bc203dc3105f7ba0b365ac1ed6ae452b4ca
+plume: https://github.com/amazingalek/plume-web f2863d81e34260b1913ec454d65cbc76889ec6c6
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -859,10 +859,10 @@ index 0000000..03b3ea0
 +}
 diff --git a/plume_device_thread.cpp b/plume_device_thread.cpp
 new file mode 100644
-index 0000000..91dd046
+index 0000000..2d8578b
 --- /dev/null
 +++ b/plume_device_thread.cpp
-@@ -0,0 +1,1421 @@
+@@ -0,0 +1,1528 @@
 +//
 +// plume
 +//
@@ -1103,8 +1103,11 @@ index 0000000..91dd046
 +        DeviceThread *thread = nullptr;
 +        RenderBuffer *inner = nullptr;
 +        std::shared_ptr<DTMapState> mapState;
++        bool uploadHeap = false;
++        std::atomic<void *> uploadData = nullptr;
 +
 +        DTBuffer(DeviceThread *thread, std::unique_ptr<RenderBuffer> inner, RenderHeapType heapType) : thread(thread), inner(inner.release()) {
++            uploadHeap = (heapType == RenderHeapType::UPLOAD) || (heapType == RenderHeapType::GPU_UPLOAD);
 +            if (heapType == RenderHeapType::READBACK) {
 +                mapState = std::make_shared<DTMapState>();
 +                mapState->inner = this->inner;
@@ -1122,7 +1125,12 @@ index 0000000..91dd046
 +
 +        // Data the backend delivers asynchronously (WebGPU's READBACK buffers) arrives while the device thread is back
 +        // in its event loop, so this thread waits for the device thread's answer rather than holding the device thread.
-+        // On the device thread itself, the backend's map() is all there is.
++        // It asks at most once a millisecond: the device thread answers at every replay and present by itself, and a
++        // question asked again as soon as the last answer said no had this thread asking as fast as the device thread
++        // answered, about 10 times a millisecond, each answer a look at the queue. In Chrome that filled the GPU
++        // process's main thread with as many tasks for as long as the data took, which held up the data and the page's
++        // presents with it: RT64's wait for a framebuffer's change count (Pilotwings 64's copies between framebuffers)
++        // made frame gaps of 100-130 ms. On the device thread itself, the backend's map() is all there is.
 +        void *map(uint32_t subresource, const RenderRange *readRange) override {
 +            if (mapState != nullptr) {
 +                if (thread->isCurrent()) {
@@ -1130,15 +1138,37 @@ index 0000000..91dd046
 +                    return mapState->data;
 +                }
 +
++                std::chrono::steady_clock::time_point asked;
 +                for (;;) {
 +                    const uint64_t counted = mapState->countAnswers();
 +                    if (mapState->isReady()) {
 +                        return mapState->data;
 +                    }
 +
-+                    mapState->ask(thread);
++                    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
++                    if ((now - asked) >= std::chrono::milliseconds(1)) {
++                        asked = now;
++                        mapState->ask(thread);
++                    }
++
 +                    mapState->waitForAnswer(counted);
 +                }
++            }
++
++            // An upload buffer maps at the same address every time (WebGPU's is a copy in memory that unmap() writes to
++            // the buffer, Vulkan's and D3D12's stay mapped), so after its first map() the backend's is queued and the
++            // caller writes there at once. Each one waited for the device thread: RT64 maps ~30 a frame, 1,700 a second
++            // in Pilotwings 64's menus, each 0.1-0.2 ms behind the page's thread.
++            if (uploadHeap && (subresource == 0)) {
++                void *data = uploadData.load(std::memory_order_acquire);
++                if (data != nullptr) {
++                    thread->runAsync([buffer = inner]() { buffer->map(0, nullptr); });
++                    return data;
++                }
++
++                data = runSync(thread, [&]() { return inner->map(subresource, readRange); });
++                uploadData.store(data, std::memory_order_release);
++                return data;
 +            }
 +
 +            const std::thread::id caller = std::this_thread::get_id();
@@ -1208,27 +1238,88 @@ index 0000000..91dd046
 +        ~DTTextureView() override { destroyAsync(thread, inner); }
 +    };
 +
++    // A texture's backend object, which the device thread fills in when it makes it. A caller that needs it before then
++    // waits (unwrap()), and a task queued meanwhile reads it when it runs, after the texture was made.
++    struct DTTextureSlot {
++        RenderTexture *texture = nullptr;
++        std::atomic<bool> made = false;
++    };
++
++    static std::mutex texturesMadeMutex;
++    static std::condition_variable texturesMade;
++
++    // Deletes a texture's backend object, on the device thread.
++    struct DTTextureRelease {
++        std::shared_ptr<DTTextureSlot> slot;
++
++        ~DTTextureRelease() {
++            delete slot->texture;
++            slot->texture = nullptr;
++        }
++    };
++
 +    struct DTTexture : RenderTexture {
 +        DeviceThread *thread = nullptr;
-+        RenderTexture *inner = nullptr;
++        std::shared_ptr<DTTextureSlot> slot = std::make_shared<DTTextureSlot>();
 +        bool ownsInner = true;
 +
-+        DTTexture(DeviceThread *thread, std::unique_ptr<RenderTexture> inner) : thread(thread), inner(inner.release()) { }
-+        DTTexture(DeviceThread *thread) : thread(thread), ownsInner(false) { }
++        // One the swap chain fills in, on the device thread.
++        DTTexture(DeviceThread *thread) : thread(thread), ownsInner(false) {
++            slot->made = true;
++        }
++
++        // Makes the texture on the device thread, after whatever is queued before, and returns without waiting. RT64's
++        // texture cache makes two for each texture the game loads and waited for each: a screen with hundreds of new
++        // ones (a menu in Pilotwings 64) held the game's display lists 110-170 ms, in Chrome and Firefox alike.
++        DTTexture(DeviceThread *thread, std::function<std::unique_ptr<RenderTexture>()> &&make) : thread(thread) {
++            thread->runAsync([slot = slot, make = std::move(make)]() {
++                slot->texture = make().release();
++                {
++                    std::lock_guard lock(texturesMadeMutex);
++                    slot->made.store(true, std::memory_order_release);
++                }
++
++                texturesMade.notify_all();
++            });
++        }
 +
 +        ~DTTexture() override {
 +            if (ownsInner) {
-+                destroyAsync(thread, inner);
++                destroyAsync(thread, new DTTextureRelease{ std::move(slot) });
 +            }
 +        }
 +
++        bool isMade() const {
++            return slot->made.load(std::memory_order_acquire);
++        }
++
++        // The backend object, once the device thread has made it.
++        RenderTexture *get() const {
++            if (!isMade()) {
++                if (thread->isCurrent()) {
++                    // Runs what is queued, which makes it.
++                    thread->runSync([]() { });
++                }
++                else {
++                    std::unique_lock lock(texturesMadeMutex);
++                    texturesMade.wait(lock, [&]() { return isMade(); });
++                }
++            }
++
++            return slot->texture;
++        }
++
 +        std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &desc) const override {
-+            std::unique_ptr<RenderTextureView> view = runSync(thread, [&]() { return inner->createTextureView(desc); });
++            std::unique_ptr<RenderTextureView> view = runSync(thread, [&]() { return slot->texture->createTextureView(desc); });
 +            return view ? std::make_unique<DTTextureView>(thread, std::move(view)) : nullptr;
 +        }
 +
 +        void setName(const std::string &name) override {
-+            thread->runAsync([texture = inner, name]() { texture->setName(name); });
++            thread->runAsync([slot = slot, name]() {
++                if (slot->texture != nullptr) {
++                    slot->texture->setName(name);
++                }
++            });
 +        }
 +    };
 +
@@ -1366,7 +1457,7 @@ index 0000000..91dd046
 +
 +    static RenderBuffer *unwrap(const RenderBuffer *object) { return unwrapAs<DTBuffer>(object); }
 +    static RenderBufferFormattedView *unwrap(const RenderBufferFormattedView *object) { return unwrapAs<DTBufferFormattedView>(object); }
-+    static RenderTexture *unwrap(const RenderTexture *object) { return unwrapAs<DTTexture>(object); }
++    static RenderTexture *unwrap(const RenderTexture *object) { return (object != nullptr) ? static_cast<const DTTexture *>(object)->get() : nullptr; }
 +    static RenderTextureView *unwrap(const RenderTextureView *object) { return unwrapAs<DTTextureView>(object); }
 +    static RenderShader *unwrap(const RenderShader *object) { return unwrapAs<DTShader>(object); }
 +    static RenderSampler *unwrap(const RenderSampler *object) { return unwrapAs<DTSampler>(object); }
@@ -1429,8 +1520,12 @@ index 0000000..91dd046
 +        }
 +
 +        void setTexture(uint32_t descriptorIndex, const RenderTexture *texture, RenderTextureLayout textureLayout, const RenderTextureView *textureView) override {
-+            thread->runAsync([set = inner, descriptorIndex, innerTexture = unwrap(texture), textureLayout, innerView = unwrap(textureView)]() {
-+                set->setTexture(descriptorIndex, innerTexture, textureLayout, innerView);
++            // A texture still being made is read from its slot when the write runs, which is after it's made.
++            const DTTexture *wrapper = static_cast<const DTTexture *>(texture);
++            std::shared_ptr<DTTextureSlot> slot = ((wrapper != nullptr) && !wrapper->isMade()) ? wrapper->slot : nullptr;
++            RenderTexture *innerTexture = (slot == nullptr) ? unwrap(texture) : nullptr;
++            thread->runAsync([set = inner, descriptorIndex, slot = std::move(slot), innerTexture, textureLayout, innerView = unwrap(textureView)]() {
++                set->setTexture(descriptorIndex, (slot != nullptr) ? slot->texture : innerTexture, textureLayout, innerView);
 +            });
 +        }
 +
@@ -1784,7 +1879,7 @@ index 0000000..91dd046
 +                    innerTextures[i] = innerDevice->createTexture(RenderTextureDesc::ColorTarget(width, height, desc.format));
 +                }
 +
-+                textures[i]->inner = innerTextures[i].get();
++                textures[i]->slot->texture = innerTextures[i].get();
 +            }
 +        }
 +
@@ -2014,6 +2109,19 @@ index 0000000..91dd046
 +        }
 +    };
 +
++    // What makes a texture later on the device thread: the description with its clear value copied, since the caller's
++    // is gone by then.
++    template<typename F>
++    static std::function<std::unique_ptr<RenderTexture>()> makeTexture(const RenderTextureDesc &desc, F &&create) {
++        const bool cleared = (desc.optimizedClearValue != nullptr);
++        const RenderClearValue clearValue = cleared ? *desc.optimizedClearValue : RenderClearValue();
++        return [desc, cleared, clearValue, create = std::forward<F>(create)]() {
++            RenderTextureDesc copy = desc;
++            copy.optimizedClearValue = cleared ? &clearValue : nullptr;
++            return create(copy);
++        };
++    }
++
 +    // DTPool
 +
 +    struct DTPool : RenderPool {
@@ -2029,8 +2137,7 @@ index 0000000..91dd046
 +        }
 +
 +        std::unique_ptr<RenderTexture> createTexture(const RenderTextureDesc &desc) override {
-+            std::unique_ptr<RenderTexture> texture = runSync(thread, [&]() { return inner->createTexture(desc); });
-+            return texture ? std::make_unique<DTTexture>(thread, std::move(texture)) : nullptr;
++            return std::make_unique<DTTexture>(thread, makeTexture(desc, [pool = inner](const RenderTextureDesc &desc) { return pool->createTexture(desc); }));
 +        }
 +    };
 +
@@ -2107,7 +2214,7 @@ index 0000000..91dd046
 +        }
 +
 +        std::unique_ptr<RenderTexture> createTexture(const RenderTextureDesc &desc) override {
-+            return create<DTTexture, RenderTexture>([&]() { return inner->createTexture(desc); });
++            return std::make_unique<DTTexture>(thread, makeTexture(desc, [device = inner](const RenderTextureDesc &desc) { return device->createTexture(desc); }));
 +        }
 +
 +        std::unique_ptr<RenderAccelerationStructure> createAccelerationStructure(const RenderAccelerationStructureDesc &desc) override {
@@ -2286,10 +2393,10 @@ index 0000000..91dd046
 +};
 diff --git a/plume_device_thread.h b/plume_device_thread.h
 new file mode 100644
-index 0000000..670b987
+index 0000000..10b5a17
 --- /dev/null
 +++ b/plume_device_thread.h
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,79 @@
 +//
 +// plume
 +//
@@ -2306,6 +2413,9 @@ index 0000000..670b987
 +//   caller waits. map() of a buffer whose data the backend delivers asynchronously waits on the calling side until
 +//   isMapReady(), so the device thread keeps returning to its event loop meanwhile, and so does
 +//   createGraphicsPipeline() for a pipeline the backend builds asynchronously, until its isReady().
++// - createTexture() and an upload buffer's map() after its first don't wait: the texture is made on the device thread
++//   after whatever is queued before, and a caller that needs its backend object first (recording it in a command list)
++//   waits then; the buffer is mapped at the address its first map() returned, and the backend's map() is queued.
 +// - A READBACK buffer's isMapReady() doesn't wait for the device thread: after a copy into the buffer is replayed, the
 +//   device thread checks it at each replay and present until the data is there, maps it and publishes the answer,
 +//   which isMapReady() reads. Its map() waits for that answer, not behind everything queued on the device thread.
