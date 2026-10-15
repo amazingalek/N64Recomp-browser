@@ -110,37 +110,66 @@ async function registerGameWorker(folder) {
 
 const player = document.getElementById('player');
 const frame = document.getElementById('player-frame');
+let games = [];
 
-async function openGame(game) {
+// History: opening a game from the grid adds one entry (#<repo>), and Back or ✕ goes back to the grid. The frame is
+// only ever navigated with location.replace, since a frame's own navigations join the page's history, and Back then
+// stepped through the games played before.
+function showFrame(url) {
+  frame.contentWindow.location.replace(url);
+}
+
+async function openGame(game, push = true) {
   const folder = sameOriginFolder(game.page);
   if (!folder || !window.crossOriginIsolated) {
     window.open(game.page, '_blank', 'noopener');
     return;
   }
+  if (push) history.pushState({ game: game.repoName }, '', '#' + encodeURIComponent(game.repoName));
   frame.title = game.name;
   player.hidden = false;
   document.body.classList.add('playing');
-  history.replaceState(null, '', '#' + encodeURIComponent(game.repoName));
   try {
     await registerGameWorker(folder);
   } catch (error) {
-    console.error('The game page\'s service worker could not register: ' + error);
+    console.error("The game page's service worker could not register: " + error);
   }
   if (!player.hidden) {
-    frame.src = game.page;
+    showFrame(game.page);
     frame.focus();
   }
 }
 
-function closeGame() {
-  frame.src = 'about:blank';  // ends the game: its threads and sound go with the document
+function hideGame() {
+  if (frame.contentDocument?.fullscreenElement) frame.contentDocument.exitFullscreen();
+  showFrame('about:blank');  // ends the game: its threads and sound go with the document
   player.hidden = true;
   document.body.classList.remove('playing');
-  history.replaceState(null, '', location.pathname + location.search);
 }
 
+function closeGame() {
+  if (history.state?.game) {
+    history.back();  // popstate hides it
+  } else {  // opened from a link to #<repo>: nothing of ours to go back to
+    hideGame();
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+function gameFromHash() {
+  const wanted = decodeURIComponent(location.hash.slice(1));
+  return games.find((g) => g.repoName === wanted);
+}
+
+window.addEventListener('popstate', () => {
+  const game = gameFromHash();
+  if (game) openGame(game, false);
+  else if (!player.hidden) hideGame();
+});
 document.getElementById('player-close').addEventListener('click', closeGame);
-document.getElementById('player-full').addEventListener('click', () => player.requestFullscreen());
+// The game's own page fullscreens, as on its own: a fullscreen element around the frame only resized it from outside,
+// and Banjo froze there (the picture, not the sound). The click's activation reaches a same-origin frame.
+document.getElementById('player-full').addEventListener('click', () => frame.contentDocument.documentElement.requestFullscreen());
 frame.addEventListener('load', () => frame.focus());
 
 async function main() {
@@ -158,9 +187,9 @@ async function main() {
   const sorted = [...table.games].sort((a, b) => title(a).localeCompare(title(b)));
   grid.replaceChildren(...sorted.map((g) => tile(g, table.columns)));
   document.getElementById('legend').textContent = table.legend;
-  const wanted = decodeURIComponent(location.hash.slice(1));
-  const game = table.games.find((g) => g.repoName === wanted);
-  if (game && window.crossOriginIsolated) openGame(game);  // not before coi_serviceworker.js's reload
+  games = table.games;
+  const game = gameFromHash();
+  if (game && window.crossOriginIsolated) openGame(game, false);  // not before coi_serviceworker.js's reload
 }
 
 main();
