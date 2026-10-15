@@ -921,7 +921,6 @@ running in a browser was found to learn from.
   fired before the listener, or the worker already activating): in ~100 cold Firefox 158 visits register() always
   resolved with the worker still installing, and the reload always came. A first visit that never started was the
   program's own fetches before the reload (shell.html says how).
-
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
