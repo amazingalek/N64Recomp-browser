@@ -71,7 +71,9 @@ plays its page, not a commit from here.
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands.
+  built and played before it lands. A change to only `*.md` and the tools that play and publish pages skips every job
+  but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
+  min, one that moves them ~8.
 
 ## The forks, one commit per change
 
@@ -316,8 +318,13 @@ and Firefox) and publishes each one, and updates their rows, in the same work. T
 retest. A bug only main has, on no page yet, waits for the retest like any other change; one the retest publishes is
 on Pages, and its fix is critical.
 
-Until a script rebuilds the pages, a retest builds and publishes them by hand (Publishing); the PR that adds the script
-says so here.
+A retest runs `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>` where the ROMs are: it builds every
+game fork's main with its N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
+files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the copies; a page that
+builds the same bytes took nothing from the tag and is left alone. Once the pins of those that played well are moved,
+a run without `--browser` builds each main again (the same bytes), publishes what differs, boots each one from Pages
+in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played from a `--dry-run`
+build of that game and then published by a run with its name (Publishing).
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
@@ -336,7 +343,7 @@ environment resets it; a new one needs `$EM_CACHE/sysroot/lib/pkgconfig` made fi
 <name> amazingalek/<fork> "main <sha>"` (it switches Pages on the first time). Each page's commit names the main it
 was built from (`git log -1 origin/gh-pages`), so a page behind main is easy to see; one found behind is played and
 published by whoever finds it. The first visit reloads once (`coi_serviceworker.js`); right after a publish that can
-take a second visit.
+take a second visit. `tools/publish_pages.sh` does all of this for every game, or the ones it is given (its header).
 
 ## The games table
 
@@ -509,8 +516,8 @@ Kong 64, GoldenEye, Conker, Wave Race 64 and Rush 2049 through their boots and 2
 Each is on `main`, and each one's README says up front that it is AI-written and not upstream's, and its BUILDING.md
 how to build the page. On BanjoRecomp-web upstream's `validate-internal` workflow, a native build on every push to main
 with no ROM, is disabled. Banjo, Majora's Mask, Donkey Kong 64 and Conker are on their own upstream submodules and
-GoldenEye on upstream's at the forks' bases, all patched by N64Recomp-browser ed8764a (v0.36.0: the canvas in the
-browser's preferred format, rt64 c6cf6c4 and 58fc4e4, plume 16e608a and 97f4e64); Banjo, Majora's Mask and Donkey Kong
+GoldenEye on upstream's at the forks' bases, all patched by the N64Recomp-browser tag their submodule pins
+(each fork's `lib/N64Recomp-browser`, Conker's `tools/N64Recomp-browser`; The pins); Banjo, Majora's Mask and Donkey Kong
 64 include its `frontend/build_speed.cmake`: their BUILDING.md says to keep `build-web` inside the checkout and put
 ccache on `PATH`. Their `main.cpp` plays sound through `audio_output.h` on Emscripten (headless Chrome: the DK Rap,
 Banjo's intro and Majora's Mask's attract demo play, nothing short after the first second). Their CMakeLists.txt pick
