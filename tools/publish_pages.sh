@@ -18,8 +18,8 @@
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own tools/shader_plan.json: launcher, ROM, Start Game, then 20 s of the
 #    game running by itself, which has to present frames with no WebGPU error.
-# 6. Prints the pages it published. The session that ran it files one card to play those in Chrome and Firefox on a
-#    desktop GPU and update their cells in the README's Games table: that needs Firefox in a window.
+# 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
+#    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
 # --browser <commit> is the retest before the forks' pins move (CLAUDE.md, "The pins"): a dry run of the forks with
 # their N64Recomp-browser moved to <commit> (a tag) in their copies only. It names the pages that build differently
