@@ -22,9 +22,9 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | the game's 20 on a laptop; smooth on the stand-in (60) | the game's 20 on a laptop; smooth after its waits on the stand-in (59) | 2026-10-14, stand-in 2026-10-15 |
 | Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | not smooth (41-48, paced) | not smooth (20-30) | 2026-10-14 |
 | Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | not smooth (41-42) | not smooth (20-24) | 2026-10-14 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth (the game's 30) | boots with the laptop's late GPU reports reproduced; smooth after a 17-30 s wait on the stand-in (60); not yet on a laptop | 2026-10-14, stand-in 2026-10-15 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth (the game's 30) | boots with the laptop's late GPU reports reproduced; smooth on the stand-in (59) after 0.5 s before its first frame and 6.5 s as the DK Rap begins; not yet on a laptop | 2026-10-14, stand-in 2026-10-15 |
 | Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | smooth (stand-in, 60) | smooth after its waits (stand-in, 59) | stand-in 2026-10-15 |
-| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | smooth (stand-in, 58) | smooth (stand-in, 60) after a 31 s wait before its first frame | stand-in 2026-10-15 |
+| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | smooth (stand-in, 60) | smooth (stand-in, 60) after a 5 s wait before its first frame and ~19 s after Start | stand-in 2026-10-15, v0.42.0 |
 | Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | smooth (stand-in, 59); the game's own 10-30 in some later worlds, as on the desktop | smooth after its waits (stand-in, 59); the game's own 10-30 in some later worlds | stand-in 2026-10-15 |
 
 How each page plays on a Windows laptop's integrated graphics (median presents a second after the shader waits), or on
@@ -344,7 +344,9 @@ take the web support without moving its submodules to the forks (Using it in a r
   each one it published from Pages in headless Chrome. `record_shaders.mjs` records a
   prebuilt shader list by a plan, and `play_page.mjs` plays a page, a build or one on Pages, by the same kind of plan in
   Chrome or Firefox and measures it: presents a second, sound frames short, WebGPU errors, the shader waits, the GPU's
-  load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table.
+  load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table;
+  `--record` appends the run to `plays.jsonl`, every page play kept, a JSON line each, so how each game's page plays
+  can be followed day by day.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and

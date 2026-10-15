@@ -17,14 +17,16 @@
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own tools/shader_plan.json: launcher, ROM, Start Game, then 20 s of the
-#    game running by itself, which has to present frames with no WebGPU error.
+#    game running by itself, which has to present frames with no WebGPU error. Each run goes into plays.jsonl
+#    (play_page.mjs --record), to be committed with the Games table's rows.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
-# --browser <commit> is the retest before the forks' pins move (CLAUDE.md, "The pins"): a dry run of the forks with
-# their N64Recomp-browser moved to <commit> (a tag) in their copies only. It names the pages that build differently
-# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n pages-<game> get and
-# play. Once the pins are moved there, a run without it builds the same bytes and publishes them.
+# --browser <commit> is the retest before the pins move (CLAUDE.md, "The pins"): a dry run of every game with its
+# N64Recomp-browser moved to <commit> (a tag) in its copy only, Rush 2049's by a commit of its own on top of main that
+# is synced there and pushed nowhere. It names the pages that build differently from what Pages serves, and their
+# builds stay in the copies to fetch with remote_build.sh -n <copy> get and play. Once the pins are moved there (a
+# fork's main, Rush 2049's by a pull request on its repo), a run without it builds the same bytes and publishes them.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
@@ -71,8 +73,6 @@ bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
-# A retest builds the forks; Rush 2049's pin moves in a pull request on its own repo, which builds its page there.
-[[ -z "$browser" ]] || selected=($(printf '%s\n' "${selected[@]}" | grep -vx rush || true))
 for g in "${selected[@]}"; do grep -q "^$g " <<< "$games" || { echo "no game $g (one of: $(awk 'NF { printf "%s ", $1 }' <<< "$games"))"; exit 1; }; done
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---
@@ -248,13 +248,25 @@ for g in "${selected[@]}"; do
     if [[ $g == rush ]]; then
         clone="$rush" copy=publish
         git -C "$clone" fetch -q origin main
+        target=origin/main
+        if [[ -n "$browser" ]]; then
+            # main with lib/N64Recomp-browser at <commit>, made in a scratch index: the checkout's files and branches
+            # stay as they are, and remote_build.sh's sync moves the submodule and patches it.
+            git -C "$here/.." fetch -q origin "$browser"
+            export GIT_INDEX_FILE="$work/rush.index"
+            git -C "$clone" read-tree origin/main
+            git -C "$clone" update-index --cacheinfo "160000,$(git -C "$here/.." rev-parse "FETCH_HEAD^{commit}"),lib/N64Recomp-browser"
+            target="$(git -C "$clone" -c user.name=publish_pages -c user.email=publish_pages@localhost \
+                commit-tree "$(git -C "$clone" write-tree)" -p origin/main -m "N64Recomp-browser $browser")"
+            unset GIT_INDEX_FILE
+        fi
     else
-        clone="$cache/$g" copy="pages-$g"
+        clone="$cache/$g" copy="pages-$g" target=origin/main
         [[ -d "$clone/.git" ]] || git clone -q --filter=blob:none --no-checkout "https://github.com/$repo" "$clone"
         git -C "$clone" fetch -q origin main
     fi
     sha="$(git -C "$clone" rev-parse --short origin/main)"
-    if ! bash "$remote_build" -C "$clone" -n $copy sync origin/main > "$work/$g.log" 2>&1; then
+    if ! bash "$remote_build" -C "$clone" -n $copy sync $target > "$work/$g.log" 2>&1; then
         echo "   sync failed:"; tail -5 "$work/$g.log"; failed+=("$g"); continue
     fi
     if [[ $g == rush ]]; then
@@ -297,7 +309,9 @@ for g in "${published[@]}"; do
     mkdir -p "$work/$g-tools"  # the plan with the scripts its steps load (shader_survey.js)
     git -C "$clone" archive origin/main tools | tar xf - -C "$work/$g-tools"
     "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-tools/tools/shader_plan.json" --play 20 --port $((20000 + RANDOM % 9000)) \
-        --profile "$work/$g-profile" --json "$work/$g.json" > "$work/$g-play.log" 2>&1 || true
+        --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
+        --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
+        > "$work/$g-play.log" 2>&1 || true
     result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
         console.log((p > 0 && !s.webgpuErrors.length ? 'ok' : 'FAILED') + ': ' + p + ' presents/s, ' + s.webgpuErrors.length +
         ' WebGPU errors, ' + s.exceptions + ' exceptions')" "$work/$g.json" 2> /dev/null || echo "FAILED: no summary")"
@@ -311,7 +325,7 @@ if [[ -n "$browser" ]]; then
     echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
     for g in "${differ[@]}"; do
         read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-        echo "  $g: bash $remote_build -n pages-$g get $dir <dir>"
+        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && echo publish || echo pages-$g) get $dir <dir>"
     done
 fi
 $dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }

@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 009957c7a43e535502b0f65556f4ce3b2d986b48
+plume: https://github.com/amazingalek/plume-web 3c23b44595a9eb8985d05211433dd901a5734112
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2226,10 +2226,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..498c58e
+index 0000000..f9f6378
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3028 @@
+@@ -0,0 +1,3139 @@
 +//
 +// plume
 +//
@@ -3099,6 +3099,14 @@ index 0000000..498c58e
 +        assert(false && "WebGPU has no acceleration structures.");
 +    }
 +
++    // Appends a kind and values to a cache key as their bytes: a set's keys are rebuilt every time a binding changes
++    // (thousands of times a second in RT64), and formatting them as text with snprintf took ~3% of the page's thread.
++    template<typename... T>
++    static void appendKey(std::string &key, char kind, T... values) {
++        key += kind;
++        (key.append(reinterpret_cast<const char *>(&values), sizeof(values)), ...);
++    }
++
 +    // Builds the bind group layout from what is bound, and the bind group for it. Unset descriptors are left out of
 +    // both, so a shader that reads one fails pipeline validation instead of reading garbage.
 +    void WebGPUDescriptorSet::update() {
@@ -3120,7 +3128,6 @@ index 0000000..498c58e
 +            layoutEntry.visibility = (stagesIt != device->bindingStages.end()) ? stagesIt->second : WGPUShaderStage_None;
 +            groupEntry.binding = binding.binding;
 +
-+            char entryKey[64];
 +            switch (binding.type) {
 +            case RenderDescriptorRangeType::CONSTANT_BUFFER:
 +            case RenderDescriptorRangeType::FORMATTED_BUFFER:
@@ -3155,7 +3162,7 @@ index 0000000..498c58e
 +                    groupEntry.size = std::min<uint64_t>(alignUp(groupEntry.size, sizeAlignment), wgpuBufferGetSize(groupEntry.buffer) - groupEntry.offset);
 +                }
 +
-+                snprintf(entryKey, sizeof(entryKey), "b%u:%d;", binding.binding, int(layoutEntry.buffer.type));
++                appendKey(key, 'b', uint32_t(binding.binding), int32_t(layoutEntry.buffer.type), int32_t(0), int32_t(0));
 +                break;
 +            }
 +            case RenderDescriptorRangeType::TEXTURE:
@@ -3176,7 +3183,7 @@ index 0000000..498c58e
 +                    layoutEntry.storageTexture.format = toWGPU(format);
 +                    layoutEntry.storageTexture.viewDimension = dimension;
 +                    layoutEntry.visibility &= ~WGPUShaderStage_Vertex;
-+                    snprintf(entryKey, sizeof(entryKey), "s%u:%d:%d;", binding.binding, int(layoutEntry.storageTexture.format), int(dimension));
++                    appendKey(key, 's', uint32_t(binding.binding), int32_t(layoutEntry.storageTexture.format), int32_t(dimension), int32_t(0));
 +                }
 +                else {
 +                    bool isSigned = false;
@@ -3196,7 +3203,7 @@ index 0000000..498c58e
 +
 +                    layoutEntry.texture.viewDimension = dimension;
 +                    layoutEntry.texture.multisampled = multisampled;
-+                    snprintf(entryKey, sizeof(entryKey), "t%u:%d:%d:%d;", binding.binding, int(layoutEntry.texture.sampleType), int(dimension), int(multisampled));
++                    appendKey(key, 't', uint32_t(binding.binding), int32_t(layoutEntry.texture.sampleType), int32_t(dimension), int32_t(multisampled));
 +                }
 +
 +                groupEntry.textureView = (binding.textureView != nullptr) ? binding.textureView->view : const_cast<WebGPUTexture *>(binding.texture)->getDefaultView();
@@ -3219,7 +3226,7 @@ index 0000000..498c58e
 +                }
 +
 +                groupEntry.sampler = binding.sampler->sampler;
-+                snprintf(entryKey, sizeof(entryKey), "p%u:%d;", binding.binding, int(layoutEntry.sampler.type));
++                appendKey(key, 'p', uint32_t(binding.binding), int32_t(layoutEntry.sampler.type), int32_t(0), int32_t(0));
 +                break;
 +            }
 +            default:
@@ -3227,8 +3234,7 @@ index 0000000..498c58e
 +                continue;
 +            }
 +
-+            key += entryKey;
-+            key += "v" + std::to_string(uint64_t(layoutEntry.visibility)) + ";";
++            appendKey(key, 'v', uint64_t(layoutEntry.visibility));
 +
 +            // What the entry binds, for the device's bind group cache: a texture without a view binds its default one.
 +            uint64_t serial = 0;
@@ -3236,9 +3242,7 @@ index 0000000..498c58e
 +            else if (groupEntry.sampler != nullptr) serial = binding.sampler->handleSerial;
 +            else if (binding.textureView != nullptr) serial = binding.textureView->handleSerial;
 +            else serial = binding.texture->handleSerial;
-+            char boundKey[96];
-+            snprintf(boundKey, sizeof(boundKey), "%u:%llu:%llu:%llu;", binding.binding, (unsigned long long)serial, (unsigned long long)groupEntry.offset, (unsigned long long)groupEntry.size);
-+            entriesKey += boundKey;
++            appendKey(entriesKey, 'e', uint32_t(binding.binding), uint64_t(serial), uint64_t(groupEntry.offset), uint64_t(groupEntry.size));
 +            layoutEntries.emplace_back(layoutEntry);
 +            groupEntries.emplace_back(groupEntry);
 +        }
@@ -3253,9 +3257,9 @@ index 0000000..498c58e
 +        }
 +
 +        // A layout lives as long as the device, so its address names it.
-+        char layoutName[32];
-+        snprintf(layoutName, sizeof(layoutName), "%p|", (void *)layout);
-+        groupKey = layoutName + entriesKey;
++        groupKey.clear();
++        appendKey(groupKey, 'l', reinterpret_cast<uintptr_t>(layout));
++        groupKey += entriesKey;
 +        bindGroup = device->getBindGroup(groupKey, layout, groupEntries);
 +        dirty = false;
 +    }
@@ -3830,8 +3834,13 @@ index 0000000..498c58e
 +        return false;
 +    }
 +
-+    // Every 2 s: while wait() held presents for more than 5% of the time and they fell short of the display's rate, one
-+    // more in flight is tried, and kept if presents rose by 8% or reached the display's rate. A GPU that is the limit
++    // Every 2 s: while wait() held presents for more than 10% of the time and they fell short of the display's rate, one
++    // more in flight is tried, and kept if presents rose by 8% or reached the display's rate. Only from a steady window,
++    // with no present more than 100 ms after the one before: one with a stall in it (a load, a wait for shaders, Chrome's
++    // GPU process building a pipeline) is held by the stall, not the cap, and whatever follows it reads as a rise.
++    // GoldenEye's page in Chrome went to 3 from a window at 0.8 presents a second in its launcher, and from one at 48
++    // while its shaders built behind the game, each with a callback hundreds of ms late. Nor for less than 10%: that
++    // build's stalls held GoldenEye's presents 20-60 ms a second, where late callbacks held Banjo's 160 and Rush 2049's 800. A GPU that is the limit
 +    // gains nothing from it, only a deeper queue, so it goes back, and the next try comes after 10 s, twice as long
 +    // each time (2 min at most). A done signal that comes back late gains from it. A number kept stays: a GPU that
 +    // later becomes the limit is left with at most 2 more frames queued than before.
@@ -3839,10 +3848,16 @@ index 0000000..498c58e
 +
 +    void WebGPUSwapChain::adaptPresentsInFlight() {
 +        const double now = emscripten_get_now();
++        if (capLastPresent > 0.0) {
++            capLongestGapMs = std::max(capLongestGapMs, now - capLastPresent);
++        }
++
++        capLastPresent = now;
 +        if (capWindowStart == 0.0) {
 +            capWindowStart = now;
 +            capWindowPresents = 0;
 +            capWaitMs = 0.0;
++            capLongestGapMs = 0.0;
 +            return;
 +        }
 +
@@ -3853,7 +3868,7 @@ index 0000000..498c58e
 +
 +        const double rate = capWindowPresents / seconds;
 +        const double displayRate = frameTimer->refreshRate;
-+        const bool held = (capWaitMs > (50.0 * seconds)) && (rate < (displayRate * 0.95));
++        const bool held = (capLongestGapMs <= 100.0) && (capWaitMs > (100.0 * seconds)) && (rate < (displayRate * 0.95));
 +        if (capTrying) {
 +            capTrying = false;
 +            if ((rate >= (capTryRate * 1.08)) || (rate >= (displayRate * 0.95))) {
@@ -3872,6 +3887,12 @@ index 0000000..498c58e
 +            }
 +        }
 +        else if (held && (maxPresentsInFlight < kMaxPresentsInFlight) && (now >= capNextTry)) {
++            if (presentStats) {
++                printf("plume: trying %u presents in flight (%.1f a second, %.0f ms a second waiting, "
++                    "at most %.0f ms between two)\n",
++                    maxPresentsInFlight + 1, rate, capWaitMs / seconds, capLongestGapMs);
++            }
++
 +            capTryRate = rate;
 +            capTrying = true;
 +            maxPresentsInFlight++;
@@ -3880,6 +3901,7 @@ index 0000000..498c58e
 +        capWindowStart = now;
 +        capWindowPresents = 0;
 +        capWaitMs = 0.0;
++        capLongestGapMs = 0.0;
 +    }
 +
 +    // present-stats' line, every 5 s.
@@ -4146,6 +4168,18 @@ index 0000000..498c58e
 +    WGPUPipelineLayout WebGPUCommandList::resolveBindings(BindState &state) {
 +        assert(state.layout != nullptr);
 +
++        // The same layout and sets as the last time, none of them changed since.
++        ResolvedBindings &resolved = state.resolved;
++        bool sameAsResolved = (resolved.pipelineLayout != nullptr) && (resolved.layout == state.layout) && (resolved.bindingStagesRevision == device->bindingStagesRevision);
++        for (uint32_t i = 0; sameAsResolved && (i < state.layout->descriptorSetCount); i++) {
++            const WebGPUDescriptorSet *descriptorSet = state.descriptorSets[i];
++            sameAsResolved = (descriptorSet == resolved.descriptorSets[i]) && ((descriptorSet == nullptr) || (!descriptorSet->dirty && (descriptorSet->layout == resolved.setLayouts[i])));
++        }
++
++        if (sameAsResolved) {
++            return resolved.pipelineLayout;
++        }
++
 +        const bool pushConstants = state.layout->pushConstantsSize > 0;
 +        std::vector<WGPUBindGroupLayout> layouts;
 +        for (uint32_t i = 0; i < state.layout->descriptorSetCount; i++) {
@@ -4191,13 +4225,34 @@ index 0000000..498c58e
 +            state.layout->waitingBuilds.clear();
 +        }
 +
++        resolved.layout = state.layout;
++        for (uint32_t i = 0; i < MaxDescriptorSets; i++) {
++            resolved.descriptorSets[i] = state.descriptorSets[i];
++            resolved.setLayouts[i] = (state.descriptorSets[i] != nullptr) ? state.descriptorSets[i]->layout : nullptr;
++        }
++
++        resolved.bindingStagesRevision = device->bindingStagesRevision;
++        resolved.pipelineLayout = pipelineLayout;
 +        return pipelineLayout;
 +    }
 +
 +    void WebGPUCommandList::bindGroups(BindState &state, WGPURenderPassEncoder renderPass, WGPUComputePassEncoder computePass) {
 +        auto setBindGroup = [&](uint32_t groupIndex, WGPUBindGroup bindGroup, uint32_t offsetCount, const uint32_t *offsets) {
 +            if (renderPass != nullptr) {
++                WGPUBindGroup &passGroup = pass.bindGroups[groupIndex];
++                if ((offsetCount == 0) && (passGroup == bindGroup)) {
++                    return;
++                }
++
 +                wgpuRenderPassEncoderSetBindGroup(renderPass, groupIndex, bindGroup, offsetCount, offsets);
++                if (passGroup != nullptr) {
++                    wgpuBindGroupRelease(passGroup);
++                }
++
++                passGroup = (offsetCount == 0) ? bindGroup : nullptr;
++                if (passGroup != nullptr) {
++                    wgpuBindGroupAddRef(passGroup);
++                }
 +            }
 +            else {
 +                wgpuComputePassEncoderSetBindGroup(computePass, groupIndex, bindGroup, offsetCount, offsets);
@@ -4281,6 +4336,22 @@ index 0000000..498c58e
 +            wgpuRenderPassEncoderRelease(renderPass);
 +            renderPass = nullptr;
 +        }
++
++        resetPassState();
++    }
++
++    void WebGPUCommandList::resetPassState() {
++        for (WGPUBindGroup &group : pass.bindGroups) {
++            if (group != nullptr) {
++                wgpuBindGroupRelease(group);
++            }
++        }
++
++        if (pass.pipeline != nullptr) {
++            wgpuRenderPipelineRelease(pass.pipeline);
++        }
++
++        pass = PassState();
 +    }
 +
 +    bool WebGPUCommandList::beginRenderPass() {
@@ -4345,6 +4416,7 @@ index 0000000..498c58e
 +        passDesc.colorAttachmentCount = colorAttachments.size();
 +        passDesc.colorAttachments = colorAttachments.data();
 +        renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
++        resetPassState();
 +        pendingColorClears.clear();
 +        pendingDepthClear = false;
 +        pendingStencilClear = false;
@@ -4360,9 +4432,11 @@ index 0000000..498c58e
 +        assert((pipeline != nullptr) && (pipeline->type == WebGPUPipeline::Type::Graphics));
 +        WGPUPipelineLayout layout = resolveBindings(graphics);
 +        const WebGPUGraphicsPipeline *graphicsPipeline = static_cast<const WebGPUGraphicsPipeline *>(pipeline);
-+        wgpuRenderPassEncoderSetPipeline(renderPass, const_cast<WebGPUGraphicsPipeline *>(graphicsPipeline)->get(layout));
-+        if (graphicsPipeline->desc.stencilEnabled) {
++        setPassPipeline(const_cast<WebGPUGraphicsPipeline *>(graphicsPipeline)->get(layout));
++        if (graphicsPipeline->desc.stencilEnabled && (!pass.stencilReferenceSet || (pass.stencilReference != graphicsPipeline->desc.stencilReference))) {
 +            wgpuRenderPassEncoderSetStencilReference(renderPass, graphicsPipeline->desc.stencilReference);
++            pass.stencilReference = graphicsPipeline->desc.stencilReference;
++            pass.stencilReferenceSet = true;
 +        }
 +
 +        bindGroups(graphics, renderPass, nullptr);
@@ -4370,27 +4444,39 @@ index 0000000..498c58e
 +        if (renderStateDirty) {
 +            for (uint32_t i = 0; i < vertexBufferCount; i++) {
 +                const RenderVertexBufferView &view = vertexBuffers[i];
-+                if (view.buffer.ref != nullptr) {
++                RenderVertexBufferView &passView = pass.vertexBuffers[i];
++                if ((view.buffer.ref != nullptr) && ((view.buffer.ref != passView.buffer.ref) || (view.buffer.offset != passView.buffer.offset) || (view.size != passView.size))) {
 +                    const WebGPUBuffer *buffer = static_cast<const WebGPUBuffer *>(view.buffer.ref);
 +                    wgpuRenderPassEncoderSetVertexBuffer(renderPass, i, buffer->buffer, view.buffer.offset, view.size);
++                    passView = view;
 +                }
 +            }
 +
-+            if (indexBuffer.buffer.ref != nullptr) {
++            const RenderIndexBufferView &passIndex = pass.indexBuffer;
++            if ((indexBuffer.buffer.ref != nullptr) && (!pass.indexBufferSet || (indexBuffer.buffer.ref != passIndex.buffer.ref) || (indexBuffer.buffer.offset != passIndex.buffer.offset) ||
++                (indexBuffer.size != passIndex.size) || (indexBuffer.format != passIndex.format)))
++            {
 +                const WebGPUBuffer *buffer = static_cast<const WebGPUBuffer *>(indexBuffer.buffer.ref);
 +                wgpuRenderPassEncoderSetIndexBuffer(renderPass, buffer->buffer, toIndexFormat(indexBuffer.format), indexBuffer.buffer.offset, indexBuffer.size);
++                pass.indexBuffer = indexBuffer;
++                pass.indexBufferSet = true;
 +            }
 +
-+            // A clear of rectangles may have left its own viewport and blend constant behind.
-+            if (viewportSet) {
-+                wgpuRenderPassEncoderSetViewport(renderPass, viewport.x, viewport.y, viewport.width, viewport.height, viewport.minDepth, viewport.maxDepth);
-+            }
-+            else {
-+                wgpuRenderPassEncoderSetViewport(renderPass, 0.0f, 0.0f, float(framebuffer->width), float(framebuffer->height), 0.0f, 1.0f);
++            const RenderViewport drawViewport = viewportSet ? viewport : RenderViewport(0.0f, 0.0f, float(framebuffer->width), float(framebuffer->height), 0.0f, 1.0f);
++            const RenderViewport &passViewport = pass.viewport;
++            if (!pass.viewportSet || (drawViewport.x != passViewport.x) || (drawViewport.y != passViewport.y) || (drawViewport.width != passViewport.width) ||
++                (drawViewport.height != passViewport.height) || (drawViewport.minDepth != passViewport.minDepth) || (drawViewport.maxDepth != passViewport.maxDepth))
++            {
++                wgpuRenderPassEncoderSetViewport(renderPass, drawViewport.x, drawViewport.y, drawViewport.width, drawViewport.height, drawViewport.minDepth, drawViewport.maxDepth);
++                pass.viewport = drawViewport;
++                pass.viewportSet = true;
 +            }
 +
-+            const WGPUColor blendConstant = { 0.0, 0.0, 0.0, 0.0 };
-+            wgpuRenderPassEncoderSetBlendConstant(renderPass, &blendConstant);
++            if (!pass.blendConstantSet) {
++                const WGPUColor blendConstant = { 0.0, 0.0, 0.0, 0.0 };
++                wgpuRenderPassEncoderSetBlendConstant(renderPass, &blendConstant);
++                pass.blendConstantSet = true;
++            }
 +
 +            // The scissor has to lie inside the attachments.
 +            RenderRect rect = scissorSet ? scissor : RenderRect(0, 0, framebuffer->width, framebuffer->height);
@@ -4398,11 +4484,31 @@ index 0000000..498c58e
 +            rect.top = std::clamp<int32_t>(rect.top, 0, framebuffer->height);
 +            rect.right = std::clamp<int32_t>(rect.right, rect.left, framebuffer->width);
 +            rect.bottom = std::clamp<int32_t>(rect.bottom, rect.top, framebuffer->height);
-+            wgpuRenderPassEncoderSetScissorRect(renderPass, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
++            const RenderRect &passScissor = pass.scissor;
++            if (!pass.scissorSet || (rect.left != passScissor.left) || (rect.top != passScissor.top) || (rect.right != passScissor.right) || (rect.bottom != passScissor.bottom)) {
++                wgpuRenderPassEncoderSetScissorRect(renderPass, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
++                pass.scissor = rect;
++                pass.scissorSet = true;
++            }
++
 +            renderStateDirty = false;
 +        }
 +
 +        return true;
++    }
++
++    void WebGPUCommandList::setPassPipeline(WGPURenderPipeline renderPipeline) {
++        if (renderPipeline == pass.pipeline) {
++            return;
++        }
++
++        wgpuRenderPassEncoderSetPipeline(renderPass, renderPipeline);
++        if (pass.pipeline != nullptr) {
++            wgpuRenderPipelineRelease(pass.pipeline);
++        }
++
++        pass.pipeline = renderPipeline;
++        wgpuRenderPipelineAddRef(pass.pipeline);
 +    }
 +
 +    void WebGPUCommandList::drawInstanced(uint32_t vertexCountPerInstance, uint32_t instanceCount, uint32_t startVertexLocation, uint32_t startInstanceLocation) {
@@ -4553,10 +4659,15 @@ index 0000000..498c58e
 +        }
 +
 +        const WGPUColor blendConstant = { color.r, color.g, color.b, color.a };
-+        wgpuRenderPassEncoderSetPipeline(renderPass, clearPipeline);
++        setPassPipeline(clearPipeline);
 +        wgpuRenderPassEncoderSetBlendConstant(renderPass, &blendConstant);
 +        wgpuRenderPassEncoderSetStencilReference(renderPass, stencilValue);
 +        wgpuRenderPassEncoderSetViewport(renderPass, 0.0f, 0.0f, float(framebuffer->width), float(framebuffer->height), depthValue, depthValue);
++        pass.blendConstantSet = false;
++        pass.stencilReference = stencilValue;
++        pass.stencilReferenceSet = true;
++        pass.viewportSet = false;
++        pass.scissorSet = false;
 +        for (uint32_t i = 0; i < rectCount; i++) {
 +            const int32_t left = std::clamp<int32_t>(rects[i].left, 0, framebuffer->width);
 +            const int32_t top = std::clamp<int32_t>(rects[i].top, 0, framebuffer->height);
@@ -5260,10 +5371,10 @@ index 0000000..498c58e
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..6dcb436
+index 0000000..0f09d4b
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,630 @@
+@@ -0,0 +1,666 @@
 +//
 +// plume
 +//
@@ -5340,7 +5451,8 @@ index 0000000..6dcb436
 +//   11-16 ms; a laptop's Intel graphics is suspected of more), Firefox 158 drew Banjo-Kazooie at 20 a second with 2 in
 +//   flight, 58 with 3 and 59 with 4. The callbacks alone can't tell a late callback from a slow GPU, but only the first
 +//   gains from one more in flight, so while wait() holds presents a swap chain tries one more, up to 4, and keeps it if
-+//   presents rise (adaptPresentsInFlight()). The page's query can fix the number (presents-in-flight=<1-8>), and
++//   presents rise (adaptPresentsInFlight()), but only from presents steady before the try: after a stall any recovery is
++//   a rise. The page's query can fix the number (presents-in-flight=<1-8>), and
 +//   present-stats prints a line every 5 s: presents a second, how long after its present each frame's onSubmittedWorkDone
 +//   came back, the time wait() held presents, and the animation frames a second, and each try that goes back. On a GPU
 +//   at hand, that says whether the GPU, the callbacks or the browser's frames hold presents back.
@@ -5645,6 +5757,8 @@ index 0000000..6dcb436
 +        double capWindowStart = 0.0;
 +        uint32_t capWindowPresents = 0;
 +        double capWaitMs = 0.0;
++        double capLastPresent = 0.0;
++        double capLongestGapMs = 0.0;
 +        double capTryRate = 0.0;
 +        bool capTrying = false;
 +        double capNextTry = 0.0;
@@ -5707,11 +5821,41 @@ index 0000000..6dcb436
 +            uint32_t used = 0;
 +        };
 +
++        // The pipeline layout the last draw or dispatch resolved its bindings to, and what from: while none of it changes,
++        // the next one's is the same. Each set's layout too, since another command list may have updated a set since.
++        struct ResolvedBindings {
++            const WebGPUPipelineLayout *layout = nullptr;
++            WebGPUDescriptorSet *descriptorSets[MaxDescriptorSets] = {};
++            WGPUBindGroupLayout setLayouts[MaxDescriptorSets] = {};
++            uint64_t bindingStagesRevision = 0;
++            WGPUPipelineLayout pipelineLayout = nullptr;
++        };
++
 +        struct BindState {
 +            const WebGPUPipelineLayout *layout = nullptr;
 +            WebGPUDescriptorSet *descriptorSets[MaxDescriptorSets] = {};
 +            std::vector<uint8_t> pushConstants;
 +            bool pushConstantsDirty = false;
++            ResolvedBindings resolved;
++        };
++
++        // What the open render pass has been given, so that a draw passes on only what changed: on a page each call is a
++        // trip through JavaScript into the browser's GPU client on the page's thread, which a slow CPU runs out of first.
++        // The pipeline and the groups are held (a reference each), so that one released meanwhile can't come back as
++        // another object at the same address. A new pass starts with nothing set.
++        struct PassState {
++            WGPURenderPipeline pipeline = nullptr;
++            WGPUBindGroup bindGroups[MaxDescriptorSets] = {};
++            uint32_t stencilReference = 0;
++            bool stencilReferenceSet = false;
++            RenderVertexBufferView vertexBuffers[MaxVertexBuffers] = {};
++            RenderIndexBufferView indexBuffer;
++            bool indexBufferSet = false;
++            RenderViewport viewport;
++            bool viewportSet = false;
++            RenderRect scissor;
++            bool scissorSet = false;
++            bool blendConstantSet = false;
 +        };
 +
 +        WebGPUDevice *device = nullptr;
@@ -5735,6 +5879,7 @@ index 0000000..6dcb436
 +        bool viewportSet = false;
 +        bool scissorSet = false;
 +        bool renderStateDirty = true;
++        PassState pass;
 +        std::vector<PushConstantsChunk> pushConstantsChunks;
 +        uint32_t pushConstantsChunkIndex = 0;
 +
@@ -5782,6 +5927,8 @@ index 0000000..6dcb436
 +
 +        void endRenderPass();
 +        bool beginRenderPass();
++        void resetPassState();
++        void setPassPipeline(WGPURenderPipeline renderPipeline);
 +        void clearRects(int32_t colorAttachment, const RenderColor &color, bool clearDepth, bool clearStencil, float depthValue, uint32_t stencilValue, const RenderRect *rects, uint32_t rectCount);
 +        void copiedInto(const RenderBuffer *buffer);
 +        bool prepareDraw();
@@ -5896,10 +6043,10 @@ index 0000000..6dcb436
 +};
 diff --git a/plume_webgpu_device.js b/plume_webgpu_device.js
 new file mode 100644
-index 0000000..882e948
+index 0000000..7a3c7c9
 --- /dev/null
 +++ b/plume_webgpu_device.js
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,77 @@
 +// Link with --pre-js for plume's WebGPU backend. Requesting a WebGPU device is asynchronous, so this does it before
 +// main() runs and hands the device over as Module.preinitializedWebGPUDevice, which emscripten_webgpu_get_device()
 +// returns. Optional features plume can use are asked for when the adapter has them, and the adapter's own maximum for
@@ -5945,21 +6092,35 @@ index 0000000..882e948
 +
 +// emdawnwebgpu hands setBindGroup its dynamic offsets as the whole wasm heap (HEAPU32) with a start and a length.
 +// Firefox refuses any ArrayBuffer or view larger than 2 GB as an argument, so on a page whose heap has grown past that
-+// every bind group with dynamic offsets threw and nothing was drawn. A view that big is replaced by a copy of only the
-+// offsets; Chrome, and any heap under 2 GB, take the call as before. (writeBuffer and writeTexture already pass a
++// every bind group with dynamic offsets threw and nothing was drawn. There a view that big is replaced by the offsets
++// copied into an array kept for it; any heap under 2 GB takes the call as before. Chrome takes the whole heap, and
++// its pages call the browser's own setBindGroup: RT64 binds a group with an offset for every draw, and a wrapper with
++// a copy took ~1.4 us a call in Chrome 155 against 0.13 straight (a 3 GB heap; 0.48 under 2 GB), ~9% of the page's
++// thread in Conker's Bad Fur Day with that thread slowed 3 times. (writeBuffer and writeTexture already pass a
 +// subarray.)
-+for (const name of ['GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPURenderBundleEncoder']) {
-+  const encoder = globalThis[name];
-+  if (!encoder) {
-+    continue;
-+  }
-+
-+  const setBindGroup = encoder.prototype.setBindGroup;
-+  encoder.prototype.setBindGroup = function (index, bindGroup, offsets, start, length) {
-+    if (offsets && offsets.byteLength > 0x7fffffff) {
-+      return setBindGroup.call(this, index, bindGroup, offsets.slice(start, start + length));
++if (navigator.userAgent.includes('Firefox')) {
++  const copied = new Uint32Array(64);
++  for (const name of ['GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPURenderBundleEncoder']) {
++    const encoder = globalThis[name];
++    if (!encoder) {
++      continue;
 +    }
 +
-+    return setBindGroup.apply(this, arguments);
-+  };
++    const setBindGroup = encoder.prototype.setBindGroup;
++    encoder.prototype.setBindGroup = function (index, bindGroup, offsets, start, length) {
++      if (offsets && (offsets.byteLength > 0x7fffffff) && (length <= copied.length)) {
++        for (let i = 0; i < length; i++) {
++          copied[i] = offsets[start + i];
++        }
++
++        return setBindGroup.call(this, index, bindGroup, copied, 0, length);
++      }
++
++      if (offsets && (offsets.byteLength > 0x7fffffff)) {
++        return setBindGroup.call(this, index, bindGroup, offsets.slice(start, start + length));
++      }
++
++      return setBindGroup.apply(this, arguments);
++    };
++  }
 +}

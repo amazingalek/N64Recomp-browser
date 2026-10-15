@@ -37,8 +37,8 @@ The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Re
 the game forks (below) take no pull requests and have never had one: a change there is a commit pushed straight to the
 fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`forks.txt` here, a game fork's submodule).
 `rush-2049-recomp` is the one game with a repo of its own that works by pull requests: what it needs from a change here
-(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, which builds, publishes and
-plays its page, not a commit from here.
+(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here (The
+pins).
 
 ## Rules
 
@@ -66,8 +66,8 @@ plays its page, not a commit from here.
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md` and the tools that play and publish pages skips every job
-  but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
+  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
 ## The forks, one commit per change
@@ -241,9 +241,22 @@ rt64 b052049           on WebGPU a pixel shader that picks its slot per pixel (m
                        and loads them in one switch over the draw's slots, not a switch a tap: GoldenEye's largest
                        224 → 185 KB of WGSL, its list 19.0 → 16.3 MB, Firefox's waits for its boot and Dam a fifth
                        and nearly a third shorter
+rt64 ee2dd6a           where pipelines build behind the game (Chrome) the boot's threads build section 1 too, the rest
+                       still on one: a boot that ends at the title, with the menus the next section so that Firefox
+                       draws the title sooner, left the menus to one thread, and Chrome waited 3-8 s for them after
+                       Start (Pilotwings 64's 28-36), where with them in the boot it never had
 plume 009957c          while the presents-in-flight cap holds presents below the display's rate, one more in flight
 rt64 2306d25           tried every 2 s (up to 4) and kept if presents rise: with onSubmittedWorkDone 20-40 ms late, 2
                        held Banjo's page in Firefox at 20 (RT64 read the skips as the GPU falling behind and paced it)
+plume 6949d22          fewer and cheaper WebGPU calls on the page's thread for each draw: 94a4795's copy of the offsets
+rt64 bf509dd           in Firefox only (in Chrome it took ~1.4 us a call against 0.13, a new array each), bind group
+                       keys as bytes, not snprintf's text, and a pass given only the state that changed since its last
+                       draw: with the page's thread slowed 3 times (Chrome's CPU throttling, a stand-in for a laptop's
+                       CPU), Conker's page presented 54-58 a second in Chrome 155, where it had presented 36-44
+plume 3c23b44          009957c's try only from a steady window: no present more than 100 ms after the one before, and
+rt64 57c0fed           presents held more than 10% of it; a stall (a load, shaders building behind the game) took a fast
+                       GPU's page to 3 from boot (GoldenEye's launcher, from 0.8 presents a second); ?present-stats
+                       prints each try
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -299,27 +312,32 @@ script), so commit to a fork from a separate clone of it:
 here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
 was made for (Changing it, step 4). Every game takes it in the next retest, a run on a schedule that takes every change
 since the last one at once. For each game fork it builds the page on main's newest tag and, if the page's files
-changed, plays that build in Chrome and Firefox (Playing a page). Only a page that boots with no WebGPU errors and plays
-no worse than its row moves its fork's N64Recomp-browser onto the tag (a commit pushed to the fork's `main`), is
+changed, plays that build in Chrome and Firefox (Playing a page), each run recorded in `plays.jsonl` and compared with
+the earlier runs like it there (`play_page.mjs --record`, The games table). A run it flags as a regression is played
+again, the host's load read first, and is a regression only if the second run is worse too and nothing beside it
+explains it; a drop within the runs' noise is not one. Only a page that boots with no WebGPU errors and plays
+no worse than its row and its earlier runs moves its fork's N64Recomp-browser onto the tag (a commit pushed to the fork's `main`), is
 published and gets its row updated (The games table). One that plays worse stays on Pages as it was, its fork on its
 last tag, and has work filed to fix it. So Pages holds only pages that were played, and a fork's `main` is what its
 page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
-to look when it plays worse. Rush 2049's `lib/N64Recomp-browser` moves in a pull request on its own repo, which builds,
-plays and publishes its page there.
+to look when it plays worse. Rush 2049 is retested with them, built and played the same way; only its pin moves
+differently: its `lib/N64Recomp-browser` moves to the tag in a pull request on its own repo, which builds those same
+bytes, runs the desktop game and publishes the page once it merges, and the retest updates its row. Its pin moves to a
+tag that left its page's bytes alone too, since its desktop build can still take something from it (below).
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages, the version players have, that crashes, never
-boots, loses its WebGPU device or can't be played, moves the pins of the games it fixes and builds, plays (in Chrome
-and Firefox) and publishes each one, and updates their rows, in the same work. The other games take it in the next
-retest. A bug only main has, on no page yet, waits for the retest like any other change; one the retest publishes is
-on Pages, and its fix is critical.
+boots, loses its WebGPU device or can't be played, moves the pins of the games it fixes (Rush 2049's by a pull request
+on its repo) and builds, plays (in Chrome and Firefox) and publishes each one, and updates their rows, in the same work.
+The other games take it in the next retest. A bug only main has, on no page yet, waits for the retest like any other
+change; one the retest publishes is on Pages, and its fix is critical.
 
 A retest runs `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>` where the ROMs are: it builds every
-game fork's main with its N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
-files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the copies; a page that
-builds the same bytes took nothing from the tag and is left alone. Once the pins of those that played well are moved,
-a run without `--browser` builds each main again (the same bytes), publishes what differs, boots each one from Pages
-in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played from a `--dry-run`
-build of that game and then published by a run with its name (Publishing).
+game's main, Rush 2049's included, with its N64Recomp-browser moved to the tag (in the build host's copy only), and
+names the pages whose files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the
+copies; a page that builds the same bytes took nothing from the tag and is left alone. Once the pins of those that
+played well are moved, a run without `--browser` builds each main again (the same bytes), publishes what differs, boots
+each one from Pages in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played
+from a `--dry-run` build of that game and then published by a run with its name (Publishing).
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
@@ -354,6 +372,12 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   console (Playing a page). Look at the menus too (a `shot` step).
 - Writes what was played, in which browser, on what GPU and when, in that game's repo, beside its other measurements
   (a game fork's README or BUILDING.md; Rush 2049's CLAUDE.md, Step 3), never in this README.
+- Records every run in `plays.jsonl`, committed with the row: `play_page.mjs --record plays.jsonl --game <name>
+  --build <tag>`, with `--note` for anything a player's visit wouldn't have (a preload, a test build). It is the
+  history of how each page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note`
+  saying so. A run without `--note` is compared with the last 5 like it (same game, browser, size and play) and
+  flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
+  and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
   stand-in for one, marked "(stand-in)": the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
   the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play
@@ -362,7 +386,11 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   one, and a laptop result stays until a newer laptop run replaces it. A cell says how the page plays as of its date,
   in absolute terms (smooth, the presents a second, never boots), never against an earlier result ("the crash is
   gone"); one whose laptop result a fix was made for gives the stand-in's result and "not yet on a laptop" until it is
-  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so.
+  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so. A
+  laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
+  so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
+  a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
+  for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
 A new game gets a row in the same work as its port.
@@ -511,8 +539,8 @@ Kong 64, GoldenEye, Conker, Wave Race 64 and Rush 2049 through their boots and 2
 Each is on `main`, and each one's README says up front that it is AI-written and not upstream's, and its BUILDING.md
 how to build the page. On BanjoRecomp-web upstream's `validate-internal` workflow, a native build on every push to main
 with no ROM, is disabled. Banjo, Majora's Mask, Donkey Kong 64 and Conker are on their own upstream submodules and
-GoldenEye on upstream's at the forks' bases, all patched by N64Recomp-browser ed8764a (v0.36.0: the canvas in the
-browser's preferred format, rt64 c6cf6c4 and 58fc4e4, plume 16e608a and 97f4e64); Banjo, Majora's Mask and Donkey Kong
+GoldenEye on upstream's at the forks' bases, all patched by the N64Recomp-browser tag their submodule pins
+(each fork's `lib/N64Recomp-browser`, Conker's `tools/N64Recomp-browser`; The pins); Banjo, Majora's Mask and Donkey Kong
 64 include its `frontend/build_speed.cmake`: their BUILDING.md says to keep `build-web` inside the checkout and put
 ccache on `PATH`. Their `main.cpp` plays sound through `audio_output.h` on Emscripten (headless Chrome: the DK Rap,
 Banjo's intro and Majora's Mask's attract demo play, nothing short after the first second). Their CMakeLists.txt pick
@@ -523,8 +551,10 @@ shaders, fits Chrome's cache and is in four sections, the band's intro its boot.
 are recorded by code, a section an area, as GoldenEye's (`patches/shader_survey.c` warps to an entrance or a map,
 `tools/shader_plan.json`, `tools/record_shaders.sh`): Majora's Mask 938 descriptions, 730 pipelines, in 17 sections,
 the boot 39 (launcher to file select), then the attract demo, Clock Town, the intro and each region; Donkey Kong 64 475
-and 361 in 13, the boot 115, since every visit draws the whole DK Rap and a moment of DK TV's Japes demo, a shader or
-two a frame, too few to start a section. Cold and then warm in headless Chrome 155 (RTX 2070, host 15-41% busy):
+and 361 in 15, the boot only the logos (10), then the DK Rap (49), whose first frame wants 31 at once and so starts its
+section, and the menus (55). Firefox waits for a boot before the page's first frame, so a boot holds only what draws
+before a frame that starts a section: Donkey Kong 64's, 115 with the Rap and the menus in it, kept Firefox 158 13-30 s
+on a black page, and the logos alone 0.5-0.7 s, then 6.5 s as the Rap begins. Cold and then warm in headless Chrome 155 (RTX 2070, host 15-41% busy):
 Majora's Mask's boot 2.4 and 0.1 s (16.4 and 10.9 s as one list), Clock Town 1.6 s either way; Donkey Kong 64's 5.0 and
 0.4 s (9.6 and 5.2 as one list), Frantic Factory 0.9-1.0 s. Firefox 157 keeps no built pipelines between visits, so
 every visit waits as long: Majora's Mask's boot 4.5-4.7 s and Clock Town 14-16 s, Donkey Kong 64's 15-17 s (26 s as one
@@ -736,8 +766,10 @@ page's). A game whose CPU copies into a framebuffer RT64 has never drawn, or rea
 the clock already let other threads in (its `patches/clocks.c`). Its list, 414 descriptions, is recorded by
 `tools/shader_survey.js` (no patches library needed: the menus' own cursor picks the test, the vehicle and class are
 written at the pilot select), a load a test, merged into a section per island and vehicle
-(`tools/merge_shader_sections.py`): 414 descriptions, 298 pipelines in 28 sections, the boot 80 (the title and the
-menus). Its scheduler took a frame busy for 50 retraces for a hung RCP and sent itself the RDP's done message, so
+(`tools/merge_shader_sections.py`): 414 descriptions, 298 pipelines in 29 sections, the boot 33 (the logos and the
+title) and the menus a section of their own (47, 49 of their 54 descriptions on the first screen after Start), so
+Firefox draws the title before it builds them; with the menus in the boot (80) it waited 18-37 s before the first
+frame, split 7-9 s. Its scheduler took a frame busy for 50 retraces for a hung RCP and sent itself the RDP's done message, so
 during Firefox's boot wait it built frames into display lists RT64 hadn't read, and the page stopped on the mix (a
 palette load past the end of memory, a texture 8404 texels wide) in two runs of three; `patches/sched.c` takes the
 timeouts out. From Pages (main 550269d, N64Recomp-browser 33d43a9), cold, RTX 2070: Firefox 158 waited 19-29 s for the
@@ -745,7 +777,10 @@ boot, 2.2-2.8 s for a glider test's section and 10-11 s for a gyrocopter test's,
 after the waits, three runs of three; Chrome 155 headless (the same files served locally) waited 5.9 s once and drew
 57 beside another page; no WebGPU errors. On 7277a2e (main 4448311), from Pages, cold, RTX 2070: Chrome 155 headless
 waited 4.1 s for 9 and drew 58.2, Firefox 158 18.2 s for the boot and drew 57.8, sound short only in the waits, no
-WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s and drew 60.
+WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s and drew 60. On bcdcb78 (main 2a5ba44),
+the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firefox 158 waited 6.7-7.3 s for the boot,
+18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
+after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
 
 ## WebGPU in Chrome and Firefox
 
@@ -813,7 +848,12 @@ changing it:
   and 29.9 in two runs, the GPU ~35% busy), as on the laptop; with 3 in flight 58.3, with 4 59.4, each callback back
   ~35 ms after its present either way. Rush 2049's attract race held 54.6 with 2 (~800 ms a second at the cap; its
   game's 30 never paced), and on plume 009957c, which tries one more while the cap holds presents and keeps it if
-  presents rise, went to 3 in 10 s and 4 at 63 s and drew 59.8; without the delay it stayed at 2 and drew 59.8. A slow
+  presents rise, went to 3 in 10 s and 4 at 63 s and drew 59.8; without the delay it stayed at 2 and drew 59.8. With plume 3c23b44,
+  which tries only from a steady window held more than 10% of the time, Banjo with the delay went to 3 at 9 s (from 54
+  a second, 817 ms a second at the cap) and drew 57-58, its waits then too short to try 4; cold without it GoldenEye and
+  Banjo stayed at 2 in Chrome 155 headless and Firefox 158, where on 009957c GoldenEye went to 3 in its launcher from a
+  window at 0.8 presents a second, and with 5% in place of 10% from one at 55 (58 ms a second at the cap) while Chrome
+  built its shaders behind the game. A slow
   GPU gains nothing from one more (2 gave 46 and 3 47 above), so there the try goes back. A page thread kept 60% busy
   (a preload spinning 10 ms of every 16) left Banjo in Firefox at 57.7 with no time at the cap, so a slow page thread
   is not what holds Firefox there. What the stand-in can't imitate, Firefox's refresh driver holding animation frames
@@ -917,6 +957,10 @@ running in a browser was found to learn from.
 
 ## Ruled out, so don't retry
 
+- coi_serviceworker.js's reload missed because its worker got further than register()'s promise ('updatefound'
+  fired before the listener, or the worker already activating): in ~100 cold Firefox 158 visits register() always
+  resolved with the worker still installing, and the reload always came. A first visit that never started was the
+  program's own fetches before the reload (shell.html says how).
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
