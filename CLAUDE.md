@@ -66,7 +66,7 @@ pins).
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  built and played before it lands. A change to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve and publish pages
   skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
@@ -421,7 +421,27 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
-A new game gets a row in the same work as its port.
+A new game gets a row in the same work as its port, its Recomp cell naming the upstream recomp and its owner
+("[name](url) by owner"), from the fork's GitHub parent.
+
+## The games page
+
+`site/` is a page of every game in the Games table: a tile each with its launcher's image, its Recomp credit and its
+Chrome and Firefox cells, and Play, which runs the game's page in a frame on it. It is not published yet, and nothing
+in this repo, the forks or the game forks links to it, and the README doesn't name it: leave it so until that
+changes. Keep it current in the same work as what changes it, like the README:
+
+- It reads the table from main's README.md on each visit (served locally, the checkout's), finding the columns by their
+  headers (Game, Recomp, Repo, Page, the two with Chrome and Firefox), so a row or a cell needs nothing more; a column
+  renamed or a cell written another way needs `site.js`'s parse to follow.
+- A new game also needs its tile's image in the same work: `site/img/<repo>.webp`, named as its Repo cell, its page's
+  launcher captured in headless Chrome at 1280x720 without a ROM (the art its recomp ships, nothing of the game's) and
+  shrunk to a 640x360 WebP. Clear `sessionStorage` between two game pages in one tab, or the second can show the
+  isolation notice (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a colour.
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path on to
+  GitHub Pages, so the games play in its frame as they will there. `site.js` says how the frame stays cross-origin
+  isolated, why it is navigated by `location.replace` (Back returns to the grid) and why fullscreen is the game page's
+  own document (a fullscreen element around the frame froze Banjo's picture).
 
 ## Playing a page
 

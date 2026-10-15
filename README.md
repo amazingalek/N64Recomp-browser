@@ -15,17 +15,17 @@ Each game's repo builds its page with this repo; a page holds no ROM, the player
 the games are here to build out and test the web support on more than one game: what one of them or one browser turns
 up is fixed in this repo or the forks unless it really is that game's own, so every game and both browsers get it.
 
-| Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
-|---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
-| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
-| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
+| Game | Recomp | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
+|---|---|---|---|---|---|---|
+| San Francisco Rush 2049 | this project's own recomp | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp](https://github.com/cblock85/GoldenEye64Recomp) by cblock85 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
+| The Legend of Zelda: Majora's Mask | [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) by Zelda64Recomp | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Banjo-Kazooie | [Banjo: Recompiled](https://github.com/BanjoRecomp/BanjoRecomp) by BanjoRecomp | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Conker's Bad Fur Day | [CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) by sciaschi | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Donkey Kong 64 | [Donkey Kong 64: Recompiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled) by Rainchus | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
+| Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
