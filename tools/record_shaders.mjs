@@ -27,7 +27,8 @@
 // holds what it printed after, less section 0. A section with "boot": true goes into section 0 too, for screens the
 // game shows before its levels that a plan reaches by code (GoldenEye's menus). Sections that share a name are one
 // section of the list, recorded a load each: a world whose levels the plan can reach only one a load (Diddy Kong
-// Racing's). Console lines go to stdout as they come, with the seconds since start.
+// Racing's). Console lines go to stdout as they come, with the seconds since start, and the list is written after every
+// section, so one stopped partway holds what was recorded until then.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -62,6 +63,19 @@ const run = (steps) => page.run(steps, { keep: (value) => { keep = value; } });
 const boot = [];
 const sections = [];
 const addNew = (list, shaders) => { for (const s of shaders) if (!list.includes(s)) list.push(s); };
+// The list so far, written after every section too, so a recording stopped partway keeps what it had; returns how
+// many shaders it holds.
+const write = () => {
+  const lines = [...(plan.header ?? []).map((line) => `# ${line}`.trimEnd()), ...boot];
+  const all = new Set(boot);
+  for (const section of sections) {
+    const own = section.shaders.filter((s) => !boot.includes(s));
+    own.forEach((s) => all.add(s));
+    lines.push(`section ${section.name}`, ...own);
+  }
+  fs.writeFileSync(outFile, lines.join('\n') + '\n');
+  return all.size;
+};
 let first = true;
 for (const section of plan.sections) {
   if (only && !only.includes(section.name)) continue;
@@ -78,17 +92,9 @@ for (const section of plan.sections) {
   if (section.boot) addNew(boot, printed); else if (same) addNew(same.shaders, printed);
   else sections.push({ name: section.name, shaders: [...printed] });
   log(`section ${section.name}: ${printed.length} shaders`);
+  write();
 }
-
-const lines = [...(plan.header ?? []).map((line) => `# ${line}`.trimEnd()), ...boot];
-const all = new Set(boot);
-for (const section of sections) {
-  const own = section.shaders.filter((s) => !boot.includes(s));
-  own.forEach((s) => all.add(s));
-  lines.push(`section ${section.name}`, ...own);
-}
-fs.writeFileSync(outFile, lines.join('\n') + '\n');
-log(`${outFile}: ${all.size} shaders, ${boot.length} in section 0 and ${sections.length} sections`);
+log(`${outFile}: ${write()} shaders, ${boot.length} in section 0 and ${sections.length} sections`);
 
 await page.close();
 server.close();

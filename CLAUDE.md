@@ -502,7 +502,9 @@ changes. Keep it current in the same work as what changes it, like the README:
   the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
   RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
 - The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
-  Original 30), Pilotwings 64 60 (a variable timestep), and the other seven their cartridge's: Majora's Mask 20,
+  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
+  which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
+  it), and the other seven their cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
   races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
 - A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
