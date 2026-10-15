@@ -338,7 +338,10 @@ take the web support without moving its submodules to the forks (Using it in a r
 - `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), `fetch_pins.sh` a recomp's
   own commits in `patches/pins.txt`, patched, and `publish_page.sh` puts
   a recomp's built page on its repo's GitHub Pages, as the only commit on an orphan `gh-pages` branch (its header says
-  how). A page holds the recompiled code, so it is built where the ROM is, never in CI. `record_shaders.mjs` records a
+  how). A page holds the recompiled code, so it is built where the ROM is, never in CI. `publish_pages.sh` is the
+  deploy after a change: it rebuilds every game's page in the Games table from its main on a build host, publishes
+  only those whose files differ from what Pages serves (a commit builds the same bytes in any checkout), and boots
+  each one it published from Pages in headless Chrome. `record_shaders.mjs` records a
   prebuilt shader list by a plan, and `play_page.mjs` plays a page, a build or one on Pages, by the same kind of plan in
   Chrome or Firefox and measures it: presents a second, sound frames short, WebGPU errors, the shader waits, the GPU's
   load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table.
