@@ -72,7 +72,7 @@ keep_times() {
     while [[ "$1" != -- ]]; do [[ -d "$1" ]] && mkdir -p "$old/$1" && cp -a "$1/." "$old/$1/"; shift; done
     shift
     "$@"
-    (cd "$old" && find . -type f) | while read -r f; do cmp -s "$old/$f" "$f" && touch -r "$old/$f" "$f"; done
+    (cd "$old" && find . -type f) | while read -r f; do if cmp -s "$old/$f" "$f"; then touch -r "$old/$f" "$f"; fi; done
     rm -rf "$old"
 }
 # n64recomp <target>...: the recompilers the runtime pins, patched for the web first (the page needs the code the
@@ -208,7 +208,7 @@ for g in "${selected[@]}"; do
         rom="${ROMS:?set ROMS to the folder holding <game>.z64}/$g.z64"
         have="$(ssh -o BatchMode=yes "$BUILD_HOST" "sha1sum rush2049/$copy/rom.z64 2> /dev/null || true")"  # remote_build.sh's base
         [[ "$have" == "$(sha1sum < "$rom" | cut -c1-40) "* ]] || scp -q "$rom" "$BUILD_HOST:rush2049/$copy/rom.z64"
-        if ! bash "$remote_build" -n $copy run "set -euo pipefail; $(declare -f exclude keep_times n64recomp web build_$g); exclude; build_$g" \
+        if ! bash "$remote_build" -n $copy run "set -euo pipefail; trap 'echo \"failed: $BASH_COMMAND\" >&2' ERR; $(declare -f exclude keep_times n64recomp web build_$g); exclude; build_$g" \
             > "$work/$g.log" 2>&1; then
             echo "   build failed:"; tail -20 "$work/$g.log"; failed+=("$g"); continue
         fi
