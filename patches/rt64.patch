@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 01790107a43870b5bbbba0153ae5fc0e8c6b1f55
+rt64: https://github.com/amazingalek/rt64-web 730e980ff486f1d1c410feab179ab047d85fe289
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1090,20 +1090,20 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..21aec35 100644
+index 3227ab1..2d6595a 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
-@@ -9,6 +9,10 @@
- 
- #include "rt64_workload_queue.h"
+@@ -7,6 +7,10 @@
+ #include "common/rt64_thread.h"
+ #include "rhi/rt64_render_hooks.h"
  
 +#if defined(__EMSCRIPTEN__)
 +#   include <emscripten.h>
 +#endif
 +
- namespace RT64 {
-     // PresentQueue
+ #include "rt64_workload_queue.h"
  
+ namespace RT64 {
 @@ -88,6 +92,14 @@ namespace RT64 {
  
          viRenderer = std::make_unique<VIRenderer>();
