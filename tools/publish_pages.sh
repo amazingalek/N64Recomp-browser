@@ -125,10 +125,11 @@ build_banjo() {
 }
 build_cbfd() {
     [[ -f conker/baserom.us.z64 ]] || cp ../rom.z64 conker/baserom.us.z64
+    # Conker's own patches, then the web's on top: only into a checkout the sync left clean (it resets one that moved).
     local tool patch
     while read -r tool patch; do
-        git -C "$tool" apply --reverse --check "$PWD/$patch" 2> /dev/null || git -C "$tool" apply "$PWD/$patch"
-    done <<< "tools/N64Recomp recomp/n64recomp.patch
+        git -C "$tool" diff --quiet HEAD && git -C "$tool" apply "$PWD/$patch"
+    done <<<"tools/N64Recomp recomp/n64recomp.patch
 tools/N64ModernRuntime recomp/n64modernruntime.patch
 tools/rt64 recomp/rt64.patch
 tools/RecompFrontend recomp/recompfrontend.patch
