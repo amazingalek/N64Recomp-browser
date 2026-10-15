@@ -3,7 +3,8 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed] [--uncapped] [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>]
+//     [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -18,7 +19,8 @@
 // interpolates to it and paces nothing) and the browser animation frames at no fixed rate (page_driver.mjs), so its
 // presents a second are what the GPU, the page's thread and the browser's GPU process can take. That compares a
 // browser, a size or a build with another where every page would read 60 at the display's rate; a run at 342 or more
-// (95% of 360) is held by the rate, not the page, and says so.
+// (95% of 360) is held by the rate, not the page, and says so. --cpu-throttle 3 (Chrome only) slows the page's thread
+// 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -70,6 +72,7 @@ const headed = args.includes('--headed');
 if (headed) args.splice(args.indexOf('--headed'), 1);
 const uncapped = args.includes('--uncapped');
 if (uncapped) args.splice(args.indexOf('--uncapped'), 1);
+const cpuThrottle = Number(option(args, '--cpu-throttle', '0'));
 const port = Number(option(args, '--port', '8937'));
 const profileOption = option(args, '--profile', null);
 const section = option(args, '--section', null);
@@ -92,7 +95,7 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -209,8 +212,8 @@ const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, uncapped, onLine, log });
-log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
+  preload, headed, uncapped, cpuThrottle, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 const samples = [];
@@ -328,7 +331,7 @@ if (recordFile) {
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
   const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
-    freshProfile, ...(uncapped ? { uncapped } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, audioShort: summary.audio?.short ?? null, shaderWaits,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
@@ -350,7 +353,8 @@ function compare(run, lines) {
   const like = (a, b) => a === null || a === undefined || b === null || b === undefined || a === b;
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
-      like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped)
+      like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped &&
+      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1))
     .slice(-5);
   if (!before.length) {
     console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);
