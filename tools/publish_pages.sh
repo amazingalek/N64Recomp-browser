@@ -25,8 +25,8 @@
 # --browser <commit> is the retest before the pins move (CLAUDE.md, "The pins"): a dry run of every game with its
 # N64Recomp-browser moved to <commit> (a tag, or a commit this checkout has) in its copy only, Rush 2049's by a
 # commit of its own on top of main that is synced there and pushed nowhere. It names the pages that build differently
-# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n <copy> get and play.
-# Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
+# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n <copy> get and play.
+# Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
 # the same bytes and publishes them.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
@@ -73,6 +73,8 @@ dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web
 wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
 pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
+mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web
+oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -91,6 +93,8 @@ exclude() {
 browser_at() {
     local b=lib/N64Recomp-browser
     [[ -d $b ]] || b=tools/N64Recomp-browser
+    # Two commands, not one && list, which set -e lets fail: a commit GitHub won't fetch by name (a short SHA) left the
+    # pin where it was, and the run built Pages' own bytes as the commit's.
     git -C $b fetch -q origin "$1"
     git -C $b checkout -q --detach FETCH_HEAD
     git add $b
@@ -236,6 +240,15 @@ build_pw() {
 }
 build_bt() {
     embuilder build sdl2-mt freetype-legacysjlj > /dev/null 2>&1
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+build_mk64() {
+    [[ -f mk64.us.z64 ]] || cp ../rom.z64 mk64.us.z64
+    n64recomp N64RecompCLI RSPRecomp
+    keep_times RecompiledFuncs rsp -- bash -c './N64Recomp us.toml > /dev/null && ./RSPRecomp aspMain.us.toml > /dev/null'
+    web MarioKart64Recompiled
+}
+build_oot() {
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 

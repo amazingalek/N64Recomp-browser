@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 2dd06e24a452d9d24e64011806d05030952a642f
+plume: https://github.com/amazingalek/plume-web 7a7e3bc203dc3105f7ba0b365ac1ed6ae452b4ca
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -859,10 +859,10 @@ index 0000000..03b3ea0
 +}
 diff --git a/plume_device_thread.cpp b/plume_device_thread.cpp
 new file mode 100644
-index 0000000..2d8578b
+index 0000000..91dd046
 --- /dev/null
 +++ b/plume_device_thread.cpp
-@@ -0,0 +1,1528 @@
+@@ -0,0 +1,1421 @@
 +//
 +// plume
 +//
@@ -1103,11 +1103,8 @@ index 0000000..2d8578b
 +        DeviceThread *thread = nullptr;
 +        RenderBuffer *inner = nullptr;
 +        std::shared_ptr<DTMapState> mapState;
-+        bool uploadHeap = false;
-+        std::atomic<void *> uploadData = nullptr;
 +
 +        DTBuffer(DeviceThread *thread, std::unique_ptr<RenderBuffer> inner, RenderHeapType heapType) : thread(thread), inner(inner.release()) {
-+            uploadHeap = (heapType == RenderHeapType::UPLOAD) || (heapType == RenderHeapType::GPU_UPLOAD);
 +            if (heapType == RenderHeapType::READBACK) {
 +                mapState = std::make_shared<DTMapState>();
 +                mapState->inner = this->inner;
@@ -1125,12 +1122,7 @@ index 0000000..2d8578b
 +
 +        // Data the backend delivers asynchronously (WebGPU's READBACK buffers) arrives while the device thread is back
 +        // in its event loop, so this thread waits for the device thread's answer rather than holding the device thread.
-+        // It asks at most once a millisecond: the device thread answers at every replay and present by itself, and a
-+        // question asked again as soon as the last answer said no had this thread asking as fast as the device thread
-+        // answered, about 10 times a millisecond, each answer a look at the queue. In Chrome that filled the GPU
-+        // process's main thread with as many tasks for as long as the data took, which held up the data and the page's
-+        // presents with it: RT64's wait for a framebuffer's change count (Pilotwings 64's copies between framebuffers)
-+        // made frame gaps of 100-130 ms. On the device thread itself, the backend's map() is all there is.
++        // On the device thread itself, the backend's map() is all there is.
 +        void *map(uint32_t subresource, const RenderRange *readRange) override {
 +            if (mapState != nullptr) {
 +                if (thread->isCurrent()) {
@@ -1138,37 +1130,15 @@ index 0000000..2d8578b
 +                    return mapState->data;
 +                }
 +
-+                std::chrono::steady_clock::time_point asked;
 +                for (;;) {
 +                    const uint64_t counted = mapState->countAnswers();
 +                    if (mapState->isReady()) {
 +                        return mapState->data;
 +                    }
 +
-+                    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-+                    if ((now - asked) >= std::chrono::milliseconds(1)) {
-+                        asked = now;
-+                        mapState->ask(thread);
-+                    }
-+
++                    mapState->ask(thread);
 +                    mapState->waitForAnswer(counted);
 +                }
-+            }
-+
-+            // An upload buffer maps at the same address every time (WebGPU's is a copy in memory that unmap() writes to
-+            // the buffer, Vulkan's and D3D12's stay mapped), so after its first map() the backend's is queued and the
-+            // caller writes there at once. Each one waited for the device thread: RT64 maps ~30 a frame, 1,700 a second
-+            // in Pilotwings 64's menus, each 0.1-0.2 ms behind the page's thread.
-+            if (uploadHeap && (subresource == 0)) {
-+                void *data = uploadData.load(std::memory_order_acquire);
-+                if (data != nullptr) {
-+                    thread->runAsync([buffer = inner]() { buffer->map(0, nullptr); });
-+                    return data;
-+                }
-+
-+                data = runSync(thread, [&]() { return inner->map(subresource, readRange); });
-+                uploadData.store(data, std::memory_order_release);
-+                return data;
 +            }
 +
 +            const std::thread::id caller = std::this_thread::get_id();
@@ -1238,88 +1208,27 @@ index 0000000..2d8578b
 +        ~DTTextureView() override { destroyAsync(thread, inner); }
 +    };
 +
-+    // A texture's backend object, which the device thread fills in when it makes it. A caller that needs it before then
-+    // waits (unwrap()), and a task queued meanwhile reads it when it runs, after the texture was made.
-+    struct DTTextureSlot {
-+        RenderTexture *texture = nullptr;
-+        std::atomic<bool> made = false;
-+    };
-+
-+    static std::mutex texturesMadeMutex;
-+    static std::condition_variable texturesMade;
-+
-+    // Deletes a texture's backend object, on the device thread.
-+    struct DTTextureRelease {
-+        std::shared_ptr<DTTextureSlot> slot;
-+
-+        ~DTTextureRelease() {
-+            delete slot->texture;
-+            slot->texture = nullptr;
-+        }
-+    };
-+
 +    struct DTTexture : RenderTexture {
 +        DeviceThread *thread = nullptr;
-+        std::shared_ptr<DTTextureSlot> slot = std::make_shared<DTTextureSlot>();
++        RenderTexture *inner = nullptr;
 +        bool ownsInner = true;
 +
-+        // One the swap chain fills in, on the device thread.
-+        DTTexture(DeviceThread *thread) : thread(thread), ownsInner(false) {
-+            slot->made = true;
-+        }
-+
-+        // Makes the texture on the device thread, after whatever is queued before, and returns without waiting. RT64's
-+        // texture cache makes two for each texture the game loads and waited for each: a screen with hundreds of new
-+        // ones (a menu in Pilotwings 64) held the game's display lists 110-170 ms, in Chrome and Firefox alike.
-+        DTTexture(DeviceThread *thread, std::function<std::unique_ptr<RenderTexture>()> &&make) : thread(thread) {
-+            thread->runAsync([slot = slot, make = std::move(make)]() {
-+                slot->texture = make().release();
-+                {
-+                    std::lock_guard lock(texturesMadeMutex);
-+                    slot->made.store(true, std::memory_order_release);
-+                }
-+
-+                texturesMade.notify_all();
-+            });
-+        }
++        DTTexture(DeviceThread *thread, std::unique_ptr<RenderTexture> inner) : thread(thread), inner(inner.release()) { }
++        DTTexture(DeviceThread *thread) : thread(thread), ownsInner(false) { }
 +
 +        ~DTTexture() override {
 +            if (ownsInner) {
-+                destroyAsync(thread, new DTTextureRelease{ std::move(slot) });
++                destroyAsync(thread, inner);
 +            }
-+        }
-+
-+        bool isMade() const {
-+            return slot->made.load(std::memory_order_acquire);
-+        }
-+
-+        // The backend object, once the device thread has made it.
-+        RenderTexture *get() const {
-+            if (!isMade()) {
-+                if (thread->isCurrent()) {
-+                    // Runs what is queued, which makes it.
-+                    thread->runSync([]() { });
-+                }
-+                else {
-+                    std::unique_lock lock(texturesMadeMutex);
-+                    texturesMade.wait(lock, [&]() { return isMade(); });
-+                }
-+            }
-+
-+            return slot->texture;
 +        }
 +
 +        std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &desc) const override {
-+            std::unique_ptr<RenderTextureView> view = runSync(thread, [&]() { return slot->texture->createTextureView(desc); });
++            std::unique_ptr<RenderTextureView> view = runSync(thread, [&]() { return inner->createTextureView(desc); });
 +            return view ? std::make_unique<DTTextureView>(thread, std::move(view)) : nullptr;
 +        }
 +
 +        void setName(const std::string &name) override {
-+            thread->runAsync([slot = slot, name]() {
-+                if (slot->texture != nullptr) {
-+                    slot->texture->setName(name);
-+                }
-+            });
++            thread->runAsync([texture = inner, name]() { texture->setName(name); });
 +        }
 +    };
 +
@@ -1457,7 +1366,7 @@ index 0000000..2d8578b
 +
 +    static RenderBuffer *unwrap(const RenderBuffer *object) { return unwrapAs<DTBuffer>(object); }
 +    static RenderBufferFormattedView *unwrap(const RenderBufferFormattedView *object) { return unwrapAs<DTBufferFormattedView>(object); }
-+    static RenderTexture *unwrap(const RenderTexture *object) { return (object != nullptr) ? static_cast<const DTTexture *>(object)->get() : nullptr; }
++    static RenderTexture *unwrap(const RenderTexture *object) { return unwrapAs<DTTexture>(object); }
 +    static RenderTextureView *unwrap(const RenderTextureView *object) { return unwrapAs<DTTextureView>(object); }
 +    static RenderShader *unwrap(const RenderShader *object) { return unwrapAs<DTShader>(object); }
 +    static RenderSampler *unwrap(const RenderSampler *object) { return unwrapAs<DTSampler>(object); }
@@ -1520,12 +1429,8 @@ index 0000000..2d8578b
 +        }
 +
 +        void setTexture(uint32_t descriptorIndex, const RenderTexture *texture, RenderTextureLayout textureLayout, const RenderTextureView *textureView) override {
-+            // A texture still being made is read from its slot when the write runs, which is after it's made.
-+            const DTTexture *wrapper = static_cast<const DTTexture *>(texture);
-+            std::shared_ptr<DTTextureSlot> slot = ((wrapper != nullptr) && !wrapper->isMade()) ? wrapper->slot : nullptr;
-+            RenderTexture *innerTexture = (slot == nullptr) ? unwrap(texture) : nullptr;
-+            thread->runAsync([set = inner, descriptorIndex, slot = std::move(slot), innerTexture, textureLayout, innerView = unwrap(textureView)]() {
-+                set->setTexture(descriptorIndex, (slot != nullptr) ? slot->texture : innerTexture, textureLayout, innerView);
++            thread->runAsync([set = inner, descriptorIndex, innerTexture = unwrap(texture), textureLayout, innerView = unwrap(textureView)]() {
++                set->setTexture(descriptorIndex, innerTexture, textureLayout, innerView);
 +            });
 +        }
 +
@@ -1879,7 +1784,7 @@ index 0000000..2d8578b
 +                    innerTextures[i] = innerDevice->createTexture(RenderTextureDesc::ColorTarget(width, height, desc.format));
 +                }
 +
-+                textures[i]->slot->texture = innerTextures[i].get();
++                textures[i]->inner = innerTextures[i].get();
 +            }
 +        }
 +
@@ -2109,19 +2014,6 @@ index 0000000..2d8578b
 +        }
 +    };
 +
-+    // What makes a texture later on the device thread: the description with its clear value copied, since the caller's
-+    // is gone by then.
-+    template<typename F>
-+    static std::function<std::unique_ptr<RenderTexture>()> makeTexture(const RenderTextureDesc &desc, F &&create) {
-+        const bool cleared = (desc.optimizedClearValue != nullptr);
-+        const RenderClearValue clearValue = cleared ? *desc.optimizedClearValue : RenderClearValue();
-+        return [desc, cleared, clearValue, create = std::forward<F>(create)]() {
-+            RenderTextureDesc copy = desc;
-+            copy.optimizedClearValue = cleared ? &clearValue : nullptr;
-+            return create(copy);
-+        };
-+    }
-+
 +    // DTPool
 +
 +    struct DTPool : RenderPool {
@@ -2137,7 +2029,8 @@ index 0000000..2d8578b
 +        }
 +
 +        std::unique_ptr<RenderTexture> createTexture(const RenderTextureDesc &desc) override {
-+            return std::make_unique<DTTexture>(thread, makeTexture(desc, [pool = inner](const RenderTextureDesc &desc) { return pool->createTexture(desc); }));
++            std::unique_ptr<RenderTexture> texture = runSync(thread, [&]() { return inner->createTexture(desc); });
++            return texture ? std::make_unique<DTTexture>(thread, std::move(texture)) : nullptr;
 +        }
 +    };
 +
@@ -2214,7 +2107,7 @@ index 0000000..2d8578b
 +        }
 +
 +        std::unique_ptr<RenderTexture> createTexture(const RenderTextureDesc &desc) override {
-+            return std::make_unique<DTTexture>(thread, makeTexture(desc, [device = inner](const RenderTextureDesc &desc) { return device->createTexture(desc); }));
++            return create<DTTexture, RenderTexture>([&]() { return inner->createTexture(desc); });
 +        }
 +
 +        std::unique_ptr<RenderAccelerationStructure> createAccelerationStructure(const RenderAccelerationStructureDesc &desc) override {
@@ -2393,10 +2286,10 @@ index 0000000..2d8578b
 +};
 diff --git a/plume_device_thread.h b/plume_device_thread.h
 new file mode 100644
-index 0000000..10b5a17
+index 0000000..670b987
 --- /dev/null
 +++ b/plume_device_thread.h
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,76 @@
 +//
 +// plume
 +//
@@ -2413,9 +2306,6 @@ index 0000000..10b5a17
 +//   caller waits. map() of a buffer whose data the backend delivers asynchronously waits on the calling side until
 +//   isMapReady(), so the device thread keeps returning to its event loop meanwhile, and so does
 +//   createGraphicsPipeline() for a pipeline the backend builds asynchronously, until its isReady().
-+// - createTexture() and an upload buffer's map() after its first don't wait: the texture is made on the device thread
-+//   after whatever is queued before, and a caller that needs its backend object first (recording it in a command list)
-+//   waits then; the buffer is mapped at the address its first map() returned, and the backend's map() is queued.
 +// - A READBACK buffer's isMapReady() doesn't wait for the device thread: after a copy into the buffer is replayed, the
 +//   device thread checks it at each replay and present until the data is there, maps it and publishes the answer,
 +//   which isMapReady() reads. Its map() waits for that answer, not behind everything queued on the device thread.
@@ -2576,10 +2466,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..f9f6378
+index 0000000..8df9c06
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3139 @@
+@@ -0,0 +1,3193 @@
 +//
 +// plume
 +//
@@ -2628,6 +2518,33 @@ index 0000000..f9f6378
 +    }
 +    const number = parseInt(value, 10);
 +    return isNaN(number) ? 0 : number;
++});
++
++// A canvas's drawing buffer is replaced with a black one whenever its width or height is set or its context configured,
++// and the browser shows that until a frame is presented in it. SDL sets the size in its resize handler, and a swap chain
++// is resized from a call that presents nothing, so each size a window went through was black for a frame or more, and
++// the frames presented meanwhile were copied into a canvas of the other size (a black edge, or a copy WebGPU refused):
++// going fullscreen, a few sizes in a row, flickered for a second or two. So the canvas keeps its buffer's size: its
++// width and height read and write the size asked for, and the buffer takes that size only in plume_webgpu_size_canvas(),
++// which acquireTexture() calls in the same task as the frame it then presents. Until then the browser stretches the
++// last frame to the canvas's box.
++EM_JS(void, plume_webgpu_hold_canvas_size, (const char *selector), {
++    const canvas = document.querySelector(UTF8ToString(selector));
++    if (!canvas || canvas.plumeSize) {
++        return;
++    }
++    const size = canvas.plumeSize = { width: canvas.width, height: canvas.height };
++    for (const name of ['width', 'height']) {
++        Object.defineProperty(canvas, name, { configurable: true, get: () => size[name], set: (value) => { size[name] = value >>> 0; } });
++    }
++});
++
++EM_JS(void, plume_webgpu_size_canvas, (const char *selector, uint32_t width, uint32_t height), {
++    const canvas = document.querySelector(UTF8ToString(selector));
++    if (canvas) {
++        Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'width').set.call(canvas, width);
++        Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'height').set.call(canvas, height);
++    }
 +});
 +
 +namespace plume {
@@ -4041,6 +3958,9 @@ index 0000000..f9f6378
 +        return true;
 +    }
 +
++    // The most presents in flight adaptPresentsInFlight() tries, and what uncapped keeps.
++    static const uint32_t kMaxPresentsInFlight = 4;
++
 +    WebGPUSwapChain::WebGPUSwapChain(WebGPUCommandQueue *commandQueue, const RenderSwapChainDesc &desc) {
 +        assert(commandQueue != nullptr);
 +        assert(desc.renderWindow != nullptr);
@@ -4057,6 +3977,7 @@ index 0000000..f9f6378
 +        WGPUInstance instance = wgpuCreateInstance(nullptr);
 +        surface = wgpuInstanceCreateSurface(instance, &surfaceDesc);
 +        wgpuInstanceRelease(instance);
++        plume_webgpu_hold_canvas_size(selector.c_str());
 +
 +        // The canvas hands out a new texture every frame, so the swap chain's textures are proxies that acquireTexture()
 +        // points at it.
@@ -4077,6 +3998,24 @@ index 0000000..f9f6378
 +        if ((presentsInFlightQuery >= 1) && (presentsInFlightQuery <= 8)) {
 +            maxPresentsInFlight = uint32_t(presentsInFlightQuery);
 +            presentsInFlightFixed = true;
++        }
++
++        // uncapped[=<rate>] measures how fast a page can present, not how it plays: the display's rate is reported as
++        // <rate> (360 without a number, 60-1000), so a caller that interpolates to it (RT64) draws as many frames as the
++        // GPU and the browser take, and 4 stay in flight unless presents-in-flight says otherwise, so that a callback
++        // that comes back late doesn't hold them. present() still waits for an animation frame, so the browser's frames
++        // must be uncapped too: Chrome with --disable-frame-rate-limit, Firefox with layout.frame_rate 0 (a test page's
++        // animation frames, a WebGPU clear each, came 3,115 and 814 a second that way, 61 without, in Chrome 155 and
++        // Firefox 158).
++        const int uncappedQuery = plume_webgpu_query_number("uncapped");
++        if (uncappedQuery >= 0) {
++            uncappedRate = (uncappedQuery == 0) ? 360U : uint32_t(std::clamp(uncappedQuery, 60, 1000));
++            if (!presentsInFlightFixed) {
++                maxPresentsInFlight = kMaxPresentsInFlight;
++                presentsInFlightFixed = true;
++            }
++
++            printf("plume: uncapped, the display reported as %u Hz, at most %u presents in flight\n", uncappedRate, maxPresentsInFlight);
 +        }
 +
 +        presentStats = (plume_webgpu_query_number("present-stats") >= 0);
@@ -4194,7 +4133,6 @@ index 0000000..f9f6378
 +    // gains nothing from it, only a deeper queue, so it goes back, and the next try comes after 10 s, twice as long
 +    // each time (2 min at most). A done signal that comes back late gains from it. A number kept stays: a GPU that
 +    // later becomes the limit is left with at most 2 more frames queued than before.
-+    static const uint32_t kMaxPresentsInFlight = 4;
 +
 +    void WebGPUSwapChain::adaptPresentsInFlight() {
 +        const double now = emscripten_get_now();
@@ -4296,21 +4234,12 @@ index 0000000..f9f6378
 +        height = uint32_t(std::max(canvasHeight, 0));
 +    }
 +
++    // The surface takes the new size at the next acquireTexture(), with the canvas's buffer.
 +    bool WebGPUSwapChain::resize() {
 +        getCanvasSize(width, height);
 +        if (isEmpty()) {
 +            return false;
 +        }
-+
-+        WGPUSurfaceConfiguration config = WGPU_SURFACE_CONFIGURATION_INIT;
-+        config.device = commandQueue->device->device;
-+        config.format = toWGPU(desc.format);
-+        config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopyDst;
-+        config.width = width;
-+        config.height = height;
-+        config.alphaMode = WGPUCompositeAlphaMode_Opaque;
-+        config.presentMode = WGPUPresentMode_Fifo;
-+        wgpuSurfaceConfigure(surface, &config);
 +
 +        for (auto &texture : textures) {
 +            texture->releaseHandle();
@@ -4360,6 +4289,21 @@ index 0000000..f9f6378
 +            return false;
 +        }
 +
++        if ((configuredWidth != width) || (configuredHeight != height)) {
++            plume_webgpu_size_canvas(selector.c_str(), width, height);
++            WGPUSurfaceConfiguration config = WGPU_SURFACE_CONFIGURATION_INIT;
++            config.device = commandQueue->device->device;
++            config.format = toWGPU(desc.format);
++            config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopyDst;
++            config.width = width;
++            config.height = height;
++            config.alphaMode = WGPUCompositeAlphaMode_Opaque;
++            config.presentMode = WGPUPresentMode_Fifo;
++            wgpuSurfaceConfigure(surface, &config);
++            configuredWidth = width;
++            configuredHeight = height;
++        }
++
 +        WGPUSurfaceTexture surfaceTexture = WGPU_SURFACE_TEXTURE_INIT;
 +        wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture);
 +        if ((surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal) && (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)) {
@@ -4384,7 +4328,7 @@ index 0000000..f9f6378
 +    }
 +
 +    uint32_t WebGPUSwapChain::getRefreshRate() const {
-+        return frameTimer->refreshRate;
++        return (uncappedRate > 0) ? uncappedRate : frameTimer->refreshRate;
 +    }
 +
 +    // WebGPUFramebuffer
@@ -5721,10 +5665,10 @@ index 0000000..f9f6378
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..0f09d4b
+index 0000000..4942e6f
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,666 @@
+@@ -0,0 +1,671 @@
 +//
 +// plume
 +//
@@ -5805,7 +5749,9 @@ index 0000000..0f09d4b
 +//   a rise. The page's query can fix the number (presents-in-flight=<1-8>), and
 +//   present-stats prints a line every 5 s: presents a second, how long after its present each frame's onSubmittedWorkDone
 +//   came back, the time wait() held presents, and the animation frames a second, and each try that goes back. On a GPU
-+//   at hand, that says whether the GPU, the callbacks or the browser's frames hold presents back.
++//   at hand, that says whether the GPU, the callbacks or the browser's frames hold presents back. uncapped=<rate>
++//   reports the display's rate as <rate> (360) and keeps 4 in flight, to measure how many presents a second a page can
++//   make with the browser's own frames uncapped (the swap chain's constructor says how).
 +// - The browser doesn't say what the display's refresh rate is, so a swap chain times the animation frames with a
 +//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming.
 +// - Every call must come from the thread that owns the device's JavaScript object: WebGPU objects can't be shared
@@ -6095,8 +6041,11 @@ index 0000000..0f09d4b
 +        uint32_t nextTextureIndex = 0;
 +        uint32_t width = 0;
 +        uint32_t height = 0;
++        uint32_t configuredWidth = 0;
++        uint32_t configuredHeight = 0;
 +        bool vsyncEnabled = true;
 +        WebGPUFrameTimer *frameTimer = nullptr;
++        uint32_t uncappedRate = 0;
 +
 +        std::shared_ptr<WebGPUPresentState> presentState = std::make_shared<WebGPUPresentState>();
 +        uint32_t maxPresentsInFlight = 2;
