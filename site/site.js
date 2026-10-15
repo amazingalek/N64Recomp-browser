@@ -61,9 +61,13 @@ function tile(game, columns) {
     el('span', { className: 'value' + (cell.length > 9 ? ' long' : '') }, cell));
   const play = el('button', { className: 'play', type: 'button', textContent: 'Play' });
   play.addEventListener('click', () => openGame(game));
+  // The game's launcher, captured from its page without a ROM (img/, the README's site/ line); a colour without one.
+  const art = el('img', { src: `img/${game.repoName}.webp`, alt: '', loading: 'lazy' });
+  art.addEventListener('error', () => art.remove());
   return el('article', { className: 'tile' },
-    el('div', { className: 'art', style: `--h:${h}` }, el('h2', {}, game.name)),
+    el('div', { className: 'art', style: `--h:${h}` }, art),
     el('div', { className: 'body' },
+      el('h2', {}, game.name),
       el('div', { className: 'stats' }, stat(columns[3] || 'Chrome', game.chrome), stat(columns[4] || 'Firefox', game.firefox)),
       el('p', { className: 'played' }, 'Played ' + game.played),
       el('div', { className: 'actions' }, play, el('a', { href: game.repo, textContent: game.repoName }))));

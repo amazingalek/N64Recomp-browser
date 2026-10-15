@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const port = Number(process.argv[2] || 8742);
 const pages = 'https://amazingalek.github.io';
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp' };
 
 createServer(async (req, res) => {
   const path = new URL(req.url, 'http://x').pathname;
@@ -21,7 +21,7 @@ createServer(async (req, res) => {
       res.writeHead(302, { location: '/N64Recomp-browser/' }).end();
     } else if (path.startsWith('/N64Recomp-browser/')) {
       const name = path.slice('/N64Recomp-browser/'.length) || 'index.html';
-      if (!/^[\w.-]+$/.test(name)) throw Object.assign(new Error(), { status: 404 });
+      if (!/^(img\/)?[\w.-]+$/.test(name)) throw Object.assign(new Error(), { status: 404 });
       const file = name === 'coi_serviceworker.js' ? join(root, 'frontend', name) : join(root, 'site', name);
       const body = await readFile(file).catch(() => { throw Object.assign(new Error(), { status: 404 }); });
       res.writeHead(200, { 'content-type': types[extname(name)] || 'application/octet-stream', 'cache-control': 'no-cache' }).end(body);
