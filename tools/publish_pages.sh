@@ -162,6 +162,9 @@ build_wr() {
     bash tools/web_patch.sh > /dev/null
     [[ -d .venv ]] || bash tools/wsl_setup_splat.sh > /dev/null
     bash tools/wsl_build_recompiler.sh > /dev/null
+    # The decomp's build as a fresh clone has it: the sync cleans what the last run left in the repo (asm-all/) but not
+    # in reference/, and a second build over the first made an ELF N64Recomp refused.
+    git -C reference/wr64-decomp clean -fdxq
     keep_times RecompiledFuncs rsp -- bash -c 'python3 tools/generate_game.py ../rom.z64 > /dev/null'
     web WaveRace64Recomp
 }
