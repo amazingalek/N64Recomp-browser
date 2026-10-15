@@ -22,11 +22,12 @@
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
-# --browser <commit> (a tag, or a commit this checkout has) is the retest before the pins move (CLAUDE.md, "The pins"): a dry run of every game with its
-# N64Recomp-browser moved to <commit> (a tag) in its copy only, Rush 2049's by a commit of its own on top of main that
-# is synced there and pushed nowhere. It names the pages that build differently from what Pages serves, and their
-# builds stay in the copies to fetch with remote_build.sh -n <copy> get and play. Once the pins are moved there (a
-# fork's main, Rush 2049's by a pull request on its repo), a run without it builds the same bytes and publishes them.
+# --browser <commit> is the retest before the pins move (CLAUDE.md, "The pins"): a dry run of every game with its
+# N64Recomp-browser moved to <commit> (a tag, or a commit this checkout has) in its copy only, Rush 2049's by a
+# commit of its own on top of main that is synced there and pushed nowhere. It names the pages that build differently
+# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n <copy> get and play.
+# Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
+# the same bytes and publishes them.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
