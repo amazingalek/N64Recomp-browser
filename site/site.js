@@ -7,9 +7,12 @@
 // So Play registers the game's worker for its folder first, and the frame's first load is already isolated.
 'use strict';
 
-const README = 'https://raw.githubusercontent.com/amazingalek/N64Recomp-browser/main/README.md';
+// Served locally (tools/serve_site.mjs), the checkout's own README.md, so a change to the table shows before it lands.
+const README = location.hostname === 'localhost' ? 'README.md'
+  : 'https://raw.githubusercontent.com/amazingalek/N64Recomp-browser/main/README.md';
 
-// The table's rows: | Game | [repo](url) | [play](url) | Chrome | Firefox | Played | (Played isn't shown)
+// The table's columns, found by their headers: Game, Recomp (the upstream recomp, "[name](url) by owner"), Repo,
+// Page, the two Intel UHD columns, Played (not shown).
 function parseGames(markdown) {
   const lines = markdown.split('\n');
   const start = lines.findIndex((l) => l.trim() === '## Games');
@@ -26,12 +29,15 @@ function parseGames(markdown) {
     if (!header) { header = cells; continue; }
     if (/^-+$/.test(cells[0])) continue;
     const link = (cell) => (cell.match(/\]\((.*?)\)/) || [])[1];
+    const col = (re) => cells[header.findIndex((h) => re.test(h))] ?? '';
+    const repo = col(/^Repo$/);
     games.push({
-      name: cells[0], repoName: cells[1].replace(/^\[(.*?)\].*$/, '$1'), repo: link(cells[1]), page: localPage(link(cells[2])),
-      chrome: cells[3], firefox: cells[4],
+      name: col(/^Game$/), recomp: col(/^Recomp$/), repoName: repo.replace(/^\[(.*?)\].*$/, '$1'), repo: link(repo),
+      page: localPage(link(col(/^Page$/))), chrome: col(/Chrome/), firefox: col(/Firefox/),
     });
   }
-  return { games, legend, columns: header || [] };
+  const named = (re, fallback) => (header || []).find((h) => re.test(h)) || fallback;
+  return { games, legend, columns: { chrome: named(/Chrome/, 'Chrome'), firefox: named(/Firefox/, 'Firefox') } };
 }
 
 // A cell is "58", "60*", "20†", "20†; 60*" or words: the first number decides its colour.
@@ -71,7 +77,15 @@ function tile(game, columns) {
     el('div', { className: 'body' },
       el('div', { className: 'head' },
         el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
-      el('div', { className: 'stats' }, stat(columns[3] || 'Chrome', game.chrome), stat(columns[4] || 'Firefox', game.firefox))));
+      el('p', { className: 'recomp', title: game.recomp.replace(/[(.*?)](.*?)/, '$1') }, ...credit(game.recomp)),
+      el('div', { className: 'stats' }, stat(columns.chrome, game.chrome), stat(columns.firefox, game.firefox))));
+}
+
+// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp".
+function credit(cell) {
+  const m = cell.match(/^\[(.*?)\]\((.*?)\)(.*)$/);
+  if (!m) return [cell ? cell[0].toUpperCase() + cell.slice(1) : ''];
+  return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3]];
 }
 
 // A page on Pages is played from this origin: the same one on Pages, tools/serve_site.mjs's when served locally.
