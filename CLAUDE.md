@@ -493,6 +493,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
+  (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
+  them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
+  for seconds while the thread looks free and the GPU process idles. Ocarina of Time's survey waited for the file
+  select's hand-over that way, and its page held 3-8 s as the file loaded, only while the loop ran.
 
 ## Frame rates
 
