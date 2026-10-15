@@ -746,7 +746,10 @@ boot, 2.2-2.8 s for a glider test's section and 10-11 s for a gyrocopter test's,
 after the waits, three runs of three; Chrome 155 headless (the same files served locally) waited 5.9 s once and drew
 57 beside another page; no WebGPU errors. On 7277a2e (main 4448311), from Pages, cold, RTX 2070: Chrome 155 headless
 waited 4.1 s for 9 and drew 58.2, Firefox 158 18.2 s for the boot and drew 57.8, sound short only in the waits, no
-WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s and drew 60.
+WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s and drew 60. On bcdcb78 (main 2a5ba44),
+the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firefox 158 waited 6.7-7.3 s for the boot,
+18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
+after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
 
 ## WebGPU in Chrome and Firefox
 
