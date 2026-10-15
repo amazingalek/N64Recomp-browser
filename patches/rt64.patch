@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web f34b19c600f08181b79976cc0b06785f5cb3d7b1
+rt64: https://github.com/amazingalek/rt64-web 8bea89204da7fe2597d71326e09de98e8e220ea7
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -832,6 +832,58 @@ index 7b38b8e..2a5c6c0 100644
          std::unique_ptr<FramebufferDrawChangesDescriptorSet> drawDescSet;
          std::unique_ptr<FramebufferReadChangesDescriptorChangesSet> readChangesSet;
          bool used;
+diff --git a/src/hle/rt64_framebuffer_manager.cpp b/src/hle/rt64_framebuffer_manager.cpp
+index d7caa12..757a2e1 100644
+--- a/src/hle/rt64_framebuffer_manager.cpp
++++ b/src/hle/rt64_framebuffer_manager.cpp
+@@ -778,6 +778,17 @@ namespace RT64 {
+         return usedTimestamp;
+     }
+ 
++    bool FramebufferManager::regionsTMEMUseTileCopy(uint64_t tileCopyId) const {
++        // A copy still in TMEM can be drawn with by a later display list, which reaches it by its ID.
++        for (const RegionTMEM &region : activeRegionsTMEM) {
++            if (region.tileCopyId == tileCopyId) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
+     uint64_t FramebufferManager::findTileCopyId(uint32_t width, uint32_t height) {
+         assert(width > 0);
+         assert(height > 0);
+@@ -796,7 +807,7 @@ namespace RT64 {
+             }
+ 
+             // Only reuse exact matches.
+-            if ((tileCopy.textureWidth == textureWidth) && (tileCopy.textureHeight == textureHeight)) {
++            if ((tileCopy.textureWidth == textureWidth) && (tileCopy.textureHeight == textureHeight) && !regionsTMEMUseTileCopy(it.first)) {
+                 tileCopy.usedWidth = width;
+                 tileCopy.usedHeight = height;
+                 tileCopy.usedTimestamp = usedTimestamp;
+@@ -807,6 +818,8 @@ namespace RT64 {
+         // Make a new tile with a new Id.
+         TileCopy &tileCopy = tileCopies[++newId];
+         tileCopy.id = newId;
++        tileCopy.textureWidth = textureWidth;
++        tileCopy.textureHeight = textureHeight;
+         tileCopy.usedWidth = width;
+         tileCopy.usedHeight = height;
+         tileCopy.usedTimestamp = usedTimestamp;
+diff --git a/src/hle/rt64_framebuffer_manager.h b/src/hle/rt64_framebuffer_manager.h
+index 8d36b51..b55b424 100644
+--- a/src/hle/rt64_framebuffer_manager.h
++++ b/src/hle/rt64_framebuffer_manager.h
+@@ -181,6 +181,7 @@ namespace RT64 {
+         void clearUsedTileCopies();
+         uint64_t getUsedTimestamp() const;
+         uint64_t findTileCopyId(uint32_t width, uint32_t height);
++        bool regionsTMEMUseTileCopy(uint64_t tileCopyId) const;
+         void createTileCopySetup(RenderWorker *renderWorker, const FramebufferOperation &op, hlslpp::float2 resolutionScale, RenderTargetManager &targetManager, std::unordered_set<RenderTarget *> *resizedTargets);
+         void createTileCopyRecord(RenderWorker *renderWorker, const FramebufferOperation &op, const FramebufferStorage &fbStorage, RenderTargetManager &targetManager,
+             hlslpp::float2 resolutionScale, uint32_t maxFbPairIndex, CommandListCopies &cmdListCopies, CommandListDiscards &cmdListDiscards, const ShaderLibrary *shaderLibrary);
 diff --git a/src/hle/rt64_game_frame.cpp b/src/hle/rt64_game_frame.cpp
 index 87392d0..03d7720 100644
 --- a/src/hle/rt64_game_frame.cpp

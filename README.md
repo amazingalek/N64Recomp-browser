@@ -278,7 +278,9 @@ amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU
                                                                   indexing, background pipeline builds, frames
                                                                   interpolated to the display's rate and paced
                                                                   evenly when the GPU falls behind, a game's
-                                                                  shaders specialized at build time
+                                                                  shaders specialized at build time; tile
+                                                                  copies reused from list to list (with render
+                                                                  to RAM off, each one was a new texture)
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
                                                                   declares every function the C calls; a mod
                                                                   recompiled to C ahead of time; functions a mod
