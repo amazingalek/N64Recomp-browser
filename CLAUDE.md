@@ -66,8 +66,8 @@ pins).
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md` and the tools that play and publish pages skips every job
-  but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
+  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
 ## The forks, one commit per change
@@ -308,8 +308,11 @@ script), so commit to a fork from a separate clone of it:
 here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
 was made for (Changing it, step 4). Every game takes it in the next retest, a run on a schedule that takes every change
 since the last one at once. For each game fork it builds the page on main's newest tag and, if the page's files
-changed, plays that build in Chrome and Firefox (Playing a page). Only a page that boots with no WebGPU errors and plays
-no worse than its row moves its fork's N64Recomp-browser onto the tag (a commit pushed to the fork's `main`), is
+changed, plays that build in Chrome and Firefox (Playing a page), each run recorded in `plays.jsonl` and compared with
+the earlier runs like it there (`play_page.mjs --record`, The games table). A run it flags as a regression is played
+again, the host's load read first, and is a regression only if the second run is worse too and nothing beside it
+explains it; a drop within the runs' noise is not one. Only a page that boots with no WebGPU errors and plays
+no worse than its row and its earlier runs moves its fork's N64Recomp-browser onto the tag (a commit pushed to the fork's `main`), is
 published and gets its row updated (The games table). One that plays worse stays on Pages as it was, its fork on its
 last tag, and has work filed to fix it. So Pages holds only pages that were played, and a fork's `main` is what its
 page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
@@ -365,6 +368,12 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   console (Playing a page). Look at the menus too (a `shot` step).
 - Writes what was played, in which browser, on what GPU and when, in that game's repo, beside its other measurements
   (a game fork's README or BUILDING.md; Rush 2049's CLAUDE.md, Step 3), never in this README.
+- Records every run in `plays.jsonl`, committed with the row: `play_page.mjs --record plays.jsonl --game <name>
+  --build <tag>`, with `--note` for anything a player's visit wouldn't have (a preload, a test build). It is the
+  history of how each page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note`
+  saying so. A run without `--note` is compared with the last 5 like it (same game, browser, size and play) and
+  flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
+  and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
   stand-in for one, marked "(stand-in)": the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
   the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play
