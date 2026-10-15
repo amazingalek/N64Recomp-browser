@@ -279,6 +279,9 @@ plume 904b26c          ?uncapped: the display reported at 360 Hz (?uncapped=<60-
 rt64 e408ed4           interpolating to it without pacing, so with the browser's frames uncapped too (play_page.mjs
                        --uncapped) a page presents as fast as the GPU, its thread and the GPU process take: every page
                        read ~60 on a desktop GPU at the display's rate, which told no browser or build from another
+plume 7a7e3bc          the canvas's buffer takes a new size only in the present that draws at it: SDL's resize and the
+                       surface's configure each made it black until a present, and the frames queued meanwhile were
+                       copied into a canvas of the other size, so going fullscreen flickered for a second or two
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
