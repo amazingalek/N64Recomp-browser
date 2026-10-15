@@ -169,8 +169,14 @@ build_wr() {
     web WaveRace64Recomp
 }
 build_pw() {
+    # Patched from clean every time, as Wave Race's web_patch.sh does: a web patch that stopped halfway once left
+    # plume with some of its new files and not others, which neither patch_all.py nor apply.cmake can get past.
+    local s p
+    for s in lib/RT64 lib/N64ModernRuntime lib/RecompFrontend; do
+        git -C $s submodule foreach --recursive -q 'git reset -q --hard && git clean -fdq'
+        git -C $s reset -q --hard && git -C $s clean -fdq
+    done
     python3 tools/patch_all.py > /dev/null
-    local p
     for p in "rt64 lib/RT64" "plume lib/RT64/src/contrib/plume" "hlslpp lib/RT64/src/contrib/hlslpp" \
         "N64ModernRuntime lib/N64ModernRuntime" "N64Recomp lib/N64ModernRuntime/N64Recomp" "RecompFrontend lib/RecompFrontend"; do
         cmake -P lib/N64Recomp-browser/patches/apply.cmake $p > /dev/null
