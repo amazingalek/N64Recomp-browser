@@ -42,6 +42,13 @@
 // mm, banjo, cbfd, dk64, wr, pw, bt), --build what the page was built from (a tag of this repo, or Pages), and --note
 // anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
 // holds the time (UTC), the summary, the page, the query and the host's processor load over the play.
+//
+// A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play and
+// freshness of profile, none with a note, failed or without a frame (one with no play or profile recorded, as a line
+// recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
+// failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
+// below the lowest of theirs, or waits for shaders over 2 s and half again longer than the longest of theirs: outside
+// the runs' own noise, but a busy host reads the same, so a flag is a reason to look again (CLAUDE.md, The pins).
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -275,10 +282,11 @@ console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Se
 if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
 if (summary.cores) console.log(`  GPU process ${r(summary.cores.gpuProcess, 2)} cores, browser ${r(summary.cores.browser, 2)} (medians)`);
 if (jsonFile && !failure) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
+let regressions = [];
 if (recordFile) {
   const round = (x) => x === null ? null : Math.round(x * 100) / 100;
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
-  fs.appendFileSync(recordFile, JSON.stringify({
+  const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
     freshProfile, play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents, audioShort: summary.audio?.short ?? null, shaderWaits,
@@ -286,6 +294,36 @@ if (recordFile) {
     cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
     host: { cores: os.cpus().length, busy: host ? Math.round(100 * (1 - (hostAfter.idle - hostBefore.idle) / host)) : null },
     failed: failure,
-  }) + '\n');
+  };
+  if (!note) regressions = compare(run, fs.existsSync(recordFile) ? fs.readFileSync(recordFile, 'utf8') : '');
+  fs.appendFileSync(recordFile, JSON.stringify(run) + '\n');
 }
-await finish(failure ? 1 : 0);
+for (const r of regressions) console.log(`regression: ${r}`);
+await finish(failure ? 1 : regressions.length ? 3 : 0);
+
+// The ways a run plays worse than the last 5 like it in the file (the header says which are like it).
+function compare(run, lines) {
+  const like = (a, b) => a === null || a === undefined || b === null || b === undefined || a === b;
+  const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
+      like(p.play, run.play) && like(p.freshProfile, run.freshProfile))
+    .slice(-5);
+  if (!before.length) {
+    console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);
+    return [];
+  }
+  const waited = (p) => (p.shaderWaits ?? []).reduce((t, w) => t + w.seconds, 0);
+  const medians = before.map((p) => p.presents?.median).filter((m) => typeof m === 'number');
+  const waits = before.filter((p) => p.shaderWaits).map(waited);
+  console.log(`compared with ${before.length} earlier: presents/s ${medians.join(' ')}, shader waits ${waits.map((w) => w.toFixed(1)).join(' ')} s`);
+  const found = [];
+  if (run.failed) found.push(`failed (${run.failed}), where the last ${before.length} like it didn't`);
+  if (run.webgpuErrors && before.at(-1).webgpuErrors === 0) found.push(`${run.webgpuErrors} WebGPU errors, where the last run like it had none`);
+  if (run.presents && medians.length && run.presents.median < Math.min(...medians) - 3) {
+    found.push(`${run.presents.median} presents a second, against ${Math.min(...medians)}-${Math.max(...medians)} before`);
+  }
+  if (waits.length && waited(run) > 2 && waited(run) > 1.5 * Math.max(...waits)) {
+    found.push(`${waited(run).toFixed(1)} s of shader waits, against at most ${Math.max(...waits).toFixed(1)} s before`);
+  }
+  return found;
+}
