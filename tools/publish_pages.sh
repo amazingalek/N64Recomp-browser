@@ -170,8 +170,16 @@ build_banjo() {
 }
 build_cbfd() {
     [[ -f conker/baserom.us.z64 ]] || cp ../rom.z64 conker/baserom.us.z64
-    # Conker's own patches, then the web's on top: only into a checkout the sync left clean (it resets one that moved).
-    local tool patch
+    # Conker's own patches, then the web's on top (tools/web_patch.sh): only into a checkout the sync left clean (it
+    # resets one that moved), and all of them again from clean when Conker's patches changed since the last build here.
+    local tool patch state
+    state="$(cat recomp/*.patch tools/web_patch.sh tools/web_rt64_game_frame.patch | git hash-object --stdin)"
+    if [[ "$(cat ../cbfd-patched 2> /dev/null)" != "$state" ]]; then
+        for tool in tools/N64Recomp tools/N64ModernRuntime tools/rt64 tools/RecompFrontend; do
+            git -C $tool submodule foreach --recursive -q 'git reset -q --hard && git clean -fdq'
+            git -C $tool reset -q --hard && git -C $tool clean -fdq
+        done
+    fi
     while read -r tool patch; do
         git -C "$tool" diff --quiet HEAD && git -C "$tool" apply "$PWD/$patch"
     done <<<"tools/N64Recomp recomp/n64recomp.patch
@@ -179,8 +187,8 @@ tools/N64ModernRuntime recomp/n64modernruntime.patch
 tools/rt64 recomp/rt64.patch
 tools/RecompFrontend recomp/recompfrontend.patch
 tools/RecompFrontend/recompui/lib/RmlUi recomp/rmlui.patch"
-    cmake -P tools/N64Recomp-browser/patches/apply.cmake tools > /dev/null
-    cmake -P tools/N64Recomp-browser/patches/apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp > /dev/null
+    sh tools/web_patch.sh > /dev/null
+    echo "$state" > ../cbfd-patched
     [[ -f tools/N64Recomp/build/build.ninja ]] || cmake -S tools/N64Recomp -B tools/N64Recomp/build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ > /dev/null
     ninja -C tools/N64Recomp/build N64RecompCLI RSPRecomp > /dev/null
