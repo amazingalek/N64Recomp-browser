@@ -17,18 +17,18 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth (58) | smooth after its waits (56) | 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth (stand-in, 59); not yet on a laptop | smooth after its waits (stand-in, 59); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | the game's 20 on a laptop; smooth on the stand-in (60) | the game's 20 on a laptop; smooth after its waits on the stand-in (60) | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth (stand-in, 60); not yet on a laptop | smooth after its waits (stand-in, 60); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth (stand-in, 60); not yet on a laptop | smooth after its waits (stand-in, 60); not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth (the game's 30) | boots with the laptop's late GPU reports reproduced; smooth on the stand-in (60) after 0.5 s before its first frame and 7 s as the DK Rap begins; not yet on a laptop | 2026-10-14, stand-in 2026-10-15, v0.46.0 |
-| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | smooth (stand-in, 60) | smooth after its waits (stand-in, 60) | stand-in 2026-10-15, v0.46.0 |
-| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | smooth (stand-in, 58) | smooth (stand-in, 60) after a 4.5 s wait before its first frame and ~10 s after Start | stand-in 2026-10-15, v0.46.0 |
-| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | smooth (stand-in, 60); the game's own 10-30 in some later worlds, as on the desktop | smooth after its waits (stand-in, 59); the game's own 10-30 in some later worlds | stand-in 2026-10-15, v0.46.0 |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
+| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 
-How each page plays on a Windows laptop's integrated graphics (median presents a second after the shader waits), or on
-a stand-in for one (a desktop GPU drawing a 3840x2000 canvas), which is gentler. The goal is every one smooth in both.
+Median presents a second after the shader waits on a Windows laptop's Intel UHD; * on a stand-in for one (a desktop GPU
+drawing a 3840x2000 canvas, which is gentler), not yet on a laptop; † the game's own frame rate. The goal is 60 in both.
 
 ## Using it in a recomp
 
@@ -76,8 +76,7 @@ target_link_options(<the recomp's executable> PRIVATE -sINITIAL_MEMORY=2GB)   # 
 ```
 
 Build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
-`PATH` (SPIRV-Tools, `apt install spirv-tools`; without it the prebuilt shaders below come out several times the
-size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
+`PATH` (SPIRV-Tools, `apt install spirv-tools`, which specializes the prebuilt shaders below), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
 checkout with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
 says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
 without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and
@@ -158,8 +157,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
   later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
   one visit, not every one. Set
-  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
-  `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
+  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time by
+  `spirv-opt` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
   and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
   come out as the same shaders and the same pipeline state share one. A line reading `background` also
   starts a section of that name.
@@ -176,8 +175,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
   105, about 4 MB, are then all built in 0.4-0.7 s and the indicator never shows; a game whose list doesn't fit waits on
   every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
-  Rush 2049's list, then without sections, took 6.3-7.2 s cold on 12 cores; 6 at a time it took 10.0-10.8 s with
-  `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
+  Rush 2049's list, then without sections, took 6.3-7.2 s cold on 12 cores; 6 at a time it took 10.0-10.8 s optimized by
+  `spirv-opt` against 16.1-17.7 s only specialized, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
   differ only in what the shaders ignore come out the same. Rush 2049's list is
   `src/rt64_shaders.txt` in its repo.
 
