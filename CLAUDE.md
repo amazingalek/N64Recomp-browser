@@ -514,7 +514,9 @@ changes. Keep it current in the same work as what changes it, like the README:
   the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
   RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
 - The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
-  Original 30), Pilotwings 64 60 (a variable timestep), and the other seven their cartridge's: Majora's Mask 20,
+  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
+  which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
+  it), and the other seven their cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
   races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
 - A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
@@ -850,7 +852,7 @@ Cauldron Keep, the game's own rate, where rt64's pacing switches on (the game's 
 builds its ELF from the Pilotwings 64 decompilation (`lib/Pilotwings64Decomp`, IDO 5.3 and the MIPS binutils, which the
 Docker image has for it) and recompiles that with the nested N64Recomp, which must be built from the patched checkout.
 Fast3D, which RT64 draws on WebGPU unchanged. Its `lib/RT64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are
-upstream's at its commits (rows of `pins.txt`), patched by its own `tools/patch_all.py` and then by `apply.cmake` a
+upstream's at its commits, patched by its own `tools/patch_all.py` and then by `apply.cmake` a
 project at a time, by name, since its folder is `RT64`. It keeps its own SDL window and audio queue with its own
 resampler; on the page the queue is `audio_output.h`'s ring at the page's rate. Render to RAM is off on its page (its
 desktop build keeps RT64's default): the CPU reads a frame only in `uvCopyFrameBuf`, which copies one framebuffer into
@@ -930,6 +932,31 @@ Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader wai
 for the file select's hand-over in a loop of messages to itself, and Chrome held the picture 3-8 s as the file loaded
 (Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
 built in line at the title).
+
+`amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
+runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
+`dependencies.lock.json` pins (rt64 at Banjo's commit, N64ModernRuntime ae1ffbb), applies DKR-R's own patches to them
+and then `apply.cmake` project by project; where the two change the same lines, `apply.cmake` leaves those files out
+and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's, and `patches/web/stage/` writes
+DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. It patches from clean whenever `lib/N64Recomp-browser`
+or `patches/` moved (`build/web-patched`). Its checkouts carry DKR-R's patches before the web's, so `pins.txt` has no
+row for it: `publish_pages.sh`'s build is what checks a tag against it. The page has a launcher of its own
+(`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
+page opened behind another window never gets the focus event), render to RAM off (the CPU reads a frame only to hold
+the last one on screen while a level unloads) and the frontend's fixed 1536 MB heap (with growth on, it never grew past
+that through the list's recording and 27 maps in one visit). It presents the game's 30 (Frame rates), uncapped too.
+Its list, `web/rt64_shaders.txt`, 107 descriptions (134 stages, 1.5 MB of WGSL) in 12 sections (the boot 23: logos and
+title; then the title's demo, the menus, Timber's Island, a section a world with its hub, races, battle and boss races,
+Future Fun Land, Wizpig's races, the trophy podium, a race's results), is recorded by code, a page load a map, the
+loads of a world merged into its section (`record_shaders.mjs`): `web/shader_survey.js` takes the game to a map through
+its own teleport and steers the player's kart toward each checkpoint, the turn's sign read from the kart's motion. The
+game's AI can't drive the player's kart: DKR-R's display list check then rejects every frame. A recording takes ~50
+minutes, and `record_shaders.mjs --from` goes on with one stopped partway. From Pages (main 082ab50, N64Recomp-browser
+3175875), cold, RTX 2070, a quiet host, `web/play_plan.json` (title, menus, Timber's Island, a Dino Domain race):
+Chrome 155 headless waited for no shader and drew 30.0 presents a second, in a window 30.0, with the page's thread
+throttled 3 times 30.0 (the browser 1.54 cores against 0.52); Firefox 158 waited 2.4 s for the boot's 23, 0.5 s for
+the menus and 0.6 s for the race, then drew 30.0; at 3840x2000 uncapped 29.8 and 30.0; no sound short, no WebGPU
+errors.
 
 ## WebGPU in Chrome and Firefox
 

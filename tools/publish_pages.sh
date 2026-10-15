@@ -75,6 +75,7 @@ pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
 mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web
 oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
+dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -260,6 +261,10 @@ build_mk64() {
 }
 build_oot() {
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+build_dkr() {
+    # Patches its dependencies from clean whenever N64Recomp-browser or its patches moved (build/web-patched).
+    bash scripts/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 
 # --- Here ---

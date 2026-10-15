@@ -96,7 +96,14 @@ function(n64recomp_browser_apply_patch name dir)
     list(GET row 2 fork)
     list(GET row 3 base)
     message(STATUS "N64Recomp-browser: ${name} needs a three-way merge, fetching ${base} from ${fork}")
-    execute_process(COMMAND git fetch -q --depth 1 "${fork}" "${base}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result)
+    # --refetch brings the commit's files even where the checkout has the commit already: a partial clone
+    # (--filter=blob:none, as DKR-R's bootstrap makes) holds upstream's commits without their files, and git apply
+    # fetches none of them for the merge ("repository lacks the necessary blob"). Older gits have no --refetch.
+    execute_process(COMMAND git fetch -q --depth 1 --refetch "${fork}" "${base}" WORKING_DIRECTORY "${top}"
+        RESULT_VARIABLE result ERROR_QUIET)
+    if (NOT result EQUAL 0)
+        execute_process(COMMAND git fetch -q --depth 1 "${fork}" "${base}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result)
+    endif()
     if (result EQUAL 0)
         # --3way merges against the index, so it works in an index of its own holding the checkout's files as they
         # are (its own changes included), and the checkout's index stays as it was.

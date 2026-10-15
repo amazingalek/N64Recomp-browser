@@ -98,16 +98,19 @@ const rdramHelpers = `(() => {
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
 // Chrome made of a 1280x800 window when the first plans were written. uncapped gives the page animation frames as fast
 // as the browser can make them, not at the display's rate: Chrome with --disable-frame-rate-limit, Firefox with
-// layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how).
+// layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how). cpuThrottle
+// (Chrome only) slows the page's thread that many times (CDP Emulation.setCPUThrottlingRate), a stand-in for a
+// laptop's CPU.
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, uncapped = false, onLine = () => {}, log = console.log }) => {
+  headed = false, uncapped = false, cpuThrottle = 0, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
   const waiters = new Set();
   const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, uncapped, line });
+  if (cpuThrottle && browser !== 'chrome') throw new Error('cpuThrottle is Chrome\'s only');
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, uncapped, cpuThrottle, line });
   else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, uncapped, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
@@ -156,7 +159,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, uncapped, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, uncapped, cpuThrottle, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to.
   const mode = headed
     ? ['--disable-features=CalculateNativeWinOcclusion', '--disable-backgrounding-occluded-windows',
@@ -204,6 +207,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  if (cpuThrottle > 1) await send('Emulation.setCPUThrottlingRate', { rate: cpuThrottle });
   if (preload) await send('Page.addScriptToEvaluateOnNewDocument', { source: `(${preload})()` });
   const click = async (x, y) => {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
