@@ -66,7 +66,9 @@ plays its page, not a commit from here.
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands.
+  built and played before it lands. A change to only `*.md` and the tools that play and publish pages skips every job
+  but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
+  min, one that moves them ~8.
 
 ## The forks, one commit per change
 
