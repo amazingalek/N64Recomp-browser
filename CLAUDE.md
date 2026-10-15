@@ -511,8 +511,8 @@ Kong 64, GoldenEye, Conker, Wave Race 64 and Rush 2049 through their boots and 2
 Each is on `main`, and each one's README says up front that it is AI-written and not upstream's, and its BUILDING.md
 how to build the page. On BanjoRecomp-web upstream's `validate-internal` workflow, a native build on every push to main
 with no ROM, is disabled. Banjo, Majora's Mask, Donkey Kong 64 and Conker are on their own upstream submodules and
-GoldenEye on upstream's at the forks' bases, all patched by N64Recomp-browser ed8764a (v0.36.0: the canvas in the
-browser's preferred format, rt64 c6cf6c4 and 58fc4e4, plume 16e608a and 97f4e64); Banjo, Majora's Mask and Donkey Kong
+GoldenEye on upstream's at the forks' bases, all patched by the N64Recomp-browser tag their submodule pins
+(each fork's `lib/N64Recomp-browser`, Conker's `tools/N64Recomp-browser`; The pins); Banjo, Majora's Mask and Donkey Kong
 64 include its `frontend/build_speed.cmake`: their BUILDING.md says to keep `build-web` inside the checkout and put
 ccache on `PATH`. Their `main.cpp` plays sound through `audio_output.h` on Emscripten (headless Chrome: the DK Rap,
 Banjo's intro and Majora's Mask's attract demo play, nothing short after the first second). Their CMakeLists.txt pick
