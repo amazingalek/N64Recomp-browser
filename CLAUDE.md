@@ -933,6 +933,31 @@ for the file select's hand-over in a loop of messages to itself, and Chrome held
 (Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
 built in line at the title).
 
+`amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
+runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
+`dependencies.lock.json` pins (rt64 at Banjo's commit, N64ModernRuntime ae1ffbb), applies DKR-R's own patches to them
+and then `apply.cmake` project by project; where the two change the same lines, `apply.cmake` leaves those files out
+and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's, and `patches/web/stage/` writes
+DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. It patches from clean whenever `lib/N64Recomp-browser`
+or `patches/` moved (`build/web-patched`). Its checkouts carry DKR-R's patches before the web's, so `pins.txt` has no
+row for it: `publish_pages.sh`'s build is what checks a tag against it. The page has a launcher of its own
+(`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
+page opened behind another window never gets the focus event), render to RAM off (the CPU reads a frame only to hold
+the last one on screen while a level unloads) and the frontend's fixed 1536 MB heap (with growth on, it never grew past
+that through the list's recording and 27 maps in one visit). It presents the game's 30 (Frame rates), uncapped too.
+Its list, `web/rt64_shaders.txt`, 107 descriptions (134 stages, 1.5 MB of WGSL) in 12 sections (the boot 23: logos and
+title; then the title's demo, the menus, Timber's Island, a section a world with its hub, races, battle and boss races,
+Future Fun Land, Wizpig's races, the trophy podium, a race's results), is recorded by code, a page load a map, the
+loads of a world merged into its section (`record_shaders.mjs`): `web/shader_survey.js` takes the game to a map through
+its own teleport and steers the player's kart toward each checkpoint, the turn's sign read from the kart's motion. The
+game's AI can't drive the player's kart: DKR-R's display list check then rejects every frame. A recording takes ~50
+minutes, and `record_shaders.mjs --from` goes on with one stopped partway. From Pages (main 082ab50, N64Recomp-browser
+3175875), cold, RTX 2070, a quiet host, `web/play_plan.json` (title, menus, Timber's Island, a Dino Domain race):
+Chrome 155 headless waited for no shader and drew 30.0 presents a second, in a window 30.0, with the page's thread
+throttled 3 times 30.0 (the browser 1.54 cores against 0.52); Firefox 158 waited 2.4 s for the boot's 23, 0.5 s for
+the menus and 0.6 s for the race, then drew 30.0; at 3840x2000 uncapped 29.8 and 30.0; no sound short, no WebGPU
+errors.
+
 ## WebGPU in Chrome and Firefox
 
 Shaders go HLSL → SPIR-V (dxc, without `-fvk-invert-y`: WebGPU's clip space is D3D's) → WGSL (naga

@@ -28,6 +28,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60* | 59* | 2026-10-15 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60* | 59* | 2026-10-15 |
+| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 30†* | 30†* | 2026-10-16 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -98,6 +99,9 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - No native file dialog (nfd: RecompFrontend asks the page; a recomp with menus of its own calls
   `n64recomp_browser::pick_files`, `frontend/file_picker.h`, and gets the picked files' paths) and no `SDL_INIT_HAPTIC`
   (Emscripten's SDL2 has no haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
+- Input read whatever SDL's window focus says. On a page SDL's keyboard focus follows the canvas's window focus events,
+  which a page opened behind another window, or driven by a script, never gets, though its tab gets the keys: DKR-R
+  read the controller only while its window had focus, and its page took no input (DKR-R-web's `runtime_platform.cpp`).
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
