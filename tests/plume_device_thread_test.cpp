@@ -1,10 +1,10 @@
-// plume's device thread layer (plume-web, plume_device_thread.cpp), run by CI against a mock backend
-// that logs every call: every call reaches the backend on the device thread, in the order it was made; command lists
-// recorded on several threads at once replay their commands with the backend's objects and with copies of what their
-// arguments pointed at; push constants of size 0 take the size of their range; a swap chain's present() copies the
-// texture drawn into the backend's swap chain texture; map() of a buffer whose data isn't there yet waits for it on
-// the calling side (WebGPU readback), and asking whether it's there doesn't wait for the device thread; and every
-// backend object is destroyed on the device thread.
+// plume's device thread layer (plume-web, plume_device_thread.cpp), run by CI against a mock backend that logs every
+// call: every call reaches the backend on the device thread, in the order it was made; command lists recorded on
+// several threads at once replay their commands with the backend's objects and with copies of what their arguments
+// pointed at; push constants of size 0 take the size of their range; a swap chain's present() copies the texture drawn
+// into the backend's swap chain texture, and its needsResize() and getRefreshRate() don't wait for the device thread;
+// map() of a buffer whose data isn't there yet waits for it on the calling side (WebGPU readback), and asking whether
+// it's there doesn't wait for the device thread; and every backend object is destroyed on the device thread.
 
 #include <atomic>
 #include <condition_variable>
@@ -244,17 +244,21 @@ struct MockCommandList : RenderCommandList, Named {
     void writeTimestamp(const RenderQueryPool *, uint32_t) override { }
 };
 
+struct MockSwapChain;
+MockSwapChain *lastSwapChain = nullptr;
+
 struct MockSwapChain : RenderSwapChain, Named {
     std::vector<std::unique_ptr<MockTexture>> textures;
-    uint32_t width = 0, height = 0, next = 0;
+    uint32_t width = 0, height = 0, next = 0, canvasWidth = 640, refreshRate = 60;
     MockSwapChain() : Named("swapChain") {
+        lastSwapChain = this;
         textures.emplace_back(std::make_unique<MockTexture>("canvas0"));
         textures.emplace_back(std::make_unique<MockTexture>("canvas1"));
     }
     bool present(uint32_t index, RenderCommandSemaphore **waits, uint32_t count) override { call("present " + std::to_string(index) + " waits " + std::to_string(count)); return true; }
     void wait() override { }
-    bool resize() override { call("resize"); width = 640; height = 480; return true; }
-    bool needsResize() const override { call("needsResize"); return width == 0; }
+    bool resize() override { call("resize"); width = canvasWidth; height = 480; return true; }
+    bool needsResize() const override { call("needsResize"); return width != canvasWidth; }
     void setVsyncEnabled(bool) override { }
     bool isVsyncEnabled() const override { return true; }
     uint32_t getWidth() const override { return width; }
@@ -264,7 +268,7 @@ struct MockSwapChain : RenderSwapChain, Named {
     bool acquireTexture(RenderCommandSemaphore *, uint32_t *index) override { call("acquire"); *index = next; next = (next + 1) % 2; return true; }
     RenderWindow getWindow() const override { return {}; }
     bool isEmpty() const override { return width == 0; }
-    uint32_t getRefreshRate() const override { return 60; }
+    uint32_t getRefreshRate() const override { return refreshRate; }
 };
 
 struct MockQueue : RenderCommandQueue, Named {
@@ -610,6 +614,22 @@ int main() {
 
     check(sameTexture, "the texture a frame is drawn into is the one present() copies");
     check(eventsStartingWith("execute").size() >= 3 && contains("execute signal semaphore" + std::to_string(counter - 3) + " waits 0 fence null"), "acquireTexture() signals the caller's semaphore");
+
+    // needsResize() and getRefreshRate() don't wait for the device thread: they answer what the backend said last, and
+    // a refresh they queue brings the answer up to date.
+    MockSwapChain *swapChainInner = lastSwapChain;
+    deviceThread->runSync([&]() { swapChainInner->canvasWidth = 800; swapChainInner->refreshRate = 144; });
+    std::promise<void> swapChainGate;
+    std::shared_future<void> swapChainGateOpen = swapChainGate.get_future().share();
+    deviceThread->runAsync([swapChainGateOpen]() { swapChainGateOpen.wait(); });
+    std::future<bool> lastAnswer = std::async(std::launch::async, [&]() { return !swapChain->needsResize() && (swapChain->getRefreshRate() == 60); });
+    const bool answeredWithoutWaiting = (lastAnswer.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    swapChainGate.set_value();
+    const bool lastAnswerKept = lastAnswer.get();
+    deviceThread->runSync([]() {});
+    const bool refreshed = swapChain->needsResize() && (swapChain->getRefreshRate() == 144);
+    check(answeredWithoutWaiting && lastAnswerKept && refreshed, "needsResize() and getRefreshRate() answer without waiting for the device thread, and a refresh later the backend's answer");
+    check(swapChain->resize() && !swapChain->needsResize() && (swapChain->getWidth() == 800), "needsResize() answers false right after resize()");
 
     // A buffer whose data arrives late: map() asks isMapReady() from the calling side until it's true, then maps.
     nextBufferNotReady = 3;

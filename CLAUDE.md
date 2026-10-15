@@ -257,6 +257,13 @@ plume 3c23b44          009957c's try only from a steady window: no present more 
 rt64 57c0fed           presents held more than 10% of it; a stall (a load, shaders building behind the game) took a fast
                        GPU's page to 3 from boot (GoldenEye's launcher, from 0.8 presents a second); ?present-stats
                        prints each try
+plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_device_thread don't wait behind its
+                       queue: the device thread checks the buffer at each replay and present once a copy into it is
+                       replayed, maps it when the data is there and publishes the answer; RT64 asks at every VI whether
+                       render to RAM's late copy can land, and each question waited for the page's thread (GoldenEye's
+                       Dam: the display list thread's waits 2.3 s → 0.15 s in 13 s, the page's thread 47% → 32% busy)
+plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present: RT64's
+rt64 a5bc25d           present thread asks both before every present (its waits 963 → 106 ms in 13 s)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -884,10 +891,13 @@ changing it:
   can a game that puts something in a framebuffer's memory once the RDP is done: the copy lands while the game runs,
   and though it keeps every word the CPU changed (rt64 cb75c5c), a word written with the value it held looks untouched
   and gets the frame. The console reports each write it kept, so a page run through a game's levels with the late copy
-  says whether its CPU touches a framebuffer with one pending. Through the device thread, `map()` polls `isMapReady()`
-  while the main thread returns to the browser, which delivers the data; a build without threads would need `-sJSPI`
-  (or ASYNCIFY) to wait in place. A call that waits for the main thread costs 50-120 µs from a pthread in a race, a
-  queued one ~0.4 µs, and a 100 µs sleep there ~1.9 ms.
+  says whether its CPU touches a framebuffer with one pending. Through the device thread, the main thread checks a
+  READBACK buffer at each replay and present once a copy into it is replayed, maps it when the browser has delivered
+  the data, and publishes the answer, which `isMapReady()` reads and `map()` waits for without waiting behind the
+  main thread's queue; a build without threads would need `-sJSPI` (or ASYNCIFY) to wait in place. A call that waits
+  for the main thread costs 50-120 µs from a pthread in a race, behind whatever is queued before it (RT64 asking at
+  each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
+  100 µs sleep there ~1.9 ms.
 - Two of the web paths run natively on Vulkan too, to check them against the stock ones: configure a game with
   `-DRT64_PER_DRAW_TEXTURES=ON` (rt64-0007: a texture set per draw, TMEM in one buffer; to test that pool, make
   `TMEMHasher::requiresRawTMEM` return true for a run) or `-DRT64_PACKED_RSP_INPUTS=ON` (rt64-0009).
