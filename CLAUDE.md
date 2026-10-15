@@ -49,13 +49,11 @@ plays its page, not a commit from here.
   it, and what one game does better (a shader list in sections, the late copy) is tried on the others. Only what is the
   game's own stays in its repo.
 - A game fork of an existing recomp is that recomp plus web support and nothing else, so its diff against upstream is
-  exactly what the page needs: no new features (controls, enhancements) and no fix the page doesn't need. A request
-  for one is answered that way, not filed against the fork. The one exception is GoldenEye's keyboard and mouse:
-  a page is played on a computer, mostly without a pad, and GoldenEye with the keyboard alone is barely playable, so
-  GoldenEye64Recomp-web carries mouse look, mouse buttons and the wheel, keys for its reload and crouch, and their
-  settings, matched to the Perfect Dark PC port (its README compares the two), in the desktop build too. What that
-  needs that every game can use (mouse buttons and the wheel as bindings, actions a game defines beyond the N64's
-  buttons) is in RecompFrontend-web, on every build.
+  exactly what the page needs: no new features (mouse aim, controls, enhancements) and no fix the page doesn't need.
+  A request for one is answered that way, not filed against the fork. The one exception is GoldenEye's keyboard and
+  mouse (mouse look and aim, click to fire, the wheel for weapons, keys for reload and crouch, as the PC ports play
+  it), which lives on GoldenEye64Recomp-web's `mouse` branch, all of it in that fork's own code and none in the forks:
+  it stays off the fork's `main` and its page until it has been played by hand, and isn't web work.
 - Never open a PR, issue or discussion upstream at rt64, plume, N64Recomp, N64ModernRuntime, RecompFrontend,
   BanjoRecomp, Zelda64Recomp or Donkey-Kong-64-Recompiled: their CONTRIBUTING.md asks for no LLM-written code
   (plume's, no AI-made contribution and no AI talking to its maintainers). The forks stay forks. Each one's README opens

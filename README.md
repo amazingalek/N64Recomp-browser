@@ -14,8 +14,6 @@ beside them, and its web build patches their checkouts (Using it in a recomp). I
 Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own. Rush 2049 aside,
 the games are here to build out and test the web support on more than one game: what one of them or one browser turns
 up is fixed in this repo or the forks unless it really is that game's own, so every game and both browsers get it.
-GoldenEye's fork also adds keyboard and mouse controls in the manner of the Perfect Dark PC port: mouse look and aim,
-click to fire, the wheel for weapons, keys for reload and crouch, in its page and its desktop build.
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
@@ -309,9 +307,7 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   a 32-bit host
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
-                                                                  and its copy a display list late as another;
-                                                                  mouse buttons and the wheel as bindings, and
-                                                                  actions a game defines beyond the N64's
+                                                                  and its copy a display list late as another
 amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
                                                                   CPU-side matrices use with -msimd128
 ```
@@ -320,8 +316,7 @@ rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` 
 N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
 of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
-`RenderSwapChain::isWaitReady()` (always true but on WebGPU), and RecompFrontend-web's mouse bindings and extra
-actions, which change nothing for a game that binds no mouse input and defines no action. Each commit's message says what it does and why.
+`RenderSwapChain::isWaitReady()` (always true but on WebGPU), which change nothing there. Each commit's message says what it does and why.
 
 `patches/` holds each fork as one patch, everything its `main` adds to the upstream commit it is on, so a recomp can
 take the web support without moving its submodules to the forks (Using it in a recomp).
