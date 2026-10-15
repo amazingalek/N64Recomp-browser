@@ -23,10 +23,11 @@
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
 # --browser <commit> is the retest before the pins move (CLAUDE.md, "The pins"): a dry run of every game with its
-# N64Recomp-browser moved to <commit> (a tag) in its copy only, Rush 2049's by a commit of its own on top of main that
-# is synced there and pushed nowhere. It names the pages that build differently from what Pages serves, and their
-# builds stay in the copies to fetch with remote_build.sh -n <copy> get and play. Once the pins are moved there (a
-# fork's main, Rush 2049's by a pull request on its repo), a run without it builds the same bytes and publishes them.
+# N64Recomp-browser moved to <commit> (a tag, or a commit this checkout has) in its copy only, Rush 2049's by a
+# commit of its own on top of main that is synced there and pushed nowhere. It names the pages that build differently
+# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n <copy> get and play.
+# Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
+# the same bytes and publishes them.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
@@ -53,6 +54,8 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 [[ ${#args[@]} -ge 1 ]] || { sed -n 5p "$0"; exit 1; }
+# A remote gives a commit only by its whole SHA: an abbreviated one failed to fetch, and the build kept the old pin.
+[[ ! $browser =~ ^[0-9a-f]{4,39}$ ]] || browser="$(git -C "$here/.." rev-parse --verify "$browser^{commit}")"
 rush="$(cd "${args[0]}" && pwd)"
 remote_build="$rush/tools/remote_build.sh"
 [[ -f "$remote_build" ]] || { echo "$rush is not a rush-2049-recomp checkout"; exit 1; }

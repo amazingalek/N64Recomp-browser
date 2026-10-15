@@ -282,6 +282,13 @@ rt64 e408ed4           interpolating to it without pacing, so with the browser's
 plume 7a7e3bc          the canvas's buffer takes a new size only in the present that draws at it: SDL's resize and the
                        surface's configure each made it black until a present, and the frames queued meanwhile were
                        copied into a canvas of the other size, so going fullscreen flickered for a second or two
+plume 3238ba3          through plume_device_thread a READBACK buffer's map() asks at most once a millisecond (it asked as
+plume f2863d8          fast as the page's thread answered, each answer Dawn commands for Chrome's GPU process), and
+rt64 730e980           createTexture() and an upload buffer's map() after its first don't wait for the page's thread
+                       (RT64 makes two textures for each the game loads, ~570 in 100 ms at Pilotwings 64's screen
+                       changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
+                       the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
+                       Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -1120,6 +1127,11 @@ running in a browser was found to learn from.
   program's own fetches before the reload (shell.html says how).
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
+- Pilotwings 64's frame gaps of 110-180 ms as its screens change (file menu, test overview, vehicle select) as the
+  page's thread or the texture uploads: they come in Firefox too, which builds nothing behind the game, the game never
+  waited for an upload in one, and plume f2863d8 took most of the waits for the page's thread away and left them. Each
+  is the game's own time between two display lists (65-84 ms, against 16-33) plus RT64's work on the new screen's first
+  one (12-87 ms, 87 at the file menu), the burst of new textures after it.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
   its GPU process, so Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from one (Firefox
   158). Nor does the driver's own shader cache spare it: the same 75 built five times in fresh profiles took as long
