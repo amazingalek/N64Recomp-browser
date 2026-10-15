@@ -1,7 +1,8 @@
 # The commits recomps built on RecompFrontend pin, which CI patches (tools/fetch_pins.sh, patches/apply.cmake), and
 # builds every library of a page from for the first: <recomp> <folder> <repository> <commit>. Each one's plume,
 # hlslpp and N64Recomp are the ones those commits point at, and an N64Recomp row is a recomp's own, beside them.
-# GoldenEye 007's upstream predates RecompFrontend, so its web fork pins upstream's commits the forks are built on.
+# GoldenEye 007's and Mario Kart 64's upstreams predate RecompFrontend, so their web forks pin upstream's commits the
+# forks are built on.
 Banjo-Kazooie       rt64              https://github.com/rt64/rt64                          6f1c2d99a4ea571c139f449c326fd176ba8f3496
 Banjo-Kazooie       N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         ca568b6ad79b9029d14077f0c3ffa757727c5559
 Banjo-Kazooie       RecompFrontend    https://github.com/N64Recomp/RecompFrontend           d0d90ba49f46f4896aaeda362056c21b1e342561
@@ -18,3 +19,6 @@ Conkers-Bad-Fur-Day N64Recomp         https://github.com/N64Recomp/N64Recomp    
 GoldenEye-007       rt64              https://github.com/rt64/rt64                          5473732a822a4423b5696e7cb18fecc425a59875
 GoldenEye-007       N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1
 GoldenEye-007       RecompFrontend    https://github.com/N64Recomp/RecompFrontend           b2c5c18d73054416c844486611fd2c2b9d8a4927
+Mario-Kart-64       rt64              https://github.com/rt64/rt64                          5473732a822a4423b5696e7cb18fecc425a59875
+Mario-Kart-64       N64ModernRuntime  https://github.com/N64Recomp/N64ModernRuntime         589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1
+Mario-Kart-64       RecompFrontend    https://github.com/N64Recomp/RecompFrontend           b2c5c18d73054416c844486611fd2c2b9d8a4927
