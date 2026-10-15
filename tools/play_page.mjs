@@ -33,9 +33,10 @@
 // --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the sound frames the
 // audio thread found its ring empty for (Module.recompAudioStats()), and, where they can be read, the GPU's
 // utilization, power, clock and memory (nvidia-smi) and the cores the browser's GPU process and the whole browser
-// took. A summary at the end covers the "play" steps: median presents a second and the range, the gaps between presents, frames short, each
-// prebuilt shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the
-// cores; --json writes it as JSON too. The GPU readings are the whole GPU's, so note what else ran beside a number.
+// took. A summary at the end covers the "play" steps: median presents a second and the range, the gaps between
+// presents, frames short, each prebuilt shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and
+// exceptions, the GPU and the cores; --json writes it as JSON too. The GPU readings are the whole GPU's, so note what
+// else ran beside a number.
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
