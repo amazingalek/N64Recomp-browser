@@ -26,6 +26,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | smooth (stand-in, 60) | smooth after its waits (stand-in, 60) | stand-in 2026-10-15, v0.46.0 |
 | Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | smooth (stand-in, 58) | smooth (stand-in, 60) after a 4.5 s wait before its first frame and ~10 s after Start | stand-in 2026-10-15, v0.46.0 |
 | Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | smooth (stand-in, 60); the game's own 10-30 in some later worlds, as on the desktop | smooth after its waits (stand-in, 59); the game's own 10-30 in some later worlds | stand-in 2026-10-15, v0.46.0 |
+| Mario Kart 64 | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | smooth (stand-in, 60) | smooth after its waits (stand-in, 59) | stand-in 2026-10-15 |
 
 How each page plays on a Windows laptop's integrated graphics (median presents a second after the shader waits), or on
 a stand-in for one (a desktop GPU drawing a 3840x2000 canvas), which is gentler. The goal is every one smooth in both.
@@ -113,6 +114,10 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   stopped soon after Firefox's boot wait (a palette load past the end of memory, a texture 8404 texels wide):
   pilotwings-64-recomp-web's `patches/sched.c` takes those timeouts out. Look for a retrace handler that counts
   retraces while the RSP or RDP is busy.
+- A recomp's patches that move the display lists into a larger buffer of their own have to move every one, the boot's
+  first included. Mario Kart 64's pointed every task at its larger pool but left the boot's first list in the game's
+  pool, so RT64 read zeros on into the pool where the game was already writing the next frame, and about one boot in
+  twenty on the page hung or crashed. MarioKart64Recomp-web's `patches/gfx_config.c` patches `rendering_init` too.
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it

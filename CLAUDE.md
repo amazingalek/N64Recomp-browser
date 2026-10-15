@@ -808,8 +808,12 @@ copy measured the same (headless Chrome 155, a busy host: a race 59.6 presents a
 exact and 58.8 late, the game's 30). Its list, `src/rt64_shaders.txt`, 813 descriptions, 136 shaders and 112
 pipelines in 27 sections (the boot 8: launcher, logos and title; the menus 8; each of 16 courses; four arenas with four
 players; Versus, Time Trials, results, the ceremony, the credits), is recorded by code: `tools/shader_survey.js`
-starts any course in any mode the way the pause menu's Retry does and hands every kart to the game's own AI.
-MEASURED
+starts any course in any mode the way the pause menu's Retry does and hands every kart to the game's own AI. Its
+`tools/play_plan.json` is a 50cc Grand Prix's Luigi Raceway on that AI. From Pages (main 9f6bcf3, N64Recomp-browser
+28a5f14), cold, RTX 2070, an idle host: Chrome 155 headless waited for nothing and drew 59.6 presents a second;
+Firefox 158 waited 0.4 s for the boot, ~0.3 s in ones and twos through the menus (wanted shaders under a section's
+4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000 59.6 and 59.0; no WebGPU errors, sound short only in
+Firefox's course wait.
 
 ## WebGPU in Chrome and Firefox
 
