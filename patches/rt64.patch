@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web 8bea89204da7fe2597d71326e09de98e8e220ea7
+rt64: https://github.com/amazingalek/rt64-web 7734fe4f1c3e944f813dfcb266ff2108241c6730
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..12f204e 100644
+index 79dfc38..2760448 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,11 @@ endif()
@@ -200,7 +200,7 @@ index 79dfc38..12f204e 100644
  target_link_libraries(rt64 libzstd_static)
  target_link_libraries(rt64 plume)
  
-@@ -504,9 +596,85 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
+@@ -504,9 +596,104 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING")
@@ -217,6 +217,25 @@ index 79dfc38..12f204e 100644
  build_vertex_shader( rt64 "src/shaders/RasterVS.hlsl" "src/shaders/RasterVSDynamic.hlsl" "-D DYNAMIC_RENDER_PARAMS")
  build_vertex_shader_spec_constants( rt64 "src/shaders/RasterVS.hlsl" "src/shaders/RasterVSSpecConstant.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS")
  build_vertex_shader_spec_constants( rt64 "src/shaders/RasterVS.hlsl" "src/shaders/RasterVSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
++# A Vulkan device without descriptor indexing (an old GPU, lavapipe before Mesa 23) gets the framebuffer renderer's
++# per-draw texture sets at run time (perDrawTextures() in rt64_descriptor_sets.h), so the SPIR-V of every shader that
++# uses those sets is built for them too, as <name>PerDraw, and picked by the same test. A WGSL build has only those.
++if (NOT RT64_WGSL)
++    set(PER_DRAW "-D PER_DRAW_TEXTURES")
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSDynamicPerDraw.hlsl" "-D DYNAMIC_RENDER_PARAMS" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSDynamicMSPerDraw.hlsl" "-D DYNAMIC_RENDER_PARAMS" "-D MULTISAMPLING" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSSpecConstantPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSSpecConstantMSPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSSpecConstantFlatPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/RasterPSSpecConstantFlatMSPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterVS.hlsl" "${DXC_VS_OPTS}" "src/shaders/RasterVSDynamicPerDraw.hlsl" "-D DYNAMIC_RENDER_PARAMS" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterVS.hlsl" "${DXC_VS_OPTS}" "src/shaders/RasterVSSpecConstantPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/RasterVS.hlsl" "${DXC_VS_OPTS}" "src/shaders/RasterVSSpecConstantFlatPerDraw.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/PostBlendDitherNoisePS.hlsl" "${DXC_PS_OPTS}" "src/shaders/PostBlendDitherNoiseAddPSPerDraw.hlsl" "-D ADD_MODE" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/PostBlendDitherNoisePS.hlsl" "${DXC_PS_OPTS}" "src/shaders/PostBlendDitherNoiseSubPSPerDraw.hlsl" "-D SUB_MODE" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/PostBlendDitherNoisePS.hlsl" "${DXC_PS_OPTS}" "src/shaders/PostBlendDitherNoiseSubNegativePSPerDraw.hlsl" "-D SUB_MODE" "-D NEGATIVE_MODE" ${PER_DRAW})
++    build_shader_spirv(rt64 "src/shaders/DebugPS.hlsl" "${DXC_PS_OPTS}" "src/shaders/DebugPSPerDraw.hlsl" ${PER_DRAW})
++endif()
 +
 +# Prebuilt shaders for WebGPU. A game that sets RT64_PREBUILT_SHADER_LIST to a list of the shader descriptions it uses
 +# (one per line, five hex words: other mode L and H, color combiner L and H, flags, as its page prints them when opened
@@ -1620,7 +1639,7 @@ index 5a331aa..b225845 100644
                  Workload &workload = workloads[processCursor];
                  ext.presentQueue->waitForPresentId(workload.presentId);
 diff --git a/src/render/rt64_descriptor_sets.h b/src/render/rt64_descriptor_sets.h
-index 69a82ac..da29249 100644
+index 69a82ac..1dd31f7 100644
 --- a/src/render/rt64_descriptor_sets.h
 +++ b/src/render/rt64_descriptor_sets.h
 @@ -221,6 +221,14 @@ namespace RT64 {
@@ -1661,7 +1680,7 @@ index 69a82ac..da29249 100644
              RtParams = builder.addConstantBuffer(25);
              SceneBVH = raytracing ? builder.addAccelerationStructure(26) : 0;
              posBuffer = builder.addByteAddressBuffer(27);
-@@ -311,6 +328,69 @@ namespace RT64 {
+@@ -311,6 +328,81 @@ namespace RT64 {
          }
      };
  
@@ -1676,6 +1695,18 @@ index 69a82ac..da29249 100644
 +        return !capabilities.descriptorIndexing;
 +#   endif
 +    }
++
++    struct SPIRVBlob {
++        const void *data;
++        size_t size;
++    };
++
++    // The SPIR-V of a shader that uses sets 1 and 2 as the device binds them: each such shader is built a second time
++    // for per-draw textures, as <NAME>PerDrawBlobSPIRV (CMakeLists.txt). Both blob headers must be included.
++#   define RT64_TEXTURE_SETS_SPIRV(NAME, CAPABILITIES)\
++        (RT64::perDrawTextures(CAPABILITIES) ?\
++            RT64::SPIRVBlob{ NAME##PerDrawBlobSPIRV, sizeof(NAME##PerDrawBlobSPIRV) } :\
++            RT64::SPIRVBlob{ NAME##BlobSPIRV, sizeof(NAME##BlobSPIRV) })
 +
 +    struct FramebufferRendererDescriptorDrawTextureSet : RenderDescriptorSetBase {
 +        static const uint32_t TileCount = 8;
@@ -1731,7 +1762,7 @@ index 69a82ac..da29249 100644
      struct FramebufferRendererDescriptorFramebufferSet : RenderDescriptorSetBase {
          uint32_t FbParams;
          uint32_t gBackgroundColor;
-@@ -506,6 +586,9 @@ namespace RT64 {
+@@ -506,6 +598,9 @@ namespace RT64 {
      };
  
      struct RSPProcessDescriptorSet : RenderDescriptorSetBase {
@@ -1741,7 +1772,7 @@ index 69a82ac..da29249 100644
          uint32_t srcPos;
          uint32_t srcVel;
          uint32_t srcTc;
-@@ -524,12 +607,16 @@ namespace RT64 {
+@@ -524,12 +619,16 @@ namespace RT64 {
          uint32_t rspLookAtVector;
          uint32_t viewProjTransforms;
          uint32_t worldTransforms;
@@ -1758,7 +1789,7 @@ index 69a82ac..da29249 100644
              srcPos = builder.addFormattedBuffer(1);
              srcVel = builder.addFormattedBuffer(2);
              srcTc = builder.addFormattedBuffer(3);
-@@ -548,6 +635,7 @@ namespace RT64 {
+@@ -548,6 +647,7 @@ namespace RT64 {
              rspLookAtVector = builder.addStructuredBuffer(16);
              viewProjTransforms = builder.addStructuredBuffer(17);
              worldTransforms = builder.addStructuredBuffer(18);
@@ -1766,7 +1797,7 @@ index 69a82ac..da29249 100644
              dstPos = builder.addReadWriteStructuredBuffer(19);
              dstTc = builder.addReadWriteStructuredBuffer(20);
              dstCol = builder.addReadWriteStructuredBuffer(21);
-@@ -598,6 +686,9 @@ namespace RT64 {
+@@ -598,6 +698,9 @@ namespace RT64 {
      };
  
      struct RSPWorldDescriptorSet : RenderDescriptorSetBase {
@@ -1776,7 +1807,7 @@ index 69a82ac..da29249 100644
          uint32_t srcPos;
          uint32_t srcVel;
          uint32_t srcNorm;
-@@ -605,12 +696,16 @@ namespace RT64 {
+@@ -605,12 +708,16 @@ namespace RT64 {
          uint32_t worldMats;
          uint32_t invTWorldMats;
          uint32_t prevWorldMats;
@@ -1793,7 +1824,7 @@ index 69a82ac..da29249 100644
              srcPos = builder.addFormattedBuffer(1);
              srcVel = builder.addFormattedBuffer(2);
              srcNorm = builder.addFormattedBuffer(3);
-@@ -618,6 +713,7 @@ namespace RT64 {
+@@ -618,6 +725,7 @@ namespace RT64 {
              worldMats = builder.addStructuredBuffer(5);
              invTWorldMats = builder.addStructuredBuffer(6);
              prevWorldMats = builder.addStructuredBuffer(7);
@@ -2281,10 +2312,10 @@ index 0000000..9984c41
 +}
 +#endif
 diff --git a/src/render/rt64_raster_shader.cpp b/src/render/rt64_raster_shader.cpp
-index 721a01e..ab86f37 100644
+index 721a01e..219b340 100644
 --- a/src/render/rt64_raster_shader.cpp
 +++ b/src/render/rt64_raster_shader.cpp
-@@ -7,18 +7,39 @@
+@@ -7,18 +7,51 @@
  #include "xxHash/xxh3.h"
  
  #include "shaders/RenderParams.hlsli.rw.h"
@@ -2332,21 +2363,50 @@ index 721a01e..ab86f37 100644
 +#   include "shaders/PostBlendDitherNoiseAddPS.hlsl.spirv.h"
 +#   include "shaders/PostBlendDitherNoiseSubPS.hlsl.spirv.h"
 +#   include "shaders/PostBlendDitherNoiseSubNegativePS.hlsl.spirv.h"
++#   include "shaders/RasterPSDynamicPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterPSDynamicMSPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterPSSpecConstantPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterPSSpecConstantMSPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterPSSpecConstantFlatPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterPSSpecConstantFlatMSPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterVSDynamicPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterVSSpecConstantPerDraw.hlsl.spirv.h"
++#   include "shaders/RasterVSSpecConstantFlatPerDraw.hlsl.spirv.h"
++#   include "shaders/PostBlendDitherNoiseAddPSPerDraw.hlsl.spirv.h"
++#   include "shaders/PostBlendDitherNoiseSubPSPerDraw.hlsl.spirv.h"
++#   include "shaders/PostBlendDitherNoiseSubNegativePSPerDraw.hlsl.spirv.h"
 +#endif
  #ifdef _WIN32
  #   include "shaders/RasterPSLibrary.hlsl.dxil.h"
  #   include "shaders/RasterPSLibraryMS.hlsl.dxil.h"
-@@ -68,6 +89,9 @@ namespace RT64 {
+@@ -67,25 +100,81 @@ namespace RT64 {
+ 
      // OptimizerCacheSPIRV
  
-     void OptimizerCacheSPIRV::initialize() {
+-    void OptimizerCacheSPIRV::initialize() {
+-        rasterVS.parse(RasterVSSpecConstantBlobSPIRV, std::size(RasterVSSpecConstantBlobSPIRV));
+-        rasterVSFlat.parse(RasterVSSpecConstantFlatBlobSPIRV, std::size(RasterVSSpecConstantFlatBlobSPIRV));
+-        rasterPS.parse(RasterPSSpecConstantBlobSPIRV, std::size(RasterPSSpecConstantBlobSPIRV));
+-        rasterPSMS.parse(RasterPSSpecConstantMSBlobSPIRV, std::size(RasterPSSpecConstantMSBlobSPIRV));
+-        rasterPSFlat.parse(RasterPSSpecConstantFlatBlobSPIRV, std::size(RasterPSSpecConstantFlatBlobSPIRV));
+-        rasterPSFlatMS.parse(RasterPSSpecConstantFlatMSBlobSPIRV, std::size(RasterPSSpecConstantFlatMSBlobSPIRV));
++    void OptimizerCacheSPIRV::initialize(const RenderDeviceCapabilities &capabilities) {
 +#   if defined(RT64_WGSL)
 +        assert(false && "A WGSL build has no SPIR-V shaders.");
 +#   else
-         rasterVS.parse(RasterVSSpecConstantBlobSPIRV, std::size(RasterVSSpecConstantBlobSPIRV));
-         rasterVSFlat.parse(RasterVSSpecConstantFlatBlobSPIRV, std::size(RasterVSSpecConstantFlatBlobSPIRV));
-         rasterPS.parse(RasterPSSpecConstantBlobSPIRV, std::size(RasterPSSpecConstantBlobSPIRV));
-@@ -80,12 +104,61 @@ namespace RT64 {
++        const auto parse = [](respv::Shader &shader, const SPIRVBlob &blob) {
++            shader.parse(blob.data, blob.size);
++        };
++
++        parse(rasterVS, RT64_TEXTURE_SETS_SPIRV(RasterVSSpecConstant, capabilities));
++        parse(rasterVSFlat, RT64_TEXTURE_SETS_SPIRV(RasterVSSpecConstantFlat, capabilities));
++        parse(rasterPS, RT64_TEXTURE_SETS_SPIRV(RasterPSSpecConstant, capabilities));
++        parse(rasterPSMS, RT64_TEXTURE_SETS_SPIRV(RasterPSSpecConstantMS, capabilities));
++        parse(rasterPSFlat, RT64_TEXTURE_SETS_SPIRV(RasterPSSpecConstantFlat, capabilities));
++        parse(rasterPSFlatMS, RT64_TEXTURE_SETS_SPIRV(RasterPSSpecConstantFlatMS, capabilities));
+         assert(!rasterVS.empty());
+         assert(!rasterVSFlat.empty());
+         assert(!rasterPS.empty());
          assert(!rasterPSMS.empty());
          assert(!rasterPSFlat.empty());
          assert(!rasterPSFlatMS.empty());
@@ -2409,7 +2469,7 @@ index 721a01e..ab86f37 100644
      {
          assert(device != nullptr);
  
-@@ -95,10 +168,25 @@ namespace RT64 {
+@@ -95,10 +184,25 @@ namespace RT64 {
          const bool useMSAA = (multisampling.sampleCount > 1);
          std::unique_ptr<RenderShader> vertexShader;
          std::unique_ptr<RenderShader> pixelShader;
@@ -2437,7 +2497,7 @@ index 721a01e..ab86f37 100644
              // Choose the pre-compiled shader permutations.
              const respv::Shader *VS = nullptr;
              const respv::Shader *PS = nullptr;
-@@ -218,13 +306,42 @@ namespace RT64 {
+@@ -218,13 +322,42 @@ namespace RT64 {
  #       endif
          }
          
@@ -2483,7 +2543,7 @@ index 721a01e..ab86f37 100644
          creation.alphaBlend = !copyMode && interop::Blender::usesAlphaBlend(desc.otherMode);
          creation.culling = !copyMode && desc.flags.culling;
          creation.zCmp = !copyMode && desc.otherMode.zCmp() && (desc.otherMode.zMode() != ZMODE_DEC);
-@@ -232,11 +349,14 @@ namespace RT64 {
+@@ -232,11 +365,14 @@ namespace RT64 {
          creation.cvgAdd = (desc.otherMode.cvgDst() == CVG_DST_WRAP) || (desc.otherMode.cvgDst() == CVG_DST_SAVE);
          creation.NoN = desc.flags.NoN;
          creation.usesHDR = desc.flags.usesHDR;
@@ -2503,7 +2563,7 @@ index 721a01e..ab86f37 100644
      }
  
      RasterShader::~RasterShader() { }
-@@ -328,13 +448,16 @@ namespace RT64 {
+@@ -328,13 +464,16 @@ namespace RT64 {
          pipelineDesc.pixelShader = c.pixelShader;
          pipelineDesc.specConstants = c.specConstants.data();
          pipelineDesc.specConstantsCount = uint32_t(c.specConstants.size());
@@ -2522,10 +2582,15 @@ index 721a01e..ab86f37 100644
              targetBlend.blendOp = RenderBlendOperation::ADD;
          }
  
-@@ -422,12 +545,29 @@ namespace RT64 {
+@@ -422,12 +561,33 @@ namespace RT64 {
              PSBlobSize = uint32_t(useMSAA ? std::size(RasterPSDynamicMSBlobDXIL) : std::size(RasterPSDynamicBlobDXIL));
              break;
  #   endif
+-        case RenderShaderFormat::SPIRV:
+-            VSBlob = RasterVSDynamicBlobSPIRV;
+-            PSBlob = useMSAA ? RasterPSDynamicMSBlobSPIRV : RasterPSDynamicBlobSPIRV;
+-            VSBlobSize = uint32_t(std::size(RasterVSDynamicBlobSPIRV));
+-            PSBlobSize = uint32_t(useMSAA ? std::size(RasterPSDynamicMSBlobSPIRV) : std::size(RasterPSDynamicBlobSPIRV));
 +#   if defined(RT64_WGSL)
 +        case RenderShaderFormat::WGSL: {
 +            const bool dualSource = device->getCapabilities().dualSourceBlending;
@@ -2542,17 +2607,21 @@ index 721a01e..ab86f37 100644
 +            break;
 +        }
 +#   else
-         case RenderShaderFormat::SPIRV:
-             VSBlob = RasterVSDynamicBlobSPIRV;
-             PSBlob = useMSAA ? RasterPSDynamicMSBlobSPIRV : RasterPSDynamicBlobSPIRV;
-             VSBlobSize = uint32_t(std::size(RasterVSDynamicBlobSPIRV));
-             PSBlobSize = uint32_t(useMSAA ? std::size(RasterPSDynamicMSBlobSPIRV) : std::size(RasterPSDynamicBlobSPIRV));
++        case RenderShaderFormat::SPIRV: {
++            const RenderDeviceCapabilities &capabilities = device->getCapabilities();
++            const SPIRVBlob VS = RT64_TEXTURE_SETS_SPIRV(RasterVSDynamic, capabilities);
++            const SPIRVBlob PS = useMSAA ? RT64_TEXTURE_SETS_SPIRV(RasterPSDynamicMS, capabilities) : RT64_TEXTURE_SETS_SPIRV(RasterPSDynamic, capabilities);
++            VSBlob = VS.data;
++            PSBlob = PS.data;
++            VSBlobSize = uint32_t(VS.size);
++            PSBlobSize = uint32_t(PS.size);
              break;
++        }
 +#   endif
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              VSBlob = RasterVSDynamicBlobMSL;
-@@ -445,14 +585,12 @@ namespace RT64 {
+@@ -445,14 +605,12 @@ namespace RT64 {
          pixelShader = device->createShader(PSBlob, PSBlobSize, "PSMain", shaderFormat);
  
          FramebufferRendererDescriptorCommonSet descriptorCommonSet(shaderLibrary->samplerLibrary, device->getCapabilities().raytracing);
@@ -2568,10 +2637,14 @@ index 721a01e..ab86f37 100644
          layoutBuilder.addDescriptorSet(descriptorFramebufferSet);
          layoutBuilder.end();
          pipelineLayout = layoutBuilder.create(device);
-@@ -502,11 +640,19 @@ namespace RT64 {
+@@ -502,11 +660,24 @@ namespace RT64 {
              postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobDXIL, std::size(PostBlendDitherNoiseSubNegativePSBlobDXIL), "PSMain", shaderFormat);
              break;
  #   endif
+-        case RenderShaderFormat::SPIRV:
+-            postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobSPIRV, std::size(PostBlendDitherNoiseAddPSBlobSPIRV), "PSMain", shaderFormat);
+-            postBlendSubPixelShader = device->createShader(PostBlendDitherNoiseSubPSBlobSPIRV, std::size(PostBlendDitherNoiseSubPSBlobSPIRV), "PSMain", shaderFormat);
+-            postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobSPIRV, std::size(PostBlendDitherNoiseSubNegativePSBlobSPIRV), "PSMain", shaderFormat);
 +#   if defined(RT64_WGSL)
 +        case RenderShaderFormat::WGSL:
 +            postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobWGSL, sizeof(PostBlendDitherNoiseAddPSBlobWGSL), "PSMain", shaderFormat);
@@ -2579,17 +2652,22 @@ index 721a01e..ab86f37 100644
 +            postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobWGSL, sizeof(PostBlendDitherNoiseSubNegativePSBlobWGSL), "PSMain", shaderFormat);
 +            break;
 +#   else
-         case RenderShaderFormat::SPIRV:
-             postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobSPIRV, std::size(PostBlendDitherNoiseAddPSBlobSPIRV), "PSMain", shaderFormat);
-             postBlendSubPixelShader = device->createShader(PostBlendDitherNoiseSubPSBlobSPIRV, std::size(PostBlendDitherNoiseSubPSBlobSPIRV), "PSMain", shaderFormat);
-             postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobSPIRV, std::size(PostBlendDitherNoiseSubNegativePSBlobSPIRV), "PSMain", shaderFormat);
++        case RenderShaderFormat::SPIRV: {
++            const RenderDeviceCapabilities &capabilities = device->getCapabilities();
++            const SPIRVBlob add = RT64_TEXTURE_SETS_SPIRV(PostBlendDitherNoiseAddPS, capabilities);
++            const SPIRVBlob sub = RT64_TEXTURE_SETS_SPIRV(PostBlendDitherNoiseSubPS, capabilities);
++            const SPIRVBlob subNegative = RT64_TEXTURE_SETS_SPIRV(PostBlendDitherNoiseSubNegativePS, capabilities);
++            postBlendAddPixelShader = device->createShader(add.data, add.size, "PSMain", shaderFormat);
++            postBlendSubPixelShader = device->createShader(sub.data, sub.size, "PSMain", shaderFormat);
++            postBlendSubNegativePixelShader = device->createShader(subNegative.data, subNegative.size, "PSMain", shaderFormat);
              break;
++        }
 +#   endif
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobMSL, std::size(PostBlendDitherNoiseAddPSBlobMSL), "PSMain", shaderFormat);
 diff --git a/src/render/rt64_raster_shader.h b/src/render/rt64_raster_shader.h
-index 3b991ff..49a0d8f 100644
+index 3b991ff..f7a5889 100644
 --- a/src/render/rt64_raster_shader.h
 +++ b/src/render/rt64_raster_shader.h
 @@ -9,6 +9,7 @@
@@ -2600,10 +2678,14 @@ index 3b991ff..49a0d8f 100644
  
  #include "re-spirv/re-spirv.h"
  
-@@ -39,6 +40,17 @@ namespace RT64 {
-         void initialize();
-     };
+@@ -36,7 +37,18 @@ namespace RT64 {
+         respv::Shader rasterPSFlat;
+         respv::Shader rasterPSFlatMS;
  
+-        void initialize();
++        void initialize(const RenderDeviceCapabilities &capabilities);
++    };
++
 +    // The spec constant shaders a WGSL build specializes with override values, each created once: they are the same
 +    // source for every shader, and creating a RasterPS module (over 1 MB of WGSL) costs the browser a parse each time.
 +    struct ShaderCacheWGSL {
@@ -2613,11 +2695,9 @@ index 3b991ff..49a0d8f 100644
 +        // The vertex and pixel shader for a shading mode, created on first use.
 +        void get(RenderDevice *device, bool smoothShade, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader);
 +        const RenderShader *get(RenderDevice *device, const void *blob, uint64_t size, const char *entryPointName);
-+    };
-+
+     };
+ 
      struct PipelineCreation {
-         RenderDevice *device;
-         const RenderPipelineLayout *pipelineLayout;
 @@ -53,6 +65,7 @@ namespace RT64 {
          bool usesHDR;
          std::vector<RenderSpecConstant> specConstants;
@@ -2646,7 +2726,7 @@ index 3b991ff..49a0d8f 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..afec91d 100644
+index bf7b669..f96c40d 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,51 @@
@@ -2750,8 +2830,9 @@ index bf7b669..afec91d 100644
 +
          // Initialize the re-spirv optimizer cache.
          if (shaderFormat == RenderShaderFormat::SPIRV) {
-             optimizerCacheSPIRV.initialize();
-         }
+-            optimizerCacheSPIRV.initialize();
++            optimizerCacheSPIRV.initialize(device->getCapabilities());
++        }
 +
 +        // Create the spec constant shaders before anything draws. plume's WebGPU backend learns from each new shader which
 +        // stages read which bindings, and when that changes every pipeline gets a new layout: the specialized ones that
@@ -3196,7 +3277,7 @@ index bf7b669..afec91d 100644
 +        if ((indexIt != prebuildIndices.end()) && (prebuildState[indexIt->second] == PrebuildQueued)) {
 +            prebuildState[indexIt->second] = PrebuildWanted;
 +            prebuildWanted.emplace_back(indexIt->second);
-+        }
+         }
      }
  
      void RasterShaderCache::submit(const ShaderDescription &desc) {
@@ -3537,10 +3618,10 @@ index 25c0cf9..3260fa0 100644
          RSPProcessor(RenderDevice *device);
          ~RSPProcessor();
 diff --git a/src/render/rt64_shader_library.cpp b/src/render/rt64_shader_library.cpp
-index d1c5273..e68011b 100644
+index d1c5273..9b86e00 100644
 --- a/src/render/rt64_shader_library.cpp
 +++ b/src/render/rt64_shader_library.cpp
-@@ -4,54 +4,104 @@
+@@ -4,54 +4,105 @@
  
  #include "rt64_shader_library.h"
  
@@ -3683,13 +3764,14 @@ index d1c5273..e68011b 100644
 +#   include "shaders/Im3DVS.hlsl.spirv.h"
 +#   include "shaders/ComposePS.hlsl.spirv.h"
 +#   include "shaders/DebugPS.hlsl.spirv.h"
++#   include "shaders/DebugPSPerDraw.hlsl.spirv.h"
 +#   include "shaders/Im3DPS.hlsl.spirv.h"
 +#   include "shaders/PostProcessPS.hlsl.spirv.h"
 +#endif
  
  #ifdef _WIN32
  #   include "shaders/FbChangesClearCS.hlsl.dxil.h"
-@@ -153,22 +203,30 @@
+@@ -153,22 +204,30 @@
  #include "rt64_descriptor_sets.h"
  #include "rt64_render_target.h"
  
@@ -3730,7 +3812,7 @@ index d1c5273..e68011b 100644
          ENTRY_NAME,\
          SHADER_FORMAT
  #endif
-@@ -194,7 +252,7 @@ namespace RT64 {
+@@ -194,7 +253,7 @@ namespace RT64 {
          RenderPipelineLayoutBuilder layoutBuilder;
  
          // Create shaders shared across all pipelines.
@@ -3739,7 +3821,7 @@ index d1c5273..e68011b 100644
          
          auto fillSamplerSet = [&](SamplerSet &set, RenderFilter filter, bool anisotropyEnabled) {
              RenderSamplerDesc samplerDesc;
-@@ -263,7 +321,7 @@ namespace RT64 {
+@@ -263,7 +322,7 @@ namespace RT64 {
              layoutBuilder.end();
              bicubicScaling.pipelineLayout = layoutBuilder.create(device);
              
@@ -3748,7 +3830,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(bicubicScaling.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              bicubicScaling.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -277,7 +335,7 @@ namespace RT64 {
+@@ -277,7 +336,7 @@ namespace RT64 {
              layoutBuilder.end();
              boxFilter.pipelineLayout = layoutBuilder.create(device);
  
@@ -3757,7 +3839,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(boxFilter.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              boxFilter.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -290,7 +348,7 @@ namespace RT64 {
+@@ -290,7 +349,7 @@ namespace RT64 {
              layoutBuilder.end();
              compose.pipelineLayout = layoutBuilder.create(device);
  
@@ -3766,7 +3848,7 @@ index d1c5273..e68011b 100644
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = compose.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::AlphaBlend();
-@@ -350,7 +408,7 @@ namespace RT64 {
+@@ -350,7 +409,7 @@ namespace RT64 {
              layoutBuilder.end();
              idle.pipelineLayout = layoutBuilder.create(device);
  
@@ -3775,7 +3857,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(idle.pipelineLayout.get(), computeShader.get(), 1, 1, 1);
              idle.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -363,7 +421,7 @@ namespace RT64 {
+@@ -363,7 +422,7 @@ namespace RT64 {
              layoutBuilder.end();
              fbChangesClear.pipelineLayout = layoutBuilder.create(device);
  
@@ -3784,7 +3866,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(fbChangesClear.pipelineLayout.get(), computeShader.get(), 1, 1, 1);
              fbChangesClear.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -380,10 +438,10 @@ namespace RT64 {
+@@ -380,10 +439,10 @@ namespace RT64 {
              fbReadAnyChanges.pipelineLayout = layoutBuilder.create(device);
              fbReadAnyFull.pipelineLayout = layoutBuilder.create(device);
  
@@ -3797,7 +3879,7 @@ index d1c5273..e68011b 100644
              fbReadAnyFull.pipeline = device->createComputePipeline(RenderComputePipelineDesc(fbReadAnyFull.pipelineLayout.get(), fullShader.get(), 8, 8, 1));
          }
  
-@@ -396,7 +454,7 @@ namespace RT64 {
+@@ -396,7 +455,7 @@ namespace RT64 {
              layoutBuilder.end();
              fbReinterpret.pipelineLayout = layoutBuilder.create(device);
  
@@ -3806,7 +3888,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(fbReinterpret.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              fbReinterpret.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -414,13 +472,13 @@ namespace RT64 {
+@@ -414,13 +473,13 @@ namespace RT64 {
              fbWriteDepth.pipelineLayout = layoutBuilder.create(device);
              fbWriteDepthMS.pipelineLayout = layoutBuilder.create(device);
  
@@ -3823,7 +3905,7 @@ index d1c5273..e68011b 100644
              fbWriteDepthMS.pipeline = device->createComputePipeline(RenderComputePipelineDesc(fbWriteDepthMS.pipelineLayout.get(), depthShaderMS.get(), 8, 8, 1));
          }
  
-@@ -433,7 +491,7 @@ namespace RT64 {
+@@ -433,7 +492,7 @@ namespace RT64 {
              layoutBuilder.end();
              gaussianFilterRGB3x3.pipelineLayout = layoutBuilder.create(device);
  
@@ -3832,7 +3914,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(gaussianFilterRGB3x3.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              gaussianFilterRGB3x3.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -447,7 +505,7 @@ namespace RT64 {
+@@ -447,7 +506,7 @@ namespace RT64 {
              layoutBuilder.end();
              histogramAverage.pipelineLayout = layoutBuilder.create(device);
  
@@ -3841,7 +3923,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(histogramAverage.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              histogramAverage.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -460,7 +518,7 @@ namespace RT64 {
+@@ -460,7 +519,7 @@ namespace RT64 {
              layoutBuilder.end();
              histogramClear.pipelineLayout = layoutBuilder.create(device);
  
@@ -3850,7 +3932,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(histogramClear.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              histogramClear.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -474,7 +532,7 @@ namespace RT64 {
+@@ -474,7 +533,7 @@ namespace RT64 {
              layoutBuilder.end();
              histogramSet.pipelineLayout = layoutBuilder.create(device);
  
@@ -3859,7 +3941,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(histogramSet.pipelineLayout.get(), computeShader.get(), 1, 1, 1);
              histogramSet.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -488,7 +546,7 @@ namespace RT64 {
+@@ -488,7 +547,7 @@ namespace RT64 {
              layoutBuilder.end();
              luminanceHistogram.pipelineLayout = layoutBuilder.create(device);
  
@@ -3868,7 +3950,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(luminanceHistogram.pipelineLayout.get(), computeShader.get(), 8, 8, 1);
              luminanceHistogram.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -502,7 +560,7 @@ namespace RT64 {
+@@ -502,7 +561,7 @@ namespace RT64 {
              layoutBuilder.end();
              rspModify.pipelineLayout = layoutBuilder.create(device);
  
@@ -3877,7 +3959,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(rspModify.pipelineLayout.get(), computeShader.get(), 64, 1, 1);
              rspModify.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -511,12 +569,12 @@ namespace RT64 {
+@@ -511,12 +570,12 @@ namespace RT64 {
          {
              RSPProcessDescriptorSet descriptorSet;
              layoutBuilder.begin();
@@ -3892,7 +3974,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(rspProcess.pipelineLayout.get(), computeShader.get(), 64, 1, 1);
              rspProcess.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -530,7 +588,7 @@ namespace RT64 {
+@@ -530,7 +589,7 @@ namespace RT64 {
              layoutBuilder.end();
              rspSmoothNormal.pipelineLayout = layoutBuilder.create(device);
  
@@ -3901,7 +3983,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(rspSmoothNormal.pipelineLayout.get(), computeShader.get(), 64, 1, 1);
              rspSmoothNormal.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -539,12 +597,12 @@ namespace RT64 {
+@@ -539,12 +598,12 @@ namespace RT64 {
          {
              RSPWorldDescriptorSet descriptorSet;
              layoutBuilder.begin();
@@ -3916,7 +3998,7 @@ index d1c5273..e68011b 100644
              RenderComputePipelineDesc pipelineDesc(rspWorld.pipelineLayout.get(), computeShader.get(), 64, 1, 1);
              rspWorld.pipeline = device->createComputePipeline(pipelineDesc);
          }
-@@ -558,7 +616,7 @@ namespace RT64 {
+@@ -558,7 +617,7 @@ namespace RT64 {
              layoutBuilder.end();
              textureCopy.pipelineLayout = layoutBuilder.create(device);
  
@@ -3925,7 +4007,7 @@ index d1c5273..e68011b 100644
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = textureCopy.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
-@@ -578,15 +636,15 @@ namespace RT64 {
+@@ -578,15 +637,15 @@ namespace RT64 {
              layoutBuilder.end();
              textureDecode.pipelineLayout = layoutBuilder.create(device);
  
@@ -3944,7 +4026,7 @@ index d1c5273..e68011b 100644
  
              VideoInterfaceDescriptorSet nearestDescriptorSet(samplerLibrary.nearest.borderBorder.get());
              VideoInterfaceDescriptorSet linearDescriptorSet(samplerLibrary.linear.borderBorder.get());
-@@ -599,7 +657,7 @@ namespace RT64 {
+@@ -599,7 +658,7 @@ namespace RT64 {
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.vertexShader = fullScreenVertexShader.get();
              pipelineDesc.pixelShader = regularShader.get();
@@ -3953,7 +4035,7 @@ index d1c5273..e68011b 100644
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
              pipelineDesc.renderTargetCount = 1;
              pipelineDesc.pipelineLayout = videoInterfaceNearest.pipelineLayout.get();
-@@ -632,7 +690,7 @@ namespace RT64 {
+@@ -632,7 +691,7 @@ namespace RT64 {
          RenderPipelineLayoutBuilder layoutBuilder;
  
          // Create shaders shared across all pipelines.
@@ -3962,7 +4044,7 @@ index d1c5273..e68011b 100644
  
          // Select shader blobs based on sample count.
          const void *TextureResolvePSBlob = nullptr;
-@@ -717,6 +775,41 @@ namespace RT64 {
+@@ -717,6 +776,41 @@ namespace RT64 {
          }
          else
  #   endif
@@ -4004,7 +4086,7 @@ index d1c5273..e68011b 100644
          if (shaderFormat == RenderShaderFormat::SPIRV) {
              RtCopyDepthToColorPSBlob = RtCopyDepthToColorPSBlobSPIRV;
              RtCopyDepthToColorPSBlobSize = std::size(RtCopyDepthToColorPSBlobSPIRV);
-@@ -750,6 +843,7 @@ namespace RT64 {
+@@ -750,6 +844,7 @@ namespace RT64 {
                  break;
              }
          }
@@ -4012,7 +4094,7 @@ index d1c5273..e68011b 100644
          else {
              assert(false && "Unknown shader format.");
          }
-@@ -764,7 +858,7 @@ namespace RT64 {
+@@ -764,7 +859,7 @@ namespace RT64 {
              fbChangesDrawColor.pipelineLayout = layoutBuilder.create(device);
              fbChangesDrawDepth.pipelineLayout = layoutBuilder.create(device);
  
@@ -4021,7 +4103,7 @@ index d1c5273..e68011b 100644
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = fbChangesDrawColor.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
-@@ -775,7 +869,7 @@ namespace RT64 {
+@@ -775,7 +870,7 @@ namespace RT64 {
              pipelineDesc.multisampling = multisampling;
              fbChangesDrawColor.pipeline = device->createGraphicsPipeline(pipelineDesc);
  
@@ -4030,7 +4112,7 @@ index d1c5273..e68011b 100644
              pipelineDesc.pipelineLayout = fbChangesDrawDepth.pipelineLayout.get();
              pipelineDesc.pixelShader = depthShader.get();
              pipelineDesc.depthEnabled = true;
-@@ -840,7 +934,7 @@ namespace RT64 {
+@@ -840,7 +935,7 @@ namespace RT64 {
              layoutBuilder.end();
              postProcess.pipelineLayout = layoutBuilder.create(device);
  
@@ -4039,7 +4121,7 @@ index d1c5273..e68011b 100644
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = postProcess.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::AlphaBlend();
-@@ -855,17 +949,15 @@ namespace RT64 {
+@@ -855,17 +950,25 @@ namespace RT64 {
          // Raytracing debug.
          {
              FramebufferRendererDescriptorCommonSet descriptorCommonSet(samplerLibrary, deviceCapabilities.raytracing);
@@ -4055,11 +4137,21 @@ index d1c5273..e68011b 100644
              debug.pipelineLayout = layoutBuilder.create(device);
  
 -            std::unique_ptr<RenderShader> pixelShader = device->createShader(CREATE_SHADER_INPUTS(DebugPSBlobDXIL, DebugPSBlobSPIRV, DebugPSBlobMSL, "PSMain", shaderFormat));
-+            std::unique_ptr<RenderShader> pixelShader = device->createShader(CREATE_SHADER_INPUTS(DebugPS, "PSMain", shaderFormat));
++            std::unique_ptr<RenderShader> pixelShader;
++#       if !defined(RT64_WGSL)
++            if (shaderFormat == RenderShaderFormat::SPIRV) {
++                const SPIRVBlob blob = RT64_TEXTURE_SETS_SPIRV(DebugPS, deviceCapabilities);
++                pixelShader = device->createShader(blob.data, blob.size, "PSMain", shaderFormat);
++            }
++            else
++#       endif
++            {
++                pixelShader = device->createShader(CREATE_SHADER_INPUTS(DebugPS, "PSMain", shaderFormat));
++            }
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = debug.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::AlphaBlend();
-@@ -889,10 +981,10 @@ namespace RT64 {
+@@ -889,10 +992,10 @@ namespace RT64 {
              rspVertexTestZ.pipelineLayout = layoutBuilder.create(device);
              rspVertexTestZMS.pipelineLayout = layoutBuilder.create(device);
  
