@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web a5bc25d81a11044c8c27be58eba62a9c01a6f977
+rt64: https://github.com/amazingalek/rt64-web f01c3a69c78b12e130efc5ab1c50491a0baba378
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1833,7 +1833,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..2747dca 100644
+index 9fae0d4..dfaf629 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -1868,19 +1868,44 @@ index 9fae0d4..2747dca 100644
              descriptorTextureVersions.clear();
              descriptorTextureGlobalVersion = 0;
              descriptorTextureReplacementMapEnabled = textureCacheReplacementMapEnabled;
-@@ -378,6 +381,11 @@ namespace RT64 {
+@@ -373,10 +376,36 @@ namespace RT64 {
+ 
+         descCommonSet->setBuffer(descCommonSet->FrParams, frameParamsBuffer.get(), sizeof(interop::FrameParams));
+         descCommonSet->setBuffer(descCommonSet->instanceRenderIndices, renderIndicesBuffer.get(), RenderBufferStructuredView(sizeof(interop::RenderIndices)));
++#   ifdef __EMSCRIPTEN__
++        // A workload makes a draw buffer the first time it has something to put in it, so one whose draws have used
++        // no tile yet (an untextured boot logo) has no GPU tiles buffer. On WebGPU a set's layout is built from what
++        // is bound (plume), so binding nothing left GPUTiles out of it, and a pipeline built in the background for
++        // that layout with a pixel shader that reads GPUTiles failed ("Binding doesn't exist"), and every command
++        // buffer that drew with it was dropped. A zeroed buffer stands in until the workload has one.
++        if (dummyStorageBuffer == nullptr) {
++            const uint64_t dummySize = std::max({ sizeof(interop::RDPParams), sizeof(interop::RDPTile), sizeof(interop::GPUTile), sizeof(interop::RenderParams) });
++            dummyStorageBuffer = worker->device->createBuffer(RenderBufferDesc::DefaultBuffer(dummySize, RenderBufferFlag::STORAGE));
++        }
++
++        auto drawBuffer = [this](const BufferPair &pair) -> const RenderBuffer * {
++            return (pair.get() != nullptr) ? pair.get() : dummyStorageBuffer.get();
++        };
++
++        descCommonSet->setBuffer(descCommonSet->instanceRDPParams, drawBuffer(drawBuffers->rdpParamsBuffer), RenderBufferStructuredView(sizeof(interop::RDPParams)));
++        descCommonSet->setBuffer(descCommonSet->RDPTiles, drawBuffer(drawBuffers->rdpTilesBuffer), RenderBufferStructuredView(sizeof(interop::RDPTile)));
++        descCommonSet->setBuffer(descCommonSet->GPUTiles, drawBuffer(drawBuffers->gpuTilesBuffer), RenderBufferStructuredView(sizeof(interop::GPUTile)));
++        descCommonSet->setBuffer(descCommonSet->DynamicRenderParams, drawBuffer(drawBuffers->renderParamsBuffer), RenderBufferStructuredView(sizeof(interop::RenderParams)));
++#   else
+         descCommonSet->setBuffer(descCommonSet->instanceRDPParams, drawBuffers->rdpParamsBuffer.get(), RenderBufferStructuredView(sizeof(interop::RDPParams)));
+         descCommonSet->setBuffer(descCommonSet->RDPTiles, drawBuffers->rdpTilesBuffer.get(), RenderBufferStructuredView(sizeof(interop::RDPTile)));
          descCommonSet->setBuffer(descCommonSet->GPUTiles, drawBuffers->gpuTilesBuffer.get(), RenderBufferStructuredView(sizeof(interop::GPUTile)));
          descCommonSet->setBuffer(descCommonSet->DynamicRenderParams, drawBuffers->renderParamsBuffer.get(), RenderBufferStructuredView(sizeof(interop::RenderParams)));
- 
++#   endif
++
 +        // The textures are bound per draw instead, by updateDrawTextureSets().
 +        if (usePerDrawTextures) {
 +            return;
 +        }
-+
+ 
          // Make sure the versions vector matches the texture cache size.
          descriptorTextureVersions.resize(textureCacheSize, 0);
- 
-@@ -473,6 +481,7 @@ namespace RT64 {
+@@ -473,6 +502,7 @@ namespace RT64 {
          interop::RasterParams rasterParams;
          RenderDescriptorSet *descRealFbSet = framebuffer.descRealFbSet->get();
          RenderDescriptorSet *descDummyFbSet = framebuffer.descDummyFbSet->get();
@@ -1888,7 +1913,7 @@ index 9fae0d4..2747dca 100644
  
          auto switchToGraphicsPipeline = [&]() {
              previousCallType = InstanceDrawCall::Type::Unknown;
-@@ -481,8 +490,15 @@ namespace RT64 {
+@@ -481,8 +511,15 @@ namespace RT64 {
              previousScissor = RenderRect();
              worker->commandList->setGraphicsPipelineLayout(rendererPipelineLayout);
              worker->commandList->setGraphicsDescriptorSet(descCommonSet->get(), 0);
@@ -1906,7 +1931,7 @@ index 9fae0d4..2747dca 100644
              worker->commandList->setGraphicsDescriptorSet(depthState ? descRealFbSet : descDummyFbSet, 3);
              worker->commandList->setViewports(framebuffer.viewport);
          };
-@@ -570,6 +586,14 @@ namespace RT64 {
+@@ -570,6 +607,14 @@ namespace RT64 {
                      worker->commandList->setPipeline(triangles.pipeline);
                      previousPipeline = triangles.pipeline;
                  }
@@ -1921,7 +1946,7 @@ index 9fae0d4..2747dca 100644
                  
                  rasterParams.renderIndex = i;
                  rasterParams.screenScale = triangles.screenScale;
-@@ -618,7 +642,12 @@ namespace RT64 {
+@@ -618,7 +663,12 @@ namespace RT64 {
                  const interop::RSPVertexTestZCB &testZCB = drawCall.vertexTestZ;
                  switchToDepthRead();
  
@@ -1934,7 +1959,7 @@ index 9fae0d4..2747dca 100644
                  const auto &rspVertexTestZ = useMSAA ? shaderLibrary->rspVertexTestZMS : shaderLibrary->rspVertexTestZ;
                  worker->commandList->barriers(RenderBarrierStage::COMPUTE, RenderBufferBarrier(testZIndexBuffer, RenderBufferAccess::WRITE));
                  worker->commandList->setPipeline(rspVertexTestZ.pipeline.get());
-@@ -1339,8 +1368,15 @@ namespace RT64 {
+@@ -1339,8 +1389,15 @@ namespace RT64 {
          memcpy(paramBufferBytes, &fbParams, sizeof(interop::FramebufferParams));
          framebuffer.paramsBuffer->unmap();
  
@@ -1950,7 +1975,7 @@ index 9fae0d4..2747dca 100644
          framebuffer.descRealFbSet->setBuffer(framebuffer.descRealFbSet->FbParams, framebuffer.paramsBuffer.get(), sizeof(interop::FramebufferParams));
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundColor, backgroundColorTexture, RenderTextureLayout::SHADER_READ, backgroundColorTextureView);
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundDepth, p.fbStorage->depthTarget->texture.get(), RenderTextureLayout::DEPTH_READ, p.fbStorage->depthTarget->textureView.get());
-@@ -1760,7 +1796,205 @@ namespace RT64 {
+@@ -1760,7 +1817,205 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
  
@@ -2157,7 +2182,7 @@ index 9fae0d4..2747dca 100644
          bool shaderViewRtEnabled = false;
          std::vector<BufferUploader::Upload> shaderUploads = {
              { renderIndicesVector.data(), { 0, renderIndicesVector.size() }, sizeof(interop::RenderIndices), RenderBufferFlag::STORAGE, { }, &renderIndicesBuffer},
-@@ -1816,8 +2050,16 @@ namespace RT64 {
+@@ -1816,8 +2071,16 @@ namespace RT64 {
          }
  #   endif
  
@@ -2175,10 +2200,10 @@ index 9fae0d4..2747dca 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..da1a2bf 100644
+index 3add9c3..9ec3b6a 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
-@@ -98,6 +98,37 @@ namespace RT64 {
+@@ -98,6 +98,41 @@ namespace RT64 {
          std::vector<uint32_t> descriptorTextureVersions;
          uint32_t descriptorTextureGlobalVersion = 0;
          bool descriptorTextureReplacementMapEnabled = false;
@@ -2213,10 +2238,14 @@ index 3add9c3..da1a2bf 100644
 +        std::unordered_map<DrawTextureStamps, uint32_t, DrawTextureStampsHash> drawTextureSetMap;
 +        std::unique_ptr<RenderTexture> dummyTileTexture;
 +        bool dummyTileTextureTransitioned = false;
++#   ifdef __EMSCRIPTEN__
++        // Bound in place of a draw buffer a workload hasn't made yet (updateShaderDescriptorSet).
++        std::unique_ptr<RenderBuffer> dummyStorageBuffer;
++#   endif
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -166,7 +197,9 @@ namespace RT64 {
+@@ -166,7 +201,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);

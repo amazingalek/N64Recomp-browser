@@ -264,6 +264,9 @@ plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_
                        Dam: the display list thread's waits 2.3 s → 0.15 s in 13 s, the page's thread 47% → 32% busy)
 plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present: RT64's
 rt64 a5bc25d           present thread asks both before every present (its waits 963 → 106 ms in 13 s)
+rt64 f01c3a6           a draw buffer a workload hasn't made yet bound as a zeroed buffer on WebGPU: one whose draws had
+                       used no tile had no GPU tiles buffer, plume left GPUTiles out of the set's layout, and pipelines
+                       built behind the game for it failed, their command buffers dropped (Mario Kart 64's boot logo)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
