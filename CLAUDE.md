@@ -774,7 +774,7 @@ Cauldron Keep, the game's own rate, where rt64's pacing switches on (the game's 
 builds its ELF from the Pilotwings 64 decompilation (`lib/Pilotwings64Decomp`, IDO 5.3 and the MIPS binutils, which the
 Docker image has for it) and recompiles that with the nested N64Recomp, which must be built from the patched checkout.
 Fast3D, which RT64 draws on WebGPU unchanged. Its `lib/RT64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are
-upstream's at its commits (rows of `pins.txt`), patched by its own `tools/patch_all.py` and then by `apply.cmake` a
+upstream's at its commits, patched by its own `tools/patch_all.py` and then by `apply.cmake` a
 project at a time, by name, since its folder is `RT64`. It keeps its own SDL window and audio queue with its own
 resampler; on the page the queue is `audio_output.h`'s ring at the page's rate. Render to RAM is off on its page (its
 desktop build keeps RT64's default): the CPU reads a frame only in `uvCopyFrameBuf`, which copies one framebuffer into
