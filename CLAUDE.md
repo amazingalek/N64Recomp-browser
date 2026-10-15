@@ -789,6 +789,26 @@ the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firef
 18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
 after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
 
+`amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled (GPL-3.0, US). Upstream is a set of patches
+and code (`patches/`, `src/jfg/`) on another recomp, a Diddy Kong Racing one that `build_linux.sh` downloads at a
+commit: its own frontend (an RmlUi launcher and menus, no RecompFrontend) and its own rt64 and N64ModernRuntime. The
+page is built by `tools/build_web.sh` in `web-build/`: that base project again, its `lib/rt64`, `lib/N64ModernRuntime`
+and `lib/N64Recomp` moved to the commits in `patches/patches.txt` and patched by `apply.cmake`, then the base's and
+the game's own changes to them made again for those commits (`patches/web/rt64.patch`, `N64ModernRuntime.patch`), and
+the base's frontend made a page (`patches/web/dkr.patch`: the canvas, recompui-style WGSL menus, `audio_output.h`, the
+file picker, HOME kept in IndexedDB, rumble through the Gamepad API, no mods, Exit, debug window or F10 toolbar, the
+dummy frame kept out of RDRAM as RecompFrontend 75fe596 does). The game's recompiled code is made again with the
+web-patched N64Recomp, which has no call tracking, so the hooks' `recomp_exit_function()` calls come out of the copy
+of its config it reads. The game binds draw buffers the workload hasn't made before the first one does, which WebGPU
+refused until rt64-web f01c3a6 bound a zeroed one. Render to RAM stays on with the exact copy (WebGPU in Chrome and
+Firefox): the CPU reworks the shadows' render targets on the heap, reads the framebuffers for its screen effects and
+the Z buffer for the lens flares. Its list, `src/rt64_shaders.txt`, 201 descriptions and 193 pipelines, the boot 36
+(launcher to the character select) and a section a planet (15, 20-86 descriptions each), is recorded by code
+(`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
+`tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
+page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C).
+<!-- jfg measurements -->
+
 ## WebGPU in Chrome and Firefox
 
 Shaders go HLSL → SPIR-V (dxc, without `-fvk-invert-y`: WebGPU's clip space is D3D's) → WGSL (naga
@@ -890,8 +910,10 @@ changing it:
   it flushes its task queue and reads the pictograph and the pause background at once, so it keeps the exact copy. Nor
   can a game that puts something in a framebuffer's memory once the RDP is done: the copy lands while the game runs,
   and though it keeps every word the CPU changed (rt64 cb75c5c), a word written with the value it held looks untouched
-  and gets the frame. The console reports each write it kept, so a page run through a game's levels with the late copy
-  says whether its CPU touches a framebuffer with one pending. Through the device thread, the main thread checks a
+  and gets the frame. Jet Force Gemini's CPU reworks its shadows' render targets once the RDP has drawn them, and with
+  the copy late they came out blurred or as dots, so its page keeps the exact copy too. The console reports each write
+  it kept, so a page run through a game's levels with the late copy says whether its CPU touches a framebuffer with one
+  pending. Through the device thread, the main thread checks a
   READBACK buffer at each replay and present once a copy into it is replayed, maps it when the browser has delivered
   the data, and publishes the answer, which `isMapReady()` reads and `map()` waits for without waiting behind the
   main thread's queue; a build without threads would need `-sJSPI` (or ASYNCIFY) to wait in place. A call that waits
