@@ -3,6 +3,7 @@
 // each level, and the page, opened with ?record-shaders, prints every shader RT64 meets.
 //
 //   node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...]
+//       [--from <load>]
 //
 // The build dir is served on 127.0.0.1 with the cross-origin headers a threaded page needs, on a fixed port (8917
 // unless --port: the ROM and saves are kept per origin, port included), and Chrome (headless, muted, WebGPU on) is
@@ -40,9 +41,10 @@ const profileOption = option(args, '--profile', null);
 const freshProfile = (profileOption === null) || !fs.existsSync(profileOption);
 const profile = profileOption ?? fs.mkdtempSync(path.join(os.tmpdir(), 'record-shaders-'));
 const only = option(args, '--only', null)?.split(',');
+const from = Number(option(args, '--from', '1'));
 const chrome = option(args, '--chrome', undefined);
 if (args.length !== 4) {
-  console.error('usage: node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...] [--chrome <path>]');
+  console.error('usage: node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...] [--from <load>] [--chrome <path>]');
   process.exit(1);
 }
 const [planFile, buildDir, rom, outFile] = args;
@@ -76,10 +78,19 @@ const write = () => {
   fs.writeFileSync(outFile, lines.join('\n') + '\n');
   return all.size;
 };
+// --from <n> goes on with a list stopped partway: the out list as it was written, and the plan's loads from the nth
+// (the log numbers them).
+if (from > 1) {
+  for (const line of fs.readFileSync(outFile, 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('section ')) sections.push({ name: line.slice(8), shaders: [] });
+    else (sections.length ? sections[sections.length - 1].shaders : boot).push(line);
+  }
+}
 let first = true;
-for (const section of plan.sections) {
-  if (only && !only.includes(section.name)) continue;
-  log(`section ${section.name}`);
+for (const [index, section] of plan.sections.entries()) {
+  if (index + 1 < from || (only && !only.includes(section.name))) continue;
+  log(`section ${section.name} (load ${index + 1} of ${plan.sections.length})`);
   printed = [];
   keep = true;
   await page.navigate(`http://127.0.0.1:${port}/${plan.page}?record-shaders`);
