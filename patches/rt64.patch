@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web b052049d27a8dc763b394a51eb1d2696a83f80cf
+rt64: https://github.com/amazingalek/rt64-web ee2dd6a283b2f1d31986b96545e1835f43080c44
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2726,7 +2726,7 @@ index 3b991ff..f7a5889 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..f96c40d 100644
+index bf7b669..e9a70c7 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,51 @@
@@ -2806,7 +2806,7 @@ index bf7b669..f96c40d 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +159,482 @@ namespace RT64 {
+@@ -105,13 +159,485 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -2869,9 +2869,12 @@ index bf7b669..f96c40d 100644
 +    // Where pipelines build in the background (Chrome), the game waits only for what a frame wants. One thread builds
 +    // the whole list behind the game from its first draw (prebuildAhead), a section at a time in the list's order, the
 +    // order the recording reached them in; a round moves the rest of its section to the front, and strays go before
-+    // that. Section 0, the boot, has only a few seconds of logos before the game wants the rest, so half the threads
-+    // build it; the rest is built one at a time, since each thread takes a core in the browser's GPU process and
-+    // levels come minutes apart. So the first frame waits only for its own shaders, the panel the page showed for a whole section before the
++    // that. Section 0, the boot, has only a few seconds of logos before the game wants the rest, and section 1 is
++    // usually what follows it by itself or a press of Start later (the attract demo, the menus), so half the threads
++    // build those two; the rest is built one at a time, since each thread takes a core in the browser's GPU process and
++    // levels come minutes apart. With section 1 on one thread, a list whose boot ends at the title (Pilotwings 64's,
++    // so that Firefox draws the title before it builds the menus) waited 3-8 s in Chrome on the menus' 28-36 after Start,
++    // where with them in the boot it never had. So the first frame waits only for its own shaders, the panel the page showed for a whole section before the
 +    // game started is mostly gone, and a level reached after a minute of play is usually built before the game gets
 +    // there. Where building a pipeline holds up the device (Firefox, setup()), anything built behind the game would
 +    // stall its frames, so nothing is: section 0 is built before the game gets past its first frame, a round builds
@@ -2964,8 +2967,8 @@ index bf7b669..f96c40d 100644
 +        prebuildCount = pipelineCount + uint32_t(prebuildLearned.size());
 +        prebuildState.assign(RT64PrebuiltShaderCount + prebuildLearned.size(), PrebuildQueued);
 +        prebuildBoot.assign(prebuildState.size(), false);
-+        if (!prebuildSections.empty()) {
-+            for (uint32_t index : prebuildSections[0]) {
++        for (uint32_t s = 0; s < std::min<uint32_t>(uint32_t(prebuildSections.size()), 2U); s++) {
++            for (uint32_t index : prebuildSections[s]) {
 +                prebuildBoot[index] = true;
 +            }
 +        }
@@ -2995,9 +2998,9 @@ index bf7b669..f96c40d 100644
 +        }
 +
 +        if (specializedShaders) {
-+            printf("RT64: %u prebuilt shaders, %u pipelines, in %u sections, and %u learned; built behind the game once it draws (section %s %u at a time, the rest one), the game waiting only for what a frame wants, %u at a time\n",
++            printf("RT64: %u prebuilt shaders, %u pipelines, in %u sections, and %u learned; built behind the game once it draws (sections %s and %s %u at a time, the rest one), the game waiting only for what a frame wants, %u at a time\n",
 +                RT64PrebuiltShaderCount, pipelineCount, RT64PrebuiltShaderSectionCount, uint32_t(prebuildLearned.size()), RT64PrebuiltShaderSections[0].name,
-+                prebuildBootThreads, threads);
++                (RT64PrebuiltShaderSectionCount > 1) ? RT64PrebuiltShaderSections[1].name : "(none)", prebuildBootThreads, threads);
 +        }
 +        else {
 +            printf("RT64: %u prebuilt shaders, %u pipelines, in %u sections, and %u learned; the game waiting for the %u of section %s, built %u at a time once the game draws\n",
@@ -3134,7 +3137,7 @@ index bf7b669..f96c40d 100644
 +    }
 +
 +    // Every thread builds the round's shaders, and between rounds the first one builds ahead of the game, with up to
-+    // half of them while what is next is section 0's (startPrebuild()).
++    // half of them while what is next is section 0's or 1's (startPrebuild()).
 +    void RasterShaderCache::prebuildLoop(uint32_t thread) {
 +#   if defined(RT64_PREBUILT_SHADERS)
 +        Thread::setCurrentThreadName("RT64 Prebuild");
@@ -3290,7 +3293,7 @@ index bf7b669..f96c40d 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +648,22 @@ namespace RT64 {
+@@ -125,6 +651,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -3313,7 +3316,7 @@ index bf7b669..f96c40d 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +704,18 @@ namespace RT64 {
+@@ -165,6 +707,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {

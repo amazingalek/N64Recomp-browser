@@ -141,15 +141,18 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
   starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are the boot, and
   each section after it a level or a part of the game. In Chrome, which builds pipelines on threads of its own, the
-  page builds the whole list behind the game from its first draw, in the list's order, the boot on half the cores and
-  the rest one at a time, and the game waits only when a frame asks for at least 4 shaders of one section that aren't
+  page builds the whole list behind the game from its first draw, in the list's order, the boot and the section after
+  it on half the cores and the rest one at a time, and the game waits only when a frame asks for at least 4 shaders of one section that aren't
   built, for those, holding its frame under a small "Preparing graphics" indicator in a corner; the rest of that
   section is built next. Rush 2049's page, cold, builds its 75 pipelines ~9 s after Start Game, behind the logos and
   the title, waiting at most half a second. Firefox waits instead, since anything built behind the game stalls its
   frames: for the boot before the game's first frame, and for a whole section when a frame first asks for 4 of its
   shaders. So a list's boot is what the game shows before its first level, and the rest goes in sections: Rush
   2049's boot (logos, title, menus) is 21 pipelines and 2 s in Firefox, against 75 and 9.8 s as one list, and its
-  race section's 41 take 7 s when the first race starts. A
+  race section's 41 take 7 s when the first race starts. A boot that would still be long can end at the title, with
+  the menus the next section: Pilotwings 64's title and menus were 80 pipelines and 24-37 s in Firefox before its
+  first frame, and its title alone is 33 and 7-9 s, the menus' 47 built after Start; Chrome builds that second
+  section on the boot's threads too, so it doesn't wait for it. A
   description can be in several sections. One the list missed, or a few at a time, is built
   behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
