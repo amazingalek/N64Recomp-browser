@@ -66,7 +66,7 @@ pins).
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  built and played before it lands. A change to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve and publish pages
   skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
@@ -264,9 +264,21 @@ plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_
                        Dam: the display list thread's waits 2.3 s → 0.15 s in 13 s, the page's thread 47% → 32% busy)
 plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present: RT64's
 rt64 a5bc25d           present thread asks both before every present (its waits 963 → 106 ms in 13 s)
-rt64 f01c3a6           a draw buffer a workload hasn't made yet bound as a zeroed buffer on WebGPU: one whose draws had
-                       used no tile had no GPU tiles buffer, plume left GPUTiles out of the set's layout, and pipelines
-                       built behind the game for it failed, their command buffers dropped (Mario Kart 64's boot logo)
+rt64 29f50e6           the prebuilt shaders' phi variables (naga's `var phi_<n>_` in a function) moved to module scope as
+                       var<private>: Chrome parses a module on the thread that takes the page's presents, a 180 KB
+                       RasterPS in 100-120 ms, ~30 after; Pilotwings 64's page, while its list built behind the game in
+                       Chrome 155, 17-19 frame gaps over 100 ms → 4 on a quiet host, Firefox's waits no longer
+rt64 f01c3a6           with Emscripten a workload's RDP params, tiles, GPU tiles and render params bound as a zeroed buffer
+                       until it makes its own: a set's layout is built from what is bound, so a pipeline whose pixel shader
+                       reads GPUTiles failed ("Binding doesn't exist") on a workload with no tile yet (Mario Kart 64's logo)
+rt64 008f380           on WebGPU a pixel shader with mip LOD samples its two levels, and its two tiles where LOD picks
+                       them per pixel, in loops the shader keeps: ~70 KB of WGSL instead of 185, and Firefox's waits for
+                       GoldenEye's Dam and Pilotwings 64's menus less than half; the prebuilt shaders specialized by
+                       spirv-opt alone (re-spirv can't take a loop), so a page's build needs it
+plume 904b26c          ?uncapped: the display reported at 360 Hz (?uncapped=<60-1000>), 4 presents in flight, and RT64
+rt64 e408ed4           interpolating to it without pacing, so with the browser's frames uncapped too (play_page.mjs
+                       --uncapped) a page presents as fast as the GPU, its thread and the GPU process take: every page
+                       read ~60 on a desktop GPU at the display's rate, which told no browser or build from another
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -292,8 +304,8 @@ place of SDL's queue; the shell's notice in Firefox, shown always, recommending 
 info is all empty strings, so a page there can't tell what it draws with; Chrome shows none), and its "Preparing
 graphics" indicator in a corner (the percentage and the time left, over the frame the game holds while it waits for
 shaders), which keeps the shaders a page learned in `localStorage`; `tools/record_shaders.mjs`, which records a game's
-shader list by a plan; and SPIRV-Tools in its CI (spirv-opt; without it rt64 warns and the shaders come out about twice
-the size). The tail calls are `return_call`s with `-mtail-call`, which every web build compiles with; a desktop build
+shader list by a plan; and SPIRV-Tools in its CI (spirv-opt, which specializes the prebuilt shaders: a page's build
+fails without it). The tail calls are `return_call`s with `-mtail-call`, which every web build compiles with; a desktop build
 only gains an empty `RECOMP_TAIL_CALL`.
 
 ## Changing it
@@ -389,21 +401,47 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
   and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
-  stand-in for one, marked "(stand-in)": the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
-  the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play
-  25`). A desktop GPU at a normal size plays every page, so it never fills a cell. The stand-in is gentler than a
-  laptop: Banjo played smooth on it in Firefox and almost smooth on the laptop, so it finds a problem but can't clear
-  one, and a laptop result stays until a newer laptop run replaces it. A cell says how the page plays as of its date,
-  in absolute terms (smooth, the presents a second, never boots), never against an earlier result ("the crash is
-  gone"); one whose laptop result a fix was made for gives the stand-in's result and "not yet on a laptop" until it is
-  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so. A
+  stand-in for one, marked `*`: the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
+  the pixels of a laptop's window, in both browsers at one CSS pixel a pixel, uncapped (`play_page.mjs --uncapped
+  --size 3840x2000 --play 25`, Playing a page). At the display's rate every page read about 60 on the stand-in, which
+  told neither browser nor any build apart; uncapped, its presents a second are what the page can make, so a higher
+  number is a cheaper frame, 342 or more is the uncapped rate's ceiling, and the retest's runs are compared with
+  earlier uncapped runs only (the first has none). A desktop GPU at a normal size plays every page, so it never fills a
+  cell. The stand-in is gentler than a laptop and sees cost only: Banjo played 59-60 on it in Firefox and 20-30 on the
+  laptop, where callbacks that come back late and the browser's own frames held it back, so it finds a problem but
+  can't clear one, and a laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence:
+  the median presents a second after the waits as of its date ("58", "240*"), `†` beside one that is the game's own
+  frame rate ("20†"), a laptop's and the stand-in's both when the stand-in has a newer one ("20†; 240*"), words only where there is no number
+  ("never boots", "not yet"), never "smooth" and never against an earlier result ("the crash is gone"). One whose laptop
+  result a fix was made for gives the stand-in's number until it is played there again. A cell below 60 without a `†` has work filed
+  to make it 60. A
   laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
   so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
   a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
   for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
-A new game gets a row in the same work as its port.
+A new game gets a row in the same work as its port, its Recomp cell naming the upstream recomp and its owner
+("[name](url) by owner"), from the fork's GitHub parent.
+
+## The games page
+
+`site/` is a page of every game in the Games table: a tile each with its launcher's image, its Recomp credit and its
+Chrome and Firefox cells, and Play, which runs the game's page in a frame on it. It is not published yet, and nothing
+in this repo, the forks or the game forks links to it, and the README doesn't name it: leave it so until that
+changes. Keep it current in the same work as what changes it, like the README:
+
+- It reads the table from main's README.md on each visit (served locally, the checkout's), finding the columns by their
+  headers (Game, Recomp, Repo, Page, the two with Chrome and Firefox), so a row or a cell needs nothing more; a column
+  renamed or a cell written another way needs `site.js`'s parse to follow.
+- A new game also needs its tile's image in the same work: `site/img/<repo>.webp`, named as its Repo cell, its page's
+  launcher captured in headless Chrome at 1280x720 without a ROM (the art its recomp ships, nothing of the game's) and
+  shrunk to a 640x360 WebP. Clear `sessionStorage` between two game pages in one tab, or the second can show the
+  isolation notice (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a colour.
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path on to
+  GitHub Pages, so the games play in its frame as they will there. `site.js` says how the frame stays cross-origin
+  isolated, why it is navigated by `location.replace` (Back returns to the grid) and why fullscreen is the game page's
+  own document (a fullscreen element around the frame froze Banjo's picture).
 
 ## Playing a page
 
@@ -428,7 +466,12 @@ A new game gets a row in the same work as its port.
   Look at a page with CDP `Page.captureScreenshot` of that page.
 - What the page says about itself: `Module.recompAudioStats()` gives frames played and frames short;
   `?present-stats` (plume 90ef8e5) prints presents a second and how late each one's onSubmittedWorkDone comes back, and
-  `?presents-in-flight=<1-8>` fixes the cap (otherwise 2, raised to 4 at most while it holds presents back); `?record-shaders` prints the shaders the game asks for; the console reports
+  `?presents-in-flight=<1-8>` fixes the cap (otherwise 2, raised to 4 at most while it holds presents back); `?uncapped`
+  (plume 904b26c, rt64 e408ed4) presents as fast as the page can, which needs the browser's animation frames uncapped
+  too (Chrome `--disable-frame-rate-limit`, Firefox `layout.frame_rate` 0; `play_page.mjs --uncapped` sets both): a
+  number to compare by, not what a player sees, since a player's browser holds the page to the display; it costs
+  video memory, an interpolated frame's color target per present a game frame (~530 MB for a 20 fps game at
+  3840x2000); `?record-shaders` prints the shaders the game asks for; the console reports
   each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode`
   in a preload, take `processorOptions.ring` and sample its two counters every few ms.
 - Read video memory from the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` counter and nvidia-smi, not the
@@ -447,6 +490,29 @@ A new game gets a row in the same work as its port.
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+
+## Frame rates
+
+- Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
+  setting, Display by default in every game, interpolates between the game's frames to the display's rate, each
+  interpolated frame a full redraw, so a page presents 60 a second on a 60 Hz display (144 on a 144 Hz one) whatever
+  the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
+  RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
+- The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
+  Original 30), Pilotwings 64 60 (a variable timestep), and the other seven their cartridge's: Majora's Mask 20,
+  Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
+  races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
+- A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
+  a game fork carrying web support only. Weigh it first: a game's logic at 60 gives lower input lag, motion the game
+  computes rather than RT64 interpolates, and the few things interpolation misses (some particles and 2D), but no
+  more presents, and it doubles the game's CPU work and RT64's per display list (4-12 ms each on a page, The game forks), which a
+  laptop's CPU pays for. For the frame rate on screen, or to measure a page, it buys nothing.
+- To measure what a page can do past the display, play it uncapped (`play_page.mjs --uncapped`, Playing a page). That
+  measures cost: the GPU's, the page's thread's WebGPU calls and the browser's GPU process's, for each present. It
+  doesn't see what held Firefox at 20-30 on a laptop's Intel UHD while the GPU idled: done callbacks coming back 20-40
+  ms late, its refresh driver's frames, the compositor. Uncapped turns the last two off, and a fast GPU's callbacks
+  come back early. So a higher uncapped number on a desktop GPU is a cheaper frame everywhere, but it doesn't clear a
+  laptop result.
 
 ## Prebuilt shader lists
 
@@ -844,6 +910,13 @@ changing it:
   boot ran at 17-20 display lists a second for ~10 s and about one run in fifteen froze for good. One compilation
   thread: six at once took ~9 cores and halved the frame rate. The wasm grows from 7.3 to 16.6 MB (the spec
   constant shaders).
+- Chrome parses and validates a shader module (Tint) in `createShaderModule`, on that same main thread, even for a
+  pipeline it then builds async, in a time that grows faster than the WGSL (0.16 ms a KB at 24 KB, 0.56 at 180 KB,
+  1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
+  RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the boot's few pipelines
+  made with `createRenderPipeline`/`createComputePipeline` (DXC on that thread, 13-64 ms each) and the spec constant
+  shaders' modules at setup (713 KB, ~0.7 s each). Dawn reuses a module whose WGSL matches one still alive, but
+  keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
   Firefox painting a handful in between, so menus and races sat below a frame a second for minutes, until every
@@ -859,7 +932,16 @@ changing it:
   switch of 8 slots (rt64 b052049), not one a tap: GoldenEye's largest RasterPS built in ~60% of the time in a test
   page (Firefox 158 and Chrome 155), and from its page Firefox waited 8.7-9.4 s for the boot and 14.0-21.7 s for Dam
   against 10.4-11.6 and 17.7-23.3 (three runs each, interleaved, a busy host). Rush 2049's waits barely moved: few of
-  its shaders have mip LOD. Merging the two mip levels' switches too would take ~5-8% more off the largest.
+  its shaders have mip LOD. Such a shader sampled two tiles of two levels of four taps, each written out by dxc;
+  sampled in loops the shader keeps (two levels, and two tiles where the tile is picked per pixel), it is ~70 KB of
+  WGSL instead of 185 (rt64 008f380). Firefox 158 built GoldenEye's Dam in a test page in 5.8-8.3 s against 14.8-19.1,
+  Pilotwings 64's menus in 5.7-8.2 against 13.9-16.3, Conker's Windy in 4.1-4.4 against 6.3-8.4 and Majora's Mask's
+  Clock Town as before, 4.1-5.4 against 4.5-5.0 (three runs each, interleaved, a busy host). From GoldenEye's page,
+  cold, Firefox waited 8.3-9.3 s for the boot and 7.6-8.4 s for Dam against 13.2-14.6 and 17.9-22.0 (1256x645 and
+  3840x2000, a busy host), then drew 59-60 presents a second as before, the GPU as busy. A loop over the tiles of a
+  shader without LOD costs it: each tile's slot and clamp modes are no longer constants, and one of Majora's Mask's
+  went from 10 KB to 60. A loop over the four taps as well made the WGSL smaller still, but Firefox built its
+  mid-sized shaders slower (one of 43 KB in 205-265 ms against 157), so the taps stay written out.
 - Firefox (157) never holds a WebGPU page back: it takes 60 frames a second whatever the GPU finishes, and Chrome
   throttles the page itself. On a laptop (Intel UHD, Tiger Lake, beside an RTX A3000) at 4K and 200% scaling, a present
   costs Firefox's GPU process and DWM about twice what it costs Chrome (up to 6 times in DWM), ~70% of the Intel chip

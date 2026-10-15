@@ -89,7 +89,10 @@ exclude() {
 browser_at() {
     local b=lib/N64Recomp-browser
     [[ -d $b ]] || b=tools/N64Recomp-browser
-    git -C $b fetch -q origin "$1" && git -C $b checkout -q --detach FETCH_HEAD
+    # Two commands, not one && list, which set -e lets fail: a commit GitHub won't fetch by name (a short SHA) left the
+    # pin where it was, and the run built Pages' own bytes as the commit's.
+    git -C $b fetch -q origin "$1"
+    git -C $b checkout -q --detach FETCH_HEAD
     git add $b
     git diff --cached --quiet || git -c user.name=publish_pages -c user.email=publish_pages@localhost commit -qm "N64Recomp-browser $1"
 }
