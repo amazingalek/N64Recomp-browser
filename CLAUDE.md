@@ -282,6 +282,13 @@ rt64 e408ed4           interpolating to it without pacing, so with the browser's
 plume 7a7e3bc          the canvas's buffer takes a new size only in the present that draws at it: SDL's resize and the
                        surface's configure each made it black until a present, and the frames queued meanwhile were
                        copied into a canvas of the other size, so going fullscreen flickered for a second or two
+plume 3238ba3          through plume_device_thread a READBACK buffer's map() asks at most once a millisecond (it asked as
+plume f2863d8          fast as the page's thread answered, each answer Dawn commands for Chrome's GPU process), and
+rt64 730e980           createTexture() and an upload buffer's map() after its first don't wait for the page's thread
+                       (RT64 makes two textures for each the game loads, ~570 in 100 ms at Pilotwings 64's screen
+                       changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
+                       the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
+                       Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -493,6 +500,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
+  (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
+  them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
+  for seconds while the thread looks free and the GPU process idles. Ocarina of Time's survey waited for the file
+  select's hand-over that way, and its page held 3-8 s as the file loaded, only while the loop ran.
 
 ## Frame rates
 
@@ -748,11 +760,16 @@ osTvType, osRomBase and osMemSize at 0x80000300.
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (MIT; its CONTRIBUTING.md welcomes AI-assisted
 work, but nothing has been offered to it). It keeps its tools as submodules in `tools/`, patched by `build.sh` from
 `recomp/*.patch`; on the fork they stay upstream's, with those patches as upstream has them, and `build.sh` then
-applies this repo's `patches/` on top (`tools/N64Recomp-browser`), N64Recomp's without `src/analysis.cpp`
-(apply.cmake's file list): its jump table in another section is a change Conker's own patch makes its own way, and the
-two conflict. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
+applies this repo's `patches/` on top (`tools/N64Recomp-browser`) a project at a time with the fork's
+`tools/web_patch.sh`, which `host/CMakeLists.txt` and `tools/publish_pages.sh` run too. It leaves out two files
+(apply.cmake's file list): N64Recomp's `src/analysis.cpp`, whose jump table in another section Conker's own patch finds
+its own way, and rt64's `src/hle/rt64_game_frame.h`, whose one line Conker's patch now changes beside, put back on top of
+it by the fork's `tools/web_rt64_game_frame.patch`. Upstream's save states sign each thread's wait with its native call
+stack, which wasm can't walk at every wait: `tools/web_save_states.patch` builds that file without one and the page sets
+up no save states. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
 it records what it left patched (`.git/patched-tools`) and patches from scratch when that changes. rt64-web 03b9dcc
-keeps rt64's web includes off the lines Conker's rt64 patch adds to. In headless Chrome: launcher, Add ROM, the intro,
+and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a game's
+patch adds none, or the next retest's Conker build stops on it. In headless Chrome: launcher, Add ROM, the intro,
 the bar, Conker walking outside it, sound. Its code runs TLB-mapped (`.game` at 0x15000000), and the host copies those
 pages to `rdram + vram + 0x80000000`, ~2.4 GB past RDRAM, inside the desktop's 4 GB reservation; on a page RDRAM is an
 allocation in the wasm heap, so `overlays.cpp` moves the heap's break past them (`sbrk`) and the page links with
@@ -911,11 +928,10 @@ dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at leas
 canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
 busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
 Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
-(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. In Chrome a scene's
-first load can hold the picture 3-8 s: one present's onSubmittedWorkDone comes back seconds late (3.3 s with
-`?present-stats`) with the page's thread free and the sound playing on, while a later load of the same scene, and 100
-s at the title with the whole list building behind it, show no gap over 50 ms: something Chrome's GPU process does in
-line the first time (a sync pipeline, a texture's first clear), not the list's build.
+(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. Its plan's survey once waited
+for the file select's hand-over in a loop of messages to itself, and Chrome held the picture 3-8 s as the file loaded
+(Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
+built in line at the title).
 
 ## WebGPU in Chrome and Firefox
 
@@ -1117,6 +1133,11 @@ running in a browser was found to learn from.
   program's own fetches before the reload (shell.html says how).
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
+- Pilotwings 64's frame gaps of 110-180 ms as its screens change (file menu, test overview, vehicle select) as the
+  page's thread or the texture uploads: they come in Firefox too, which builds nothing behind the game, the game never
+  waited for an upload in one, and plume f2863d8 took most of the waits for the page's thread away and left them. Each
+  is the game's own time between two display lists (65-84 ms, against 16-33) plus RT64's work on the new screen's first
+  one (12-87 ms, 87 at the file menu), the burst of new textures after it.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
   its GPU process, so Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from one (Firefox
   158). Nor does the driver's own shader cache spare it: the same 75 built five times in fresh profiles took as long
