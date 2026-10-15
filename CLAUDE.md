@@ -317,8 +317,13 @@ and Firefox) and publishes each one, and updates their rows, in the same work. T
 retest. A bug only main has, on no page yet, waits for the retest like any other change; one the retest publishes is
 on Pages, and its fix is critical.
 
-Until a script rebuilds the pages, a retest builds and publishes them by hand (Publishing); the PR that adds the script
-says so here.
+A retest runs `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>` where the ROMs are: it builds every
+game fork's main with its N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
+files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the copies; a page that
+builds the same bytes took nothing from the tag and is left alone. Once the pins of those that played well are moved,
+a run without `--browser` builds each main again (the same bytes), publishes what differs, boots each one from Pages
+in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played from a `--dry-run`
+build of that game and then published by a run with its name (Publishing).
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
@@ -337,7 +342,7 @@ environment resets it; a new one needs `$EM_CACHE/sysroot/lib/pkgconfig` made fi
 <name> amazingalek/<fork> "main <sha>"` (it switches Pages on the first time). Each page's commit names the main it
 was built from (`git log -1 origin/gh-pages`), so a page behind main is easy to see; one found behind is played and
 published by whoever finds it. The first visit reloads once (`coi_serviceworker.js`); right after a publish that can
-take a second visit.
+take a second visit. `tools/publish_pages.sh` does all of this for every game, or the ones it is given (its header).
 
 ## The games table
 
