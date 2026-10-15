@@ -264,6 +264,10 @@ plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_
                        Dam: the display list thread's waits 2.3 s → 0.15 s in 13 s, the page's thread 47% → 32% busy)
 plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present: RT64's
 rt64 a5bc25d           present thread asks both before every present (its waits 963 → 106 ms in 13 s)
+rt64 RTXXXXX           on WebGPU a pixel shader with mip LOD samples its two levels, and its two tiles where LOD picks
+                       them per pixel, in loops the shader keeps: ~70 KB of WGSL instead of 185, and Firefox's waits for
+                       GoldenEye's Dam and Pilotwings 64's menus less than half; the prebuilt shaders specialized by
+                       spirv-opt alone (re-spirv can't take a loop), so a page's build needs it
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -289,8 +293,8 @@ place of SDL's queue; the shell's notice in Firefox, shown always, recommending 
 info is all empty strings, so a page there can't tell what it draws with; Chrome shows none), and its "Preparing
 graphics" indicator in a corner (the percentage and the time left, over the frame the game holds while it waits for
 shaders), which keeps the shaders a page learned in `localStorage`; `tools/record_shaders.mjs`, which records a game's
-shader list by a plan; and SPIRV-Tools in its CI (spirv-opt; without it rt64 warns and the shaders come out about twice
-the size). The tail calls are `return_call`s with `-mtail-call`, which every web build compiles with; a desktop build
+shader list by a plan; and SPIRV-Tools in its CI (spirv-opt, which specializes the prebuilt shaders: a page's build
+fails without it). The tail calls are `return_call`s with `-mtail-call`, which every web build compiles with; a desktop build
 only gains an empty `RECOMP_TAIL_CALL`.
 
 ## Changing it
@@ -833,7 +837,14 @@ changing it:
   switch of 8 slots (rt64 b052049), not one a tap: GoldenEye's largest RasterPS built in ~60% of the time in a test
   page (Firefox 158 and Chrome 155), and from its page Firefox waited 8.7-9.4 s for the boot and 14.0-21.7 s for Dam
   against 10.4-11.6 and 17.7-23.3 (three runs each, interleaved, a busy host). Rush 2049's waits barely moved: few of
-  its shaders have mip LOD. Merging the two mip levels' switches too would take ~5-8% more off the largest.
+  its shaders have mip LOD. Such a shader sampled two tiles of two levels of four taps, each written out by dxc;
+  sampled in loops the shader keeps (two levels, and two tiles where the tile is picked per pixel), it is ~70 KB of
+  WGSL instead of 185 (rt64 RTXXXXX). Firefox 158 built GoldenEye's Dam in a test page in 5.8-8.3 s against 14.8-19.1,
+  Pilotwings 64's menus in 5.7-8.2 against 13.9-16.3, Conker's Windy in 4.1-4.4 against 6.3-8.4 and Majora's Mask's
+  Clock Town as before, 4.1-5.4 against 4.5-5.0 (three runs each, interleaved, a busy host). A loop over the tiles of a
+  shader without LOD costs it: each tile's slot and clamp modes are no longer constants, and one of Majora's Mask's
+  went from 10 KB to 60. A loop over the four taps as well made the WGSL smaller still, but Firefox built its
+  mid-sized shaders slower (one of 43 KB in 205-265 ms against 157), so the taps stay written out.
 - Firefox (157) never holds a WebGPU page back: it takes 60 frames a second whatever the GPU finishes, and Chrome
   throttles the page itself. On a laptop (Intel UHD, Tiger Lake, beside an RTX A3000) at 4K and 200% scaling, a present
   costs Firefox's GPU process and DWM about twice what it costs Chrome (up to 6 times in DWM), ~70% of the Intel chip
