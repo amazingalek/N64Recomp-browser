@@ -103,6 +103,13 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   GoldenEye's main loop waited for its next frame that way, and its audio thread waited behind it: ~0.4 s of sound
   short at a time in Firefox, ~20% for ~40 s while Chrome built shaders. GoldenEye64Recomp-web's `patches/fps.c`
   yields in each poll (`recomp_yield_self_1ms`). A trace of count calls a second finds such a loop.
+- A frame can take seconds on a page: the game waits while the browser builds the shaders it needs (Firefox's boot
+  waits are 5-30 s). A scheduler that takes a frame that slow for a hung RCP and goes on without it, by sending
+  itself the done message or resetting the RSP, then builds the next frames into display lists RT64 hasn't read yet,
+  and RT64 reads a mix of two frames' commands. Pilotwings 64's scheduler did that after 50 retraces, and its page
+  stopped soon after Firefox's boot wait (a palette load past the end of memory, a texture 8404 texels wide):
+  pilotwings-64-recomp-web's `patches/sched.c` takes those timeouts out. Look for a retrace handler that counts
+  retraces while the RSP or RDP is busy.
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
