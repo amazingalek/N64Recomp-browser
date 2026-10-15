@@ -792,6 +792,25 @@ the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firef
 18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
 after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
 
+`amazingalek/MarioKart64Recomp-web` is MarioKart 64: Recompiled (GPL-3.0, US). Its upstream carries a copy of Zelda 64:
+Recompiled's menus and pins an older runtime and rt64, so, as GoldenEye's, it is moved onto RecompFrontend: its
+`lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are built on,
+patched by `patches/apply.cmake` for the desktop build too. What that took: `patches.h` maps the game's patches onto
+rt64's newer extended GBI, the debug natives they call are stubs, and the runtime has no Controller Pak file, so none
+is plugged in (Time Trials' ghosts aren't saved; records are, in EEPROM). Upstream's patches write every frame's
+display list to a larger pool of their own and point its task there, but the boot's first list went to the game's
+pool, so its task pointed RT64 at zeros, which it read on into the pool the game was writing the next frame to: about
+one boot in twenty on the page hung (an empty list) or crashed (a microcode load from garbage), and none of 80 after
+the fork's `patches/gfx_config.c` patched `rendering_init` to match. Its boot logo draws with no tile, which on WebGPU
+left the pipelines built behind the game without a binding their layout named (rt64 f01c3a6). Render to RAM stays on
+and exact: the jumbotron at Luigi Raceway and Wario Stadium is the last frame copied by the CPU out of RDRAM; the late
+copy measured the same (headless Chrome 155, a busy host: a race 59.6 presents a second either way, four players 59.1
+exact and 58.8 late, the game's 30). Its list, `src/rt64_shaders.txt`, 813 descriptions, 136 shaders and 112
+pipelines in 27 sections (the boot 8: launcher, logos and title; the menus 8; each of 16 courses; four arenas with four
+players; Versus, Time Trials, results, the ceremony, the credits), is recorded by code: `tools/shader_survey.js`
+starts any course in any mode the way the pause menu's Retry does and hands every kart to the game's own AI.
+MEASURED
+
 ## WebGPU in Chrome and Firefox
 
 Shaders go HLSL → SPIR-V (dxc, without `-fvk-invert-y`: WebGPU's clip space is D3D's) → WGSL (naga
