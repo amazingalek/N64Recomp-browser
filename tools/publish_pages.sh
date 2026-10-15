@@ -75,8 +75,10 @@ keep_times() {
     (cd "$old" && find . -type f) | while read -r f; do cmp -s "$old/$f" "$f" && touch -r "$old/$f" "$f"; done
     rm -rf "$old"
 }
-# n64recomp <target>...: the recompilers the runtime pins, built in build-n64recomp and copied to the root.
+# n64recomp <target>...: the recompilers the runtime pins, patched for the web first (the page needs the code the
+# patched one writes), built in build-n64recomp and copied to the root.
 n64recomp() {
+    cmake -P lib/N64Recomp-browser/patches/apply.cmake lib > /dev/null
     [[ -f build-n64recomp/build.ninja ]] || cmake -S lib/N64ModernRuntime/N64Recomp -B build-n64recomp -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ > /dev/null
     ninja -C build-n64recomp "$@" > /dev/null
@@ -114,7 +116,7 @@ build_mm() {
 build_banjo() {
     if [[ ! -f banjo.us.v10.decompressed.z64 ]]; then
         local c=lib/bk-decomp/tools/bk_rom_compressor
-        (cd $c && CARGO_HOME=$HOME/.cargo RUSTUP_HOME=/opt/rustup /opt/cargo/bin/cargo build -q --release --bin bk_rom_decompress)
+        (cd $c && PATH=/opt/cargo/bin:$PATH CARGO_HOME=$HOME/.cargo RUSTUP_HOME=/opt/rustup /opt/cargo/bin/cargo build -q --release --bin bk_rom_decompress)
         $c/target/release/bk_rom_decompress ../rom.z64 banjo.us.v10.decompressed.z64 > /dev/null
     fi
     n64recomp N64RecompCLI RSPRecomp
@@ -131,6 +133,8 @@ tools/N64ModernRuntime recomp/n64modernruntime.patch
 tools/rt64 recomp/rt64.patch
 tools/RecompFrontend recomp/recompfrontend.patch
 tools/RecompFrontend/recompui/lib/RmlUi recomp/rmlui.patch"
+    cmake -P tools/N64Recomp-browser/patches/apply.cmake tools > /dev/null
+    cmake -P tools/N64Recomp-browser/patches/apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp > /dev/null
     [[ -f tools/N64Recomp/build/build.ninja ]] || cmake -S tools/N64Recomp -B tools/N64Recomp/build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ > /dev/null
     ninja -C tools/N64Recomp/build N64RecompCLI RSPRecomp > /dev/null
@@ -244,7 +248,8 @@ for g in "${published[@]}"; do
 done
 
 echo
-$dry_run && { echo "dry run: nothing published"; exit 0; }
+[[ ${#failed[@]} -eq 0 ]] || echo "failed: ${failed[*]}"
+$dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }
 if [[ ${#published[@]} -eq 0 ]]; then
     echo "every page is what its main builds: nothing published"
 else
@@ -254,4 +259,4 @@ else
         echo "  $g https://${repo%%/*}.github.io/${repo#*/}/ (main $(git -C "$([[ $g == rush ]] && echo "$rush" || echo "$cache/$g")" rev-parse --short origin/main))"
     done
 fi
-[[ ${#failed[@]} -eq 0 ]] || { echo "failed: ${failed[*]}"; exit 1; }
+[[ ${#failed[@]} -eq 0 ]]
