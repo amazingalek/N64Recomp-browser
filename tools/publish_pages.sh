@@ -70,6 +70,7 @@ dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web
 wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
 pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
+jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -232,6 +233,9 @@ build_pw() {
 }
 build_bt() {
     embuilder build sdl2-mt freetype-legacysjlj > /dev/null 2>&1
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+build_jfg() {
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 
