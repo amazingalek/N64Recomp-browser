@@ -62,6 +62,12 @@ function(n64recomp_browser_frontend_page target)
     endif()
 endfunction()
 
+# The page's file picker for a recomp whose menus are its own (file_picker.h); RecompFrontend's menus have one built in.
+# A library of its own, so a page that doesn't link it builds the same bytes as before.
+add_library(n64recomp_browser_file_picker INTERFACE)
+target_sources(n64recomp_browser_file_picker INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/file_picker.cpp")
+target_include_directories(n64recomp_browser_file_picker INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # For a build to try something: the page is linked at -O1, where Binaryen's wasm-opt doesn't optimize the whole module,
 # which is most of a link at -O3. The code is still compiled at the build's level. Rush 2049's link took 190 s at -O3
 # and 11 s at -O1 (2026-10-12), and its wasm grew 7%. Leave it off for a page that people play.
