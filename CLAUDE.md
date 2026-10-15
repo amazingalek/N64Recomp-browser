@@ -66,8 +66,8 @@ pins).
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md` and the tools that play and publish pages skips every job
-  but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
+  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
 ## The forks, one commit per change
@@ -360,6 +360,10 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   console (Playing a page). Look at the menus too (a `shot` step).
 - Writes what was played, in which browser, on what GPU and when, in that game's repo, beside its other measurements
   (a game fork's README or BUILDING.md; Rush 2049's CLAUDE.md, Step 3), never in this README.
+- Records every run in `plays.jsonl`, committed with the row: `play_page.mjs --record plays.jsonl --game <name>
+  --build <tag>`, with `--note` for anything a player's visit wouldn't have (a preload, a test build). It is the
+  history of how each page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note`
+  saying so.
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
   stand-in for one, marked "(stand-in)": the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
   the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play

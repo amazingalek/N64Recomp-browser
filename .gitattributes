@@ -1,2 +1,4 @@
 # Applied byte for byte: a checkout with core.autocrlf must not give them CRLF line endings.
 patches/*.patch -text
+# A line a run, appended on many branches: a merge keeps both sides' lines.
+plays.jsonl merge=union

@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed]
+//     [--browser <path>] [--headed] [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -36,6 +36,12 @@
 // took. A summary at the end covers the "play" steps: median presents a second and the range, frames short, each
 // prebuilt shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the
 // cores; --json writes it as JSON too. The GPU readings are the whole GPU's, so note what else ran beside a number.
+//
+// --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
+// plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
+// mm, banjo, cbfd, dk64, wr, pw, bt), --build what the page was built from (a tag of this repo, or Pages), and --note
+// anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
+// holds the time (UTC), the summary, the page, the query and the host's processor load over the play.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -55,10 +61,18 @@ const interval = Number(option(args, '--interval', '5'));
 const query = option(args, '--query', '');
 const jsonFile = option(args, '--json', null);
 const executable = option(args, '--browser', undefined);
+const recordFile = option(args, '--record', null);
+const game = option(args, '--game', null);
+const build = option(args, '--build', null);
+const note = option(args, '--note', null);
+if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
+  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt (publish_pages.sh\'s names)');
+  process.exit(1);
+}
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed]');
+    '[--json <file>] [--browser <path>] [--headed] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -216,19 +230,29 @@ const finish = async (code) => {
   process.exit(code);
 };
 let audioBefore = null;
+let failure = null;
+// The host's processors, busy or idle, summed over every core: the load beside the run, the browser's own included.
+const hostTimes = () => os.cpus().reduce((t, c) => {
+  const all = Object.values(c.times).reduce((a, b) => a + b, 0);
+  return { all: t.all + all, idle: t.idle + c.times.idle };
+}, { all: 0, idle: 0 });
+let hostBefore = null;
 try {
   await page.navigate(pageUrl);
   await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]));
   audioBefore = last?.audio ?? null;
   playing = true;
+  hostBefore = hostTimes();
   log('play');
   await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play));
   await sample();
   playing = false;
 } catch (error) {
   log(`failed: ${error.message}`);
-  await finish(1);
+  failure = error.message;
+  if (!recordFile) await finish(1);
 }
+const hostAfter = hostTimes();
 
 const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
@@ -250,5 +274,18 @@ console.log(`  shader waits ${shaderWaits.length ? shaderWaits.map((w) => `${w.s
 console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
 if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
 if (summary.cores) console.log(`  GPU process ${r(summary.cores.gpuProcess, 2)} cores, browser ${r(summary.cores.browser, 2)} (medians)`);
-if (jsonFile) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
-await finish(0);
+if (jsonFile && !failure) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
+if (recordFile) {
+  const round = (x) => x === null ? null : Math.round(x * 100) / 100;
+  const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
+  fs.appendFileSync(recordFile, JSON.stringify({
+    time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
+    freshProfile, play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    presents: summary.presents, audioShort: summary.audio?.short ?? null, shaderWaits,
+    webgpuErrors: errors.length, firstErrors: [...new Set(errors)].slice(0, 3), exceptions, gpu: summary.gpu,
+    cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
+    host: { cores: os.cpus().length, busy: host ? Math.round(100 * (1 - (hostAfter.idle - hostBefore.idle) / host)) : null },
+    failed: failure,
+  }) + '\n');
+}
+await finish(failure ? 1 : 0);

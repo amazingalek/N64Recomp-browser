@@ -17,7 +17,8 @@
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own tools/shader_plan.json: launcher, ROM, Start Game, then 20 s of the
-#    game running by itself, which has to present frames with no WebGPU error.
+#    game running by itself, which has to present frames with no WebGPU error. Each run goes into plays.jsonl
+#    (play_page.mjs --record), to be committed with the Games table's rows.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
@@ -308,7 +309,9 @@ for g in "${published[@]}"; do
     mkdir -p "$work/$g-tools"  # the plan with the scripts its steps load (shader_survey.js)
     git -C "$clone" archive origin/main tools | tar xf - -C "$work/$g-tools"
     "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-tools/tools/shader_plan.json" --play 20 --port $((20000 + RANDOM % 9000)) \
-        --profile "$work/$g-profile" --json "$work/$g.json" > "$work/$g-play.log" 2>&1 || true
+        --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
+        --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
+        > "$work/$g-play.log" 2>&1 || true
     result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
         console.log((p > 0 && !s.webgpuErrors.length ? 'ok' : 'FAILED') + ': ' + p + ' presents/s, ' + s.webgpuErrors.length +
         ' WebGPU errors, ' + s.exceptions + ' exceptions')" "$work/$g.json" 2> /dev/null || echo "FAILED: no summary")"
