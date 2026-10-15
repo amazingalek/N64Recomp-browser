@@ -529,8 +529,10 @@ shaders, fits Chrome's cache and is in four sections, the band's intro its boot.
 are recorded by code, a section an area, as GoldenEye's (`patches/shader_survey.c` warps to an entrance or a map,
 `tools/shader_plan.json`, `tools/record_shaders.sh`): Majora's Mask 938 descriptions, 730 pipelines, in 17 sections,
 the boot 39 (launcher to file select), then the attract demo, Clock Town, the intro and each region; Donkey Kong 64 475
-and 361 in 13, the boot 115, since every visit draws the whole DK Rap and a moment of DK TV's Japes demo, a shader or
-two a frame, too few to start a section. Cold and then warm in headless Chrome 155 (RTX 2070, host 15-41% busy):
+and 361 in 15, the boot only the logos (10), then the DK Rap (49), whose first frame wants 31 at once and so starts its
+section, and the menus (55). Firefox waits for a boot before the page's first frame, so a boot holds only what draws
+before a frame that starts a section: Donkey Kong 64's, 115 with the Rap and the menus in it, kept Firefox 158 13-30 s
+on a black page, and the logos alone 0.5-0.7 s, then 6.5 s as the Rap begins. Cold and then warm in headless Chrome 155 (RTX 2070, host 15-41% busy):
 Majora's Mask's boot 2.4 and 0.1 s (16.4 and 10.9 s as one list), Clock Town 1.6 s either way; Donkey Kong 64's 5.0 and
 0.4 s (9.6 and 5.2 as one list), Frantic Factory 0.9-1.0 s. Firefox 157 keeps no built pipelines between visits, so
 every visit waits as long: Majora's Mask's boot 4.5-4.7 s and Clock Town 14-16 s, Donkey Kong 64's 15-17 s (26 s as one
