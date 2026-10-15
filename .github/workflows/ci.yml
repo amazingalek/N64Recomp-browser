@@ -198,13 +198,14 @@ jobs:
       # spirv-opt, which rt64 runs on the prebuilt shaders (tests/build/shaders.txt) before naga.
       - name: SPIRV-Tools
         run: sudo apt-get install -y --no-install-recommends spirv-tools
-      # Emscripten's cache, where embuilder puts its ports, is in emsdk's folder, cached before they are built.
+      # Emscripten's cache, where embuilder puts its ports, is in emsdk's folder, cached before they are built. One a leg:
+      # a leg's compiles all missed ccache against the other leg's (577 of 578), and hit against its own.
       - id: em-cache
         run: echo "dir=$(em-config CACHE)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: ${{ steps.em-cache.outputs.dir }}
-          key: em-cache-${{ env.EMSDK_VERSION }}-sdl2-mt-freetype-legacysjlj-${{ runner.os }}
+          key: em-cache-${{ env.EMSDK_VERSION }}-${{ matrix.source }}-sdl2-mt-freetype-legacysjlj-${{ runner.os }}
       - name: Emscripten's SDL2 and FreeType
         run: embuilder build sdl2-mt freetype-legacysjlj
       # frontend/build_speed.cmake puts ccache in front of every compile once it is on PATH.
