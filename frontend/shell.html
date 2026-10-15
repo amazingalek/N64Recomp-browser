@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- The page of a recomp built with n64recomp_browser_frontend (CMakeLists.txt): a canvas filling the window, which SDL's window
      is and RT64 draws on (SDL follows its CSS size), and a line saying what is loading or what went wrong. The program
-     sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't.
+     sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't,
+     and the program starts only once it is (below).
      The #gpu notice recommends Chrome or Edge in Firefox (below). #shaders, in a corner, is the progress of the
      shaders the game waits for (RasterShaderCache::startPrebuild(), a game's RT64_PREBUILT_SHADER_LIST), over the frame
      it holds meanwhile. The browser keeps them, so a later visit builds them in under a second, and the indicator shows
@@ -33,6 +34,7 @@
 <body>
 <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 <div id="status">Loading…</div>
+<template id="program">{{{ SCRIPT }}}</template>
 <div id="shaders" hidden><span class="spin"></span><span>Preparing graphics</span><span class="figures"></span></div>
 <div id="gpu" hidden><span>This game plays best in Chrome or Edge. Firefox draws it slowly on many computers,
   integrated graphics above all.</span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
@@ -104,7 +106,12 @@
   // and Edge. Its WebGPU adapter's info is empty, so the page can't tell what it draws with: in Firefox it always
   // recommends Chrome or Edge. Without WebGPU the status line already says so.
   if (navigator.gpu && /Firefox\//.test(navigator.userAgent)) document.getElementById('gpu').hidden = false;
+  // The program (its script, in #program) starts only on a page that is cross-origin isolated, which it needs anyway.
+  // A first visit to a host that can't send the headers isn't, and coi_serviceworker.js reloads it: started there, the
+  // program fetched its .wasm and .data only for the reload to cut them off, and in Firefox (158, from GitHub Pages)
+  // the reloaded page's fetches of the same files then failed in 4 of 58 cold visits, which never started; with
+  // nothing fetched before the reload, none of 30 failed.
+  if (window.crossOriginIsolated) document.body.append(document.importNode(document.getElementById('program').content, true));
 </script>
-{{{ SCRIPT }}}
 </body>
 </html>
