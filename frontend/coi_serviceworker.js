@@ -23,11 +23,13 @@ if (typeof window === 'undefined') {
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }));
   });
-} else if (!window.crossOriginIsolated && window.isSecureContext && navigator.serviceWorker) {
-  // Reload once the worker controls the page; the session flag stops a loop where service workers are refused.
+} else if (window.isSecureContext && navigator.serviceWorker) {
+  // Reload once the worker controls the page; the session flag stops a loop where service workers are refused. It is
+  // read and removed on every load, the isolated one after the reload too: left behind, it stopped the next page of
+  // the origin opened in that tab (another game's, under a scope of its own) from registering and reloading.
   const reloaded = sessionStorage.getItem('coiReloaded');
   sessionStorage.removeItem('coiReloaded');
-  if (!reloaded) {
+  if (!reloaded && !window.crossOriginIsolated) {
     navigator.serviceWorker.register(document.currentScript.src).then((registration) => {
       const reload = () => {
         sessionStorage.setItem('coiReloaded', '1');

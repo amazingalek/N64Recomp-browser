@@ -70,6 +70,8 @@ dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web
 wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
 pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
+mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web
+oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
 "
 selected=("${args[@]:1}")
@@ -89,7 +91,10 @@ exclude() {
 browser_at() {
     local b=lib/N64Recomp-browser
     [[ -d $b ]] || b=tools/N64Recomp-browser
-    git -C $b fetch -q origin "$1" && git -C $b checkout -q --detach FETCH_HEAD
+    # Two commands, not one && list, which set -e lets fail: a commit GitHub won't fetch by name (a short SHA) left the
+    # pin where it was, and the run built Pages' own bytes as the commit's.
+    git -C $b fetch -q origin "$1"
+    git -C $b checkout -q --detach FETCH_HEAD
     git add $b
     git diff --cached --quiet || git -c user.name=publish_pages -c user.email=publish_pages@localhost commit -qm "N64Recomp-browser $1"
 }
@@ -233,6 +238,15 @@ build_pw() {
 }
 build_bt() {
     embuilder build sdl2-mt freetype-legacysjlj > /dev/null 2>&1
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+build_mk64() {
+    [[ -f mk64.us.z64 ]] || cp ../rom.z64 mk64.us.z64
+    n64recomp N64RecompCLI RSPRecomp
+    keep_times RecompiledFuncs rsp -- bash -c './N64Recomp us.toml > /dev/null && ./RSPRecomp aspMain.us.toml > /dev/null'
+    web MarioKart64Recompiled
+}
+build_oot() {
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 build_dkr() {

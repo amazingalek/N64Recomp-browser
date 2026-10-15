@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed] [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--browser <path>] [--headed] [--uncapped] [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -13,7 +13,12 @@
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
 // another size a click goes where recompui puts the same spot: it lays its launcher and menus out by the viewport's
 // height, about the centre. --query is added to the page's URL. --headed runs Chrome in a window off the desktop, as a
-// player's Chrome presents, instead of headless (page_driver.mjs; Firefox is always in a window).
+// player's Chrome presents, instead of headless (page_driver.mjs; Firefox is always in a window). --uncapped measures how
+// fast the page can present, not how it plays: the page gets ?uncapped (plume reports the display at 360 Hz, RT64
+// interpolates to it and paces nothing) and the browser animation frames at no fixed rate (page_driver.mjs), so its
+// presents a second are what the GPU, the page's thread and the browser's GPU process can take. That compares a
+// browser, a size or a build with another where every page would read 60 at the display's rate; a run at 342 or more
+// (95% of 360) is held by the rate, not the page, and says so.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -41,8 +46,8 @@
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
-// mm, banjo, cbfd, dk64, wr, pw, bt, dkr), --build what the page was built from (a tag of this repo, or Pages), and --note
-// anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
+// mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr), --build what the page was built from (a tag of this repo, or Pages),
+// and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms), each sample's presents, sound
 // short and GPU load, the page, the query and the host's processor load over the play.
@@ -63,6 +68,8 @@ import { open, option, serve, sleep } from './page_driver.mjs';
 const args = process.argv.slice(2);
 const headed = args.includes('--headed');
 if (headed) args.splice(args.indexOf('--headed'), 1);
+const uncapped = args.includes('--uncapped');
+if (uncapped) args.splice(args.indexOf('--uncapped'), 1);
 const port = Number(option(args, '--port', '8937'));
 const profileOption = option(args, '--profile', null);
 const section = option(args, '--section', null);
@@ -70,7 +77,8 @@ const playFor = option(args, '--play', null);
 const shotFile = option(args, '--shot', null);
 const size = option(args, '--size', '1256x645').split('x').map(Number);
 const interval = Number(option(args, '--interval', '5'));
-const query = option(args, '--query', '');
+const queryOption = option(args, '--query', '');
+const query = uncapped ? (queryOption ? `${queryOption}&uncapped` : '?uncapped') : queryOption;
 const jsonFile = option(args, '--json', null);
 const executable = option(args, '--browser', undefined);
 const recordFile = option(args, '--record', null);
@@ -78,13 +86,13 @@ const game = option(args, '--game', null);
 const build = option(args, '--build', null);
 const note = option(args, '--note', null);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
-  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, dkr (publish_pages.sh\'s names)');
+  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr (publish_pages.sh\'s names)');
   process.exit(1);
 }
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -201,8 +209,8 @@ const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, onLine, log });
-log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
+  preload, headed, uncapped, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 const samples = [];
@@ -289,7 +297,7 @@ const percentile = (values, q) => {
 // Every gap between two presents while playing: the dips a sample's average hides.
 const gaps = during.flatMap((s) => s.gaps ?? []);
 const summary = {
-  browser, page: pageUrl, size: `${size[0]}x${size[1]}`, freshProfile, seconds: Math.round(seconds()),
+  browser, page: pageUrl, size: `${size[0]}x${size[1]}`, freshProfile, uncapped, seconds: Math.round(seconds()),
   presents: presents.length ? { median: median(presents), p10: percentile(presents, 0.1), min: Math.min(...presents),
     max: Math.max(...presents) } : null,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
@@ -302,8 +310,10 @@ const summary = {
     { gpuProcess: median(during.map((s) => s.gpuProcess)), browser: median(during.map((s) => s.browser)) } : null,
 };
 const r = (x, digits = 1) => x?.toFixed(digits) ?? '-';
-console.log(`summary: ${browser} ${summary.size}, ${during.length} samples of ${interval} s played`);
-console.log(`  presents/s ${summary.presents ? `${r(summary.presents.median)} (${r(summary.presents.min)}-${r(summary.presents.max)})` : '-'}`);
+console.log(`summary: ${browser} ${summary.size}${uncapped ? ' uncapped' : ''}, ${during.length} samples of ${interval} s played`);
+const atCeiling = uncapped && summary.presents && summary.presents.median >= 342;
+console.log(`  presents/s ${summary.presents ? `${r(summary.presents.median)} (${r(summary.presents.min)}-${r(summary.presents.max)})` : '-'}` +
+  (atCeiling ? ', held by the uncapped rate (360), not the page' : ''));
 if (summary.frames) console.log(`  frame gaps p50 ${summary.frames.p50Ms} ms, p99 ${summary.frames.p99Ms} ms, longest ${summary.frames.longestMs} ms, ` +
   `${summary.frames.over50Ms} over 50 ms, ${summary.frames.over100Ms} over 100, ${summary.frames.over250Ms} over 250`);
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
@@ -318,7 +328,7 @@ if (recordFile) {
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
   const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
-    freshProfile, play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    freshProfile, ...(uncapped ? { uncapped } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, audioShort: summary.audio?.short ?? null, shaderWaits,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
@@ -340,7 +350,7 @@ function compare(run, lines) {
   const like = (a, b) => a === null || a === undefined || b === null || b === undefined || a === b;
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
-      like(p.play, run.play) && like(p.freshProfile, run.freshProfile))
+      like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped)
     .slice(-5);
   if (!before.length) {
     console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);
@@ -353,7 +363,9 @@ function compare(run, lines) {
   const found = [];
   if (run.failed) found.push(`failed (${run.failed}), where the last ${before.length} like it didn't`);
   if (run.webgpuErrors && before.at(-1).webgpuErrors === 0) found.push(`${run.webgpuErrors} WebGPU errors, where the last run like it had none`);
-  if (run.presents && medians.length && run.presents.median < Math.min(...medians) - 3) {
+  // Uncapped, presents run to the hundreds and wander with them: 10% below the lowest, not 3.
+  const allowed = run.uncapped ? Math.min(...medians) * 0.1 : 3;
+  if (run.presents && medians.length && run.presents.median < Math.min(...medians) - allowed) {
     found.push(`${run.presents.median} presents a second, against ${Math.min(...medians)}-${Math.max(...medians)} before`);
   }
   const p99s = before.map((p) => p.frames?.p99Ms).filter((m) => typeof m === 'number');
