@@ -373,7 +373,11 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   one, and a laptop result stays until a newer laptop run replaces it. A cell says how the page plays as of its date,
   in absolute terms (smooth, the presents a second, never boots), never against an earlier result ("the crash is
   gone"); one whose laptop result a fix was made for gives the stand-in's result and "not yet on a laptop" until it is
-  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so.
+  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so. A
+  laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
+  so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
+  a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
+  for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
 A new game gets a row in the same work as its port.
