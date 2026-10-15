@@ -25,7 +25,8 @@
 //     "play": [steps]                  what is measured: e.g. a wait while the attract demo runs, keys to reach a level
 //   }
 //
-// a step one of page_driver.mjs's. A shader plan's own section plays with --section <name> in place of "play", and
+// a step one of page_driver.mjs's. A shader plan's own section plays with --section <name> in place of "play" (its
+// "keep" steps, which only say what record_shaders.mjs records, do nothing here), and
 // --play <s> plays nothing but lets the game run by itself that long (an attract demo; the stand-in's runs). --shot
 // takes a screenshot of the page when the play steps end.
 //
@@ -260,14 +261,15 @@ const hostTimes = () => os.cpus().reduce((t, c) => {
   return { all: t.all + all, idle: t.idle + c.times.idle };
 }, { all: 0, idle: 0 });
 let hostBefore = null;
+const steps = { keep: () => {} };  // record_shaders.mjs's own step, in a shader plan's sections
 try {
   await page.navigate(pageUrl);
-  await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]));
+  await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]), steps);
   audioBefore = last?.audio ?? null;
   playing = true;
   hostBefore = hostTimes();
   log('play');
-  await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play));
+  await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play), steps);
   await sample();
   playing = false;
 } catch (error) {
