@@ -253,6 +253,10 @@ rt64 bf509dd           in Firefox only (in Chrome it took ~1.4 us a call against
                        keys as bytes, not snprintf's text, and a pass given only the state that changed since its last
                        draw: with the page's thread slowed 3 times (Chrome's CPU throttling, a stand-in for a laptop's
                        CPU), Conker's page presented 54-58 a second in Chrome 155, where it had presented 36-44
+plume 3c23b44          009957c's try only from a steady window: no present more than 100 ms after the one before, and
+rt64 57c0fed           presents held more than 10% of it; a stall (a load, shaders building behind the game) took a fast
+                       GPU's page to 3 from boot (GoldenEye's launcher, from 0.8 presents a second); ?present-stats
+                       prints each try
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -844,7 +848,12 @@ changing it:
   and 29.9 in two runs, the GPU ~35% busy), as on the laptop; with 3 in flight 58.3, with 4 59.4, each callback back
   ~35 ms after its present either way. Rush 2049's attract race held 54.6 with 2 (~800 ms a second at the cap; its
   game's 30 never paced), and on plume 009957c, which tries one more while the cap holds presents and keeps it if
-  presents rise, went to 3 in 10 s and 4 at 63 s and drew 59.8; without the delay it stayed at 2 and drew 59.8. A slow
+  presents rise, went to 3 in 10 s and 4 at 63 s and drew 59.8; without the delay it stayed at 2 and drew 59.8. With plume 3c23b44,
+  which tries only from a steady window held more than 10% of the time, Banjo with the delay went to 3 at 9 s (from 54
+  a second, 817 ms a second at the cap) and drew 57-58, its waits then too short to try 4; cold without it GoldenEye and
+  Banjo stayed at 2 in Chrome 155 headless and Firefox 158, where on 009957c GoldenEye went to 3 in its launcher from a
+  window at 0.8 presents a second, and with 5% in place of 10% from one at 55 (58 ms a second at the cap) while Chrome
+  built its shaders behind the game. A slow
   GPU gains nothing from one more (2 gave 46 and 3 47 above), so there the try goes back. A page thread kept 60% busy
   (a preload spinning 10 ms of every 16) left Banjo in Firefox at 57.7 with no time at the cap, so a slow page thread
   is not what holds Firefox there. What the stand-in can't imitate, Firefox's refresh driver holding animation frames
