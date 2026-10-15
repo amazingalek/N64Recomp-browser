@@ -17,15 +17,15 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 
 | Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth | smooth after its waits (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | smooth | smooth after its wait (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | smooth | smooth after its waits (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | smooth | almost smooth | 2026-10-13, stand-in 2026-10-14 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | smooth | smooth (stand-in) | 2026-10-13, stand-in 2026-10-14 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth | smooth after its wait (stand-in) | 2026-10-13, stand-in 2026-10-14 |
+| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | smooth (58) | smooth after its waits (56) | 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | almost smooth (48; Dam 55) | almost smooth (47); Dam smooth (57) after ~20 s of waits | 2026-10-14 |
+| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | the game's 20; crashes ~35 s into Clock Town | the game's 20; crashes ~35 s into Clock Town | 2026-10-14 |
+| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | not smooth (41-48, paced) | not smooth (20-30) | 2026-10-14 |
+| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | not smooth (41-42) | not smooth (20-24) | 2026-10-14 |
+| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | smooth (the game's 30) | never boots | 2026-10-14 |
 
-How each page plays on a Windows laptop's integrated graphics, or on a stand-in for one (a desktop GPU drawing a
-3840x2000 canvas), which finds problems but is gentler than a laptop. The goal is every one smooth in both browsers.
+How each page plays on a Windows laptop's integrated graphics (median presents a second after the shader waits), or on
+a stand-in for one (a desktop GPU drawing a 3840x2000 canvas), which is gentler. The goal is every one smooth in both.
 
 ## Using it in a recomp
 
