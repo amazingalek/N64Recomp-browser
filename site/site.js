@@ -117,8 +117,7 @@ async function openGame(game) {
     window.open(game.page, '_blank', 'noopener');
     return;
   }
-  document.getElementById('player-title').textContent = game.name;
-  document.getElementById('player-tab').href = game.page;
+  frame.title = game.name;
   player.hidden = false;
   document.body.classList.add('playing');
   history.replaceState(null, '', '#' + encodeURIComponent(game.repoName));
@@ -141,7 +140,7 @@ function closeGame() {
 }
 
 document.getElementById('player-close').addEventListener('click', closeGame);
-document.getElementById('player-full').addEventListener('click', () => frame.requestFullscreen());
+document.getElementById('player-full').addEventListener('click', () => player.requestFullscreen());
 frame.addEventListener('load', () => frame.focus());
 
 async function main() {

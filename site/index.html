@@ -26,12 +26,9 @@
   <p id="legend" class="note"></p>
 </main>
 <div id="player" class="player" hidden>
-  <div class="bar">
-    <strong id="player-title"></strong>
-    <span class="spacer"></span>
-    <button id="player-full" type="button">Fullscreen</button>
-    <a id="player-tab" target="_blank" rel="noopener">Own tab</a>
-    <button id="player-close" type="button" aria-label="Close">✕</button>
+  <div class="controls">
+    <button id="player-full" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+    <button id="player-close" type="button" title="Back to the games" aria-label="Close">✕</button>
   </div>
   <iframe id="player-frame" title="Game" allow="fullscreen; gamepad; autoplay; cross-origin-isolated"></iframe>
 </div>

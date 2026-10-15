@@ -67,9 +67,10 @@ button:hover { background: #343b4e; }
 .play { background: #2f6fed; border-color: #2f6fed; font-weight: 700; padding: 3px 14px; font-size: 14px; }
 .play:hover { background: #4a83f2; }
 
-.player { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; z-index: 10; }
+.player { position: fixed; inset: 0; background: #000; z-index: 10; }
 .player[hidden] { display: none; }
-.player .bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--panel); }
-.player .bar a { font-size: 14px; }
-.player .spacer { flex: 1; }
-.player iframe { flex: 1; width: 100%; border: 0; background: #000; }
+.player iframe { display: block; width: 100%; height: 100%; border: 0; background: #000; }
+/* Over the game's top-right corner, faint until the pointer is over them. */
+.player .controls { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0.35; transition: opacity 0.2s; }
+.player .controls:hover, .player .controls:focus-within { opacity: 1; }
+.player .controls button { width: 34px; height: 34px; padding: 0; background: rgb(0 0 0 / 0.6); border-color: rgb(255 255 255 / 0.25); }
