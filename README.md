@@ -76,8 +76,7 @@ target_link_options(<the recomp's executable> PRIVATE -sINITIAL_MEMORY=2GB)   # 
 ```
 
 Build with `emcmake cmake ... -DRT64_NAGA_EXECUTABLE=<naga>` (`cargo install naga-cli`), with `spirv-opt` on
-`PATH` (SPIRV-Tools, `apt install spirv-tools`; without it the prebuilt shaders below come out several times the
-size), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
+`PATH` (SPIRV-Tools, `apt install spirv-tools`, which specializes the prebuilt shaders below), after `embuilder build sdl2-mt freetype-legacysjlj` once. With ccache on `PATH`, a new build dir, or another
 checkout with its build dir at the same place in it, compiles nothing that was compiled before (`frontend/build_speed.cmake`
 says how), and `-DN64RECOMP_BROWSER_FAST_LINK=ON` links a page to try something in seconds instead of minutes,
 without Binaryen's whole-program optimizations (not for a page people play). The page needs a browser with WebGPU and
@@ -158,8 +157,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
   later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
   one visit, not every one. Set
-  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time and run through
-  `spirv-opt -O` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
+  `RT64_PREBUILT_SHADER_LIST` to the file before adding rt64. Each one is specialized at build time by
+  `spirv-opt` (rt64-web's CMakeLists.txt says how), its pixel shader both with dual-source blending and without,
   and they are built largest first, as many at once as the computer has cores, each pipeline once: descriptions that
   come out as the same shaders and the same pipeline state share one. A line reading `background` also
   starts a section of that name.
@@ -176,8 +175,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   Chrome keeps built pipelines for later visits in a cache of 6 MB per profile, for every site together: Rush 2049's
   105, about 4 MB, are then all built in 0.4-0.7 s and the indicator never shows; a game whose list doesn't fit waits on
   every visit, and sections keep each wait to what one level needs. Measured in Chrome 154 on an RTX 2070 (headless):
-  Rush 2049's list, then without sections, took 6.3-7.2 s cold on 12 cores; 6 at a time it took 10.0-10.8 s with
-  `spirv-opt` against 16.1-17.7 s without, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
+  Rush 2049's list, then without sections, took 6.3-7.2 s cold on 12 cores; 6 at a time it took 10.0-10.8 s optimized by
+  `spirv-opt` against 16.1-17.7 s only specialized, and its WGSL is 5.9 MB against 17.5 MB, since many descriptions that
   differ only in what the shaders ignore come out the same. Rush 2049's list is
   `src/rt64_shaders.txt` in its repo.
 
