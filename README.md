@@ -270,7 +270,9 @@ and RecompFrontend don't take code written with an LLM (their CONTRIBUTING.md), 
 ```
 fork                                     upstream                 what the fork adds
 amazingalek/plume-web                    renderbag/plume          a WebGPU backend, the display's rate timed from
-                                                                  animation frames, at most 2 frames in flight;
+                                                                  animation frames, at most 2 frames in flight
+                                                                  (?presents-in-flight=<n>; ?present-stats prints
+                                                                  what holds presents back every 5 s);
                                                                   any backend run on one thread
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
