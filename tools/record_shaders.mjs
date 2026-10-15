@@ -25,7 +25,9 @@
 // level on its way to a screen after it). What a load prints before its section's steps start (the
 // launcher, the game's boot, the "start" steps) is the list's section 0, built before the game starts; a section
 // holds what it printed after, less section 0. A section with "boot": true goes into section 0 too, for screens the
-// game shows before its levels that a plan reaches by code (GoldenEye's menus). Console lines go to stdout as they come, with the seconds since start.
+// game shows before its levels that a plan reaches by code (GoldenEye's menus). Sections that share a name are one
+// section of the list, recorded a load each: a world whose levels the plan can reach only one a load (Diddy Kong
+// Racing's). Console lines go to stdout as they come, with the seconds since start.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -72,7 +74,9 @@ for (const section of plan.sections) {
   addNew(boot, printed);
   printed = [];
   await run(section.steps);
-  if (section.boot) addNew(boot, printed); else sections.push({ name: section.name, shaders: [...printed] });
+  const same = sections.find((s) => s.name === section.name);
+  if (section.boot) addNew(boot, printed); else if (same) addNew(same.shaders, printed);
+  else sections.push({ name: section.name, shaders: [...printed] });
   log(`section ${section.name}: ${printed.length} shaders`);
 }
 

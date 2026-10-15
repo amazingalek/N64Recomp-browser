@@ -70,7 +70,7 @@ dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web
 wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
 pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
 bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
-dkr    amazingalek/DKR-R-web                      DKR-R                build-web
+dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
