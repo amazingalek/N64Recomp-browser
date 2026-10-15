@@ -880,6 +880,7 @@ Raceway on that AI. From Pages (main 9f6bcf3, N64Recomp-browser 28a5f14), cold, 
 headless waited for nothing and drew 59.6 presents a second; Firefox 158 waited 0.4 s for the boot, ~0.3 s in ones and
 twos through the menus (wanted shaders under a section's 4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000
 59.6 and 59.0; no WebGPU errors, sound short only in Firefox's course wait.
+
 ## WebGPU in Chrome and Firefox
 
 Shaders go HLSL → SPIR-V (dxc, without `-fvk-invert-y`: WebGPU's clip space is D3D's) → WGSL (naga
