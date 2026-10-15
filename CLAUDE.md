@@ -390,14 +390,16 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
   and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
-  stand-in for one, marked "(stand-in)": the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
+  stand-in for one, marked `*`: the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
   the pixels of a laptop's window, in both browsers at one CSS pixel a pixel (`play_page.mjs --size 3840x2000 --play
   25`). A desktop GPU at a normal size plays every page, so it never fills a cell. The stand-in is gentler than a
-  laptop: Banjo played smooth on it in Firefox and almost smooth on the laptop, so it finds a problem but can't clear
-  one, and a laptop result stays until a newer laptop run replaces it. A cell says how the page plays as of its date,
-  in absolute terms (smooth, the presents a second, never boots), never against an earlier result ("the crash is
-  gone"); one whose laptop result a fix was made for gives the stand-in's result and "not yet on a laptop" until it is
-  played there again, and one never played "not yet". A cell that isn't smooth has work filed to make it so. A
+  laptop: Banjo played 59-60 on it in Firefox and 20-30 on the laptop, so it finds a problem but can't clear one, and a
+  laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence: the median presents a
+  second after the waits as of its date ("58", "60*"), `†` beside one that is the game's own frame rate ("20†"), a
+  laptop's and the stand-in's both when the stand-in has a newer one ("20†; 60*"), words only where there is no number
+  ("never boots", "not yet"), never "smooth" and never against an earlier result ("the crash is gone"). One whose laptop
+  result a fix was made for gives the stand-in's number until it is played there again. A cell below 60 without a `†` has work filed
+  to make it 60. A
   laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
   so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
   a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
