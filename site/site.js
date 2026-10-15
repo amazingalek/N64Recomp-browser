@@ -77,7 +77,7 @@ function tile(game, columns) {
     el('div', { className: 'body' },
       el('div', { className: 'head' },
         el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
-      el('p', { className: 'recomp', title: game.recomp.replace(/[(.*?)](.*?)/, '$1') }, ...credit(game.recomp)),
+      el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp)),
       el('div', { className: 'stats' }, stat(columns.chrome, game.chrome), stat(columns.firefox, game.firefox))));
 }
 
