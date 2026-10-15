@@ -29,6 +29,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60* | 59* | 2026-10-15 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60* | 59* | 2026-10-15 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 30†* | 30†* | 2026-10-16 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 19†* | 22†* | 2026-10-16, v0.49.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -123,6 +124,12 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   first included. Mario Kart 64's pointed every task at its larger pool but left the boot's first list in the game's
   pool, so RT64 read zeros on into the pool where the game was already writing the next frame, and about one boot in
   twenty on the page hung or crashed. MarioKart64Recomp-web's `patches/gfx_config.c` patches `rendering_init` too.
+- A runtime that holds the game thread submitting a display list until the list is drawn holds the whole game through
+  render to RAM's readback (ultramodern runs one game thread at a time). Jet Force Gemini's (its base's, not
+  N64ModernRuntime's) did, and with the exact copy its page lost 250,000-300,000 sound frames in 160 s.
+  JetForceGemini-Recomp-web lets the game go once RT64 reaches the list's last full sync (the list is all read by
+  then), and sends the RSP's and the RDP's completion once the frame is drawn, as before. Running on, a scheduler that
+  counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP (above).
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
@@ -143,7 +150,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   over its shader plan, and the page plays the same; GoldenEye's never does. A word the CPU writes with the value it
   already held looks untouched, though, and gets the frame, so it is also wrong for a game that puts code or data in
   a framebuffer's memory once the RDP is done: Donkey Kong 64 inflates its main code and data over the framebuffers
-  of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too.
+  of its boot logos, the late copy crashed its boot now and then, and it keeps the exact copy too. Jet Force Gemini's CPU
+  reworks its shadows' render targets once the RDP has drawn them, and keeps it as well.
 - Give RT64 a list of the game's shaders, so the page builds them before the game draws with them.
   This is part of every port, not an optional extra: without it the page is unplayable on most machines. Until a
   shader is built RT64 draws with its ubershader, which costs several times as much a pixel: on a laptop's Intel
