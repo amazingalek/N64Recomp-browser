@@ -241,8 +241,9 @@ for g in "${published[@]}"; do
         sleep 10
     done
     if [[ $g == rush ]]; then rom="$rush/roms/rush2049.us.z64" clone="$rush"; else rom="$ROMS/$g.z64" clone="$cache/$g"; fi
-    git -C "$clone" show origin/main:tools/shader_plan.json > "$work/$g-plan.json"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-plan.json" --play 20 --port $((20000 + RANDOM % 9000)) \
+    mkdir -p "$work/$g-tools"  # the plan with the scripts its steps load (shader_survey.js)
+    git -C "$clone" archive origin/main tools | tar xf - -C "$work/$g-tools"
+    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-tools/tools/shader_plan.json" --play 20 --port $((20000 + RANDOM % 9000)) \
         --profile "$work/$g-profile" --json "$work/$g.json" > "$work/$g-play.log" 2>&1 || true
     result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
         console.log((p > 0 && !s.webgpuErrors.length ? 'ok' : 'FAILED') + ': ' + p + ' presents/s, ' + s.webgpuErrors.length +
