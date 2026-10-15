@@ -165,12 +165,16 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   // The game's threads are workers, and an exception on one reaches the page only as an ErrorEvent without its stack,
   // so each worker is attached to as it starts and its exceptions are reported from there, stack and all (a wasm
   // frame names its function if the page was linked with --profiling-funcs). Its console lines come through the page
-  // already, so only its exceptions are taken.
+  // already, so only its exceptions are taken. Auto-attach takes the page's service worker too (coi_serviceworker.js on
+  // a host without the headers), held until resumed, and Runtime.enable doesn't answer a held service worker: resumed
+  // only once that answered, it never activated, and the page from such a host was never cross-origin isolated. So
+  // the two go out together; each target takes them in order, so a worker still has Runtime on before it runs.
   let send;
   send = await connect(targets.find((t) => t.type === 'page').webSocketDebuggerUrl, (m) => {
     if (m.method === 'Target.attachedToTarget') {
       const session = m.params.sessionId;
-      send('Runtime.enable', {}, session).then(() => send('Runtime.runIfWaitingForDebugger', {}, session));
+      send('Runtime.enable', {}, session);
+      send('Runtime.runIfWaitingForDebugger', {}, session);
       return;
     }
     if (m.method === 'Page.fileChooserOpened') fileChooser = m.params;
