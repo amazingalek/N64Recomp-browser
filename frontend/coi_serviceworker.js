@@ -6,7 +6,6 @@
 // The same idea as gzuidhof/coi-serviceworker, written anew.
 if (typeof window === 'undefined') {
   self.addEventListener('install', () => self.skipWaiting());
-  self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
   self.addEventListener('fetch', (event) => {
     const request = event.request;
     if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') {
@@ -24,26 +23,23 @@ if (typeof window === 'undefined') {
     }));
   });
 } else if (!window.crossOriginIsolated && window.isSecureContext && navigator.serviceWorker) {
-  // Reload once the worker controls the page; the session flag stops a loop where service workers are refused.
+  // Reload once the worker is activated, so the reload's navigation goes through it; the session flag stops a loop
+  // where service workers are refused. ready resolves whatever state the worker reached before register()'s promise
+  // did: Firefox can finish installing it first, which an 'updatefound' listener added then never hears. And never
+  // while it is still activating: in Firefox a reload then could hang for good, the page never coming back.
   const reloaded = sessionStorage.getItem('coiReloaded');
   sessionStorage.removeItem('coiReloaded');
   if (!reloaded) {
-    navigator.serviceWorker.register(document.currentScript.src).then((registration) => {
-      const reload = () => {
-        sessionStorage.setItem('coiReloaded', '1');
-        location.reload();
-      };
-      if (navigator.serviceWorker.controller) {
+    const reload = () => {
+      sessionStorage.setItem('coiReloaded', '1');
+      location.reload();
+    };
+    navigator.serviceWorker.register(document.currentScript.src).then(() => navigator.serviceWorker.ready).then((registration) => {
+      const worker = registration.active;
+      if (worker.state === 'activated') {
         reload();
       } else {
-        registration.addEventListener('updatefound', () => registration.installing.addEventListener('statechange', (e) => {
-          if (e.target.state === 'activated') {
-            reload();
-          }
-        }));
-        if (registration.active) {
-          reload();
-        }
+        worker.addEventListener('statechange', () => worker.state === 'activated' && reload());
       }
     }, (error) => console.error('The cross-origin isolation service worker could not register: ' + error));
   }
