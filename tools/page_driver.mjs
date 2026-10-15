@@ -3,7 +3,10 @@
 // steps on the page.
 //
 // Chrome runs headless (muted, WebGPU on, one CSS pixel a pixel) and is driven over the DevTools protocol: its input
-// events are trusted, and the ROM goes to the file chooser the page opens. Firefox has no WebGPU adapter headless, so
+// events are trusted, and the ROM goes to the file chooser the page opens. Headless Chrome draws to no display, so its
+// presents never go through the desktop's compositor or wait for the display; with headed it runs in a window of its own,
+// moved off the desktop as Firefox's is below, with its throttling of hidden windows off, which presents as a player's
+// Chrome does. Firefox has no WebGPU adapter headless, so
 // it runs in a window of its own, moved off the desktop and sized from a DPI-aware process on Windows, with the
 // viewport set to the size asked for, and is driven over WebDriver BiDi. A window off the desktop never has focus, so
 // keys are KeyboardEvents dispatched on `window` and clicks mouse events dispatched on the canvas itself; and since
@@ -95,14 +98,14 @@ const rdramHelpers = `(() => {
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
 // Chrome made of a 1280x800 window when the first plans were written.
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  onLine = () => {}, log = console.log }) => {
+  headed = false, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
   const waiters = new Set();
   const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, line });
   else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
@@ -151,11 +154,19 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, line }) => {
-  const proc = spawn(executable ?? defaultExecutable.chrome, ['--headless=new', '--enable-unsafe-webgpu', '--mute-audio',
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, line }) => {
+  // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to.
+  const mode = headed
+    ? ['--disable-features=CalculateNativeWinOcclusion', '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding', '--no-default-browser-check']
+    : ['--headless=new'];
+  const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--force-device-scale-factor=1',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, `--window-size=${width},${height}`, 'about:blank'],
     { stdio: 'ignore' });
+  if (headed && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
+    line('page_driver: Chrome window not moved');
+  }
   let targets = null;
   for (let i = 0; i < 300 && !targets; i++) {
     try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); } catch { await sleep(200); }
@@ -229,16 +240,17 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   };
 };
 
-// Moves the window of the Firefox whose command line names this profile off the desktop, big enough for the viewport.
+// Moves the window of the browser (its exe's name) whose command line names this profile off the desktop, big enough
+// for the viewport.
 // From a DPI-aware process, or a desktop scaled 175% makes it 1.75 times as big.
-const moveFirefoxWindow = (profile, width, height) => new Promise((resolve) => {
+const moveWindow = (exe, profile, width, height) => new Promise((resolve) => {
   const script = `
 Add-Type -Name U -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr a, int x, int y, int cx, int cy, uint f); [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
 [W.U]::SetProcessDPIAware() | Out-Null
 $w = 0
 for ($i = 0; $i -lt 100 -and -not $w; $i++) {
   Start-Sleep -Milliseconds 200
-  $w = Get-CimInstance Win32_Process -Filter "Name='firefox.exe'" | ? { $_.CommandLine -and $_.CommandLine.Contains($env:PAGE_DRIVER_PROFILE) } |
+  $w = Get-CimInstance Win32_Process -Filter "Name='${exe}'" | ? { $_.CommandLine -and $_.CommandLine.Contains($env:PAGE_DRIVER_PROFILE) } |
     % { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle } | ? { $_ -and $_ -ne 0 } | Select-Object -First 1
 }
 if ($w) { [W.U]::SetWindowPos($w, [IntPtr]::Zero, -${width + 200}, 0, ${width + 100}, ${height + 200}, 0x14) | Out-Null; 'moved' }`;
@@ -268,7 +280,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   await send('session.new', { capabilities: {} });
   await send('session.subscribe', { events: ['log.entryAdded'] });
   const context = (await send('browsingContext.getTree', {})).result.contexts[0].context;
-  if (process.platform === 'win32' && !await moveFirefoxWindow(profile, width, height)) line('page_driver: Firefox window not moved');
+  if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, width, height)) line('page_driver: Firefox window not moved');
   const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: 1 });
   if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
   if (preload) await send('script.addPreloadScript', { functionDeclaration: preload });

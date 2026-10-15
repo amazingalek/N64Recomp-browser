@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>]
+//     [--browser <path>] [--headed]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -12,7 +12,8 @@
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
 // another size a click goes where recompui puts the same spot: it lays its launcher and menus out by the viewport's
-// height, about the centre. --query is added to the page's URL.
+// height, about the centre. --query is added to the page's URL. --headed runs Chrome in a window off the desktop, as a
+// player's Chrome presents, instead of headless (page_driver.mjs; Firefox is always in a window).
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -42,6 +43,8 @@ import { spawn } from 'child_process';
 import { open, option, serve, sleep } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
+const headed = args.includes('--headed');
+if (headed) args.splice(args.indexOf('--headed'), 1);
 const port = Number(option(args, '--port', '8937'));
 const profileOption = option(args, '--profile', null);
 const section = option(args, '--section', null);
@@ -55,7 +58,7 @@ const executable = option(args, '--browser', undefined);
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>]');
+    '[--json <file>] [--browser <path>] [--headed]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -164,8 +167,8 @@ const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
-  preload, onLine, log });
-log(`${browser} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
+  preload, headed, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 const samples = [];
