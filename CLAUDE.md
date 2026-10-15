@@ -795,16 +795,17 @@ after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an
 interface of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`), the desktop build D3D12 only. Its
-`lib/rt64` and `lib/N64ModernRuntime` are upstream's at its commits, patched by `apply.cmake`; `rt64-patches/` (ray
+`lib/rt64` and `lib/N64ModernRuntime` are upstream's at its commits (Conker's, so `pins.txt`'s rows cover them),
+patched by `apply.cmake`; `rt64-patches/` (ray
 tracing, the video recorder) is D3D12 work and stays out of the page. `web/page.cmake` is the page's CMake, included in
 place of the rest of CMakeLists.txt with Emscripten, and `web/stubs.cpp` stands in for the crash handler, installer,
 update check, signature check and video recorder. With no RecompFrontend it has no file picker of its own, so this repo's
 `frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's for its ROM row and Load ROM. Upstream
 shapes its window to the launcher and to the game's aspect; on a page `SDL_SetWindowSize` sets only the canvas's
 backing size under CSS that keeps it at the page's size, which stretched the picture, so the page leaves the window
-alone. The game reads the keyboard once a frame at its 20 a second, so a script holds a key 150-300 ms. Upstream's
-default frame rate is Original, the game's 20 presented as 20 (not interpolated to the display's rate), and the page
-keeps it. Render to RAM stays on with the exact copy: the pause menu's background flushes the task queue and filters
+alone. The game reads the keyboard once a frame at its 20 a second, so a script holds a key 150-300 ms. Upstream
+starts a first run at the console's picture, 320x240 and the game's 20 presented as 20; a page starts at Match the
+window and Match the display (`machine_defaults`), as the other pages draw. Render to RAM stays on with the exact copy: the pause menu's background flushes the task queue and filters
 the copied frame on the CPU at once (`z_play.c`, `PreRender_ApplyFilters`), as in Majora's Mask. Its list,
 `src/rt64_shaders.txt`, 544 descriptions in 24 sections (the boot 69: launcher, logos, title), is recorded by code:
 `tools/shader_survey.js` loads File 1 from the title (name entry on a new profile), clears a new file's opening
