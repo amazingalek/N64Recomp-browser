@@ -937,15 +937,22 @@ commit: its own frontend (an RmlUi launcher and menus, no RecompFrontend) and it
 page is built by `tools/build_web.sh` in `web-build/`: that base project again, its `lib/rt64`, `lib/N64ModernRuntime`
 and `lib/N64Recomp` moved to the commits in `patches/patches.txt` and patched by `apply.cmake`, then the base's and
 the game's own changes to them made again for those commits (`patches/web/rt64.patch`, `N64ModernRuntime.patch`), and
-the base's frontend made a page (`patches/web/dkr.patch`: the canvas, recompui-style WGSL menus, `audio_output.h`, the
+the base's frontend made a page (`patches/web/dkr.patch`: the canvas, the menus' shaders as WGSL, `audio_output.h`, the
 file picker, HOME kept in IndexedDB, rumble through the Gamepad API, no mods, Exit, debug window or F10 toolbar, the
 dummy frame kept out of RDRAM as RecompFrontend 75fe596 does). The game's recompiled code is made again with the
 web-patched N64Recomp, which has no call tracking, so the hooks' `recomp_exit_function()` calls come out of the copy
 of its config it reads. The game binds draw buffers the workload hasn't made before the first one does, which WebGPU
 refused until rt64-web f01c3a6 bound a zeroed one. Render to RAM stays on with the exact copy (WebGPU in Chrome and
 Firefox): the CPU reworks the shadows' render targets on the heap, reads the framebuffers for its screen effects and
-the Z buffer for the lens flares. Its list, `src/rt64_shaders.txt`, 201 descriptions and 193 pipelines, the boot 36
-(launcher to the character select) and a section a planet (15, 20-86 descriptions each), is recorded by code
+the Z buffer for the lens flares. The base's runtime (not upstream's, which never waits there) holds the game thread that
+submits a display list until the graphics thread has drawn it, readback included, and no other game thread runs meanwhile, so with the exact copy the
+game ran at 19-20 frames a second, its sound short; on the page RT64 calls the runtime back at the list's last full sync
+(the one its end follows), when the list is all read, and the game goes on from there while RT64 draws (the RSP's and
+the RDP's completion still come after). Running on, its scheduler counted a frame that waited for shaders as an RCP
+hung for 11 retraces and stopped on its debug screen, so a hook of the page's starts those counts again each retrace
+(the fork's BUILDING.md, Render to RAM). Its list, `src/rt64_shaders.txt`, 201 descriptions and 192 pipelines in
+16 sections, the boot 36 (launcher to the character select) and a section a planet (20-86 descriptions each), is
+recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
 page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C).
