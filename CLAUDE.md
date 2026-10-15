@@ -471,6 +471,29 @@ A new game gets a row in the same work as its port.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
 
+## Frame rates
+
+- Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
+  setting, Display by default in every game, interpolates between the game's frames to the display's rate, each
+  interpolated frame a full redraw, so a page presents 60 a second on a 60 Hz display (144 on a 144 Hz one) whatever
+  the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
+  RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
+- The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
+  Original 30), Pilotwings 64 60 (a variable timestep), and the other seven their cartridge's: Majora's Mask 20,
+  Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
+  races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
+- A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
+  a game fork carrying web support only. Weigh it first: a game's logic at 60 gives lower input lag, motion the game
+  computes rather than RT64 interpolates, and the few things interpolation misses (some particles and 2D), but no
+  more presents, and it doubles the game's CPU work and RT64's per display list (4-12 ms each on a page, The game forks), which a
+  laptop's CPU pays for. For the frame rate on screen, or to measure a page, it buys nothing.
+- To measure what a page can do past the display, play it uncapped (`play_page.mjs --uncapped`, Playing a page). That
+  measures cost: the GPU's, the page's thread's WebGPU calls and the browser's GPU process's, for each present. It
+  doesn't see what held Firefox at 20-30 on a laptop's Intel UHD while the GPU idled: done callbacks coming back 20-40
+  ms late, its refresh driver's frames, the compositor. Uncapped turns the last two off, and a fast GPU's callbacks
+  come back early. So a higher uncapped number on a desktop GPU is a cheaper frame everywhere, but it doesn't clear a
+  laptop result.
+
 ## Prebuilt shader lists
 
 Without them a page is unplayable (WebGPU in Chrome and Firefox says why), so **every web port records a list and
