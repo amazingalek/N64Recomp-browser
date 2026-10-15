@@ -37,8 +37,8 @@ The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Re
 the game forks (below) take no pull requests and have never had one: a change there is a commit pushed straight to the
 fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`forks.txt` here, a game fork's submodule).
 `rush-2049-recomp` is the one game with a repo of its own that works by pull requests: what it needs from a change here
-(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, which builds, publishes and
-plays its page, not a commit from here.
+(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here (The
+pins).
 
 ## Rules
 
@@ -308,22 +308,24 @@ no worse than its row moves its fork's N64Recomp-browser onto the tag (a commit 
 published and gets its row updated (The games table). One that plays worse stays on Pages as it was, its fork on its
 last tag, and has work filed to fix it. So Pages holds only pages that were played, and a fork's `main` is what its
 page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
-to look when it plays worse. Rush 2049's `lib/N64Recomp-browser` moves in a pull request on its own repo, which builds,
-plays and publishes its page there.
+to look when it plays worse. Rush 2049 is retested with them, built and played the same way; only its pin moves
+differently: its `lib/N64Recomp-browser` moves to the tag in a pull request on its own repo, which builds those same
+bytes, runs the desktop game and publishes the page once it merges, and the retest updates its row. Its pin moves to a
+tag that left its page's bytes alone too, since its desktop build can still take something from it (below).
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages, the version players have, that crashes, never
-boots, loses its WebGPU device or can't be played, moves the pins of the games it fixes and builds, plays (in Chrome
-and Firefox) and publishes each one, and updates their rows, in the same work. The other games take it in the next
-retest. A bug only main has, on no page yet, waits for the retest like any other change; one the retest publishes is
-on Pages, and its fix is critical.
+boots, loses its WebGPU device or can't be played, moves the pins of the games it fixes (Rush 2049's by a pull request
+on its repo) and builds, plays (in Chrome and Firefox) and publishes each one, and updates their rows, in the same work.
+The other games take it in the next retest. A bug only main has, on no page yet, waits for the retest like any other
+change; one the retest publishes is on Pages, and its fix is critical.
 
 A retest runs `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>` where the ROMs are: it builds every
-game fork's main with its N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
-files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the copies; a page that
-builds the same bytes took nothing from the tag and is left alone. Once the pins of those that played well are moved,
-a run without `--browser` builds each main again (the same bytes), publishes what differs, boots each one from Pages
-in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played from a `--dry-run`
-build of that game and then published by a run with its name (Publishing).
+game's main, Rush 2049's included, with its N64Recomp-browser moved to the tag (in the build host's copy only), and
+names the pages whose files differ from what Pages serves. Those are the ones to play, from the builds it leaves in the
+copies; a page that builds the same bytes took nothing from the tag and is left alone. Once the pins of those that
+played well are moved, a run without `--browser` builds each main again (the same bytes), publishes what differs, boots
+each one from Pages in headless Chrome and lists them, and their rows are updated. A change to one game's repo is played
+from a `--dry-run` build of that game and then published by a run with its name (Publishing).
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
@@ -515,8 +517,8 @@ Kong 64, GoldenEye, Conker, Wave Race 64 and Rush 2049 through their boots and 2
 Each is on `main`, and each one's README says up front that it is AI-written and not upstream's, and its BUILDING.md
 how to build the page. On BanjoRecomp-web upstream's `validate-internal` workflow, a native build on every push to main
 with no ROM, is disabled. Banjo, Majora's Mask, Donkey Kong 64 and Conker are on their own upstream submodules and
-GoldenEye on upstream's at the forks' bases, all patched by N64Recomp-browser ed8764a (v0.36.0: the canvas in the
-browser's preferred format, rt64 c6cf6c4 and 58fc4e4, plume 16e608a and 97f4e64); Banjo, Majora's Mask and Donkey Kong
+GoldenEye on upstream's at the forks' bases, all patched by the N64Recomp-browser tag their submodule pins
+(each fork's `lib/N64Recomp-browser`, Conker's `tools/N64Recomp-browser`; The pins); Banjo, Majora's Mask and Donkey Kong
 64 include its `frontend/build_speed.cmake`: their BUILDING.md says to keep `build-web` inside the checkout and put
 ccache on `PATH`. Their `main.cpp` plays sound through `audio_output.h` on Emscripten (headless Chrome: the DK Rap,
 Banjo's intro and Majora's Mask's attract demo play, nothing short after the first second). Their CMakeLists.txt pick
