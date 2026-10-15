@@ -813,7 +813,14 @@ cutscene as play begins (`gSaveContext.cutsceneIndex` and `nextCutsceneIndex`, w
 since clearing them mid-cutscene hung the game on a black screen), and warps through `Module._oot_web_warp`
 (`web/survey.cpp`, upstream's own `--warp`, taken by `patches/harness_warp.c` in play) as a child or an adult (the play
 state's `linkAgeOnLoad`, which `Player_Destroy` copies into the save; the save's `linkAge` alone is overwritten).
-While a cutscene index is set a warp lands in the entrance's cutscene layer, another place.
+While a cutscene index is set a warp lands in the entrance's cutscene layer, another place. Its launcher's sizes are
+dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at least), so the launcher fills a 3840x2000
+canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
+busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
+Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
+(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. Every Chrome run stopped
+presenting once for 5-8 s, 50-67 s in, around when the list finished building behind the game and whatever the game
+was doing (the file select, a scene load), the page's thread held and its sound playing on.
 
 ## WebGPU in Chrome and Firefox
 
