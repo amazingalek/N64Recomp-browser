@@ -2,7 +2,7 @@
 # Rebuilds every game's page from its repo's main, publishes the ones whose files changed, and checks each one it
 # published from Pages: the deploy after a change that reaches the pages, so no page is left behind main.
 #
-#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run]
+#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit>]
 #
 # For each game in the list below (all of them unless named):
 # 1. Syncs its repo's origin/main to a copy kept on $BUILD_HOST, with rush-2049-recomp's tools/remote_build.sh (its
@@ -21,6 +21,12 @@
 # 6. Prints the pages it published. The session that ran it files one card to play those in Chrome and Firefox on a
 #    desktop GPU and update their cells in the README's Games table: that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
+# --browser <commit> is the retest before the forks' pins move (CLAUDE.md, "The pins"): a dry run of the forks with
+# their N64Recomp-browser moved to <commit> (a tag) in their copies only. It names the pages that build differently
+# from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n pages-<game> get and
+# play. Once the pins are moved there, a run without it builds the same bytes and publishes them.
+# A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
+# apply.cmake can't take a checkout from one version of the patches to another.
 #
 # It needs BUILD_HOST (an ssh host with Docker), push access to the game repos and gh signed in, and the ROMs: Rush
 # 2049's in the checkout's roms/ (its README), and each other game's plain dump as $ROMS/<game>.z64 (sha1 in the fork's
@@ -34,9 +40,16 @@
 # ccache), 162 s to built, 6 min 14 s with its publish, the wait for Pages and the boot in headless Chrome.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-dry_run=false
+dry_run=false browser=""
 args=()
-for a in "$@"; do [[ "$a" == --dry-run ]] && dry_run=true || args+=("$a"); done
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --dry-run) dry_run=true ;;
+    --browser) browser="$2" dry_run=true; shift ;;
+    *) args+=("$1") ;;
+    esac
+    shift
+done
 [[ ${#args[@]} -ge 1 ]] || { sed -n 5p "$0"; exit 1; }
 rush="$(cd "${args[0]}" && pwd)"
 remote_build="$rush/tools/remote_build.sh"
@@ -58,6 +71,8 @@ bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
+# A retest builds the forks; Rush 2049's pin moves in a pull request on its own repo, which builds its page there.
+[[ -z "$browser" ]] || selected=($(printf '%s\n' "${selected[@]}" | grep -vx rush || true))
 for g in "${selected[@]}"; do grep -q "^$g " <<< "$games" || { echo "no game $g (one of: $(awk 'NF { printf "%s ", $1 }' <<< "$games"))"; exit 1; }; done
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---
@@ -67,6 +82,32 @@ exclude() {
     grep -qx '# publish_pages.sh' .git/info/exclude 2> /dev/null ||
         printf '%s\n' '# publish_pages.sh' '/build*/' '/host/build-web/' '/N64Recomp' '/RSPRecomp' '/OfflineModRecomp' \
             '*.z64' '/RecompiledFuncs/' '/RecompiledPatches/' '/reference/' '/.venv/' >> .git/info/exclude
+}
+# browser_at <commit>: N64Recomp-browser moved to <commit> in a commit of the copy's own, for a retest: the build is
+# then what main builds once the fork's pin is moved there, which a run after the move checks (the same bytes).
+browser_at() {
+    local b=lib/N64Recomp-browser
+    [[ -d $b ]] || b=tools/N64Recomp-browser
+    git -C $b fetch -q origin "$1" && git -C $b checkout -q --detach FETCH_HEAD
+    git add $b
+    git diff --cached --quiet || git -c user.name=publish_pages -c user.email=publish_pages@localhost commit -qm "N64Recomp-browser $1"
+}
+# unpatch / patched: the checkouts N64Recomp-browser patches go back to their commits when it moved since the last
+# build here, since its patches changed and apply.cmake can't take a checkout from one version of them to another.
+unpatch() {
+    local b=lib s
+    [[ -d $b/N64Recomp-browser ]] || b=tools
+    [[ "$(cat ../patched 2> /dev/null)" != "$(git -C $b/N64Recomp-browser rev-parse HEAD)" ]] || return 0
+    for s in $b/rt64 $b/RT64 $b/N64ModernRuntime $b/RecompFrontend $b/N64Recomp; do
+        [[ -e $s/.git ]] || continue
+        git -C $s submodule foreach --recursive -q 'git reset -q --hard && git clean -fdq'
+        git -C $s reset -q --hard && git -C $s clean -fdq
+    done
+}
+patched() {
+    local b=lib
+    [[ -d $b/N64Recomp-browser ]] || b=tools
+    git -C $b/N64Recomp-browser rev-parse HEAD > ../patched
 }
 # keep_times <dir>... -- <command>: a file the command writes the same as before keeps its old time, so the build
 # recompiles only what the recompiler changed (it rewrites everything).
@@ -199,7 +240,7 @@ build_bt() {
 files() { echo "$1.html $1.js $1.wasm $1.data coi_serviceworker.js"; }
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-published=() failed=()
+published=() differ=() failed=()
 for g in "${selected[@]}"; do
     read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
     start=$SECONDS
@@ -222,7 +263,8 @@ for g in "${selected[@]}"; do
         rom="${ROMS:?set ROMS to the folder holding <game>.z64}/$g.z64"
         have="$(ssh -o BatchMode=yes "$BUILD_HOST" "sha1sum rush2049/$copy/rom.z64 2> /dev/null || true")"  # remote_build.sh's base
         [[ "$have" == "$(sha1sum < "$rom" | cut -c1-40) "* ]] || scp -q "$rom" "$BUILD_HOST:rush2049/$copy/rom.z64"
-        if ! bash "$remote_build" -n $copy run "set -euo pipefail; trap 'echo \"failed: \$BASH_COMMAND\" >&2' ERR; $(declare -f exclude keep_times n64recomp web build_$g); exclude; build_$g" \
+        if ! bash "$remote_build" -n $copy run "set -euo pipefail; trap 'echo \"failed: \$BASH_COMMAND\" >&2' ERR; $(declare -f exclude browser_at unpatch patched keep_times n64recomp web build_$g); exclude;
+            ${browser:+browser_at $browser;} unpatch; build_$g; patched" \
             > "$work/$g.log" 2>&1; then
             echo "   build failed:"; tail -20 "$work/$g.log"; failed+=("$g"); continue
         fi
@@ -231,8 +273,9 @@ for g in "${selected[@]}"; do
     pages="$(gh api "repos/$repo/git/trees/gh-pages" --jq '.tree[] | .path + " " + .sha' 2> /dev/null || true)"
     served=""
     for f in $(files $name); do served+="$(awk -v p="${f/$name.html/index.html}" '$1 == p { print $2 }' <<< "$pages") "; done
-    echo "   main $sha built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as gh-pages" || echo "differs from gh-pages")"
+    echo "   main $sha${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as gh-pages" || echo "differs from gh-pages")"
     [[ "$built" != "$served" ]] || continue
+    differ+=("$g")
     $dry_run && continue
     bash "$remote_build" -n $copy get "$dir" "$work/$g"
     bash "$here/publish_page.sh" "$work/$g" "$name" "$repo" "main $sha" | sed 's/^/   /'
@@ -264,6 +307,13 @@ done
 
 echo
 [[ ${#failed[@]} -eq 0 ]] || echo "failed: ${failed[*]}"
+if [[ -n "$browser" ]]; then
+    echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
+    for g in "${differ[@]}"; do
+        read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
+        echo "  $g: bash $remote_build -n pages-$g get $dir <dir>"
+    done
+fi
 $dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }
 if [[ ${#published[@]} -eq 0 ]]; then
     echo "every page is what its main builds: nothing published"
