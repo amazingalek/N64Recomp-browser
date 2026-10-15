@@ -500,6 +500,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
+  (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
+  them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
+  for seconds while the thread looks free and the GPU process idles. Ocarina of Time's survey waited for the file
+  select's hand-over that way, and its page held 3-8 s as the file loaded, only while the loop ran.
 
 ## Frame rates
 
@@ -921,11 +926,10 @@ dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at leas
 canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
 busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
 Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
-(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. In Chrome a scene's
-first load can hold the picture 3-8 s: one present's onSubmittedWorkDone comes back seconds late (3.3 s with
-`?present-stats`) with the page's thread free and the sound playing on, while a later load of the same scene, and 100
-s at the title with the whole list building behind it, show no gap over 50 ms: something Chrome's GPU process does in
-line the first time (a sync pipeline, a texture's first clear), not the list's build.
+(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. Its plan's survey once waited
+for the file select's hand-over in a loop of messages to itself, and Chrome held the picture 3-8 s as the file loaded
+(Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
+built in line at the title).
 
 ## WebGPU in Chrome and Firefox
 
