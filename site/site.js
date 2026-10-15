@@ -9,7 +9,7 @@
 
 const README = 'https://raw.githubusercontent.com/amazingalek/N64Recomp-browser/main/README.md';
 
-// The table's rows: | Game | [repo](url) | [play](url) | Chrome | Firefox | Played |
+// The table's rows: | Game | [repo](url) | [play](url) | Chrome | Firefox | Played | (Played isn't shown)
 function parseGames(markdown) {
   const lines = markdown.split('\n');
   const start = lines.findIndex((l) => l.trim() === '## Games');
@@ -28,7 +28,7 @@ function parseGames(markdown) {
     const link = (cell) => (cell.match(/\]\((.*?)\)/) || [])[1];
     games.push({
       name: cells[0], repoName: cells[1].replace(/^\[(.*?)\].*$/, '$1'), repo: link(cells[1]), page: localPage(link(cells[2])),
-      chrome: cells[3], firefox: cells[4], played: cells[5],
+      chrome: cells[3], firefox: cells[4],
     });
   }
   return { games, legend, columns: header || [] };
@@ -56,21 +56,22 @@ function el(tag, props, ...children) {
 
 function tile(game, columns) {
   const h = hue(game.name);
-  const stat = (label, cell) => el('div', { className: 'stat ' + cellClass(cell), title: label },
+  // The numbers only ("60*; 10-30† in later worlds" shows "60*; 10-30†"), the whole cell on hover.
+  const stat = (label, cell) => el('div', { className: 'stat ' + cellClass(cell), title: `${label}: ${cell}` },
     el('span', { className: 'browser' }, label.replace(/^.*, /, '')),
-    el('span', { className: 'value' + (cell.length > 9 ? ' long' : '') }, cell));
+    el('span', { className: 'value' }, /^\d/.test(cell) ? cell.replace(/\s+[a-z][a-z ]*$/i, '') : cell));
   const play = el('button', { className: 'play', type: 'button', textContent: 'Play' });
   play.addEventListener('click', () => openGame(game));
   // The game's launcher, captured from its page without a ROM (img/, the README's site/ line); a colour without one.
   const art = el('img', { src: `img/${game.repoName}.webp`, alt: '', loading: 'lazy' });
   art.addEventListener('error', () => art.remove());
-  return el('article', { className: 'tile' },
-    el('div', { className: 'art', style: `--h:${h}` }, art),
+  const cover = el('div', { className: 'art', style: `--h:${h}` }, art);
+  cover.addEventListener('click', () => openGame(game));
+  return el('article', { className: 'tile' }, cover,
     el('div', { className: 'body' },
-      el('h2', {}, game.name),
-      el('div', { className: 'stats' }, stat(columns[3] || 'Chrome', game.chrome), stat(columns[4] || 'Firefox', game.firefox)),
-      el('p', { className: 'played' }, 'Played ' + game.played),
-      el('div', { className: 'actions' }, play, el('a', { href: game.repo, textContent: game.repoName }))));
+      el('div', { className: 'head' },
+        el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
+      el('div', { className: 'stats' }, stat(columns[3] || 'Chrome', game.chrome), stat(columns[4] || 'Firefox', game.firefox))));
 }
 
 // A page on Pages is played from this origin: the same one on Pages, tools/serve_site.mjs's when served locally.
@@ -140,7 +141,9 @@ async function main() {
     grid.replaceChildren(el('p', { className: 'note' }, 'The games table could not be read: ' + error.message));
     return;
   }
-  grid.replaceChildren(...table.games.map((g) => tile(g, table.columns)));
+  const title = (g) => g.name.replace(/^The /, '');
+  const sorted = [...table.games].sort((a, b) => title(a).localeCompare(title(b)));
+  grid.replaceChildren(...sorted.map((g) => tile(g, table.columns)));
   document.getElementById('legend').textContent = table.legend;
   const wanted = decodeURIComponent(location.hash.slice(1));
   const game = table.games.find((g) => g.repoName === wanted);
