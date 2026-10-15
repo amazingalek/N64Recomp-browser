@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  The games' page: every game in the README's Games table as a tile, played in the page itself. It is published at
+  https://<owner>.github.io/N64Recomp-browser/ (tools/publish_site.sh), the same origin as every game's page, so a game
+  plays in a frame here. The table is read from main's README.md each visit (site.js), so the page shows what the
+  table says without being published again; only a change to this folder needs that.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N64 recomps in the browser</title>
+<link rel="stylesheet" href="site.css">
+<!-- A game in a frame gets SharedArrayBuffer only if this page is cross-origin isolated too. -->
+<script src="coi_serviceworker.js"></script>
+</head>
+<body>
+<header>
+  <h1>N64 recomps<span>in the browser</span></h1>
+  <p>Static recompilations of N64 games, built for the web with WebGPU. Pick a game and load your own ROM: the pages
+    hold none. Written almost entirely by AI (Claude); not affiliated with the recomps' authors.</p>
+  <p class="links"><a href="https://github.com/amazingalek/N64Recomp-browser">Source and how it works</a></p>
+</header>
+<main>
+  <div id="grid" class="grid" aria-live="polite"><p class="note">Loading the games…</p></div>
+  <p id="legend" class="note"></p>
+</main>
+<div id="player" class="player" hidden>
+  <div class="bar">
+    <strong id="player-title"></strong>
+    <span class="spacer"></span>
+    <button id="player-full" type="button">Fullscreen</button>
+    <a id="player-tab" target="_blank" rel="noopener">Own tab</a>
+    <button id="player-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <iframe id="player-frame" title="Game" allow="fullscreen; gamepad; autoplay; cross-origin-isolated"></iframe>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
