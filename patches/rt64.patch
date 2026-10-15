@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web a5bc25d81a11044c8c27be58eba62a9c01a6f977
+rt64: https://github.com/amazingalek/rt64-web 29f50e63a0570d66f7201aafc6709fb09826c6fc
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..2760448 100644
+index 79dfc38..e77c8b9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,11 @@ endif()
@@ -200,7 +200,7 @@ index 79dfc38..2760448 100644
  target_link_libraries(rt64 libzstd_static)
  target_link_libraries(rt64 plume)
  
-@@ -504,9 +596,104 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
+@@ -504,9 +596,106 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING")
@@ -250,6 +250,8 @@ index 79dfc38..2760448 100644
 +# out. A RasterPS comes out about 45% smaller (the largest 370 KB to 224 KB), descriptions that differ only in what
 +# RasterPS ignores come out the same and are kept once (GoldenEye's 340: 624 different stages to 210, 103 MB of WGSL
 +# to 16), and Chrome builds them in about 60% of the time. Without spirv-opt they are the same shaders, only bigger.
++# pack moves the variables naga makes of SPIR-V's phis out of their functions, which Chrome parses about four times
++# faster, on the thread that takes the page's presents (shader_specializer.cpp, privatizePhis()).
 +if (RT64_WGSL AND RT64_PREBUILT_SHADER_LIST)
 +    find_program(RT64_SPIRV_OPT_EXECUTABLE spirv-opt)
 +    if (NOT RT64_SPIRV_OPT_EXECUTABLE)
@@ -1833,7 +1835,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..2747dca 100644
+index 9fae0d4..dfaf629 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -1868,19 +1870,44 @@ index 9fae0d4..2747dca 100644
              descriptorTextureVersions.clear();
              descriptorTextureGlobalVersion = 0;
              descriptorTextureReplacementMapEnabled = textureCacheReplacementMapEnabled;
-@@ -378,6 +381,11 @@ namespace RT64 {
+@@ -373,10 +376,36 @@ namespace RT64 {
+ 
+         descCommonSet->setBuffer(descCommonSet->FrParams, frameParamsBuffer.get(), sizeof(interop::FrameParams));
+         descCommonSet->setBuffer(descCommonSet->instanceRenderIndices, renderIndicesBuffer.get(), RenderBufferStructuredView(sizeof(interop::RenderIndices)));
++#   ifdef __EMSCRIPTEN__
++        // A workload makes a draw buffer the first time it has something to put in it, so one whose draws have used
++        // no tile yet (an untextured boot logo) has no GPU tiles buffer. On WebGPU a set's layout is built from what
++        // is bound (plume), so binding nothing left GPUTiles out of it, and a pipeline built in the background for
++        // that layout with a pixel shader that reads GPUTiles failed ("Binding doesn't exist"), and every command
++        // buffer that drew with it was dropped. A zeroed buffer stands in until the workload has one.
++        if (dummyStorageBuffer == nullptr) {
++            const uint64_t dummySize = std::max({ sizeof(interop::RDPParams), sizeof(interop::RDPTile), sizeof(interop::GPUTile), sizeof(interop::RenderParams) });
++            dummyStorageBuffer = worker->device->createBuffer(RenderBufferDesc::DefaultBuffer(dummySize, RenderBufferFlag::STORAGE));
++        }
++
++        auto drawBuffer = [this](const BufferPair &pair) -> const RenderBuffer * {
++            return (pair.get() != nullptr) ? pair.get() : dummyStorageBuffer.get();
++        };
++
++        descCommonSet->setBuffer(descCommonSet->instanceRDPParams, drawBuffer(drawBuffers->rdpParamsBuffer), RenderBufferStructuredView(sizeof(interop::RDPParams)));
++        descCommonSet->setBuffer(descCommonSet->RDPTiles, drawBuffer(drawBuffers->rdpTilesBuffer), RenderBufferStructuredView(sizeof(interop::RDPTile)));
++        descCommonSet->setBuffer(descCommonSet->GPUTiles, drawBuffer(drawBuffers->gpuTilesBuffer), RenderBufferStructuredView(sizeof(interop::GPUTile)));
++        descCommonSet->setBuffer(descCommonSet->DynamicRenderParams, drawBuffer(drawBuffers->renderParamsBuffer), RenderBufferStructuredView(sizeof(interop::RenderParams)));
++#   else
+         descCommonSet->setBuffer(descCommonSet->instanceRDPParams, drawBuffers->rdpParamsBuffer.get(), RenderBufferStructuredView(sizeof(interop::RDPParams)));
+         descCommonSet->setBuffer(descCommonSet->RDPTiles, drawBuffers->rdpTilesBuffer.get(), RenderBufferStructuredView(sizeof(interop::RDPTile)));
          descCommonSet->setBuffer(descCommonSet->GPUTiles, drawBuffers->gpuTilesBuffer.get(), RenderBufferStructuredView(sizeof(interop::GPUTile)));
          descCommonSet->setBuffer(descCommonSet->DynamicRenderParams, drawBuffers->renderParamsBuffer.get(), RenderBufferStructuredView(sizeof(interop::RenderParams)));
- 
++#   endif
++
 +        // The textures are bound per draw instead, by updateDrawTextureSets().
 +        if (usePerDrawTextures) {
 +            return;
 +        }
-+
+ 
          // Make sure the versions vector matches the texture cache size.
          descriptorTextureVersions.resize(textureCacheSize, 0);
- 
-@@ -473,6 +481,7 @@ namespace RT64 {
+@@ -473,6 +502,7 @@ namespace RT64 {
          interop::RasterParams rasterParams;
          RenderDescriptorSet *descRealFbSet = framebuffer.descRealFbSet->get();
          RenderDescriptorSet *descDummyFbSet = framebuffer.descDummyFbSet->get();
@@ -1888,7 +1915,7 @@ index 9fae0d4..2747dca 100644
  
          auto switchToGraphicsPipeline = [&]() {
              previousCallType = InstanceDrawCall::Type::Unknown;
-@@ -481,8 +490,15 @@ namespace RT64 {
+@@ -481,8 +511,15 @@ namespace RT64 {
              previousScissor = RenderRect();
              worker->commandList->setGraphicsPipelineLayout(rendererPipelineLayout);
              worker->commandList->setGraphicsDescriptorSet(descCommonSet->get(), 0);
@@ -1906,7 +1933,7 @@ index 9fae0d4..2747dca 100644
              worker->commandList->setGraphicsDescriptorSet(depthState ? descRealFbSet : descDummyFbSet, 3);
              worker->commandList->setViewports(framebuffer.viewport);
          };
-@@ -570,6 +586,14 @@ namespace RT64 {
+@@ -570,6 +607,14 @@ namespace RT64 {
                      worker->commandList->setPipeline(triangles.pipeline);
                      previousPipeline = triangles.pipeline;
                  }
@@ -1921,7 +1948,7 @@ index 9fae0d4..2747dca 100644
                  
                  rasterParams.renderIndex = i;
                  rasterParams.screenScale = triangles.screenScale;
-@@ -618,7 +642,12 @@ namespace RT64 {
+@@ -618,7 +663,12 @@ namespace RT64 {
                  const interop::RSPVertexTestZCB &testZCB = drawCall.vertexTestZ;
                  switchToDepthRead();
  
@@ -1934,7 +1961,7 @@ index 9fae0d4..2747dca 100644
                  const auto &rspVertexTestZ = useMSAA ? shaderLibrary->rspVertexTestZMS : shaderLibrary->rspVertexTestZ;
                  worker->commandList->barriers(RenderBarrierStage::COMPUTE, RenderBufferBarrier(testZIndexBuffer, RenderBufferAccess::WRITE));
                  worker->commandList->setPipeline(rspVertexTestZ.pipeline.get());
-@@ -1339,8 +1368,15 @@ namespace RT64 {
+@@ -1339,8 +1389,15 @@ namespace RT64 {
          memcpy(paramBufferBytes, &fbParams, sizeof(interop::FramebufferParams));
          framebuffer.paramsBuffer->unmap();
  
@@ -1950,7 +1977,7 @@ index 9fae0d4..2747dca 100644
          framebuffer.descRealFbSet->setBuffer(framebuffer.descRealFbSet->FbParams, framebuffer.paramsBuffer.get(), sizeof(interop::FramebufferParams));
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundColor, backgroundColorTexture, RenderTextureLayout::SHADER_READ, backgroundColorTextureView);
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundDepth, p.fbStorage->depthTarget->texture.get(), RenderTextureLayout::DEPTH_READ, p.fbStorage->depthTarget->textureView.get());
-@@ -1760,7 +1796,205 @@ namespace RT64 {
+@@ -1760,7 +1817,205 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
  
@@ -2157,7 +2184,7 @@ index 9fae0d4..2747dca 100644
          bool shaderViewRtEnabled = false;
          std::vector<BufferUploader::Upload> shaderUploads = {
              { renderIndicesVector.data(), { 0, renderIndicesVector.size() }, sizeof(interop::RenderIndices), RenderBufferFlag::STORAGE, { }, &renderIndicesBuffer},
-@@ -1816,8 +2050,16 @@ namespace RT64 {
+@@ -1816,8 +2071,16 @@ namespace RT64 {
          }
  #   endif
  
@@ -2175,10 +2202,10 @@ index 9fae0d4..2747dca 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..da1a2bf 100644
+index 3add9c3..9ec3b6a 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
-@@ -98,6 +98,37 @@ namespace RT64 {
+@@ -98,6 +98,41 @@ namespace RT64 {
          std::vector<uint32_t> descriptorTextureVersions;
          uint32_t descriptorTextureGlobalVersion = 0;
          bool descriptorTextureReplacementMapEnabled = false;
@@ -2213,10 +2240,14 @@ index 3add9c3..da1a2bf 100644
 +        std::unordered_map<DrawTextureStamps, uint32_t, DrawTextureStampsHash> drawTextureSetMap;
 +        std::unique_ptr<RenderTexture> dummyTileTexture;
 +        bool dummyTileTextureTransitioned = false;
++#   ifdef __EMSCRIPTEN__
++        // Bound in place of a draw buffer a workload hasn't made yet (updateShaderDescriptorSet).
++        std::unique_ptr<RenderBuffer> dummyStorageBuffer;
++#   endif
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -166,7 +197,9 @@ namespace RT64 {
+@@ -166,7 +201,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);
@@ -5947,10 +5978,10 @@ index 0000000..782d640
 +endif()
 diff --git a/src/tools/shader_specializer/shader_specializer.cpp b/src/tools/shader_specializer/shader_specializer.cpp
 new file mode 100644
-index 0000000..d8c4332
+index 0000000..3f62629
 --- /dev/null
 +++ b/src/tools/shader_specializer/shader_specializer.cpp
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,360 @@
 +//
 +// RT64
 +//
@@ -6024,8 +6055,131 @@ index 0000000..d8c4332
 +    return stream.good() ? 0 : 1;
 +}
 +
++static bool isIdentifierChar(char c) {
++    return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) || ((c >= '0') && (c <= '9')) || (c == '_');
++}
++
++// naga writes each SPIR-V phi as a variable of its function, `var phi_<n>_: <type>;`, assigned on every edge into the
++// block that reads it, and spirv-opt leaves a RasterPS hundreds of them in one function. Chrome parses a shader module
++// (Tint) on its GPU process's main thread, the one that takes the page's presents, in a time that grows with a
++// function's variables times its branches: a 180 KB RasterPS with ~300 of them took 100-120 ms, so each one built
++// behind the game held the page's presents that long (Pilotwings 64's list, 45 such shaders, made 30 gaps of over 100
++// ms in Chrome 155). As variables of the module (var<private>, one per invocation like a function's) the same shader
++// parses in ~30 ms, and the list's 142 largest in 2.5 s against 6.7. A phi is always written before it is read, so
++// it needn't start at zero each call. Tint reads a private variable as non-uniform where it tracked a function's, so
++// the module turns the derivative uniformity check off, which naga's own output already passed.
++static void privatizePhis(std::string &wgsl) {
++    const std::string Removed(1, '\0');
++    std::vector<std::string> lines;
++    for (size_t start = 0; start <= wgsl.size();) {
++        size_t end = wgsl.find('\n', start);
++        if (end == std::string::npos) {
++            end = wgsl.size();
++        }
++
++        lines.emplace_back(wgsl.substr(start, end - start));
++        start = end + 1;
++    }
++
++    std::vector<size_t> functions;
++    for (size_t i = 0; i < lines.size(); i++) {
++        if (lines[i].compare(0, 3, "fn ") == 0) {
++            functions.emplace_back(i);
++        }
++    }
++
++    std::string declarations;
++    for (size_t f = 0; f < functions.size(); f++) {
++        const size_t first = functions[f];
++        const size_t last = (f + 1 < functions.size()) ? functions[f + 1] : lines.size();
++        std::map<std::string, std::string> renamed;
++        for (size_t i = first; i < last; i++) {
++            std::string &line = lines[i];
++            const size_t var = line.find_first_not_of(' ');
++            if ((var == std::string::npos) || (var == 0) || (line.compare(var, 8, "var phi_") != 0) || (line.back() != ';') ||
++                (line.find('=') != std::string::npos)) {
++                continue;
++            }
++
++            const size_t colon = line.find(": ", var);
++            if (colon == std::string::npos) {
++                continue;
++            }
++
++            const std::string name = line.substr(var + 4, colon - var - 4);
++            const std::string privateName = "phi_f" + std::to_string(f) + name.substr(3);
++            if (wgsl.find(privateName) != std::string::npos) {
++                return;
++            }
++
++            declarations += "var<private> " + privateName + line.substr(colon) + "\n";
++            renamed[name] = privateName;
++            line = Removed;
++        }
++
++        if (renamed.empty()) {
++            continue;
++        }
++
++        for (size_t i = first; i < last; i++) {
++            std::string &line = lines[i];
++            if (line == Removed) {
++                continue;
++            }
++
++            std::string rewritten;
++            for (size_t p = 0; p < line.size();) {
++                if (!isIdentifierChar(line[p])) {
++                    rewritten.push_back(line[p++]);
++                    continue;
++                }
++
++                size_t end = p;
++                while ((end < line.size()) && isIdentifierChar(line[end])) {
++                    end++;
++                }
++
++                const std::string token = line.substr(p, end - p);
++                auto it = renamed.find(token);
++                rewritten += (it != renamed.end()) ? it->second : token;
++                p = end;
++            }
++
++            line = rewritten;
++        }
++    }
++
++    if (declarations.empty()) {
++        return;
++    }
++
++    // Before the first function and the attributes on the lines above it.
++    size_t insertAt = functions[0];
++    while ((insertAt > 0) && (lines[insertAt - 1].compare(0, 1, "@") == 0)) {
++        insertAt--;
++    }
++
++    std::string result = "diagnostic(off, derivative_uniformity);\n";
++    for (size_t i = 0; i < lines.size(); i++) {
++        if (i == insertAt) {
++            result += declarations;
++        }
++
++        if (lines[i] == Removed) {
++            continue;
++        }
++
++        result += lines[i];
++        if (i + 1 < lines.size()) {
++            result.push_back('\n');
++        }
++    }
++
++    wgsl = result;
++}
++
 +// PlumeWGSL.cmake's rewrites: the push constant block becomes the uniform buffer plume's WebGPU backend gives it, and
-+// a storage texture is write-only unless its format can be read and written in core WebGPU.
++// a storage texture is write-only unless its format can be read and written in core WebGPU. Then privatizePhis().
 +static void rewrite(std::string &wgsl) {
 +    for (const std::string block : { "var<immediate>", "var<push_constant>" }) {
 +        for (size_t p = wgsl.find(block); p != std::string::npos; p = wgsl.find(block, p)) {
@@ -6041,6 +6195,8 @@ index 0000000..d8c4332
 +            wgsl.replace(p, readWrite.size(), ",write>");
 +        }
 +    }
++
++    privatizePhis(wgsl);
 +}
 +
 +static int pack(char **argv) {
