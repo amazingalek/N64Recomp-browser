@@ -239,6 +239,10 @@ rt64 b052049           on WebGPU a pixel shader that picks its slot per pixel (m
                        and loads them in one switch over the draw's slots, not a switch a tap: GoldenEye's largest
                        224 → 185 KB of WGSL, its list 19.0 → 16.3 MB, Firefox's waits for its boot and Dam a fifth
                        and nearly a third shorter
+rt64 ee2dd6a           where pipelines build behind the game (Chrome) the boot's threads build section 1 too, the rest
+                       still on one: a boot that ends at the title, with the menus the next section so that Firefox
+                       draws the title sooner, left the menus to one thread, and Chrome waited 3-8 s for them after
+                       Start (Pilotwings 64's 28-36), where with them in the boot it never had
 plume 009957c          while the presents-in-flight cap holds presents below the display's rate, one more in flight
 rt64 2306d25           tried every 2 s (up to 4) and kept if presents rise: with onSubmittedWorkDone 20-40 ms late, 2
                        held Banjo's page in Firefox at 20 (RT64 read the skips as the GPU falling behind and paced it)
@@ -717,8 +721,10 @@ page's). A game whose CPU copies into a framebuffer RT64 has never drawn, or rea
 the clock already let other threads in (its `patches/clocks.c`). Its list, 414 descriptions, is recorded by
 `tools/shader_survey.js` (no patches library needed: the menus' own cursor picks the test, the vehicle and class are
 written at the pilot select), a load a test, merged into a section per island and vehicle
-(`tools/merge_shader_sections.py`): 414 descriptions, 298 pipelines in 28 sections, the boot 80 (the title and the
-menus). Its scheduler took a frame busy for 50 retraces for a hung RCP and sent itself the RDP's done message, so
+(`tools/merge_shader_sections.py`): 414 descriptions, 298 pipelines in 29 sections, the boot 33 (the logos and the
+title) and the menus a section of their own (47, 49 of their 54 descriptions on the first screen after Start), so
+Firefox draws the title before it builds them; with the menus in the boot (80) it waited 18-37 s before the first
+frame, split 7-9 s. Its scheduler took a frame busy for 50 retraces for a hung RCP and sent itself the RDP's done message, so
 during Firefox's boot wait it built frames into display lists RT64 hadn't read, and the page stopped on the mix (a
 palette load past the end of memory, a texture 8404 texels wide) in two runs of three; `patches/sched.c` takes the
 timeouts out. From Pages (main 550269d, N64Recomp-browser 33d43a9), cold, RTX 2070: Firefox 158 waited 19-29 s for the
