@@ -271,7 +271,7 @@ rt64 29f50e6           the prebuilt shaders' phi variables (naga's `var phi_<n>_
 rt64 f01c3a6           with Emscripten a workload's RDP params, tiles, GPU tiles and render params bound as a zeroed buffer
                        until it makes its own: a set's layout is built from what is bound, so a pipeline whose pixel shader
                        reads GPUTiles failed ("Binding doesn't exist") on a workload with no tile yet (Mario Kart 64's logo)
-rt64 RTXXXXX           on WebGPU a pixel shader with mip LOD samples its two levels, and its two tiles where LOD picks
+rt64 008f380           on WebGPU a pixel shader with mip LOD samples its two levels, and its two tiles where LOD picks
                        them per pixel, in loops the shader keeps: ~70 KB of WGSL instead of 185, and Firefox's waits for
                        GoldenEye's Dam and Pilotwings 64's menus less than half; the prebuilt shaders specialized by
                        spirv-opt alone (re-spirv can't take a loop), so a page's build needs it
@@ -853,9 +853,11 @@ changing it:
   against 10.4-11.6 and 17.7-23.3 (three runs each, interleaved, a busy host). Rush 2049's waits barely moved: few of
   its shaders have mip LOD. Such a shader sampled two tiles of two levels of four taps, each written out by dxc;
   sampled in loops the shader keeps (two levels, and two tiles where the tile is picked per pixel), it is ~70 KB of
-  WGSL instead of 185 (rt64 RTXXXXX). Firefox 158 built GoldenEye's Dam in a test page in 5.8-8.3 s against 14.8-19.1,
+  WGSL instead of 185 (rt64 008f380). Firefox 158 built GoldenEye's Dam in a test page in 5.8-8.3 s against 14.8-19.1,
   Pilotwings 64's menus in 5.7-8.2 against 13.9-16.3, Conker's Windy in 4.1-4.4 against 6.3-8.4 and Majora's Mask's
-  Clock Town as before, 4.1-5.4 against 4.5-5.0 (three runs each, interleaved, a busy host). A loop over the tiles of a
+  Clock Town as before, 4.1-5.4 against 4.5-5.0 (three runs each, interleaved, a busy host). From GoldenEye's page,
+  cold, Firefox waited 8.3-9.3 s for the boot and 7.6-8.4 s for Dam against 13.2-14.6 and 17.9-22.0 (1256x645 and
+  3840x2000, a busy host), then drew 59-60 presents a second as before, the GPU as busy. A loop over the tiles of a
   shader without LOD costs it: each tile's slot and clamp modes are no longer constants, and one of Majora's Mask's
   went from 10 KB to 60. A loop over the four taps as well made the WGSL smaller still, but Firefox built its
   mid-sized shaders slower (one of 43 KB in 205-265 ms against 157), so the taps stay written out.

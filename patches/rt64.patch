@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web 29f50e63a0570d66f7201aafc6709fb09826c6fc
+rt64: https://github.com/amazingalek/rt64-web 008f38024990be907556e6929607025235553f64
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..e77c8b9 100644
+index 79dfc38..9ad062b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,11 @@ endif()
@@ -200,7 +200,7 @@ index 79dfc38..e77c8b9 100644
  target_link_libraries(rt64 libzstd_static)
  target_link_libraries(rt64 plume)
  
-@@ -504,9 +596,106 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
+@@ -504,9 +596,112 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING")
@@ -239,23 +239,25 @@ index 79dfc38..e77c8b9 100644
 +
 +# Prebuilt shaders for WebGPU. A game that sets RT64_PREBUILT_SHADER_LIST to a list of the shader descriptions it uses
 +# (one per line, five hex words: other mode L and H, color combiner L and H, flags, as its page prints them when opened
-+# with ?record-shaders) gets each one specialized here: shader_specializer folds the description into the spec constant
-+# SPIR-V with re-spirv, spirv-opt -O cleans up after it, naga turns that into WGSL, and the lot goes into rt64
-+# compressed. RasterShaderCache builds them in every browser (startPrebuild()), with the game waiting: those above the
-+# list's first line reading "section <name>" (all of them without one) before it gets past its first frame, and each
-+# section after that when the game first draws with its shaders, a level at a time. They are made without MSAA, with
-+# RasterPS both with dual-source blending (.ps.wgsl) and without (.ps-single.wgsl).
-+# re-spirv folds the spec constants and drops the branches they decide, but leaves the rest as dxc wrote it for any
-+# description: variables kept in memory, copies, branches on what is now constant. spirv-opt (SPIRV-Tools) takes those
-+# out. A RasterPS comes out about 45% smaller (the largest 370 KB to 224 KB), descriptions that differ only in what
-+# RasterPS ignores come out the same and are kept once (GoldenEye's 340: 624 different stages to 210, 103 MB of WGSL
-+# to 16), and Chrome builds them in about 60% of the time. Without spirv-opt they are the same shaders, only bigger.
++# with ?record-shaders) gets each one specialized here: spirv-opt (SPIRV-Tools) sets the spec constant SPIR-V's
++# constants to the description, freezes them and optimizes what is left, naga turns that into WGSL, and
++# shader_specializer puts the lot into rt64 compressed. RasterShaderCache builds them in every browser
++# (startPrebuild()), with the game waiting: those above the list's first line reading "section <name>" (all of them
++# without one) before it gets past its first frame, and each section after that when the game first draws with its
++# shaders, a level at a time. They are made without MSAA, with RasterPS both with dual-source blending (.ps.wgsl) and
++# without (.ps-single.wgsl).
++# -O runs twice: once leaves much of what the constants decided (a small RasterPS 42 KB of WGSL against 15). Without
++# --strip-debug naga names every value after dxc's debug names. re-spirv, which RT64 specializes with on Vulkan, can't
++# take a loop the shader keeps, which the WebGPU pixel shaders have (TextureSampler.hlsli, RasterPS.hlsl), and on
++# shaders without one spirv-opt alone comes within 1% of re-spirv followed by spirv-opt -O. Against re-spirv alone it
++# makes a RasterPS about 45% smaller and descriptions that differ only in what RasterPS ignores the same, kept once
++# (GoldenEye's 340: 624 different stages to 210, 103 MB of WGSL to 16), and Chrome builds them in about 60% of the time.
 +# pack moves the variables naga makes of SPIR-V's phis out of their functions, which Chrome parses about four times
 +# faster, on the thread that takes the page's presents (shader_specializer.cpp, privatizePhis()).
 +if (RT64_WGSL AND RT64_PREBUILT_SHADER_LIST)
 +    find_program(RT64_SPIRV_OPT_EXECUTABLE spirv-opt)
 +    if (NOT RT64_SPIRV_OPT_EXECUTABLE)
-+        message(WARNING "spirv-opt not found: the prebuilt shaders' WGSL is about twice the size. Install SPIRV-Tools or set RT64_SPIRV_OPT_EXECUTABLE.")
++        message(FATAL_ERROR "spirv-opt not found: the prebuilt shaders need it. Install SPIRV-Tools or set RT64_SPIRV_OPT_EXECUTABLE.")
 +    endif()
 +    add_subdirectory(src/tools/shader_specializer)
 +    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${RT64_PREBUILT_SHADER_LIST})
@@ -268,6 +270,15 @@ index 79dfc38..e77c8b9 100644
 +        string(REGEX MATCHALL "[0-9a-fA-F]+" PREBUILT_WORDS "${PREBUILT_LINE}")
 +        list(GET PREBUILT_WORDS 4 PREBUILT_FLAGS)
 +        string(JOIN "_" PREBUILT_KEY ${PREBUILT_WORDS})
++        # The spec constants' ids are RT64's: other mode L and H, color combiner L and H, flags.
++        set(PREBUILT_SPEC_CONSTANTS)
++        set(PREBUILT_ID 0)
++        foreach(PREBUILT_WORD ${PREBUILT_WORDS})
++            math(EXPR PREBUILT_VALUE "0x${PREBUILT_WORD}" OUTPUT_FORMAT DECIMAL)
++            list(APPEND PREBUILT_SPEC_CONSTANTS "${PREBUILT_ID}:${PREBUILT_VALUE}")
++            math(EXPR PREBUILT_ID "${PREBUILT_ID} + 1")
++        endforeach()
++        string(JOIN " " PREBUILT_SPEC_CONSTANTS ${PREBUILT_SPEC_CONSTANTS})
 +        # The flags' fourth bit is smoothShade.
 +        math(EXPR PREBUILT_SMOOTH "(0x${PREBUILT_FLAGS} >> 3) & 1")
 +        if (PREBUILT_SMOOTH)
@@ -282,20 +293,15 @@ index 79dfc38..e77c8b9 100644
 +        set(PREBUILT_OUT "${PREBUILT_DIR}/${PREBUILT_KEY}")
 +        set(PREBUILT_COMMANDS)
 +        foreach(PREBUILT_STAGE vs ps ps-single)
-+            if (RT64_SPIRV_OPT_EXECUTABLE)
-+                list(APPEND PREBUILT_COMMANDS
-+                    COMMAND shader_specializer specialize ${PREBUILT_SPIRV_${PREBUILT_STAGE}} ${PREBUILT_OUT}.${PREBUILT_STAGE}.specialized.spv ${PREBUILT_WORDS}
-+                    COMMAND ${RT64_SPIRV_OPT_EXECUTABLE} -O ${PREBUILT_OUT}.${PREBUILT_STAGE}.specialized.spv -o ${PREBUILT_OUT}.${PREBUILT_STAGE}.spv)
-+            else()
-+                list(APPEND PREBUILT_COMMANDS
-+                    COMMAND shader_specializer specialize ${PREBUILT_SPIRV_${PREBUILT_STAGE}} ${PREBUILT_OUT}.${PREBUILT_STAGE}.spv ${PREBUILT_WORDS})
-+            endif()
 +            list(APPEND PREBUILT_COMMANDS
++                COMMAND ${RT64_SPIRV_OPT_EXECUTABLE} --set-spec-const-default-value "${PREBUILT_SPEC_CONSTANTS}" --freeze-spec-const
++                    --fold-spec-const-op-composite --strip-debug -O -O ${PREBUILT_SPIRV_${PREBUILT_STAGE}} -o ${PREBUILT_OUT}.${PREBUILT_STAGE}.spv
 +                COMMAND ${RT64_NAGA_EXECUTABLE} --input-kind spv --keep-coordinate-space ${PREBUILT_OUT}.${PREBUILT_STAGE}.spv ${PREBUILT_OUT}.${PREBUILT_STAGE}.wgsl)
 +        endforeach()
 +        add_custom_command(OUTPUT ${PREBUILT_OUT}.vs.wgsl ${PREBUILT_OUT}.ps.wgsl ${PREBUILT_OUT}.ps-single.wgsl
 +            ${PREBUILT_COMMANDS}
-+            DEPENDS shader_specializer ${PREBUILT_SPIRV_vs} ${PREBUILT_SPIRV_ps} ${PREBUILT_SPIRV_ps-single})
++            DEPENDS ${PREBUILT_SPIRV_vs} ${PREBUILT_SPIRV_ps} ${PREBUILT_SPIRV_ps-single}
++            VERBATIM)
 +        list(APPEND PREBUILT_OUTPUTS ${PREBUILT_OUT}.vs.wgsl ${PREBUILT_OUT}.ps.wgsl ${PREBUILT_OUT}.ps-single.wgsl)
 +    endforeach()
 +    add_custom_command(OUTPUT ${PREBUILT_DIR}/rt64_prebuilt_shaders.c
@@ -5138,10 +5144,40 @@ index 205dc4c..2aeed21 100644
      dstNorm[vertexOffsetIndex] = worldNorm;
      dstVel[vertexOffsetIndex] = worldPos - prevWorldPos;
 diff --git a/src/shaders/RasterPS.hlsl b/src/shaders/RasterPS.hlsl
-index e7895c3..7b68481 100644
+index e7895c3..dd05459 100644
 --- a/src/shaders/RasterPS.hlsl
 +++ b/src/shaders/RasterPS.hlsl
-@@ -48,6 +48,13 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
+@@ -45,9 +45,43 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
+ }
+ #endif
+ 
++#if defined(WEBGPU) && defined(PER_DRAW_TEXTURES)
++// Samples texture 0 or 1 (t) as the two blocks below RasterPS's #else do. With mip LOD the tiles are picked per pixel,
++// so each tile's texture slot is a switch anyway (TextureSampler.hlsli), and RasterPS samples both in a loop the shader
++// keeps, which leaves sampleTexture() in it once: most of a prebuilt pixel shader with mip LOD. Without LOD a specialized
++// shader knows each tile's slot and clamp modes only if it samples them apart, as two calls (one of Majora's Mask's
++// with two tiles is 10 KB of WGSL that way, 60 in the loop). The ubershader always loops. Firefox 158 builds a section's
++// pipelines one at a time while the game waits, and in a test page built GoldenEye's Dam in 5.8-8.3 s against
++// 14.8-19.1, Pilotwings 64's menus in 5.7-8.2 against 13.9-16.3 and Conker's Windy in 4.1-4.4 against 6.3-8.4 (RTX
++// 2070, three runs each, interleaved, a busy host).
++float4 sampleDrawTile(uint t, OtherMode otherMode, RenderFlags flags, int tileIndex0, int tileIndex1, float2 lowResUV, float2 highResUV, float2 ddxUV, float2 ddyUV) {
++    const bool oneCycleHardwareBug = (otherMode.cycleType() == G_CYC_1CYCLE);
++    const bool firstTile = (t == 0) || oneCycleHardwareBug;
++    const uint tileIndex = firstTile ? tileIndex0 : tileIndex1;
++    const uint globalTileIndex = instanceRenderIndices[gConstants.renderIndex].rdpTileIndex + tileIndex;
++    RDPTile rdpTile = RDPTiles[globalTileIndex];
++    if (!renderFlagDynamicTiles(flags)) {
++        rdpTile.cms = firstTile ? renderCMS0(flags) : renderCMS1(flags);
++        rdpTile.cmt = firstTile ? renderCMT0(flags) : renderCMT1(flags);
++        rdpTile.nativeSampler = firstTile ? renderFlagNativeSampler0(flags) : renderFlagNativeSampler1(flags);
++    }
++
++    const GPUTile gpuTile = drawGPUTile(instanceRenderIndices[gConstants.renderIndex].rdpTileIndex, tileIndex);
++    const float2 textureUV = gpuTileFlagHighRes(gpuTile.flags) ? highResUV : lowResUV;
++    return sampleTexture(otherMode, flags, textureUV, ddxUV, ddyUV, rdpTile, gpuTile, (t == 1) && oneCycleHardwareBug);
++}
++#endif
++
  LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float2 vertexUV, float4 vertexSmoothColor, float4 vertexFlatColor,
      bool isFrontFace, out float4 resultColor, out float4 resultAlpha) 
  {
@@ -5155,7 +5191,7 @@ index e7895c3..7b68481 100644
      const OtherMode otherMode = { rp.omL, rp.omH };
  #if defined(DYNAMIC_RENDER_PARAMS)
      if ((otherMode.cycleType() != G_CYC_COPY) && renderFlagCulling(rp.flags) && isFrontFace) {
-@@ -100,7 +107,7 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -100,7 +134,7 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              dz = instanceRDPParams[instanceIndex].primDepth.y;
          }
          else {
@@ -5164,7 +5200,7 @@ index e7895c3..7b68481 100644
          }
  
          // Perform the decal depth tolerance check.
-@@ -111,15 +118,24 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -111,15 +145,24 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
          }
      }
      
@@ -5192,7 +5228,48 @@ index e7895c3..7b68481 100644
      int tileIndex0 = 0;
      int tileIndex1 = 1;
      float lodFraction;
-@@ -141,14 +157,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -132,6 +175,40 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+ 
+     float4 texVal0 = float4(0.0f, 0.0f, 0.0f, 1.0f);
+     float4 texVal1 = float4(0.0f, 0.0f, 0.0f, 1.0f);
++#if defined(WEBGPU) && defined(PER_DRAW_TEXTURES)
++    // The tiles in a loop or apart: sampleDrawTile() says when.
++    const bool usesTexture0 = renderFlagUsesTexture0(rp.flags);
++    const bool usesTexture1 = renderFlagUsesTexture1(rp.flags);
++    const bool loopTiles = usesTexture0 && usesTexture1 && (otherMode.textLOD() == G_TL_LOD);
++#if !defined(DYNAMIC_RENDER_PARAMS)
++    if (!loopTiles) {
++        if (usesTexture0) {
++            texVal0 = sampleDrawTile(0, otherMode, rp.flags, tileIndex0, tileIndex1, lowResUV, highResUV, ddxVertexUV, ddyVertexUV);
++        }
++
++        if (usesTexture1) {
++            texVal1 = sampleDrawTile(1, otherMode, rp.flags, tileIndex0, tileIndex1, lowResUV, highResUV, ddxVertexUV, ddyVertexUV);
++        }
++    }
++    else
++#endif
++    {
++        [loop]
++        for (uint t = 0; t < 2; t++) {
++            if (!((t == 0) ? usesTexture0 : usesTexture1)) {
++                continue;
++            }
++
++            const float4 texVal = sampleDrawTile(t, otherMode, rp.flags, tileIndex0, tileIndex1, lowResUV, highResUV, ddxVertexUV, ddyVertexUV);
++            if (t == 0) {
++                texVal0 = texVal;
++            }
++            else {
++                texVal1 = texVal;
++            }
++        }
++    }
++#else
+     if (renderFlagUsesTexture0(rp.flags)) {
+         const uint globalTileIndex = instanceRenderIndices[gConstants.renderIndex].rdpTileIndex + tileIndex0;
+         RDPTile rdpTile = RDPTiles[globalTileIndex];
+@@ -141,14 +218,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = renderFlagNativeSampler0(rp.flags);
          }
          
@@ -5211,7 +5288,7 @@ index e7895c3..7b68481 100644
          RDPTile rdpTile = RDPTiles[globalTileIndex];
          if (!renderFlagDynamicTiles(rp.flags)) {
              rdpTile.cms = oneCycleHardwareBug ? renderCMS0(rp.flags) : renderCMS1(rp.flags);
-@@ -156,8 +173,8 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -156,12 +234,13 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = oneCycleHardwareBug ? renderFlagNativeSampler0(rp.flags) : renderFlagNativeSampler1(rp.flags);
          }
          
@@ -5222,7 +5299,13 @@ index e7895c3..7b68481 100644
          const uint nativeSampler = renderFlagNativeSampler1(rp.flags);
          texVal1 = sampleTexture(otherMode, rp.flags, textureUV, ddxVertexUV, ddyVertexUV, rdpTile, gpuTile, oneCycleHardwareBug);
      }
-@@ -254,6 +271,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+-    
++#endif
++
+     // Color combiner.
+     float4 shadeColor = vertexColor;
+     float4 combinerColor;
+@@ -254,6 +333,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
          resultColor.a = resultCvg;
      }
      
@@ -5237,7 +5320,7 @@ index e7895c3..7b68481 100644
      // Add highlight color to the last step.
      uint highlightColorUint = instanceRenderIndices[gConstants.renderIndex].highlightColor;
      if (highlightColorUint > 0) {
-@@ -290,8 +315,12 @@ void PSMain(
+@@ -290,8 +377,12 @@ void PSMain(
  #if defined(DYNAMIC_RENDER_PARAMS)
      , bool isFrontFace : SV_IsFrontFace
  #endif
@@ -5250,7 +5333,7 @@ index e7895c3..7b68481 100644
  )
  {
  #if !defined(DYNAMIC_RENDER_PARAMS)
-@@ -308,6 +337,8 @@ void PSMain(
+@@ -308,6 +399,8 @@ void PSMain(
      }
  
      pixelColor = resultColor;
@@ -5341,7 +5424,7 @@ index dcc88b2..5e56d4b 100644
      const bool oddColumn = (texelInt.x & 1);
      const bool isRgba32 = and(fmt == G_IM_FMT_RGBA, siz == G_IM_SIZ_32b);
 diff --git a/src/shaders/TextureSampler.hlsli b/src/shaders/TextureSampler.hlsli
-index 1ceb2ce..5b2b8d9 100644
+index 1ceb2ce..8078911 100644
 --- a/src/shaders/TextureSampler.hlsli
 +++ b/src/shaders/TextureSampler.hlsli
 @@ -24,6 +24,88 @@
@@ -5661,6 +5744,28 @@ index 1ceb2ce..5b2b8d9 100644
          }
      }
      else {
+@@ -328,6 +494,21 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+     for (uint i = 0; i < numRDPSamples; i++) {
+         textureSamples[i] = sampleTextureLevel(rdpTile, gpuTile, filterBilerp, filterAverage, linearFiltering, uvCoord, tlut, canDecodeTMEM, RDPMipLevels[i], usesHDR);
+     }
++#elif defined(WEBGPU) && defined(PER_DRAW_TEXTURES)
++    // A level is its four taps' texels found and loaded (sampleTextureLevel()), most of a pixel shader with mip LOD, so
++    // the two levels are sampled in a loop the shader keeps ([loop]) and that code is in it once, not twice. Each index
++    // is a constant, or dxc keeps the arrays in memory. With RasterPS's loop over its two tiles (sampleDrawTile()), a
++    // prebuilt pixel shader with mip LOD is about 70 KB of WGSL instead of 185 (RasterPS.hlsl has what Firefox saves).
++    [loop]
++    for (uint i = 0; i < numRDPSamples; i++) {
++        const float4 levelSample = sampleTextureLevel(rdpTile, gpuTile, filterBilerp, filterAverage, linearFiltering, uvCoord, tlut, canDecodeTMEM, (i == 0) ? RDPMipLevels[0] : RDPMipLevels[1], usesHDR);
++        if (i == 0) {
++            textureSamples[0] = levelSample;
++        }
++        else {
++            textureSamples[1] = levelSample;
++        }
++    }
+ #else
+     textureSamples[0] = sampleTextureLevel(rdpTile, gpuTile, filterBilerp, filterAverage, linearFiltering, uvCoord, tlut, canDecodeTMEM, RDPMipLevels[0], usesHDR);
+     
 diff --git a/src/shaders/WebGPU.hlsli b/src/shaders/WebGPU.hlsli
 new file mode 100644
 index 0000000..3b0d71c
@@ -5960,7 +6065,7 @@ index 22ee3eb..407b127 100644
 +endif()
 diff --git a/src/tools/shader_specializer/CMakeLists.txt b/src/tools/shader_specializer/CMakeLists.txt
 new file mode 100644
-index 0000000..782d640
+index 0000000..7920c89
 --- /dev/null
 +++ b/src/tools/shader_specializer/CMakeLists.txt
 @@ -0,0 +1,12 @@
@@ -5969,8 +6074,8 @@ index 0000000..782d640
 +set(CMAKE_CXX_STANDARD 17)
 +
 +add_executable(shader_specializer "shader_specializer.cpp")
-+target_link_libraries(shader_specializer re-spirv libzstd_static)
-+target_include_directories(shader_specializer PRIVATE ${PROJECT_SOURCE_DIR}/../../contrib/re-spirv ${PROJECT_SOURCE_DIR}/../../contrib/zstd/lib)
++target_link_libraries(shader_specializer libzstd_static)
++target_include_directories(shader_specializer PRIVATE ${PROJECT_SOURCE_DIR}/../../contrib/zstd/lib)
 +
 +# Built with Emscripten, the tool runs in node at build time, as file_to_c does.
 +if (EMSCRIPTEN)
@@ -5978,18 +6083,17 @@ index 0000000..782d640
 +endif()
 diff --git a/src/tools/shader_specializer/shader_specializer.cpp b/src/tools/shader_specializer/shader_specializer.cpp
 new file mode 100644
-index 0000000..3f62629
+index 0000000..0c05a6f
 --- /dev/null
 +++ b/src/tools/shader_specializer/shader_specializer.cpp
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,325 @@
 +//
 +// RT64
 +//
 +
-+// Prebuilt shaders for WebGPU (RT64_PREBUILT_SHADER_LIST in CMakeLists.txt), in two steps that naga runs between:
++// Prebuilt shaders for WebGPU (RT64_PREBUILT_SHADER_LIST in CMakeLists.txt), after spirv-opt has specialized each
++// description and naga has written it as WGSL:
 +//
-+//   shader_specializer specialize <in.spv> <out.spv> <otherModeL> <otherModeH> <combinerL> <combinerH> <flags>
-+//       folds a shader description into a spec constant shader's SPIR-V with re-spirv, as RT64 does on Vulkan.
 +//   shader_specializer pack <list> <dir> <out.c> <header>
 +//       reads naga's <dir>/<description>.vs.wgsl, .ps.wgsl (dual-source blending) and .ps-single.wgsl (without)
 +//       for every line of the list, rewrites them as
@@ -6011,8 +6115,6 @@ index 0000000..3f62629
 +
 +#include <zstd.h>
 +
-+#include "re-spirv.h"
-+
 +static bool readFile(const std::string &path, std::string &data) {
 +    std::ifstream stream(path, std::ios::binary);
 +    if (!stream.is_open()) {
@@ -6024,35 +6126,6 @@ index 0000000..3f62629
 +    buffer << stream.rdbuf();
 +    data = buffer.str();
 +    return true;
-+}
-+
-+static int specialize(char **argv) {
-+    std::string input;
-+    if (!readFile(argv[0], input)) {
-+        return 1;
-+    }
-+
-+    respv::Shader shader(input.data(), input.size());
-+    if (shader.empty()) {
-+        fprintf(stderr, "shader_specializer: %s isn't SPIR-V re-spirv can parse\n", argv[0]);
-+        return 1;
-+    }
-+
-+    // The spec constants' ids are RT64's: other mode L and H, color combiner L and H, flags.
-+    std::vector<respv::SpecConstant> specConstants;
-+    for (uint32_t i = 0; i < 5; i++) {
-+        specConstants.emplace_back(i, std::vector<uint32_t>{ uint32_t(strtoul(argv[2 + i], nullptr, 16)) });
-+    }
-+
-+    std::vector<uint8_t> output;
-+    if (!respv::Optimizer::run(shader, specConstants.data(), uint32_t(specConstants.size()), output)) {
-+        fprintf(stderr, "shader_specializer: re-spirv couldn't specialize %s\n", argv[0]);
-+        return 1;
-+    }
-+
-+    std::ofstream stream(argv[1], std::ios::binary);
-+    stream.write(reinterpret_cast<const char *>(output.data()), output.size());
-+    return stream.good() ? 0 : 1;
 +}
 +
 +static bool isIdentifierChar(char c) {
@@ -6332,13 +6405,10 @@ index 0000000..3f62629
 +}
 +
 +int main(int argc, char *argv[]) {
-+    if ((argc == 9) && (std::string(argv[1]) == "specialize")) {
-+        return specialize(argv + 2);
-+    }
-+    else if ((argc == 6) && (std::string(argv[1]) == "pack")) {
++    if ((argc == 6) && (std::string(argv[1]) == "pack")) {
 +        return pack(argv + 2);
 +    }
 +
-+    fprintf(stderr, "usage: shader_specializer specialize <in.spv> <out.spv> <5 hex words> | pack <list> <dir> <out.c> <header>\n");
++    fprintf(stderr, "usage: shader_specializer pack <list> <dir> <out.c> <header>\n");
 +    return 1;
 +}
