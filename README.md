@@ -348,6 +348,11 @@ take the web support without moving its submodules to the forks (Using it in a r
   can be followed day by day.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
+- `site/`: the games' page, a proof of concept, published nowhere yet: a tile for every game in the Games table, read
+  from main's README.md on each visit, with its Chrome and Firefox numbers, and Play, which runs the game's page in a
+  frame on the same page (every page is on the same `github.io` origin; `site.js` says how it stays cross-origin
+  isolated). `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/`, passing every other
+  path on to GitHub Pages, so the games play in it as they would there.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.
