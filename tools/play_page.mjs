@@ -33,7 +33,7 @@
 // --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the sound frames the
 // audio thread found its ring empty for (Module.recompAudioStats()), and, where they can be read, the GPU's
 // utilization, power, clock and memory (nvidia-smi) and the cores the browser's GPU process and the whole browser
-// took. A summary at the end covers the "play" steps: median presents a second and the range, frames short, each
+// took. A summary at the end covers the "play" steps: median presents a second and the range, the gaps between presents, frames short, each
 // prebuilt shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the
 // cores; --json writes it as JSON too. The GPU readings are the whole GPU's, so note what else ran beside a number.
 //
@@ -41,13 +41,16 @@
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
 // mm, banjo, cbfd, dk64, wr, pw, bt), --build what the page was built from (a tag of this repo, or Pages), and --note
 // anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
-// holds the time (UTC), the summary, the page, the query and the host's processor load over the play.
+// holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
+// between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms), each sample's presents, sound
+// short and GPU load, the page, the query and the host's processor load over the play.
 //
 // A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play and
 // freshness of profile, none with a note, failed or without a frame (one with no play or profile recorded, as a line
 // recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
-// below the lowest of theirs, or waits for shaders over 2 s and half again longer than the longest of theirs: outside
+// below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
+// or waits for shaders over 2 s and half again longer than the longest of theirs: outside
 // the runs' own noise, but a busy host reads the same, so a flag is a reason to look again (CLAUDE.md, The pins).
 import fs from 'fs';
 import os from 'os';
@@ -117,16 +120,24 @@ const onLine = (text) => {
   if (/^exception: /.test(text)) exceptions++;
 };
 
-// Presents: every getCurrentTexture call on a WebGPU canvas.
+// Presents: every getCurrentTexture call on a WebGPU canvas, and the gap in ms since the one before (taken each sample).
 const preload = `() => {
   window.__presents = 0;
+  window.__gaps = [];
+  let lastPresent = 0;
   const getContext = HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext = function (kind) {
     const context = getContext.apply(this, arguments);
     if (kind === 'webgpu' && context && !context.__counted) {
       context.__counted = true;
       const getCurrentTexture = context.getCurrentTexture;
-      context.getCurrentTexture = function () { window.__presents++; return getCurrentTexture.apply(this, arguments); };
+      context.getCurrentTexture = function () {
+        window.__presents++;
+        const now = performance.now();
+        if (lastPresent) window.__gaps.push(Math.round((now - lastPresent) * 10) / 10);
+        lastPresent = now;
+        return getCurrentTexture.apply(this, arguments);
+      };
     }
     return context;
   };
@@ -203,8 +214,12 @@ let sampleBusy = false;
 const sample = async () => {
   if (sampleBusy) return;
   sampleBusy = true;
-  let presents = null, audio = null;
-  try { presents = await page.evaluate('window.__presents ?? null'); audio = await page.evaluate(audioStats); } catch {}
+  let presents = null, audio = null, gaps = [];
+  try {
+    presents = await page.evaluate('window.__presents ?? null');
+    gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()'));
+    audio = await page.evaluate(audioStats);
+  } catch {}
   const now = { at: seconds(), presents, audio, cpu: procCpu() };
   if (last) {
     const dt = now.at - last.at;
@@ -213,7 +228,7 @@ const sample = async () => {
       at: Math.round(now.at), playing,
       presents: (presents !== null && last.presents !== null) ? (presents - last.presents) / dt : null,
       short: (audio && last.audio) ? audio.short - last.audio.short : null,
-      gpu,
+      gaps, gpu,
       gpuProcess: fresh ? (now.cpu.gpuProcess - last.cpu.gpuProcess) / (now.cpu.at - last.cpu.at) : null,
       browser: fresh ? (now.cpu.all - last.cpu.all) / (now.cpu.at - last.cpu.at) : null,
     };
@@ -264,9 +279,19 @@ const hostAfter = hostTimes();
 const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
 const audioAfter = last?.audio ?? null;
+const percentile = (values, q) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null;
+};
+// Every gap between two presents while playing: the dips a sample's average hides.
+const gaps = during.flatMap((s) => s.gaps ?? []);
 const summary = {
   browser, page: pageUrl, size: `${size[0]}x${size[1]}`, freshProfile, seconds: Math.round(seconds()),
-  presents: presents.length ? { median: median(presents), min: Math.min(...presents), max: Math.max(...presents) } : null,
+  presents: presents.length ? { median: median(presents), p10: percentile(presents, 0.1), min: Math.min(...presents),
+    max: Math.max(...presents) } : null,
+  frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
+    longestMs: Math.max(...gaps), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
+    over250Ms: gaps.filter((g) => g > 250).length } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
   shaderWaits, webgpuErrors: errors, exceptions,
   gpu: during.some((s) => s.gpu) ? { busy: median(during.map((s) => s.gpu?.busy ?? null)), watts: median(during.map((s) => s.gpu?.watts ?? null)) } : null,
@@ -276,6 +301,8 @@ const summary = {
 const r = (x, digits = 1) => x?.toFixed(digits) ?? '-';
 console.log(`summary: ${browser} ${summary.size}, ${during.length} samples of ${interval} s played`);
 console.log(`  presents/s ${summary.presents ? `${r(summary.presents.median)} (${r(summary.presents.min)}-${r(summary.presents.max)})` : '-'}`);
+if (summary.frames) console.log(`  frame gaps p50 ${summary.frames.p50Ms} ms, p99 ${summary.frames.p99Ms} ms, longest ${summary.frames.longestMs} ms, ` +
+  `${summary.frames.over50Ms} over 50 ms, ${summary.frames.over100Ms} over 100, ${summary.frames.over250Ms} over 250`);
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
 console.log(`  shader waits ${shaderWaits.length ? shaderWaits.map((w) => `${w.seconds} s for ${w.shaders} at ${w.at} s`).join(', ') : 'none'}`);
 console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
@@ -289,7 +316,11 @@ if (recordFile) {
   const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
     freshProfile, play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
-    presents: summary.presents, audioShort: summary.audio?.short ?? null, shaderWaits,
+    presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
+    frames: summary.frames, audioShort: summary.audio?.short ?? null, shaderWaits,
+    // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
+    interval, series: { presents: during.map((s) => s.presents === null ? null : Math.round(s.presents * 10) / 10),
+      short: during.map((s) => s.short), gpuBusy: during.map((s) => s.gpu?.busy ?? null) },
     webgpuErrors: errors.length, firstErrors: [...new Set(errors)].slice(0, 3), exceptions, gpu: summary.gpu,
     cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
     host: { cores: os.cpus().length, busy: host ? Math.round(100 * (1 - (hostAfter.idle - hostBefore.idle) / host)) : null },
@@ -321,6 +352,10 @@ function compare(run, lines) {
   if (run.webgpuErrors && before.at(-1).webgpuErrors === 0) found.push(`${run.webgpuErrors} WebGPU errors, where the last run like it had none`);
   if (run.presents && medians.length && run.presents.median < Math.min(...medians) - 3) {
     found.push(`${run.presents.median} presents a second, against ${Math.min(...medians)}-${Math.max(...medians)} before`);
+  }
+  const p99s = before.map((p) => p.frames?.p99Ms).filter((m) => typeof m === 'number');
+  if (run.frames && p99s.length && run.frames.p99Ms > 50 && run.frames.p99Ms > 1.5 * Math.max(...p99s)) {
+    found.push(`frame gaps of ${run.frames.p99Ms} ms at the 99th percentile, against at most ${Math.max(...p99s)} ms before`);
   }
   if (waits.length && waited(run) > 2 && waited(run) > 1.5 * Math.max(...waits)) {
     found.push(`${waited(run).toFixed(1)} s of shader waits, against at most ${Math.max(...waits).toFixed(1)} s before`);
