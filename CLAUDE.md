@@ -248,6 +248,11 @@ rt64 ee2dd6a           where pipelines build behind the game (Chrome) the boot's
 plume 009957c          while the presents-in-flight cap holds presents below the display's rate, one more in flight
 rt64 2306d25           tried every 2 s (up to 4) and kept if presents rise: with onSubmittedWorkDone 20-40 ms late, 2
                        held Banjo's page in Firefox at 20 (RT64 read the skips as the GPU falling behind and paced it)
+plume 6949d22          fewer and cheaper WebGPU calls on the page's thread for each draw: 94a4795's copy of the offsets
+rt64 bf509dd           in Firefox only (in Chrome it took ~1.4 us a call against 0.13, a new array each), bind group
+                       keys as bytes, not snprintf's text, and a pass given only the state that changed since its last
+                       draw: with the page's thread slowed 3 times (Chrome's CPU throttling, a stand-in for a laptop's
+                       CPU), Conker's page presented 54-58 a second in Chrome 155, where it had presented 36-44
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
