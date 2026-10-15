@@ -288,19 +288,28 @@ script), so commit to a fork from a separate clone of it:
    change.
 4. Before it merges, build a page on the branch and play it (Playing a page): a game fork's checkout with its
    N64Recomp-browser at the branch's commit. Once it has merged, tag main `v0.<n+1>.0` and push the tag (a tag is a
-   release: a recomp checks this repo out at one), then move the pins.
+   release: a recomp checks this repo out at one). The pins move in the next retest (The pins).
 
 **The pins.** A change reaches the builds whose code it changes. A change to what a page runs (a fork, or anything
-here a page is built from: `forks.txt`, `patches/`, `frontend/`) reaches every game in the same work, never
-later: the agent moves every game fork's N64Recomp-browser onto the new commit (a commit pushed to each fork's
-`main`), rebuilds and republishes each page, plays each one in Chrome and Firefox, and updates the games table, before
-calling it done. Rush 2049 is the one exception: its `lib/N64Recomp-browser` moves in a pull request on its own repo,
-which builds, publishes and plays its page there.
+here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
+was made for (Changing it, step 4). Every game takes it in the next retest, a run on a schedule that takes every change
+since the last one at once. For each game fork it builds the page on main's newest tag and, if the page's files
+changed, plays that build in Chrome and Firefox (Playing a page). Only a page that boots with no WebGPU errors and plays
+no worse than its row moves its fork's N64Recomp-browser onto the tag (a commit pushed to the fork's `main`), is
+published and gets its row updated (The games table). One that plays worse stays on Pages as it was, its fork on its
+last tag, and has work filed to fix it. So Pages holds only pages that were played, and a fork's `main` is what its
+page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
+to look when it plays worse. Rush 2049's `lib/N64Recomp-browser` moves in a pull request on its own repo, which builds,
+plays and publishes its page there.
 
-That holds until a script rebuilds the pages: one that builds every game's page from main, publishes only those whose
-output changed and lists them to play. Once it exists, the agent bumps the pins
-(scripted, a few minutes), rebuilding and publishing go through the script, and the pages whose output changed are played
-as work of their own. The PR that adds the script rewrites this paragraph to say so.
+A critical fix doesn't wait for the retest: a fix for a page on Pages, the version players have, that crashes, never
+boots, loses its WebGPU device or can't be played, moves the pins of the games it fixes and builds, plays (in Chrome
+and Firefox) and publishes each one, and updates their rows, in the same work. The other games take it in the next
+retest. A bug only main has, on no page yet, waits for the retest like any other change; one the retest publishes is
+on Pages, and its fix is critical.
+
+Until a script rebuilds the pages, a retest builds and publishes them by hand (Publishing); the PR that adds the script
+says so here.
 
 A change that only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop
 build through its pin, checked by a run of the desktop game: no page is republished, and no game fork moves for it (a
@@ -308,28 +317,31 @@ game fork carries only what its page needs). A fork's rt64 older than 7910126 ne
 an incremental build there keeps the WGSL made from an `.hlsli` that changed, and Conker's page built that way loaded
 and then failed every pipeline with "Binding doesn't exist" (moving onto 7910126 rebuilds every shader).
 
-**Publishing.** Publishing a page is the deploy, and no CI job or pipeline does it: whoever's change changed what a
-page runs publishes that page right after it lands, as part of the same work and without being asked, and plays it
-from Pages. Each game fork's page is at `https://amazingalek.github.io/<fork>/`, linked from the top of its README,
-built from main with its prebuilt shader list by its BUILDING.md steps on Linux, in rush-2049-recomp's Docker image
-(its `tools/docker/Dockerfile`, which its `tools/remote_build.sh -C <checkout>` builds in), with `EM_CACHE` set to a
-mounted folder, since emsdk's environment resets it; a new one needs `$EM_CACHE/sysroot/lib/pkgconfig` made first, or
-`embuilder` fails writing `sdl2.pc`. A tool a build lacks goes into that Dockerfile. It is published with
-`tools/publish_page.sh <build dir> <name> amazingalek/<fork> "main <sha>"` (it switches Pages on the first time). Each
-page's commit names the main it was built from (`git log -1 origin/gh-pages`), so a page behind main is easy to see;
-one found behind is published by whoever finds it. The first visit reloads once (`coi_serviceworker.js`); right after
-a publish that can take a second visit.
+**Publishing.** Publishing a page is the deploy, and no CI job or pipeline does it: a retest or a critical fix
+publishes the pages it moves (The pins), and a change to one game's own repo publishes that game's page right after it
+lands, without being asked, each one played before it is published and booted from Pages after. Each game fork's page
+is at `https://amazingalek.github.io/<fork>/`, linked from the top of its README, built from main with its prebuilt
+shader list by its BUILDING.md steps on Linux, in rush-2049-recomp's Docker image (its `tools/docker/Dockerfile`,
+which its `tools/remote_build.sh -C <checkout>` builds in), with `EM_CACHE` set to a mounted folder, since emsdk's
+environment resets it; a new one needs `$EM_CACHE/sysroot/lib/pkgconfig` made first, or `embuilder` fails writing
+`sdl2.pc`. A tool a build lacks goes into that Dockerfile. It is published with `tools/publish_page.sh <build dir>
+<name> amazingalek/<fork> "main <sha>"` (it switches Pages on the first time). Each page's commit names the main it
+was built from (`git log -1 origin/gh-pages`), so a page behind main is easy to see; one found behind is played and
+published by whoever finds it. The first visit reloads once (`coi_serviceworker.js`); right after a publish that can
+take a second visit.
 
 ## The games table
 
 The README's Games table has each game's repo and page, how it plays in Chrome and in Firefox on a laptop's
-integrated graphics (Intel UHD) or a stand-in for one, and the date it was last played; a desktop GPU plays them all,
-so it has no column. Under the table are two lines and no more. Keeping it current is the agent's job, not the
-reader's, so whoever changes how a page plays (a fork, a page published again, a shader list) does all of this in the
-same work:
+integrated graphics (Intel UHD) or a stand-in for one, and when it was last played; a desktop GPU plays them all,
+so it has no column. A Played cell gives the date and the tag of this repo the page played was built on
+("2026-10-16, v0.39.0"); one that names no tag is played in the next retest. Under the table are two lines and no
+more. Keeping it current is the agent's job, not the reader's, so whoever plays a page that changed (a retest, a
+critical fix, a change to a game's own repo or its shader list) does all of this in the same work:
 
-- Plays the page from Pages in both Chrome and Firefox: launcher, Load ROM, the wait for the shaders, menus, a level or
-  race, sound, the frame rate, WebGPU errors in the console (Playing a page). Look at the menus too (a `shot` step).
+- Plays the page in both Chrome and Firefox, its build before it is published (The pins) and from Pages after:
+  launcher, Load ROM, the wait for the shaders, menus, a level or race, sound, the frame rate, WebGPU errors in the
+  console (Playing a page). Look at the menus too (a `shot` step).
 - Writes what was played, in which browser, on what GPU and when, in that game's repo, beside its other measurements
   (a game fork's README or BUILDING.md; Rush 2049's CLAUDE.md, Step 3), never in this README.
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
