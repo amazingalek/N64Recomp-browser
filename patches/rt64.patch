@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web ee2dd6a283b2f1d31986b96545e1835f43080c44
+rt64: https://github.com/amazingalek/rt64-web 2306d25cb676e9226bbf0f9c49bdf8d4ff546563
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt

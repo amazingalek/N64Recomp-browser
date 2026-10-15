@@ -239,6 +239,9 @@ rt64 b052049           on WebGPU a pixel shader that picks its slot per pixel (m
                        and loads them in one switch over the draw's slots, not a switch a tap: GoldenEye's largest
                        224 → 185 KB of WGSL, its list 19.0 → 16.3 MB, Firefox's waits for its boot and Dam a fifth
                        and nearly a third shorter
+plume 009957c          while the presents-in-flight cap holds presents below the display's rate, one more in flight
+rt64 2306d25           tried every 2 s (up to 4) and kept if presents rise: with onSubmittedWorkDone 20-40 ms late, 2
+                       held Banjo's page in Firefox at 20 (RT64 read the skips as the GPU falling behind and paced it)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -368,7 +371,7 @@ A new game gets a row in the same work as its port.
   Look at a page with CDP `Page.captureScreenshot` of that page.
 - What the page says about itself: `Module.recompAudioStats()` gives frames played and frames short;
   `?present-stats` (plume 90ef8e5) prints presents a second and how late each one's onSubmittedWorkDone comes back, and
-  `?presents-in-flight=<1-8>` sets the cap; `?record-shaders` prints the shaders the game asks for; the console reports
+  `?presents-in-flight=<1-8>` fixes the cap (otherwise 2, raised to 4 at most while it holds presents back); `?record-shaders` prints the shaders the game asks for; the console reports
   each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode`
   in a preload, take `processorOptions.ring` and sample its two counters every few ms.
 - Read video memory from the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` counter and nvidia-smi, not the
@@ -785,7 +788,17 @@ changing it:
   1256x645 had each present's onSubmittedWorkDone back 11-16 ms after it (median, 14-18 at p90) in Firefox 158 and 3
   ms in Chrome 155 headless, both at 60 a second. The cap leaves two presents ~33 ms, so a callback that comes back
   later than that costs presents while the GPU idles: the suspect for Firefox's 20-30 on a laptop's Intel graphics
-  (Banjo, Conker), where Chrome drew 40-48. `?presents-in-flight=3` tries a wider cap.
+  (Banjo, Conker), where Chrome drew 40-48. The stand-in for it, on the same RTX 2070 (Firefox 158, 1256x645, a preload
+  holding each `onSubmittedWorkDone` promise 20-40 ms past the browser's, in order): Banjo's intro drew ~50 presents a
+  second with ~160 ms a second at the cap, and RT64's pacing then held it at the game's 20 for most of 90 s (median 20.0
+  and 29.9 in two runs, the GPU ~35% busy), as on the laptop; with 3 in flight 58.3, with 4 59.4, each callback back
+  ~35 ms after its present either way. Rush 2049's attract race held 54.6 with 2 (~800 ms a second at the cap; its
+  game's 30 never paced), and on plume 009957c, which tries one more while the cap holds presents and keeps it if
+  presents rise, went to 3 in 10 s and 4 at 63 s and drew 59.8; without the delay it stayed at 2 and drew 59.8. A slow
+  GPU gains nothing from one more (2 gave 46 and 3 47 above), so there the try goes back. A page thread kept 60% busy
+  (a preload spinning 10 ms of every 16) left Banjo in Firefox at 57.7 with no time at the cap, so a slow page thread
+  is not what holds Firefox there. What the stand-in can't imitate, Firefox's refresh driver holding animation frames
+  at 20-30 on that laptop, isn't ruled out until a laptop run with `?present-stats` reads its animation frames.
 - Chrome on Windows gives a page the integrated GPU on a laptop that has two, since it ignores `powerPreference`
   (crbug.com/369219127); `chrome://flags/#force-high-performance-gpu` gives it the other. On that laptop's Intel UHD
   (D3D12) Rush 2049's page crawled until its specialized pipelines were built (~1 fps for minutes in menus, 20-30 in
