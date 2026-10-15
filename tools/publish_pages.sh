@@ -11,7 +11,8 @@
 #    (~/.cache/n64recomp-pages) with no files checked out.
 # 2. Builds the page there by the fork's BUILDING.md steps (Rush 2049's: remote_build.sh build).
 # 3. Hashes the files the page serves (.html, .js, .wasm, .data, coi_serviceworker.js) as git does and compares them
-#    with the blobs on the repo's gh-pages. A commit builds the same bytes in any copy (frontend/build_speed.cmake), so
+#    with the blobs on the repo's gh-pages. A commit builds the same bytes in any copy (frontend/build_speed.cmake, once
+#    the game's N64Recomp-browser pin has it: before, a ccache hit could carry another checkout's path in), so
 #    a page whose code didn't change is left alone, and one built from an older main but the same bytes stays too.
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
@@ -26,8 +27,11 @@
 # BUILDING.md), copied to the build host when they differ. NODE is the node that runs play_page.mjs (node unless set).
 # The pages build one after another; each container takes $BUILD_CPUS cores (remote_build.sh).
 #
-# Measured on 2026-10-15 (32-core host, a container 12 cores, other builds on the host now and then): all 9 pages warm,
-# nothing changed: <warm>; one game cold (a new copy, ccache warm): <cold>.
+# Measured on 2026-10-15, a 32-core host, a container 12 cores, the host otherwise quiet (load 0.5-4): all 9 pages warm,
+# --dry-run, 4 min 53 s, 24-53 s a game (sync, the recompilers run again, ninja), two of them rebuilding a new main
+# (Pilotwings 64 failed in that run, and took ~50 s alone once fixed);
+# one game cold, Donkey Kong 64 in a new copy (its clone and submodules, the ROM, a whole build from the shared
+# ccache), 162 s to built, 6 min 14 s with its publish, the wait for Pages and the boot in headless Chrome.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 dry_run=false
