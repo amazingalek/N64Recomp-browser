@@ -66,7 +66,7 @@ pins).
   from the forks (`tests/build`, recompui's `Interface*.wgsl` included), checks every WGSL shader, the plume device
   thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply to every recomp's commits
   in `patches/pins.txt`. It builds no page (that needs a game), so anything that changes what a page runs needs a page
-  built and played before it lands. A change to only `*.md`, `plays.jsonl` and the tools that play and publish pages
+  built and played before it lands. A change to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve and publish pages
   skips every job but `changes` (skipped, not failed). The compiles go through ccache, cached per leg: a PR on main's forks takes ~2.5
   min, one that moves them ~8.
 
@@ -279,6 +279,16 @@ plume 904b26c          ?uncapped: the display reported at 360 Hz (?uncapped=<60-
 rt64 e408ed4           interpolating to it without pacing, so with the browser's frames uncapped too (play_page.mjs
                        --uncapped) a page presents as fast as the GPU, its thread and the GPU process take: every page
                        read ~60 on a desktop GPU at the display's rate, which told no browser or build from another
+plume 7a7e3bc          the canvas's buffer takes a new size only in the present that draws at it: SDL's resize and the
+                       surface's configure each made it black until a present, and the frames queued meanwhile were
+                       copied into a canvas of the other size, so going fullscreen flickered for a second or two
+plume 3238ba3          through plume_device_thread a READBACK buffer's map() asks at most once a millisecond (it asked as
+plume f2863d8          fast as the page's thread answered, each answer Dawn commands for Chrome's GPU process), and
+rt64 730e980           createTexture() and an upload buffer's map() after its first don't wait for the page's thread
+                       (RT64 makes two textures for each the game loads, ~570 in 100 ms at Pilotwings 64's screen
+                       changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
+                       the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
+                       Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -421,7 +431,27 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
-A new game gets a row in the same work as its port.
+A new game gets a row in the same work as its port, its Recomp cell naming the upstream recomp and its owner
+("[name](url) by owner"), from the fork's GitHub parent.
+
+## The games page
+
+`site/` is a page of every game in the Games table: a tile each with its launcher's image, its Recomp credit and its
+Chrome and Firefox cells, and Play, which runs the game's page in a frame on it. It is not published yet, and nothing
+in this repo, the forks or the game forks links to it, and the README doesn't name it: leave it so until that
+changes. Keep it current in the same work as what changes it, like the README:
+
+- It reads the table from main's README.md on each visit (served locally, the checkout's), finding the columns by their
+  headers (Game, Recomp, Repo, Page, the two with Chrome and Firefox), so a row or a cell needs nothing more; a column
+  renamed or a cell written another way needs `site.js`'s parse to follow.
+- A new game also needs its tile's image in the same work: `site/img/<repo>.webp`, named as its Repo cell, its page's
+  launcher captured in headless Chrome at 1280x720 without a ROM (the art its recomp ships, nothing of the game's) and
+  shrunk to a 640x360 WebP. Clear `sessionStorage` between two game pages in one tab, or the second can show the
+  isolation notice (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a colour.
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path on to
+  GitHub Pages, so the games play in its frame as they will there. `site.js` says how the frame stays cross-origin
+  isolated, why it is navigated by `location.replace` (Back returns to the grid) and why fullscreen is the game page's
+  own document (a fullscreen element around the frame froze Banjo's picture).
 
 ## Playing a page
 
@@ -470,6 +500,11 @@ A new game gets a row in the same work as its port.
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
+  (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
+  them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
+  for seconds while the thread looks free and the GPU process idles. Ocarina of Time's survey waited for the file
+  select's hand-over that way, and its page held 3-8 s as the file loaded, only while the loop ran.
 
 ## Frame rates
 
@@ -503,7 +538,7 @@ rt64 0034023), in every browser and on every adapter (rt64 bfe07cb).
 
 - In sections (rt64 657c222): `section <name>` lines, the first the boot. A section's name is one word: rt64's shader
   specializer reads no further. A game with many levels has a section a level or an area (GoldenEye, Majora's Mask,
-  Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64).
+  Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64, Mario Kart 64).
 - In Chrome the whole list is built behind the game from its first draw, and a frame that wants 4 or more unbuilt
   shaders of a section holds the game, for those, under the "Preparing graphics" indicator (rt64 950188f). Firefox
   builds nothing behind the game, so it waits for a list's boot before the first frame and for a section when the game
@@ -723,11 +758,16 @@ osTvType, osRomBase and osMemSize at 0x80000300.
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (MIT; its CONTRIBUTING.md welcomes AI-assisted
 work, but nothing has been offered to it). It keeps its tools as submodules in `tools/`, patched by `build.sh` from
 `recomp/*.patch`; on the fork they stay upstream's, with those patches as upstream has them, and `build.sh` then
-applies this repo's `patches/` on top (`tools/N64Recomp-browser`), N64Recomp's without `src/analysis.cpp`
-(apply.cmake's file list): its jump table in another section is a change Conker's own patch makes its own way, and the
-two conflict. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
+applies this repo's `patches/` on top (`tools/N64Recomp-browser`) a project at a time with the fork's
+`tools/web_patch.sh`, which `host/CMakeLists.txt` and `tools/publish_pages.sh` run too. It leaves out two files
+(apply.cmake's file list): N64Recomp's `src/analysis.cpp`, whose jump table in another section Conker's own patch finds
+its own way, and rt64's `src/hle/rt64_game_frame.h`, whose one line Conker's patch now changes beside, put back on top of
+it by the fork's `tools/web_rt64_game_frame.patch`. Upstream's save states sign each thread's wait with its native call
+stack, which wasm can't walk at every wait: `tools/web_save_states.patch` builds that file without one and the page sets
+up no save states. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
 it records what it left patched (`.git/patched-tools`) and patches from scratch when that changes. rt64-web 03b9dcc
-keeps rt64's web includes off the lines Conker's rt64 patch adds to. In headless Chrome: launcher, Add ROM, the intro,
+and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a game's
+patch adds none, or the next retest's Conker build stops on it. In headless Chrome: launcher, Add ROM, the intro,
 the bar, Conker walking outside it, sound. Its code runs TLB-mapped (`.game` at 0x15000000), and the host copies those
 pages to `rdram + vram + 0x80000000`, ~2.4 GB past RDRAM, inside the desktop's 4 GB reservation; on a page RDRAM is an
 allocation in the wasm heap, so `overlays.cpp` moves the heap's break past them (`sbrk`) and the page links with
@@ -837,6 +877,59 @@ WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s an
 the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firefox 158 waited 6.7-7.3 s for the boot,
 18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
 after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
+
+`amazingalek/MarioKart64Recomp-web` is MarioKart 64: Recompiled (GPL-3.0, US). Its upstream carries a copy of Zelda 64:
+Recompiled's menus and pins an older runtime and rt64, so, as GoldenEye's, it is moved onto RecompFrontend: its
+`lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are built on,
+patched by `patches/apply.cmake` for the desktop build too. What that took: `patches.h` maps the game's patches onto
+rt64's newer extended GBI, the debug natives they call are stubs, and the runtime has no Controller Pak file, so none
+is plugged in (Time Trials' ghosts aren't saved; records are, in EEPROM). Upstream's four workflows, native builds
+without a ROM, are disabled on the fork. Upstream's patches write every frame's display list to a larger pool of their
+own and point its task there, but the boot's first list went to the game's pool, so its task pointed RT64 at zeros,
+which it read on into the pool the game was writing the next frame to: about one boot in twenty on the page hung (an
+empty list) or crashed (a microcode load from garbage), and none of 80 after the fork's `patches/gfx_config.c` patched
+`rendering_init` to match. Its boot logo draws with no tile, which on WebGPU left the pipelines built behind the game
+without a binding their layout named (rt64 f01c3a6). Render to RAM stays on and exact: the jumbotron at Luigi Raceway
+and Wario Stadium is the last frame copied by the CPU out of RDRAM; the late copy measured the same (headless Chrome
+155, a busy host: a race 59.6 presents a second either way, four players 59.1 exact and 58.8 late, the game's 30). Its
+list, `src/rt64_shaders.txt`, 813 descriptions, 136 shaders and 112 pipelines in 27 sections (the boot 8: launcher,
+logos and title; the menus 8; each of 16 courses; four arenas with four players; Versus, Time Trials, results, the
+ceremony, the credits), is recorded by code: `tools/shader_survey.js` starts any course in any mode the way the pause
+menu's Retry does and hands every kart to the game's own AI. Its `tools/play_plan.json` is a 50cc Grand Prix's Luigi
+Raceway on that AI. From Pages (main 9f6bcf3, N64Recomp-browser 28a5f14), cold, RTX 2070, an idle host: Chrome 155
+headless waited for nothing and drew 59.6 presents a second; Firefox 158 waited 0.4 s for the boot, ~0.3 s in ones and
+twos through the menus (wanted shaders under a section's 4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000
+59.6 and 59.0; no WebGPU errors, sound short only in Firefox's course wait.
+
+`amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an
+interface of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`), the desktop build D3D12 only. Its
+`lib/rt64` and `lib/N64ModernRuntime` are upstream's at its commits (Conker's, so `pins.txt`'s rows cover them),
+patched by `apply.cmake`; `rt64-patches/` (ray
+tracing, the video recorder) is D3D12 work and stays out of the page. `web/page.cmake` is the page's CMake, included in
+place of the rest of CMakeLists.txt with Emscripten, and `web/stubs.cpp` stands in for the crash handler, installer,
+update check, signature check and video recorder. With no RecompFrontend it has no file picker of its own, so this repo's
+`frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's for its ROM row and Load ROM. Upstream
+shapes its window to the launcher and to the game's aspect; on a page `SDL_SetWindowSize` sets only the canvas's
+backing size under CSS that keeps it at the page's size, which stretched the picture, so the page leaves the window
+alone. The game reads the keyboard once a frame at its 20 a second, so a script holds a key 150-300 ms. Upstream
+starts a first run at the console's picture, 320x240 and the game's 20 presented as 20; a page starts at Match the
+window and Match the display (`machine_defaults`), as the other pages draw. Render to RAM stays on with the exact copy: the pause menu's background flushes the task queue and filters
+the copied frame on the CPU at once (`z_play.c`, `PreRender_ApplyFilters`), as in Majora's Mask. Its list,
+`src/rt64_shaders.txt`, 544 descriptions in 24 sections (the boot 69: launcher, logos, title), is recorded by code:
+`tools/shader_survey.js` loads File 1 from the title (name entry on a new profile), clears a new file's opening
+cutscene as play begins (`gSaveContext.cutsceneIndex` and `nextCutsceneIndex`, written at the file select's hand-over,
+since clearing them mid-cutscene hung the game on a black screen), and warps through `Module._oot_web_warp`
+(`web/survey.cpp`, upstream's own `--warp`, taken by `patches/harness_warp.c` in play) as a child or an adult (the play
+state's `linkAgeOnLoad`, which `Player_Destroy` copies into the save; the save's `linkAge` alone is overwritten).
+While a cutscene index is set a warp lands in the entrance's cutscene layer, another place. Its launcher's sizes are
+dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at least), so the launcher fills a 3840x2000
+canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
+busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
+Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
+(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. Its plan's survey once waited
+for the file select's hand-over in a loop of messages to itself, and Chrome held the picture 3-8 s as the file loaded
+(Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
+built in line at the title).
 
 `amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled (GPL-3.0, US). Upstream is a set of patches
 and code (`patches/`, `src/jfg/`) on another recomp, a Diddy Kong Racing one that `build_linux.sh` downloads at a
@@ -1060,6 +1153,11 @@ running in a browser was found to learn from.
   program's own fetches before the reload (shell.html says how).
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
+- Pilotwings 64's frame gaps of 110-180 ms as its screens change (file menu, test overview, vehicle select) as the
+  page's thread or the texture uploads: they come in Firefox too, which builds nothing behind the game, the game never
+  waited for an upload in one, and plume f2863d8 took most of the waits for the page's thread away and left them. Each
+  is the game's own time between two display lists (65-84 ms, against 16-33) plus RT64's work on the new screen's first
+  one (12-87 ms, 87 at the file menu), the burst of new textures after it.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
   its GPU process, so Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from one (Firefox
   158). Nor does the driver's own shader cache spare it: the same 75 built five times in fresh profiles took as long

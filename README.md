@@ -15,17 +15,19 @@ Each game's repo builds its page with this repo; a page holds no ROM, the player
 the games are here to build out and test the web support on more than one game: what one of them or one browser turns
 up is fixed in this repo or the forks unless it really is that game's own, so every game and both browsers get it.
 
-| Game | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
-|---|---|---|---|---|---|
-| San Francisco Rush 2049 | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
-| GoldenEye 007 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
-| The Legend of Zelda: Majora's Mask | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
-| Banjo-Kazooie | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Conker's Bad Fur Day | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Donkey Kong 64 | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
-| Wave Race 64 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
-| Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
-| Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
+| Game | Recomp | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
+|---|---|---|---|---|---|---|
+| San Francisco Rush 2049 | this project's own recomp | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 58 | 56 | 2026-10-14 |
+| GoldenEye 007 | [GoldenEye64Recomp](https://github.com/cblock85/GoldenEye64Recomp) by cblock85 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 59* | 59* | 2026-10-15, v0.46.0 |
+| The Legend of Zelda: Majora's Mask | [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) by Zelda64Recomp | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 20†; 60* | 20†; 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Banjo-Kazooie | [Banjo: Recompiled](https://github.com/BanjoRecomp/BanjoRecomp) by BanjoRecomp | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Conker's Bad Fur Day | [CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) by sciaschi | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 56* | 60* | 2026-10-15, v0.46.0 |
+| Donkey Kong 64 | [Donkey Kong 64: Recompiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled) by Rainchus | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 30† | 60* | 2026-10-15, v0.46.0; laptop 2026-10-14 |
+| Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 60* | 60* | 2026-10-15, v0.46.0 |
+| Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
+| Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
+| Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60* | 59* | 2026-10-15 |
+| The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60* | 59* | 2026-10-15 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
 desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -93,8 +95,9 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
-- No native file dialog (nfd: RecompFrontend asks the page) and no `SDL_INIT_HAPTIC` (Emscripten's SDL2 has no
-  haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
+- No native file dialog (nfd: RecompFrontend asks the page; a recomp with menus of its own calls
+  `n64recomp_browser::pick_files`, `frontend/file_picker.h`, and gets the picked files' paths) and no `SDL_INIT_HAPTIC`
+  (Emscripten's SDL2 has no haptics, and `SDL_Init` fails as a whole when asked for them, gamepads with it).
 - RT64's render to RAM costs a 5-6 ms wait per display list in a browser: turn it off with
   `recompui::renderer::set_render_to_ram(false)` if the game never reads its frames on the CPU (Banjo's frame reads
   are patched to sample RT64's framebuffer on the GPU, so it is off there too). Majora's Mask reads them: the
@@ -112,6 +115,10 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   stopped soon after Firefox's boot wait (a palette load past the end of memory, a texture 8404 texels wide):
   pilotwings-64-recomp-web's `patches/sched.c` takes those timeouts out. Look for a retrace handler that counts
   retraces while the RSP or RDP is busy.
+- A recomp's patches that move the display lists into a larger buffer of their own have to move every one, the boot's
+  first included. Mario Kart 64's pointed every task at its larger pool but left the boot's first list in the game's
+  pool, so RT64 read zeros on into the pool where the game was already writing the next frame, and about one boot in
+  twenty on the page hung or crashed. MarioKart64Recomp-web's `patches/gfx_config.c` patches `rendering_init` too.
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
@@ -331,8 +338,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   (`recomp_web_frontend_page()` works too)
   (its header says what each part does): threads, the page, HOME kept in IndexedDB, a thread's prints without
   waiting for the page's thread, SDL2 audio from a thread, sound
-  played on the browser's audio thread (`audio_output.h`), the WebGPU device, a notice in Firefox recommending Chrome
-  or Edge, and `coi_serviceworker.js`.
+  played on the browser's audio thread (`audio_output.h`), the browser's file picker for a recomp with menus of its own
+  (`file_picker.h`), the WebGPU device, a notice in Firefox recommending Chrome or Edge, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
 - `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), `fetch_pins.sh` a recomp's
   own commits in `patches/pins.txt`, patched, and `publish_page.sh` puts
