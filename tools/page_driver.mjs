@@ -96,17 +96,19 @@ const rdramHelpers = `(() => {
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
-// Chrome made of a 1280x800 window when the first plans were written.
+// Chrome made of a 1280x800 window when the first plans were written. uncapped gives the page animation frames as fast
+// as the browser can make them, not at the display's rate: Chrome with --disable-frame-rate-limit, Firefox with
+// layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how).
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onLine = () => {}, log = console.log }) => {
+  headed = false, uncapped = false, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
   const waiters = new Set();
   const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, line });
-  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, uncapped, line });
+  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, uncapped, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
   page.profile = profile;
@@ -154,12 +156,13 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, uncapped, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to.
   const mode = headed
     ? ['--disable-features=CalculateNativeWinOcclusion', '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding', '--no-default-browser-check']
     : ['--headless=new'];
+  if (uncapped) mode.push('--disable-frame-rate-limit');
   const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--force-device-scale-factor=1',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, `--window-size=${width},${height}`, 'about:blank'],
@@ -258,12 +261,12 @@ if ($w) { [W.U]::SetWindowPos($w, [IntPtr]::Zero, -${width + 200}, 0, ${width + 
     (err, stdout) => resolve(!err && stdout.includes('moved')));
 });
 
-const openFirefox = async ({ profile, port, width, height, executable, rom, preload, line }) => {
+const openFirefox = async ({ profile, port, width, height, executable, rom, preload, uncapped, line }) => {
   // No first-run pages or crash restore, one CSS pixel a pixel, sound allowed to start without a click but silent.
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
     'browser.aboutwelcome.enabled': false, 'app.update.auto': false, 'browser.sessionstore.resume_from_crash': false,
     'dom.webgpu.enabled': true, 'layout.css.devPixelsPerPx': '1.0', 'media.volume_scale': '0.0',
-    'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0 };
+    'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? 0 : -1 };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,

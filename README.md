@@ -27,8 +27,8 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Pilotwings 64 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 58* | 60* | 2026-10-15, v0.46.0 |
 | Banjo-Tooie | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 60*; 10-30† in later worlds | 59*; 10-30† in later worlds | 2026-10-15, v0.46.0 |
 
-Median presents a second after the shader waits on a Windows laptop's Intel UHD; * on a stand-in for one (a desktop GPU
-drawing a 3840x2000 canvas, which is gentler), not yet on a laptop; † the game's own frame rate. The goal is 60 in both.
+Median presents a second after the shader waits on a laptop's Intel UHD; * on a stand-in, not yet on a laptop: a
+desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
 
 ## Using it in a recomp
 
