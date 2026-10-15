@@ -687,9 +687,13 @@ osTvType, osRomBase and osMemSize at 0x80000300.
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (MIT; its CONTRIBUTING.md welcomes AI-assisted
 work, but nothing has been offered to it). It keeps its tools as submodules in `tools/`, patched by `build.sh` from
 `recomp/*.patch`; on the fork they stay upstream's, with those patches as upstream has them, and `build.sh` then
-applies this repo's `patches/` on top (`tools/N64Recomp-browser`), N64Recomp's without `src/analysis.cpp`
-(apply.cmake's file list): its jump table in another section is a change Conker's own patch makes its own way, and the
-two conflict. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
+applies this repo's `patches/` on top (`tools/N64Recomp-browser`) a project at a time with the fork's
+`tools/web_patch.sh`, which `host/CMakeLists.txt` and `tools/publish_pages.sh` run too. It leaves out two files
+(apply.cmake's file list): N64Recomp's `src/analysis.cpp`, whose jump table in another section Conker's own patch finds
+its own way, and rt64's `src/hle/rt64_game_frame.h`, whose one line Conker's patch now changes beside, put back on top of
+it by the fork's `tools/web_rt64_game_frame.patch`. Upstream's save states sign each thread's wait with its native call
+stack, which wasm can't walk at every wait: `tools/web_save_states.patch` builds that file without one and the page sets
+up no save states. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
 it records what it left patched (`.git/patched-tools`) and patches from scratch when that changes. rt64-web 03b9dcc
 keeps rt64's web includes off the lines Conker's rt64 patch adds to. In headless Chrome: launcher, Add ROM, the intro,
 the bar, Conker walking outside it, sound. Its code runs TLB-mapped (`.game` at 0x15000000), and the host copies those
