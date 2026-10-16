@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web e26d0c66447a862430f0ec5cd44ff7d40b8035f1
+rt64: https://github.com/amazingalek/rt64-web 2205282ceab63afb6d8851d1c61c76620224c3d1
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..46e5ccf 100644
+index 79dfc38..67fd66a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,11 @@ endif()
@@ -295,9 +295,9 @@ index 79dfc38..46e5ccf 100644
 +        # The flags' fourth bit is smoothShade, and other mode L's bits 10 and 11 both set are a decal (ZMODE_DEC).
 +        math(EXPR PREBUILT_SMOOTH "(0x${PREBUILT_FLAGS} >> 3) & 1")
 +        list(GET PREBUILT_WORDS 0 PREBUILT_OTHER_MODE_L)
-+        math(EXPR PREBUILT_DECAL "((0x${PREBUILT_OTHER_MODE_L} >> 10) & 3) == 3")
++        math(EXPR PREBUILT_ZMODE "(0x${PREBUILT_OTHER_MODE_L} >> 10) & 3")
 +        set(PREBUILT_PS_DECAL "")
-+        if (PREBUILT_DECAL)
++        if (PREBUILT_ZMODE EQUAL 3)
 +            set(PREBUILT_PS_DECAL "Decal")
 +        endif()
 +        if (PREBUILT_SMOOTH)
