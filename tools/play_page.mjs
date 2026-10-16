@@ -44,8 +44,9 @@
 // took, and the GPU process's private bytes. A summary at the end covers the "play" steps: median presents a second
 // and the range, the gaps between presents, frames short, each prebuilt shader wait (RT64's "built in ... the game
 // waiting" lines), WebGPU errors and exceptions, the GPU and the cores, and the GPU process's private bytes from the
-// first sample to the last and MB a second between them (a leak's rate); --json writes it as JSON too. The GPU readings are the whole GPU's, so note what
-// else ran beside a number.
+// first sample to the last and MB a second between them (a leak's rate), in Firefox with its own report of which part
+// grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too. The GPU readings are the whole GPU's, so
+// note what else ran beside a number.
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
@@ -270,6 +271,8 @@ const finish = async (code) => {
   process.exit(code);
 };
 let audioBefore = null;
+// Firefox's report of its GPU process when the play starts and ends (page_driver.mjs's gpuProcessMemory).
+let memoryBefore = null, memoryAfter = null;
 let failure = null;
 // The host's processors, busy or idle, summed over every core: the load beside the run, the browser's own included.
 const hostTimes = () => os.cpus().reduce((t, c) => {
@@ -282,12 +285,14 @@ try {
   await page.navigate(pageUrl);
   await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]), steps);
   audioBefore = last?.audio ?? null;
+  memoryBefore = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
   playing = true;
   hostBefore = hostTimes();
   log('play');
   await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play), steps);
   await sample();
   playing = false;
+  memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
@@ -320,6 +325,7 @@ const summary = {
     { gpuProcess: median(during.map((s) => s.gpuProcess)), browser: median(during.map((s) => s.browser)) } : null,
   gpuProcessMB: memory.length > 1 ? { first: Math.round(memory[0].gpuProcessMB), last: Math.round(memory.at(-1).gpuProcessMB),
     perSecond: Math.round(100 * (memory.at(-1).gpuProcessMB - memory[0].gpuProcessMB) / (memory.at(-1).at - memory[0].at)) / 100 } : null,
+  gpuProcessMemory: memoryBefore && memoryAfter ? { before: memoryBefore, after: memoryAfter } : null,
 };
 const r = (x, digits = 1) => x?.toFixed(digits) ?? '-';
 console.log(`summary: ${browser} ${summary.size}${uncapped ? ' uncapped' : ''}, ${during.length} samples of ${interval} s played`);
@@ -335,6 +341,8 @@ if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.wat
 if (summary.cores) console.log(`  GPU process ${r(summary.cores.gpuProcess, 2)} cores, browser ${r(summary.cores.browser, 2)} (medians)`);
 if (summary.gpuProcessMB) console.log(`  GPU process private bytes ${summary.gpuProcessMB.first} -> ${summary.gpuProcessMB.last} MB, ` +
   `${summary.gpuProcessMB.perSecond} MB a second`);
+if (summary.gpuProcessMemory) console.log(`  GPU process memory, start -> end of the play (about:memory, MB): ` +
+  Object.keys(memoryAfter).map((k) => `${k} ${memoryBefore[k] ?? '-'} -> ${memoryAfter[k]}`).join(', '));
 if (jsonFile && !failure) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
 let regressions = [];
 if (recordFile) {
@@ -352,6 +360,7 @@ if (recordFile) {
     webgpuErrors: errors.length, firstErrors: [...new Set(errors)].slice(0, 3), exceptions, gpu: summary.gpu,
     cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
     gpuProcessMB: summary.gpuProcessMB,
+    ...(summary.gpuProcessMemory ? { gpuProcessMemory: summary.gpuProcessMemory } : {}),
     host: { cores: os.cpus().length, busy: host ? Math.round(100 * (1 - (hostAfter.idle - hostBefore.idle) / host)) : null },
     failed: failure,
   };
