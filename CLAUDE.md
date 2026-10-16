@@ -494,11 +494,22 @@ changes. Keep it current in the same work as what changes it, like the README:
 - On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with, the one the
   browser's own 3D load lands on (by LUID), with nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is
   the idle discrete GPU, and its numbers say nothing about the page.
+- Every game's `tools/play_plan.json` reaches a level the way a player does and plays it for a minute or more: the
+  menus where they are quick, the survey's warp or stage start where they aren't (each header says which). A plan's
+  walk goes out and back by as much each way, swaying about a spot it was played to and looked at: a blind walk in one
+  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance.
+  Banjo-Tooie's plan, 2.5 s on W a world, ended black in all three of a laptop's runs, after Cauldron Keep's walk,
+  where the page draws the keep in both browsers at every size tried: the walks took Banjo off Hailfire Peaks' and
+  Cloud Cuckooland's ledges or through an exit, and in one Chrome run, once the game had begun a change of map of its own
+  (its jigsaw wipe) in Hailfire Peaks, every world warped to after it drew black, though each warp reached its map. Its plan visits ten worlds and doesn't walk (Banjo jumps
+  and attacks where he lands), and its survey's warp waits for a change the game began. A plan that ends on black is
+  the plan until a direct warp to that place draws black too.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
   shaders never hits at all. Chrome killed before it has closed loses what it wrote to its caches: close it with
-  `Browser.close` and wait for the process to end.
+  `Browser.close` and wait for the process to end. A debugging port (`--port`'s next) another browser on the machine
+  holds is refused (`page_driver.mjs`): shared, the second Chrome took `[::1]` and the tool drove the first one's page.
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key has reached RmlUi): Enter starts the game
   on the second press, or click Start Game. Every RecompFrontend game does the same, the desktop build too.
@@ -756,7 +767,11 @@ Conker's boot 7.2 s and Windy 11.2 s, then about 60 presents a second.
 patches their checkouts (a step before N64Recomp is built from them, and again when CMake configures): the web support
 without the forks as submodules. Built that way the page boots to the intro in headless Chrome, its 111 prebuilt
 pipelines built in 4.8 s cold. Its runtime is older than the forks', so `recomp::start` takes upstream Banjo's
-arguments, not a `recomp::Configuration`. It has no externs header. What porting it found is in this README.
+arguments, not a `recomp::Configuration`. It has no externs header. What porting it found is in this README. Start
+skips a new game's opening only once a save file isn't empty, so on a fresh profile its play plan reaches Spiral
+Mountain and Mumbo's Mountain through `tools/warp.js`, which leaves the map change the game's own code requests (the
+struct at 0x8037E8E0, from the decomp; the map is the word at 0x803835D4): about 3 minutes of A through the opening
+reached only the dialogue in Banjo's house.
 
 `amazingalek/Zelda64Recomp-web` is Majora's Mask on upstream's `recomp-frontend` branch (draft PR 722, which moves it
 onto RecompFrontend). Its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's, at the commits
@@ -1307,6 +1322,11 @@ running in a browser was found to learn from.
   new buffers and descriptor sets, made through the page's thread), and its wait for the count of changed pixels is gone
   (rt64 254dee3). Right after the boot's wait in Chrome, on a busy host, gaps of 200-480 ms come with every page thread
   idle and the prebuild threads waiting for Chrome's GPU process; on a quiet host 3 cold runs of 4 had none.
+- Holding back the list built behind the game in Chrome (a pause after each dropped present, fewer threads): on
+  v0.50.0 the build cost Conker's page at 3840x2000 a little (57.0-57.9 presents a second against 58.7-58.8 with
+  nothing built behind it, the low after its intro's second scene 50-56 against 58-59), and on rt64 c89ced0's present
+  timeline nothing: no present dropped while it built, and the page drew 58.6-60.0 either way, 278-292 uncapped, the
+  same dip to 55-57 at that scene with no build behind it (Chrome 155 headless, RTX 2070, cold, a host 7-37% busy).
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
   its GPU process, so Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from one (Firefox
   158). Nor does the driver's own shader cache spare it: the same 75 built five times in fresh profiles took as long
