@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web 55ab72340e1081bb6c521b51499050b17d78fce6
+rt64: https://github.com/amazingalek/rt64-web 52a524ce147b367475731b7015d2e643ffe1dee6
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..4af18ba 100644
+index 79dfc38..0548747 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,13 @@ endif()
@@ -193,7 +193,7 @@ index 79dfc38..4af18ba 100644
 +    target_compile_definitions(rt64 PUBLIC RT64_WGSL=1)
 +endif()
 +if (RT64_OFFSCREEN_WORKLOADS OR RT64_WGSL)
-+    target_compile_definitions(rt64 PRIVATE RT64_OFFSCREEN_WORKLOADS=1)
++    target_compile_definitions(rt64 PUBLIC RT64_OFFSCREEN_WORKLOADS=1)
 +endif()
 +if (RT64_UNEVEN_FRAME_RATES OR RT64_WGSL)
 +    target_compile_definitions(rt64 PRIVATE RT64_UNEVEN_FRAME_RATES=1)
@@ -1724,7 +1724,7 @@ index 8ea27d5..0f4af83 100644
          DebuggerCamera debuggerCamera;
          std::multimap<uint32_t, uint32_t> transformIdMap;
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..6d50c87 100644
+index 5a331aa..e43adfa 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -1805,7 +1805,7 @@ index 5a331aa..6d50c87 100644
 +                // before it, and the present's framebuffers and interpolated frames stay that frame's. Otherwise each workload
 +                // is a frame, and the frame after such a pass matched nothing and was never interpolated. One pass at most
 +                // between two frames: the frame before stays out of the writer's reach until the next frame is drawn (the
-+                // barrier), and the queue holds four workloads.
++                // barrier), and the queue holds two more workloads for it (WORKLOAD_QUEUE_SIZE).
 +#           if RT64_OFFSCREEN_WORKLOADS
 +                const bool offscreenPass = workload.offscreenOnly && !workload.paused && !lastWorkloadOffscreen && !gameFrames[curFrameIndex].workloads.empty();
 +#           else
@@ -1900,6 +1900,28 @@ index 5a331aa..6d50c87 100644
                      threadAdvanceBarrier();
                  }
  
+diff --git a/src/hle/rt64_workload_queue.h b/src/hle/rt64_workload_queue.h
+index bde2f03..9fb1c05 100644
+--- a/src/hle/rt64_workload_queue.h
++++ b/src/hle/rt64_workload_queue.h
+@@ -23,7 +23,16 @@
+ #   include "render/rt64_raytracing_shader_cache.h"
+ #endif
+ 
+-#define WORKLOAD_QUEUE_SIZE 4
++#if RT64_OFFSCREEN_WORKLOADS
++// Two more than upstream's: while a frame after an offscreen pass is drawn, the frame before the pass stays out of the
++// writer's reach too (WorkloadQueue::renderThreadLoop), and the game must still be able to queue its next pass and its
++// next frame, which is what ends the frame's interpolated frames. With four it could queue nothing, and waited for every
++// interpolated frame to be presented: its frames took longer, its rate fell and the interpolated frames grew, down to
++// a rate of one or two a second and a color target for each of hundreds of display frames.
++#   define WORKLOAD_QUEUE_SIZE 6
++#else
++#   define WORKLOAD_QUEUE_SIZE 4
++#endif
+ 
+ namespace RT64 {
+     struct PresentQueue;
 diff --git a/src/render/rt64_descriptor_sets.h b/src/render/rt64_descriptor_sets.h
 index 69a82ac..1dd31f7 100644
 --- a/src/render/rt64_descriptor_sets.h
