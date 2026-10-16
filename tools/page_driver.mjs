@@ -33,6 +33,7 @@
 // "keep").
 import fs from 'fs';
 import http from 'http';
+import net from 'net';
 import path from 'path';
 import { spawn, execFile } from 'child_process';
 
@@ -118,6 +119,11 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
   if (cpuThrottle && browser !== 'chrome') throw new Error('cpuThrottle is Chrome\'s only');
+  // A debugging port another browser holds is refused, not shared: the browser started here would take the other
+  // address (Chrome binds [::1] when 127.0.0.1 is taken), and the tool would drive and measure the other one's page.
+  for (const host of ['127.0.0.1', '::1']) {
+    if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
+  }
   if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line });
   else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
@@ -172,6 +178,14 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 };
 
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
+const listening = (host, port) => new Promise((resolve) => {
+  const socket = net.connect({ host, port });
+  socket.setTimeout(1000);
+  socket.once('connect', () => { socket.destroy(); resolve(true); });
+  socket.once('error', () => resolve(false));
+  socket.once('timeout', () => { socket.destroy(); resolve(false); });
+});
+
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
 const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line }) => {
