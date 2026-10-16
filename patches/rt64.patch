@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 52a524ce147b367475731b7015d2e643ffe1dee6
+rt64: https://github.com/amazingalek/rt64-web 179adb8a8322f8fd6f3e5c2b2b5e867c6afeaedb
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1678,10 +1678,10 @@ index 7a8c13b..019e41d 100644
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
-index a870166..2759278 100644
+index a870166..05625cc 100644
 --- a/src/hle/rt64_vi.cpp
 +++ b/src/hle/rt64_vi.cpp
-@@ -162,13 +162,24 @@ namespace RT64 {
+@@ -162,13 +162,22 @@ namespace RT64 {
      }
  
      uint32_t VIHistory::logicalRateFromFactors() {
@@ -1695,11 +1695,9 @@ index a870166..2759278 100644
 +#   if RT64_UNEVEN_FRAME_RATES
 +        // With RT64_UNEVEN_FRAME_RATES frames that took an uneven number of VIs (a game at 30 dropping to 20 when a frame
 +        // runs long, or VIs that come unevenly) are interpolated at the fastest of them, not left uninterpolated: a frame
-+        // that comes later holds the last interpolated frame until it does. Not the slowest: the workload thread draws a
-+        // frame's interpolated frames only as fast as they're presented, and a frame planned longer than the game's held
-+        // the game back, so its frames took more VIs, its rate fell and its frames grew more, down to a rate of one or two
-+        // a second and a color target for each of hundreds of display frames. Only while the slowest took at most twice
-+        // the VIs of the fastest, so a load's frame of dozens of VIs leaves its frames uninterpolated as before.
++        // that comes later holds the last interpolated frame until it does, and none is cut short by the next. Only while
++        // the slowest took at most twice the VIs of the fastest, so a load's frame of dozens of VIs leaves its frames
++        // uninterpolated as before: RT64 keeps a color target for every display frame of a game frame.
 +        const auto range = std::minmax_element(factors.begin(), factors.end());
 +        if ((*range.first != 0) && (*range.second <= (*range.first * 2))) {
 +            return FullRate / *range.first;

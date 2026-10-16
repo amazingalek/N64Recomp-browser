@@ -316,7 +316,9 @@ amazingalek/plume-web                    renderbag/plume          a WebGPU backe
                                                                   as Firefox's timed waits do there
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
-                                                                  interpolated to the display's rate and paced
+                                                                  interpolated to the display's rate (a game's
+                                                                  offscreen pass in a display list of its own
+                                                                  and frames of uneven VIs too) and paced
                                                                   evenly when the GPU falls behind, a game's
                                                                   shaders specialized at build time; tile
                                                                   copies reused from list to list (with render
