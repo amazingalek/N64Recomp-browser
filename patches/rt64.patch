@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web fced8869758badde3e5c761fb6d223483378dd9a
+rt64: https://github.com/amazingalek/rt64-web f313d0c47ea16b7f28026c6e8606d126e20b0d7c
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2152,7 +2152,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..ef53d50 100644
+index 9fae0d4..d7534a2 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -2294,14 +2294,14 @@ index 9fae0d4..ef53d50 100644
                  rasterParams.screenOffset = triangles.screenOffset;
 +
 +                // A prebuilt decal's first draw marks the stencil where the surface is no deeper than its high bound
-+                // (RasterShader::createPipeline()).
++                // (RasterShader::createPipeline()), padding0 1 for it: nothing else reads padding0 in a raster draw.
 +                if (triangles.decalMarkPipeline != nullptr) {
 +                    worker->commandList->setPipeline(triangles.decalMarkPipeline);
-+                    rasterParams.decalDepthHigh = 1;
++                    rasterParams.padding0 = 1;
 +                    worker->commandList->setGraphicsPushConstants(0, &rasterParams);
 +                    drawCallTriangles(drawCall);
 +                    worker->commandList->setPipeline(triangles.pipeline);
-+                    rasterParams.decalDepthHigh = 0;
++                    rasterParams.padding0 = 0;
 +                }
 +
                  worker->commandList->setGraphicsPushConstants(0, &rasterParams);
@@ -5762,7 +5762,7 @@ index 205dc4c..2aeed21 100644
      dstNorm[vertexOffsetIndex] = worldNorm;
      dstVel[vertexOffsetIndex] = worldPos - prevWorldPos;
 diff --git a/src/shaders/RasterPS.hlsl b/src/shaders/RasterPS.hlsl
-index e7895c3..4e8a68b 100644
+index e7895c3..3edf47d 100644
 --- a/src/shaders/RasterPS.hlsl
 +++ b/src/shaders/RasterPS.hlsl
 @@ -45,9 +45,78 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
@@ -5775,8 +5775,8 @@ index e7895c3..4e8a68b 100644
 +// a draw that wrote depth and begins it again after: Banjo-Tooie ~25 times a frame, each pass ~70 us of Firefox's GPU
 +// process. The decal check, |pixel - surface| <= max(CoplanarDepthTolerance(surface), dz), is two depth tests against
 +// the surface's depth instead, in two draws with the stencil between them (RasterShader::createPipeline()): the first
-+// writes the highest surface depth that passes (decalDepthHigh, greater-equal) and marks the pixels, the second the
-+// lowest (less-equal), drawn where a mark is, which it takes back.
++// writes the highest surface depth that passes (greater-equal; RasterParams' padding0 is 1 for it) and marks the
++// pixels, the second the lowest (less-equal), drawn where a mark is, which it takes back.
 +static float decalDepth = 0.0f;
 +
 +// CoplanarDepthTolerance() is the same over each band of FloatToFixedDepth()'s exponent (0, 1, 2, 3 and more), so a
@@ -5866,7 +5866,7 @@ index e7895c3..4e8a68b 100644
 +        const float pixelDepth = select(depthClampNear, max(vertexPosition.z, 0.0f), vertexPosition.z);
 +#if defined(DECAL_DEPTH_BOUNDS)
 +        // The depth tests do the check (decalDepthBound()).
-+        decalDepth = decalDepthBound(pixelDepth, dz, gConstants.decalDepthHigh != 0);
++        decalDepth = decalDepthBound(pixelDepth, dz, gConstants.padding0 != 0);
 +#else
 +        // Sample the depth buffer for this pixel to compare for the decal check.
 +        int2 pixelPos = floor(vertexPosition.xy);
@@ -6611,18 +6611,16 @@ index 4548f15..11ffa56 100644
  #endif
 \ No newline at end of file
 diff --git a/src/shared/rt64_raster_params.h b/src/shared/rt64_raster_params.h
-index 0a5c332..98d9975 100644
+index 0a5c332..20d48e2 100644
 --- a/src/shared/rt64_raster_params.h
 +++ b/src/shared/rt64_raster_params.h
-@@ -11,10 +11,18 @@ namespace interop {
+@@ -11,10 +11,16 @@ namespace interop {
  #endif
      struct RasterParams {
          uint renderIndex;
 -        uint3 padding;
-+        // Which of its two depth bounds a decal's prebuilt pixel shader writes on WebGPU, 1 the high one and 0 the low
-+        // one (RasterPS.hlsl, DECAL_DEPTH_BOUNDS); nothing else reads it.
-+        uint decalDepthHigh;
-+        // Two words, not a uint2 after decalDepthHigh: WGSL starts a vector on 8 bytes, which would move what follows.
++        // Three words, not a uint3: WGSL starts a vec3 on 16 bytes, which would move what follows it.
++        uint padding0;
 +        uint padding1;
 +        uint padding2;
          float2 screenScale;
