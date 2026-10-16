@@ -1,4 +1,4 @@
-RecompFrontend: https://github.com/amazingalek/RecompFrontend-web 75fe596dd1e542e06b01375f97af375d6ed92805
+RecompFrontend: https://github.com/amazingalek/RecompFrontend-web 7bbaa3c158a9b610e6079946e7edcb47e1a933d7
 on upstream b2c5c18d73054416c844486611fd2c2b9d8a4927 (tools/export_patches.sh)
 
 diff --git a/recompinput/CMakeLists.txt b/recompinput/CMakeLists.txt
@@ -424,7 +424,7 @@ index 5ca5349..96d4685 100644
                  screen_framebuffer_ = device_->createFramebuffer(plume::RenderFramebufferDesc(&color_attachment, 1));
                  screen_descriptor_set_->setTexture(0, screen_texture_.get(), plume::RenderTextureLayout::SHADER_READ);
 diff --git a/recompui/src/util/file.cpp b/recompui/src/util/file.cpp
-index 7ee84ed..9b0eb43 100644
+index 7ee84ed..35c83ed 100644
 --- a/recompui/src/util/file.cpp
 +++ b/recompui/src/util/file.cpp
 @@ -1,7 +1,9 @@
@@ -437,13 +437,14 @@ index 7ee84ed..9b0eb43 100644
  #include "RmlUi/Core.h"
  
  #include "recompui/program_config.h"
-@@ -17,9 +19,88 @@
+@@ -17,9 +19,108 @@
  #include <pwd.h>
  #elif defined(__APPLE__)
  #include "apple/rt64_apple.h"
 +#elif defined(__EMSCRIPTEN__)
 +#include <atomic>
 +#include <cmath>
++#include <thread>
 +#include <emscripten.h>
 +#include <emscripten/threading.h>
  #endif
@@ -507,26 +508,45 @@ index 7ee84ed..9b0eb43 100644
 +        return paths;
 +    }
 +
++    // The menus ask for a file on the thread that draws them, and a native dialog holds that thread until it closes. On
++    // a page that thread would wait for the picker and then for whatever the callback does with the file: the launcher's
++    // Load ROM copies a ROM into memory, reads, hashes and stores it, several hundred ms for a 64 MB one, in which the
++    // launcher presented nothing. So the picker and the callback run on a thread of their own and the menus draw on (the
++    // callbacks open the UI context they change themselves); a request while a picker is open is ignored.
++    static std::atomic<bool> picking{false};
++
 +    static void perform_file_dialog_operation(const std::function<void(bool, const std::filesystem::path&)>& callback) {
-+        std::list<std::filesystem::path> paths = pick_files(false);
-+        callback(!paths.empty(), paths.empty() ? std::filesystem::path{} : paths.front());
-+        for (const auto& path : paths) {
-+            std::filesystem::remove(path); // a copy in memory, of a file the callback has read or copied by now
++        if (picking.exchange(true)) {
++            return;
 +        }
++        std::thread([callback]() {
++            std::list<std::filesystem::path> paths = pick_files(false);
++            callback(!paths.empty(), paths.empty() ? std::filesystem::path{} : paths.front());
++            for (const auto& path : paths) {
++                std::filesystem::remove(path); // a copy in memory, of a file the callback has read or copied by now
++            }
++            picking = false;
++        }).detach();
 +    }
 +
 +    static void perform_file_dialog_operation_multiple(const std::function<void(bool, const std::list<std::filesystem::path>&)>& callback) {
-+        std::list<std::filesystem::path> paths = pick_files(true);
-+        callback(!paths.empty(), paths);
-+        for (const auto& path : paths) {
-+            std::filesystem::remove(path);
++        if (picking.exchange(true)) {
++            return;
 +        }
++        std::thread([callback]() {
++            std::list<std::filesystem::path> paths = pick_files(true);
++            callback(!paths.empty(), paths);
++            for (const auto& path : paths) {
++                std::filesystem::remove(path);
++            }
++            picking = false;
++        }).detach();
 +    }
 +#else
      static void perform_file_dialog_operation(const std::function<void(bool, const std::filesystem::path&)>& callback) {
          nfdnchar_t* native_path = nullptr;
          nfdresult_t result = NFD_OpenDialogN(&native_path, nullptr, 0, nullptr);
-@@ -57,6 +138,7 @@ namespace recompui {
+@@ -57,6 +158,7 @@ namespace recompui {
  
          callback(success, paths);
      }
@@ -534,7 +554,7 @@ index 7ee84ed..9b0eb43 100644
  
      std::filesystem::path file::get_app_folder_path() {
          // directly check for portable.txt (windows and native linux binary)
-@@ -83,7 +165,8 @@ namespace recompui {
+@@ -83,7 +185,8 @@ namespace recompui {
          }
  
          CoTaskMemFree(known_path);

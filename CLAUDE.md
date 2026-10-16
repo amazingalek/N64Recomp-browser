@@ -331,6 +331,13 @@ N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK b
                        page, for no more presents); Conker's page under a stand-in for the tick
                        (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
                        25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
+N64ModernRuntime       on a page read_file reads in 4 MB pieces: an ifstream's reads were ~1 KB each, every one proxied
+b79d63b                to the page's thread, 65,624 for Conker's 64 MB ROM, which held its presents ~0.5 s at Load ROM
+RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's copy, hash and write) run on a thread of their
+                       own, not the launcher's drawing thread, and persistent_home.js stores a file of 1 MB or more from a
+                       worker (IndexedDB's put serialized 64 MB in ~120 ms on the page's thread): the launcher's present
+                       gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
+                       155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -348,6 +355,7 @@ thread (a mod that fails to load) into a console error instead of an exception t
 `thread_stdio.js`, which prints a thread's stdout and stderr from that thread: Emscripten proxies every write to the
 page's thread, WebGPU's, and waits, so each line held its thread for up to a frame (Banjo-Tooie's upstream logs ~100
 lines a second: its title screen's sound was 12,900-13,400 frames short of ~2.1 million before, 235-1,325 with it);
+`persistent_home.js`, HOME kept in IndexedDB, a file of 1 MB or more (a ROM) stored from a worker off the page's thread;
 `frontend/build_speed.cmake` (ccache) and `N64RECOMP_BROWSER_FAST_LINK` (Building with Emscripten); a page's link
 that fails on any wasm-ld warning (`--fatal-warnings`: a call whose signature doesn't match the function's links as a
 trap) and takes a game's own `-sINITIAL_MEMORY`, stack sizes and thread pool over `frontend/`'s;
