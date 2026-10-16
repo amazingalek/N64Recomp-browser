@@ -1162,6 +1162,11 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
 - RmlUi's FreeType must be the `freetype-legacysjlj` build (setjmp with wasm exceptions); the plain one leaves
   `emscripten_longjmp` undefined. Emscripten's `bits/limits.h` defines `PAGESIZE`, which breaks `slot_map.h`.
 - The `--pre-js` files and the shell are read at link time, so a page lists them in `LINK_DEPENDS`.
+- Every library a page links is static: a shared one (`.so`) makes emcc link the page relocatable, with the `pic`
+  system libraries, and wasm-ld then refuses the address of an EM_JS function ("recompile with -fPIC"). A game whose
+  CMake sets `BUILD_SHARED_LIBS OFF` as a normal variable before a subproject's `option(BUILD_SHARED_LIBS ... ON)`
+  (lunasvg's) gets the shared one on a build dir's first configure only (CMP0077's old behaviour), so its page sets
+  it in the cache (`FORCE`), as Jet Force Gemini's does, and only a fresh build dir shows it.
 - The web builds compile with `-msimd128` (hlslpp's wasm backend, the auto-vectorizer) and `-DXXH_HAS_INCLUDE(x)=0`
   (xxHash's NEON path through Emscripten's `arm_neon.h` doesn't compile in C++, so XXH3 stays scalar). Small (Rush
   2049's CLAUDE.md, Step 3, has the measurement), but free: every browser with WebGPU has wasm SIMD.
