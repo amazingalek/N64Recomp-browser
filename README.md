@@ -334,8 +334,9 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   page's timed waits end late (Firefox on
                                                                   Windows); a ROM read in 4 MB pieces
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
-                                                                  a file picker, render to RAM as an option
-                                                                  and its copy a display list late as another
+                                                                  a file picker on a thread of its own, render
+                                                                  to RAM as an option and its copy a display
+                                                                  list late as another
 amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
                                                                   CPU-side matrices use with -msimd128
 ```
