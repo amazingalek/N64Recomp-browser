@@ -507,11 +507,6 @@ changes. Keep it current in the same work as what changes it, like the README:
 
 ## Playing a page
 
-- Play a page uncapped (`play_page.mjs --uncapped`), and skip the capped run. At the display's rate every page reads
-  that rate, 60, or 55.6 in a Chrome whose frames come on a timer (a host with its monitor off), so a capped run
-  tells no build, browser or page from another, and uncapped its presents a second are what the page can make. A
-  capped run needs a very good reason, said in its `--note`: what is measured is the display's rate itself (a
-  laptop's cell, RT64's pacing, the presents-in-flight cap), which an uncapped page never meets.
 - `tools/play_page.mjs` (its header says how) plays a page by a plan in either browser and prints presents a second,
   sound frames short, the shader waits, WebGPU errors and the GPU's and the browser's load; a game's plan is its
   `tools/play_plan.json`, and a game fork's shader plan plays with `--section`. `tools/page_driver.mjs` drives both

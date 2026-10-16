@@ -6,7 +6,13 @@
 // A pass's kind is its attachments' size and formats (a compute pass: "compute"), and a present is a getCurrentTexture
 // call on a WebGPU canvas, so a kind's numbers are per present whatever the game's own frame rate. Copies are counted
 // beside the passes, untimed: WebGPU times only passes. The passes are reported an interval late, once their
-// timestamps are back. The timestamps cost a query resolve and a readback per command buffer.
+// timestamps are back. The timestamps cost a query resolve and a readback per command buffer. Beside them, the draws a
+// present by fragment shader, each named by its WGSL's size ("70 KB"), and one present's passes in order.
+//
+// To read what a shader costs, leave its draws out: ?probe-skip=<KB>,... (play_page.mjs --query) skips every draw
+// whose fragment shader is that size, and the GPU time and presents a second that come back are the page without
+// them (the picture is wrong meanwhile). ?probe-dump=<KB>,... prints each module of that size once, as a JSON string
+// after "passes: wgsl ", to read or to build in a page of its own.
 (() => {
   if (typeof GPUCommandEncoder === 'undefined') return;
   const CAP = 64;
@@ -37,7 +43,7 @@
     viewTexture.set(view, this);
     return view;
   });
-  // Each draw's fragment shader by its WGSL's size (the ubershader is the largest), and the area its scissor leaves.
+  // Each draw's fragment shader by its WGSL's size (the ubershader is the largest).
   const moduleSize = new WeakMap();
   const pipelineShader = new WeakMap();
   const passState = new WeakMap();
@@ -114,23 +120,12 @@
     const record = { kind: `${size(colorTextures[0] ?? depthTexture)} ${formats.join('+')}${clears}`, work: 0, ns: null };
     const pass = original.call(this, begin(this, descriptor, record));
     passRecord.set(pass, record);
-    const t = colorTextures[0] ?? depthTexture;
-    passState.set(pass, { shader: '?', full: t ? t.width * t.height : 0, scissor: null, viewport: null });
+    passState.set(pass, { shader: '?' });
     return pass;
   });
   wrap(GPURenderPassEncoder.prototype, 'setPipeline', (original) => function (pipeline) {
     const state = passState.get(this);
     if (state) state.shader = pipelineShader.get(pipeline) ?? '?';
-    return original.apply(this, arguments);
-  });
-  wrap(GPURenderPassEncoder.prototype, 'setScissorRect', (original) => function (x, y, w, h) {
-    const state = passState.get(this);
-    if (state) state.scissor = w * h;
-    return original.apply(this, arguments);
-  });
-  wrap(GPURenderPassEncoder.prototype, 'setViewport', (original) => function (x, y, w, h) {
-    const state = passState.get(this);
-    if (state) state.viewport = w * h;
     return original.apply(this, arguments);
   });
   wrap(GPUCommandEncoder.prototype, 'beginComputePass', (original) => function (descriptor) {
@@ -145,11 +140,7 @@
       if (record) record.work++;
       const state = passState.get(this);
       if (state) {
-        const area = Math.min(state.full, state.scissor ?? state.full, state.viewport ?? state.full);
-        const s = shaders.get(state.shader) ?? { draws: 0, pixels: 0 };
-        s.draws++;
-        s.pixels += area;
-        shaders.set(state.shader, s);
+        shaders.set(state.shader, (shaders.get(state.shader) ?? 0) + 1);
         if (skip.has(state.shader)) return undefined;
       }
       return original.apply(this, arguments);
@@ -233,9 +224,9 @@
     shaders = new Map();
     if (previous.presents) {
       const p = previous.presents;
-      const list = [...drawn].sort((a, b) => b[1].pixels - a[1].pixels).slice(0, 8)
-        .map(([shader, s]) => `${shader} ${(s.draws / p).toFixed(1)} draws ${(s.pixels / p / 1e6).toFixed(1)} Mpx`);
-      console.log(`passes: fragment shaders a present (scissored area): ${list.join(', ')}`);
+      const list = [...drawn].sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([shader, draws]) => `${shader} ${(draws / p).toFixed(1)}`);
+      console.log(`passes: draws a present by fragment shader: ${list.join(', ')}`);
     }
     if (!report || !report.presents) return;
     const kinds = new Map();
