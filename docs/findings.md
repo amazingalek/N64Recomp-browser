@@ -321,6 +321,8 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   `navigator.hardwareConcurrency` now (55 at 12 cores). Untraced, three interleaved runs each: GoldenEye's Start gap
   1631-1651 ms with 32 and 1600-1619 with 55 (one run of 55 had none), Donkey Kong 64's two 1562-1596 and 1467-1478
   against 1481-1512 and 1444-1454; the renderer's private bytes 2040 MB against 2110, and the first present no later.
+  In Firefox 158 (two rounds) no gap moved, GoldenEye's Start being its shader wait there (7.6-8.8 s either way), and
+  GoldenEye's first present came 1325-1330 ms against 1120-1198 (Donkey Kong 64's 1665-1754 either way).
   `performance.measureUserAgentSpecificMemory` counts the shared heap once a worker (15-25 GB with 55): read the
   process's own counters.
 - The launcher: 1.4-2.0 s about a second after its first frame in every game, Chrome's GPU main thread parsing the
