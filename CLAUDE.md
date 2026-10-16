@@ -103,9 +103,10 @@ games' repos name each change by a short label (`plume-0003`, `rt64-0010`) or by
 c89ced0`): `docs/forks.md` has every one, a line each, and `git show` in the fork the rest. A change pushed to a
 fork gets its row there in the PR that moves `forks.txt` onto it.
 
-Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
+Five of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
 too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64
-179adb8) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
+179adb8), `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334) and `ULTRAMODERN_HOLD_BLOCKED_MESSAGES`
+(N64ModernRuntime 66539ab).
 
 ## What this repo adds besides the forks
 
@@ -469,6 +470,10 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   stack minutes in without it.
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
   runs one game thread at a time and delivers interrupts only inside OS calls (GoldenEye, docs/game-forks.md).
+- An interrupt's message to a queue the game leaves full (Jet Force Gemini's controller queue) waits in a list and is
+  tried first at each OS call and idle wait (N64ModernRuntime 66539ab). Put back into the external queue, which keeps no
+  order, it was taken again at once by the idle thread, which spun on it while the messages behind it, an RDP
+  completion among them, waited for a game thread's OS call, often the next retrace's.
 - A page's files are in the page's thread's file system, and every file call from another thread waits for that
   thread, which presents nothing meanwhile. An istreambuf_iterator, an ifstream loop or libc++'s
   `std::filesystem::copy_file` (fstreams, a few KB a call on Emscripten) takes a 64 MB ROM there in ~65,000 round

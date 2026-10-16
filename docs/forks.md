@@ -196,4 +196,11 @@ RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the byt
                        uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
                        second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 87-138 ms;
                        headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
+N64ModernRuntime       ULTRAMODERN_HOLD_BLOCKED_MESSAGES: an external message sent to a full queue and to be sent again
+66539ab, 39fa01e,      waits in a list of its own, tried first at the next OS call or idle wait, not put back into the
+ed4a797, f8e03f5       queue the idle thread took it from again at once and spun on (~12 million times a second) while
+                       the messages behind it waited for a game thread's OS call. Jet Force Gemini leaves a controller
+                       message blocked for good, and with its RSP completion sent at the list's last full sync its RDP
+                       completion waited for the next retrace: 4-6 retraces a game frame, 2 with the list (headless
+                       Chrome 155 uncapped, 3840x2000, its plan: 31,926 sound frames short → 0)
 ```
