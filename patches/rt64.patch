@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web b1a1230100d278212a7f33afe963112de0e0fdac
+rt64: https://github.com/amazingalek/rt64-web 55ab72340e1081bb6c521b51499050b17d78fce6
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..cc72607 100644
+index 79dfc38..4af18ba 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,13 @@ endif()
@@ -14,7 +14,7 @@ index 79dfc38..cc72607 100644
 +option(RT64_PER_DRAW_TEXTURES "Bind textures per draw on every device, as devices without descriptor indexing (WebGPU) need; to test that path" OFF)
 +option(RT64_PACKED_RSP_INPUTS "Gather the RSP compute shaders' inputs into one buffer on every device, as WebGPU's 8 storage buffers per stage need; to test that path" OFF)
 +option(RT64_FLIPPED_RECT_HIGH_RES "Sample a high-res replacement on a rect drawn backwards on the texel the RDP picks, not one native pixel behind it (always on with Emscripten)" OFF)
-+option(RT64_UNEVEN_FRAME_RATES "Interpolate a game whose last frames took an uneven number of VIs, at the rate of the slowest of them, not leave it uninterpolated (always on with Emscripten)" OFF)
++option(RT64_UNEVEN_FRAME_RATES "Interpolate a game whose last frames took an uneven number of VIs (the slowest at most twice the fastest) at the rate of the fastest, not leave it uninterpolated (always on with Emscripten)" OFF)
 +option(RT64_OFFSCREEN_WORKLOADS "A workload that draws only to framebuffers the VI has not shown is a pass of the next one's game frame, so a game that draws such a pass in a display list of its own interpolates (always on with Emscripten)" OFF)
  
  if (NOT ${RT64_STATIC})
@@ -1678,10 +1678,10 @@ index 7a8c13b..019e41d 100644
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
-index a870166..1ef7dd9 100644
+index a870166..2759278 100644
 --- a/src/hle/rt64_vi.cpp
 +++ b/src/hle/rt64_vi.cpp
-@@ -162,13 +162,22 @@ namespace RT64 {
+@@ -162,13 +162,24 @@ namespace RT64 {
      }
  
      uint32_t VIHistory::logicalRateFromFactors() {
@@ -1694,13 +1694,15 @@ index a870166..1ef7dd9 100644
 -            return 0;
 +#   if RT64_UNEVEN_FRAME_RATES
 +        // With RT64_UNEVEN_FRAME_RATES frames that took an uneven number of VIs (a game at 30 dropping to 20 when a frame
-+        // runs long, or VIs that come unevenly) are interpolated at the slowest of them, not left uninterpolated: a frame
-+        // that comes sooner ends the interpolated frames left of the one before (WorkloadQueue::renderThreadLoop). Only
-+        // while the slowest took at most twice the VIs of the fastest: a load or a hitch of dozens of VIs would set a rate
-+        // of one or two frames a second, and RT64 keeps a color target for every display frame of a game frame.
++        // runs long, or VIs that come unevenly) are interpolated at the fastest of them, not left uninterpolated: a frame
++        // that comes later holds the last interpolated frame until it does. Not the slowest: the workload thread draws a
++        // frame's interpolated frames only as fast as they're presented, and a frame planned longer than the game's held
++        // the game back, so its frames took more VIs, its rate fell and its frames grew more, down to a rate of one or two
++        // a second and a color target for each of hundreds of display frames. Only while the slowest took at most twice
++        // the VIs of the fastest, so a load's frame of dozens of VIs leaves its frames uninterpolated as before.
 +        const auto range = std::minmax_element(factors.begin(), factors.end());
 +        if ((*range.first != 0) && (*range.second <= (*range.first * 2))) {
-+            return FullRate / *range.second;
++            return FullRate / *range.first;
          }
 +#   endif
 +        return 0;
