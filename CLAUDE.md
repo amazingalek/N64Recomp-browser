@@ -289,6 +289,14 @@ rt64 730e980           createTexture() and an upload buffer's map() after its fi
                        changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
                        the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
                        Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
+rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slot one period after the last one's, not
+                       the moment that one went out (a present a period late or more starts the slots again): the
+                       sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
+                       the pages of games below the display's rate presented 55.6 a second in Chrome on some nights
+                       and 51-55 on a laptop's Intel UHD, where games at its rate, which never sleep there, presented
+                       60. Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
+                       it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -500,11 +508,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
-- Headless Chrome's own frames come every 16.7 ms on some runs and every 18 ms (~56 a second) on others, for every page
-  alike, and a whole night's runs can sit at either: at 1256x645 a page then reads 55.6 presents a second against its
-  earlier 59.6, a gap between presents of 18 ms at the median, and `play_page.mjs` flags it. The page Pages serves,
-  played just before the new build in the same conditions (`--note` it), tells the browser from the build: on
-  2026-10-16 both read 54.8-55.6 in four games while the builds drew 150-346 uncapped.
+- Before rt64 c89ced0 a page whose game runs below the display's rate read 55.6 presents a second on some nights in
+  Chrome (a present every 18 ms) and 59.6 on others, every such page alike, while Pilotwings 64, a game at 60, read
+  60.0: RT64 timed each interpolated frame from when the last one went out, so the host's timer and the page's
+  thread set the rate, not the page. The page Pages serves, played just before a new build in the same conditions
+  (`--note` it), still tells the host from the build.
 - A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
   (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
   them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
