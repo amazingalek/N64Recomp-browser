@@ -61,8 +61,8 @@
 // short and GPU load, the page, the query and the host's processor load over the play.
 //
 // A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
-// freshness of profile, uncapped or not and on screen or not, none with a note, failed or without a frame (one with no play or profile recorded, as a line
-// recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
+// freshness of profile, uncapped or not and on screen or not, none with a note, failed or without a frame (one with
+// no play or profile recorded, as a line recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
 // or waits for shaders over 2 s and half again longer than the longest of theirs: outside
