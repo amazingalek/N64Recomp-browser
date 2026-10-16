@@ -491,12 +491,14 @@ changes. Keep it current in the same work as what changes it, like the README:
   the idle discrete GPU, and its numbers say nothing about the page.
 - Every game's `tools/play_plan.json` reaches a level the way a player does and plays it for a minute or more: the
   menus where they are quick, the survey's warp or stage start where they aren't (each header says which). A plan's
-  walk goes out and back by as much each way, swaying about a spot away from the entrance: a blind walk in one
-  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance,
-  and the game's fade or respawn can end the plan on a black screen. Banjo-Tooie's plan, 2.5 s on W a world, ended
-  black in all three of a laptop's runs, 3.5 s after Cauldron Keep's walk, where the page draws the keep in both
-  browsers at every size tried; in Firefox the same walk carried Banjo off Cloud Cuckooland's island. A plan that ends
-  on black is the plan until a direct warp to that place draws black too.
+  walk goes out and back by as much each way, swaying about a spot it was played to and looked at: a blind walk in one
+  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance.
+  Banjo-Tooie's plan, 2.5 s on W a world, ended black in all three of a laptop's runs, after Cauldron Keep's walk,
+  where the page draws the keep in both browsers at every size tried: the walks took Banjo off Hailfire Peaks' and
+  Cloud Cuckooland's ledges or through an exit, and in one Chrome run, once the game had begun a change of map of its own
+  (its jigsaw wipe) in Hailfire Peaks, every world warped to after it drew black, though each warp reached its map. Its plan visits ten worlds and doesn't walk (Banjo jumps
+  and attacks where he lands), and its survey's warp waits for a change the game began. A plan that ends on black is
+  the plan until a direct warp to that place draws black too.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
