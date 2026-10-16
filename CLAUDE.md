@@ -579,10 +579,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
   which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
   it), Jet Force Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default, which
-  RT64 draws at its base's Original: no interpolation; 20 on a page, The game forks), and the other seven their
+  RT64 draws at its base's Original: no interpolation; 20 on a page, The game forks), and the other eight their
   cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
-  races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
+  races, Star Fox 64 30 (20 where a scene sets 3 VIs a frame), GoldenEye's and Conker's variable. None of the eight
+  has an option to run faster.
 - A game fork may take a change that runs its game faster when that makes the page play better, the one exception to
   a game fork carrying web support only. Weigh it first: a game's logic at 60 gives lower input lag, motion the game
   computes rather than RT64 interpolates, and the few things interpolation misses (some particles and 2D), but no
@@ -1012,6 +1013,29 @@ Raceway on that AI. From Pages (main 9f6bcf3, N64Recomp-browser 28a5f14), cold, 
 headless waited for nothing and drew 59.6 presents a second; Firefox 158 waited 0.4 s for the boot, ~0.3 s in ones and
 twos through the menus (wanted shaders under a section's 4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000
 59.6 and 59.0; no WebGPU errors, sound short only in Firefox's course wait.
+
+`amazingalek/Starfox64Recomp-web` is Starfox 64: Recompiled (US 1.1, Rev A). Like Mario Kart 64's upstream, it carries
+Zelda 64: Recompiled's menus and pins an older runtime and rt64, so it is moved onto RecompFrontend the same way: its
+`lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are built on,
+patched by `patches/apply.cmake` for the desktop build too (a row each in `pins.txt`). Its settings (film grain, the
+radio box, inverted Y, the volumes) are on RecompFrontend's General and Sound tabs; upstream's debug menu and
+quicksaves stay out. The cartridge is MIO0-compressed: N64Recomp reads the decompressed ROM, which
+`tools/decompress_rom.sh` makes with the sf64 decompilation's comptool and MIO0 decompressor (`lib/sf64decomp`), and
+the program takes the plain dump and decompresses it in memory, as upstream's does. Render to RAM is off on the page:
+the CPU never reads a frame it drew (the decomp's CPU blur, `fox_blur.c`, is never called; the motion blur is the RDP
+drawing over the last frame), and it only writes framebuffer memory to decompress overlays into it, which RT64 sees on
+the CPU. Every wait is on a message queue, none polls the clock. Its game runs at the cartridge's 30 (20 in places),
+interpolated by RT64 to the display (Framerate Display, Resolution Auto: RecompFrontend's defaults). Its CMake makes `register_patches.cpp` depend on the patches' section
+table, which N64Recomp writes in the middle of a build: without it an incremental build after a patch changed kept the
+old table, and the page stopped at boot ("Failed to find function at" the moved patch; Mario Kart 64's CMake lacks the
+same edge). Its list, `src/rt64_shaders.txt`, 818 descriptions in 24 sections (the boot 6: launcher, logos and title;
+then the menus to the Lylat map, each planet, Meteo's and Sector X's warp zones, the training, Venom's two routes and
+Andross, game over, the Versus menus and the ending), is recorded by code: `patches/shader_survey.c` hands a level, a
+phase (the warp zones) or a game state from the script to the game's own change of state (`gNextGameState`), with
+the level's audio spec set as the Lylat map sets it and the player's shields kept full, and `tools/shader_survey.js`
+fires for 90-150 s a level. A straight switch to the ending crashed (a call through the table out of bounds) until
+the survey set it up as Andross's end does (`D_ending_80196D00`, the ending's audio spec). Its `tools/play_plan.json`
+plays the menus to Corneria and a minute of it. PLAYED
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an
 interface of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`), the desktop build D3D12 only. Its
