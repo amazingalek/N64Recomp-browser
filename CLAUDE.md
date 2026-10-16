@@ -1306,6 +1306,12 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   stack minutes in without it.
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
   runs one game thread at a time and delivers interrupts only inside OS calls (GoldenEye, The game forks).
+- A page's files are in the page's thread's file system, and every file call from another thread waits for that
+  thread, which presents nothing meanwhile. An istreambuf_iterator, an ifstream loop or libc++'s
+  `std::filesystem::copy_file` (fstreams, a few KB a call on Emscripten) takes a 64 MB ROM there in ~65,000 round
+  trips: Conker's ROM-version check held its launcher 0.85 s in Chrome and 2.3 s in Firefox. Read a large file with
+  `read()` in 4 MB pieces and write it in one call, behind `__EMSCRIPTEN__` (N64ModernRuntime-web b79d63b,
+  CBFD-Recompiled-web 8de429c).
 - Emscripten's SDL2 port opens audio on the page's thread except one line that reads the audio context's rate on the
   calling thread, which fails from a pthread: `frontend/sdl_audio.js` works around it. It also plays on the page's
   thread, a ScriptProcessorNode taking 256 frames (5 ms) at a time, and the main thread is WebGPU's: in headless Chrome
