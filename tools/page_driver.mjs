@@ -108,7 +108,7 @@ const rdramHelpers = `(() => {
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra),
-//   close(), pid, profile, and in Firefox gpuProcessMemory() (below).
+//   close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -369,6 +369,25 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       })` });
       const value = r.result?.result?.value;
       return value && value !== '{}' ? JSON.parse(value) : null;
+    },
+    // The Gecko profiler over every process, the GPU process included (a profile Firefox writes at shutdown,
+    // MOZ_PROFILER_SHUTDOWN, leaves that one out): start() samples the threads that carry a page's work, the page's
+    // own and the GPU process's CanvasRenderer, which does all of a page's WebGPU, every interval ms with native
+    // stacks and each sample's CPU time; dump(file) writes the profile as JSON for profiler.firefox.com, unsymbolicated.
+    geckoProfile: {
+      start: async (interval = 10) => {
+        const chrome = (await send('browsingContext.getTree', { 'moz:scope': 'chrome' })).result?.contexts?.[0]?.context;
+        await send('script.evaluate', { target: { context: chrome }, awaitPromise: true, expression: `Services.profiler.StartProfiler(
+          1 << 26, ${interval}, ['stackwalk', 'cpu'],
+          ['GeckoMain', 'CanvasRenderer', 'Compositor', 'Renderer', 'DOM Worker', 'WebGPU']), undefined` });
+        return chrome;
+      },
+      dump: async (file) => {
+        const chrome = (await send('browsingContext.getTree', { 'moz:scope': 'chrome' })).result?.contexts?.[0]?.context;
+        const r = await send('script.evaluate', { target: { context: chrome }, awaitPromise: true, expression:
+          `Services.profiler.dumpProfileToFileAsync(${JSON.stringify(path.resolve(file))}).then(() => Services.profiler.StopProfiler())` });
+        if (r.result?.type === 'exception') throw new Error(r.result.exceptionDetails.text);
+      },
     },
     navigate: (url) => send('browsingContext.navigate', { context, url, wait: 'none' }),
     evaluate,

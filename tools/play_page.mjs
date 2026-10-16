@@ -4,7 +4,7 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>]
-//     [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--gecko-profile <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -26,6 +26,10 @@
 // 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
 // --preload runs a JavaScript file of your own in every document before the page's scripts, after play_page's own
 // (a probe that wraps a WebGPU call, a stand-in for a slow GPU's callbacks): its console lines come out with the rest.
+// --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
+// CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
+// profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
+// below that, which changes how Firefox's waits end (CLAUDE.md, WebGPU in Chrome and Firefox).
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -106,6 +110,7 @@ const game = option(args, '--game', null);
 const build = option(args, '--build', null);
 const note = option(args, '--note', null);
 const preloadFile = option(args, '--preload', null);
+const geckoProfileFile = option(args, '--gecko-profile', null);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg (publish_pages.sh\'s names)');
   process.exit(1);
@@ -113,10 +118,11 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--gecko-profile <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
+if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
@@ -370,6 +376,7 @@ try {
   // it has passed, and none from before the play comes into them.
   if (memoryBefore) await sleep(500);
   await page.evaluate('window.__gaps = []; undefined').catch(() => {});
+  if (geckoProfileFile) await page.geckoProfile.start();
   playing = true;
   hostBefore = hostTimes();
   viewport = await page.viewport();
@@ -377,6 +384,7 @@ try {
   await page.run(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play, steps);
   await sample();
   playing = false;
+  if (geckoProfileFile) await page.geckoProfile.dump(geckoProfileFile);
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
 } catch (error) {
   log(`failed: ${error.message}`);

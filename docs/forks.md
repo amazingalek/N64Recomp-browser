@@ -184,6 +184,9 @@ RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's cop
                        gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
                        155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
 rt64 179adb8           RT64_OFFSCREEN_WORKLOADS and RT64_UNEVEN_FRAME_RATES: Jet Force Gemini's page interpolates
+plume db27484          a prebuilt decal draws in the pass that writes depth (depth32float-stencil8, where the adapter has
+rt64 0560318           it), its depth bounds drawn twice through the stencil, not in a pass of its own: Banjo-Tooie's
+                       58.2 passes a present 4.7, Firefox 158 uncapped 117-121 → 189-206
 plume 795cadf, 2950009 on WebGPU the ubershader's pipelines built behind the launcher; a build matching one in flight
 rt64 977ddca           waits for it
 RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
