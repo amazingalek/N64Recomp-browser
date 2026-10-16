@@ -191,10 +191,8 @@ times Chrome's gaps over 100 ms.
   (headless Chrome 155, 3840x2000 uncapped, cold, RTX 2070, a quiet host, `plays.jsonl`): Banjo 2.08 → 0.30 s, Rush
   2049 1.35 → 0.25, Conker 2.97 → 0.61 (Load ROM's, on both), Ocarina of Time 2.27 → 0.44, Mario Kart 64 2.53 →
   0.67, GoldenEye 1.79 → 1.65 and Donkey Kong 64 1.78 → 1.54, their second gap gone; Firefox 158 the same on
-  both. What is left over 100 ms after Start is not the GPU process: the page makes no WebGPU call for the game
-  between the launcher's last frame and the game's first, 0.2-0.5 s in most games, ~1.65 s in GoldenEye's and two
-  of ~1.5 s in Donkey Kong 64's boot, while Chrome goes on answering the list's builds, and 0.1-0.5 s at a game's
-  loads. Dawn reuses a module whose WGSL matches one still alive, but
+  both. What is left over 100 ms after Start is not the GPU process (Present gaps after Start, below).
+  Dawn reuses a module whose WGSL matches one still alive, but
   keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
@@ -322,3 +320,39 @@ times Chrome's gaps over 100 ms.
   for the main thread costs 50-120 µs from a pthread in a race, behind whatever is queued before it (RT64 asking at
   each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
   100 µs sleep there ~1.9 ms.
+
+## Present gaps after Start
+
+What each thread does in a gap over 100 ms with no shader wait, read from a CDP trace of every thread of every
+process (Tracing at the browser's target: `toplevel`, `disabled-by-default-v8.cpu_profiler` and `blink.user_timing`,
+with `gpu.dawn` for the GPU process's WebGPU work), on pages linked with `--profiling-funcs` for the wasm's names, a
+preload marking each gap with `performance.mark` (headless Chrome 155, uncapped 3840x2000, RTX 2070, v0.56.0, a fresh
+profile). The V8 profiler slows what it samples: a new worker took 130-240 ms traced and 30-115 ms without.
+
+- Each pthread past `-sPTHREAD_POOL_SIZE` waits while the browser makes a worker and instantiates the wasm in it, and
+  `osCreateThread` waits for its thread to start. With 32 workers GoldenEye and Donkey Kong 64 ran 45 and 46 threads
+  on 12 cores (12 RT64 shader prebuild threads, 12 buffer uploaders, 3 texture stream threads, the runtime's and the
+  game's), so the game threads started at Start each made one: GoldenEye's audio manager (195 ms traced) and three
+  of Donkey Kong 64's boot (142, 126 and 243 ms). `frontend/CMakeLists.txt` sizes the pool from
+  `navigator.hardwareConcurrency` now (55 at 12 cores). Untraced, three interleaved runs each: GoldenEye's Start gap
+  1631-1651 ms with 32 and 1600-1619 with 55 (one run of 55 had none), Donkey Kong 64's two 1562-1596 and 1467-1478
+  against 1481-1512 and 1444-1454; the renderer's private bytes 2040 MB against 2110, and the first present no later.
+  In Firefox 158 (two rounds) no gap moved, GoldenEye's Start being its shader wait there (7.6-8.8 s either way), and
+  GoldenEye's first present came 1325-1330 ms against 1120-1198 (Donkey Kong 64's 1665-1754 either way).
+  `performance.measureUserAgentSpecificMemory` counts the shared heap once a worker (15-25 GB with 55): read the
+  process's own counters.
+- The launcher: 1.4-2.0 s about a second after its first frame in every game, Chrome's GPU main thread parsing the
+  spec constant shaders' modules (703 and 730 ms for two of ~671 KB, `DeviceBase::APICreateShaderModule`) and building
+  three compute pipelines in line (55, 43, 78 ms).
+- GoldenEye's Start (1.6 s): the boss thread's first retraces (~0.6 s), then on a profile with no save its first boot
+  validating the EEPROM (`fileValidateSaves` → `fileResetSave` → `fileWriteSave`), 48 EEPROM calls, each between
+  `joyDisablePoll` and `joyEnablePoll`, which wait a retrace for the controller thread (~0.77 s); a second visit, with the save, waits 1.05 s. The display list
+  thread had the game's first lists and nothing after them until its first frame.
+- Donkey Kong 64's two boot gaps (~1.5 s each): its main thread (`func_global_asm_805FBFF4`) waits on one message
+  1.30 s and then 1.42 s, every other thread and the page's idle and no RSP task.
+- Conker's Start (1.1 s): its first lists, each with render to RAM's copies, whose readback the display list thread
+  waits for (`DTBuffer::map`, 3-38 ms each, ~0.5 s in all), while the game waits on them. Its Load ROM gap (0.6 s on
+  v0.51.0) is 0.1 s.
+- Mario Kart 64's loads (0.43-0.46 s before a race, 0.55 s at its start): the game thread in `audio_reset_session_eu`
+  ~470 ms while the audio thread resets its session, the page's thread, the display list thread and the GPU process
+  idle.
