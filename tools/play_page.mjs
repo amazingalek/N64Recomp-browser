@@ -60,8 +60,8 @@
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms), each sample's presents, sound
 // short and GPU load, the page, the query and the host's processor load over the play.
 //
-// A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play and
-// freshness of profile, none with a note, failed or without a frame (one with no play or profile recorded, as a line
+// A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
+// freshness of profile, uncapped or not and on screen or not, none with a note, failed or without a frame (one with no play or profile recorded, as a line
 // recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
@@ -371,7 +371,7 @@ const gpuMedians = (key) => {
 };
 const summary = {
   browser, page: pageUrl, size: onScreen && viewport ? `${viewport[0]}x${viewport[1]}` : `${size[0]}x${size[1]}`,
-  ...(onScreen ? { onScreen, devicePixelRatio: viewport?.[2] ?? null } : {}), freshProfile, uncapped, seconds: Math.round(seconds()),
+  ...(onScreen ? { onScreen, devicePixelRatio: viewport ? Math.round(viewport[2] * 100) / 100 : null } : {}), freshProfile, uncapped, seconds: Math.round(seconds()),
   presents: presents.length ? { median: median(presents), p10: percentile(presents, 0.1), min: Math.min(...presents),
     max: Math.max(...presents) } : null,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),

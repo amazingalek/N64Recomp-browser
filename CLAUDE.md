@@ -425,7 +425,12 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   ("never boots", "not yet"), never "smooth" and never against an earlier result ("the crash is gone"). One whose laptop
   result a fix was made for gives the stand-in's number until it is played there again. A cell below 60 without a `†` has work filed
   to make it 60. A
-  laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
+  laptop's cell comes from a run on screen (`--on-screen`: the window maximized on the desktop at the laptop's own
+  scale, as a player's is) as well as the usual one off the desktop, and gives the on-screen number. Windows never
+  composites a window off the desktop, and on a laptop's Intel UHD that flattered Firefox: on screen its pages took
+  ~30 more points of the Intel chip's 3D engine (Banjo 75% against 45, Conker 72 against 44) and 3-5 times its GPU
+  process's CPU, and Conker fell from 31.5 presents a second to 25.1, its boot's shader wait doubled (11.4 s against
+  5.4); Chrome stayed within 2. A laptop's Chrome cell is played headless too: headless Chrome draws to no display,
   so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
   a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
   for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
@@ -462,7 +467,14 @@ changes. Keep it current in the same work as what changes it, like the README:
   window off the desktop with `--headed`, and Firefox always in a window off the desktop over WebDriver BiDi, since
   Firefox headless has no WebGPU adapter. Such a window has no focus, so keys and clicks are dispatched from script,
   the ROM is sent to the page in pieces, and the viewport is set to one CSS pixel a pixel in both browsers, since the
-  canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`).
+  canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`). `--on-screen` (a laptop's runs, The games table) maximizes
+  either browser's window on the desktop instead, at the desktop's scale, with none of those overrides, so the
+  viewport is what the window leaves the page: 1920x889 for a `--size` of 1920x945 on a laptop at 200%. A plan's
+  clicks are in 1256x645, and page_driver moves each to the viewport the page has as it clicks (`innerWidth`,
+  `innerHeight`), never to `--size`: scaled to 945, Load ROM's click landed between Load ROM and Controls.
+- On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with, the one the
+  browser's own 3D load lands on (by LUID), with nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is
+  the idle discrete GPU, and its numbers say nothing about the page.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
