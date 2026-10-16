@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 32a7d6909fe325a135d013c1bc2fb712aa84a84b
+rt64: https://github.com/amazingalek/rt64-web 6bed6c916ceb9ce293f42319385e30039675a8f8
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1373,7 +1373,7 @@ index 8858dac..933b80e 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..f5156dd 100644
+index 2970e71..ab15562 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
 @@ -7,6 +7,13 @@
@@ -1545,7 +1545,17 @@ index 2970e71..f5156dd 100644
  
          auto emitTileWarning = [&](CommandWarning warning, size_t tileIndex) {
              warning.indexType = CommandWarning::IndexType::TileIndex;
-@@ -1254,6 +1381,10 @@ namespace RT64 {
+@@ -1103,7 +1230,8 @@ namespace RT64 {
+ 
+                     // Submit the shader to the cache so compilation can start right away.
+                     // Ignore any calls that use fill type, as they're emulated without using a shader.
+-                    if (callDesc.otherMode.cycleType() != G_CYC_FILL) {
++                    // A pipeline warm-up's draw is the game's no more than its shader is (warmUpPipelines()).
++                    if ((callDesc.otherMode.cycleType() != G_CYC_FILL) && !extended.pipelineWarmUp) {
+                         ext.rasterShaderCache->submit(shaderDesc);
+                     }
+ 
+@@ -1254,6 +1382,10 @@ namespace RT64 {
                              resizedTargets.emplace(colorDepthPair.second);
                          }
                      }
@@ -1556,7 +1566,7 @@ index 2970e71..f5156dd 100644
                  }
  
                  for (RenderTarget *renderTarget : resizedTargets) {
-@@ -1264,6 +1395,9 @@ namespace RT64 {
+@@ -1264,6 +1396,9 @@ namespace RT64 {
              };
  
              auto renderAndSynchronize = [&](uint32_t maxFramebufferPair) {
@@ -1566,7 +1576,7 @@ index 2970e71..f5156dd 100644
                  // Preprocess all the framebuffer operations.
                  uint32_t pairCursor = framebufferPairCursor;
                  while (pairCursor < maxFramebufferPair) {
-@@ -1346,7 +1480,7 @@ namespace RT64 {
+@@ -1346,7 +1481,7 @@ namespace RT64 {
                  }
  
                  // Record all setup previous to drawing any of the recorded framebuffers.
@@ -1575,7 +1585,7 @@ index 2970e71..f5156dd 100644
                  framebufferRenderer->recordSetup(ext.framebufferGraphicsWorker, bufferUploaders, queuedProcessor, nullptr, &workload.outputBuffers, false);
  
                  // Record the command list for the framebuffer pairs.
-@@ -1471,15 +1605,26 @@ namespace RT64 {
+@@ -1471,15 +1606,26 @@ namespace RT64 {
                  ext.framebufferGraphicsWorker->commandList->end();
                  framebufferRenderer->waitForUploaders();
                  ext.framebufferGraphicsWorker->execute();
@@ -1605,7 +1615,7 @@ index 2970e71..f5156dd 100644
                          }
                      }
  
-@@ -1836,6 +1981,10 @@ namespace RT64 {
+@@ -1836,6 +1982,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1616,7 +1626,7 @@ index 2970e71..f5156dd 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2058,7 @@ namespace RT64 {
+@@ -1909,6 +2059,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {
@@ -1624,7 +1634,7 @@ index 2970e71..f5156dd 100644
                          {
                              RenderWorkerExecution workerExecution(worker);
                              thread_local std::vector<uint32_t> fbDiscards;
-@@ -2724,6 +2874,24 @@ namespace RT64 {
+@@ -2724,6 +2875,24 @@ namespace RT64 {
          extended.renderToRAM = renderToRAM;
      }
  
