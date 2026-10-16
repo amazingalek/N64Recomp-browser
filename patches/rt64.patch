@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 2e93be2691d6c4d5328bcd2ac85bb48af80b47cd
+rt64: https://github.com/amazingalek/rt64-web 32a7d6909fe325a135d013c1bc2fb712aa84a84b
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -683,7 +683,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..839b243 100644
+index 785de27..29ba826 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -771,6 +771,20 @@ index 785de27..839b243 100644
 +#   endif
          sharedQueueResources->renderTargetManager.setMultisampling(multisampling);
          sharedQueueResources->renderTargetManager.setUsesHDR(usesHDR);
+ 
+@@ -455,6 +487,13 @@ namespace RT64 {
+         // Set up the RDP
+         state->rdp->setGBI();
+ 
++#   if defined(__EMSCRIPTEN__)
++        // Where pipelines build in the background (Chrome), the ubershader's are built before the game draws with them.
++        if (device->getCapabilities().backgroundPipelineBuilds) {
++            state->warmUpPipelines();
++        }
++#   endif
++
+         return SetupResult::Success;
+     }
  
 diff --git a/src/hle/rt64_application_window.cpp b/src/hle/rt64_application_window.cpp
 index 08f83e5..75800e1 100755
@@ -1359,7 +1373,7 @@ index 8858dac..933b80e 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..61f2ace 100644
+index 2970e71..f5156dd 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
 @@ -7,6 +7,13 @@
@@ -1523,7 +1537,15 @@ index 2970e71..61f2ace 100644
          flush();
          submitFramebufferPair(FramebufferPair::FlushReason::ProcessDisplayListsEnd);
  
-@@ -1254,6 +1380,10 @@ namespace RT64 {
+@@ -809,6 +935,7 @@ namespace RT64 {
+         // Copy the current state's extended parameters into the workload.
+         workload.extended.ditherNoiseStrength = extended.ditherNoiseStrength;
+         workload.extended.texcoordWrapPoint = extended.texcoordWrapPoint;
++        workload.extended.pipelineWarmUp = extended.pipelineWarmUp;
+ 
+         auto emitTileWarning = [&](CommandWarning warning, size_t tileIndex) {
+             warning.indexType = CommandWarning::IndexType::TileIndex;
+@@ -1254,6 +1381,10 @@ namespace RT64 {
                              resizedTargets.emplace(colorDepthPair.second);
                          }
                      }
@@ -1534,7 +1556,7 @@ index 2970e71..61f2ace 100644
                  }
  
                  for (RenderTarget *renderTarget : resizedTargets) {
-@@ -1264,6 +1394,9 @@ namespace RT64 {
+@@ -1264,6 +1395,9 @@ namespace RT64 {
              };
  
              auto renderAndSynchronize = [&](uint32_t maxFramebufferPair) {
@@ -1544,7 +1566,7 @@ index 2970e71..61f2ace 100644
                  // Preprocess all the framebuffer operations.
                  uint32_t pairCursor = framebufferPairCursor;
                  while (pairCursor < maxFramebufferPair) {
-@@ -1346,7 +1479,7 @@ namespace RT64 {
+@@ -1346,7 +1480,7 @@ namespace RT64 {
                  }
  
                  // Record all setup previous to drawing any of the recorded framebuffers.
@@ -1553,7 +1575,7 @@ index 2970e71..61f2ace 100644
                  framebufferRenderer->recordSetup(ext.framebufferGraphicsWorker, bufferUploaders, queuedProcessor, nullptr, &workload.outputBuffers, false);
  
                  // Record the command list for the framebuffer pairs.
-@@ -1471,15 +1604,26 @@ namespace RT64 {
+@@ -1471,15 +1605,26 @@ namespace RT64 {
                  ext.framebufferGraphicsWorker->commandList->end();
                  framebufferRenderer->waitForUploaders();
                  ext.framebufferGraphicsWorker->execute();
@@ -1583,7 +1605,7 @@ index 2970e71..61f2ace 100644
                          }
                      }
  
-@@ -1836,6 +1980,10 @@ namespace RT64 {
+@@ -1836,6 +1981,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1594,7 +1616,7 @@ index 2970e71..61f2ace 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2057,7 @@ namespace RT64 {
+@@ -1909,6 +2058,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {
@@ -1602,8 +1624,33 @@ index 2970e71..61f2ace 100644
                          {
                              RenderWorkerExecution workerExecution(worker);
                              thread_local std::vector<uint32_t> fbDiscards;
+@@ -2724,6 +2874,24 @@ namespace RT64 {
+         extended.renderToRAM = renderToRAM;
+     }
+ 
++    // A list that draws a rect with the ubershader through the renderer, but none of its triangles (drawsNothing), and
++    // copies nothing to RAM: on WebGPU the draw of nothing resolves the layout of the sets the renderer draws with, which
++    // starts the pipelines made for it in the background (plume's WebGPUGraphicsPipeline), where the device builds them
++    // there. Done at setup, the ubershader's pipelines (one per depth and coverage state) are built behind the launcher;
++    // otherwise the game's first frame resolved the layout and built each state it drew in line, which in Chrome held the
++    // page's presents for as long (1.4-2.0 s for Banjo's four).
++    void State::warmUpPipelines() {
++        listProcessBegin();
++        rdp->setColorImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 320, 0x700000);
++        rdp->setOtherMode(G_CYC_1CYCLE, 0);
++        rdp->setScissor(0, 0, 0, 320 << 2, 240 << 2);
++        rdp->fillRect(0, 0, 16 << 2, 16 << 2);
++        setRenderToRAM(0);
++        extended.pipelineWarmUp = true;
++        fullSync();
++        listProcessEnd();
++    }
++
+     void State::setDitherNoiseStrength(float noiseStrength) {
+         extended.ditherNoiseStrength = noiseStrength;
+     }
 diff --git a/src/hle/rt64_state.h b/src/hle/rt64_state.h
-index 7a8c13b..019e41d 100644
+index 7a8c13b..551816c 100644
 --- a/src/hle/rt64_state.h
 +++ b/src/hle/rt64_state.h
 @@ -91,6 +91,28 @@ namespace RT64 {
@@ -1635,7 +1682,15 @@ index 7a8c13b..019e41d 100644
          GameConfiguration gameConfig;
          uint32_t displayListAddress;
          uint64_t displayListCounter;
-@@ -144,6 +166,8 @@ namespace RT64 {
+@@ -129,6 +151,7 @@ namespace RT64 {
+             bool vertexTestZActive = false;
+             float ditherNoiseStrength = 1.0f;
+             bool extendRDRAM = false;
++            bool pipelineWarmUp = false;
+         };
+ 
+         Extended extended;
+@@ -144,6 +167,8 @@ namespace RT64 {
          void flush();
          void submitFramebufferPair(FramebufferPair::FlushReason flushReason);
          void checkRDRAM();
@@ -1644,8 +1699,40 @@ index 7a8c13b..019e41d 100644
          void fullSync();
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
+@@ -162,6 +187,7 @@ namespace RT64 {
+         DisplayList *popReturnAddress();
+         void setRefreshRate(uint16_t refreshRate);
+         void setRenderToRAM(uint8_t renderToRAM);
++        void warmUpPipelines();
+         void setDitherNoiseStrength(float noiseStrength);
+         void setExtendedRDRAM(bool isExtended);
+         void setTexcoordWrapPoint(int16_t wrapU, int16_t wrapV);
+diff --git a/src/hle/rt64_workload.cpp b/src/hle/rt64_workload.cpp
+index b4c85f5..6d3d99d 100644
+--- a/src/hle/rt64_workload.cpp
++++ b/src/hle/rt64_workload.cpp
+@@ -22,6 +22,7 @@ namespace RT64 {
+         workloadId = 0;
+         extended.testZIndexCount = 0;
+         extended.ditherNoiseStrength = 1.0f;
++        extended.pipelineWarmUp = false;
+ 
+         commandWarnings.clear();
+         spriteCommands.clear();
+diff --git a/src/hle/rt64_workload.h b/src/hle/rt64_workload.h
+index 8ea27d5..c2d4420 100644
+--- a/src/hle/rt64_workload.h
++++ b/src/hle/rt64_workload.h
+@@ -239,6 +239,7 @@ namespace RT64 {
+             uint32_t testZIndexCount = 0;
+             float ditherNoiseStrength = 1.0f;
+             hlslpp::float2 texcoordWrapPoint = {};
++            bool pipelineWarmUp = false;
+         } extended;
+ 
+         void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..b225845 100644
+index 5a331aa..6a1b24c 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -1684,7 +1771,17 @@ index 5a331aa..b225845 100644
              for (RenderTarget *renderTarget : resizedTargets) {
                  renderFramebufferManager->destroyAllWithRenderTarget(renderTarget);
              }
-@@ -701,7 +715,7 @@ namespace RT64 {
+@@ -635,7 +649,8 @@ namespace RT64 {
+                     drawParams.rtEnabled = workloadConfig.raytracingEnabled;
+                     drawParams.submissionFrame = workload.submissionFrame;
+                     drawParams.deltaTimeMs = deltaTimeMs;
+-                    drawParams.ubershadersOnly = ubershadersOnly;
++                    drawParams.ubershadersOnly = ubershadersOnly || workload.extended.pipelineWarmUp;
++                    drawParams.drawsNothing = workload.extended.pipelineWarmUp;
+                     drawParams.postBlendNoise = workloadConfig.postBlendNoise;
+                     drawParams.postBlendNoiseNegative = workloadConfig.postBlendNoiseNegative;
+                     drawParams.maxGameCall = std::min(gameCallCountMax - gameCallCursor, fbPair.gameCallCount);
+@@ -701,7 +716,7 @@ namespace RT64 {
              ext.workloadGraphicsWorker->commandList->begin();
              ext.workloadGraphicsWorker->commandList->resetQueryPool(queryPool.get(), 0, 2);
              ext.workloadGraphicsWorker->commandList->writeTimestamp(queryPool.get(), 0);
@@ -1693,7 +1790,7 @@ index 5a331aa..b225845 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -902,6 +916,12 @@ namespace RT64 {
+@@ -902,6 +917,12 @@ namespace RT64 {
              }
  
              if (processCursor >= 0) {
@@ -1901,7 +1998,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..dfaf629 100644
+index 9fae0d4..ab4ed24 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -2043,6 +2140,15 @@ index 9fae0d4..dfaf629 100644
          framebuffer.descRealFbSet->setBuffer(framebuffer.descRealFbSet->FbParams, framebuffer.paramsBuffer.get(), sizeof(interop::FramebufferParams));
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundColor, backgroundColorTexture, RenderTextureLayout::SHADER_READ, backgroundColorTextureView);
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundDepth, p.fbStorage->depthTarget->texture.get(), RenderTextureLayout::DEPTH_READ, p.fbStorage->depthTarget->textureView.get());
+@@ -1619,7 +1676,7 @@ namespace RT64 {
+                                 (call.shaderDesc.otherMode.cvgDst() == CVG_DST_WRAP) || (call.shaderDesc.otherMode.cvgDst() == CVG_DST_SAVE));
+                         }
+                         
+-                        triangles.faceCount = call.callDesc.triangleCount;
++                        triangles.faceCount = p.drawsNothing ? 0 : call.callDesc.triangleCount;
+                         triangles.vertexTestZ = (vertexTestZCallIndex >= 0);
+                         triangles.postBlendDitherNoise = false;
+ 
 @@ -1760,7 +1817,205 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
@@ -2268,7 +2374,7 @@ index 9fae0d4..dfaf629 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..9ec3b6a 100644
+index 3add9c3..4efd5c4 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
 @@ -98,6 +98,41 @@ namespace RT64 {
@@ -2313,7 +2419,15 @@ index 3add9c3..9ec3b6a 100644
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -166,7 +201,9 @@ namespace RT64 {
+@@ -144,6 +179,7 @@ namespace RT64 {
+             uint64_t submissionFrame;
+             float deltaTimeMs;
+             bool ubershadersOnly;
++            bool drawsNothing = false; // Every draw of no triangles (State::warmUpPipelines()).
+             bool postBlendNoise;
+             bool postBlendNoiseNegative;
+             uint32_t maxGameCall;
+@@ -166,7 +202,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);
