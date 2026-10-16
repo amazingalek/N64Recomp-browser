@@ -25,11 +25,11 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Donkey Kong 64 | [Donkey Kong 64: Recompiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled) by Rainchus | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 54; 346* | 30†; 225* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
 | Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 54; 320* | 20†; 220* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
 | Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 59; 323* | 60; 238* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
-| Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 30†; 335* | 30†; 124* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
+| Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 30†; 335* | 30†; 142* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 346* | 334* | 2026-10-16, v0.50.0 |
-| The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 335* | 196* | 2026-10-16, v0.50.0 |
-| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 30†* | 30†* | 2026-10-16, v0.50.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 19†* | 22†* | 2026-10-16, v0.50.0 |
+| The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 340* | 200* | 2026-10-16, v0.50.0 |
+| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 341* | 252* | 2026-10-16, v0.50.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 20†* | 315* | 2026-10-16, v0.50.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, Chrome in a window; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -94,6 +94,12 @@ way.
 
 What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 
+- RT64's Framerate at Display and its resolution at Auto by default, so that every page presents at the display's rate
+  (60 a second on a 60 Hz display, 144 on a 144 Hz one), RT64 interpolating between the game's frames, and draws at
+  the canvas's size, whatever the recomp's desktop build defaults to. RecompFrontend's defaults are those. A recomp
+  with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
+  `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
+  of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
@@ -310,7 +316,9 @@ amazingalek/plume-web                    renderbag/plume          a WebGPU backe
                                                                   as Firefox's timed waits do there
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
-                                                                  interpolated to the display's rate and paced
+                                                                  interpolated to the display's rate (a game's
+                                                                  offscreen pass in a display list of its own
+                                                                  and frames of uneven VIs too) and paced
                                                                   evenly when the GPU falls behind, a game's
                                                                   shaders specialized at build time; tile
                                                                   copies reused from list to list (with render
@@ -326,10 +334,11 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   OSThread's context past libultra's thprof on
                                                                   a 32-bit host; game timers on time where a
                                                                   page's timed waits end late (Firefox on
-                                                                  Windows)
+                                                                  Windows); a ROM read in 4 MB pieces
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
-                                                                  a file picker, render to RAM as an option
-                                                                  and its copy a display list late as another
+                                                                  a file picker on a thread of its own, render
+                                                                  to RAM as an option and its copy a display
+                                                                  list late as another
 amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the WebAssembly SIMD backend RT64's
                                                                   CPU-side matrices use with -msimd128
 ```
@@ -352,7 +361,7 @@ take the web support without moving its submodules to the forks (Using it in a r
   and `pins.txt`, the upstream commits recomps pin, which CI patches.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` works too)
-  (its header says what each part does): threads, the page, HOME kept in IndexedDB, a thread's prints without
+  (its header says what each part does): threads, the page, HOME kept in IndexedDB (a database a page, a ROM stored from a worker), a thread's prints without
   waiting for the page's thread, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the browser's file picker for a recomp with menus of its own
   (`file_picker.h`), the WebGPU device, a notice in Firefox recommending Chrome or Edge, and `coi_serviceworker.js`.
