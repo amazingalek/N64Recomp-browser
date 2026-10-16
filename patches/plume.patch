@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 14ab63ab726e8b80609bbd0b3920635edae1aac1
+plume: https://github.com/amazingalek/plume-web 2950009d4d536e21209a4fc048c09e9e9a305720
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2702,10 +2702,10 @@ index 0000000..0b0ff01
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..723d552
+index 0000000..2fdf3a9
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3298 @@
+@@ -0,0 +1,3305 @@
 +//
 +// plume
 +//
@@ -5381,13 +5381,14 @@ index 0000000..723d552
 +    void WebGPUCommandList::copyTextureRegion(const RenderTextureCopyLocation &dstLocation, const RenderTextureCopyLocation &srcLocation, uint32_t dstX, uint32_t dstY, uint32_t dstZ, const RenderBox *srcBox) {
 +        endRenderPass();
 +
-+        auto textureInfo = [](const RenderTextureCopyLocation &location, uint32_t x, uint32_t y, uint32_t z) {
++        // A depth and stencil texture copies to or from a buffer one aspect at a time, and to another texture whole.
++        auto textureInfo = [](const RenderTextureCopyLocation &location, uint32_t x, uint32_t y, uint32_t z, bool withBuffer) {
 +            const WebGPUTexture *texture = static_cast<const WebGPUTexture *>(location.texture);
 +            WGPUTexelCopyTextureInfo info = WGPU_TEXEL_COPY_TEXTURE_INFO_INIT;
 +            info.texture = texture->texture;
 +            info.mipLevel = location.subresource.mipLevel;
 +            info.origin = { x, y, (texture->desc.dimension == RenderTextureDimension::TEXTURE_3D) ? z : location.subresource.arrayIndex + z };
-+            if (RenderFormatIsDepth(texture->desc.format) && RenderFormatIsStencil(texture->desc.format)) {
++            if (withBuffer && RenderFormatIsDepth(texture->desc.format) && RenderFormatIsStencil(texture->desc.format)) {
 +                info.aspect = WGPUTextureAspect_DepthOnly;
 +            }
 +
@@ -5431,18 +5432,18 @@ index 0000000..723d552
 +
 +        if (!srcIsTexture && dstIsTexture) {
 +            WGPUTexelCopyBufferInfo src = bufferInfo(srcLocation);
-+            WGPUTexelCopyTextureInfo dst = textureInfo(dstLocation, dstX, dstY, dstZ);
++            WGPUTexelCopyTextureInfo dst = textureInfo(dstLocation, dstX, dstY, dstZ, true);
 +            wgpuCommandEncoderCopyBufferToTexture(encoder, &src, &dst, &extent);
 +        }
 +        else if (srcIsTexture && !dstIsTexture) {
-+            WGPUTexelCopyTextureInfo src = textureInfo(srcLocation, srcX, srcY, srcZ);
++            WGPUTexelCopyTextureInfo src = textureInfo(srcLocation, srcX, srcY, srcZ, true);
 +            WGPUTexelCopyBufferInfo dst = bufferInfo(dstLocation);
 +            wgpuCommandEncoderCopyTextureToBuffer(encoder, &src, &dst, &extent);
 +            copiedInto(dstLocation.buffer);
 +        }
 +        else if (srcIsTexture && dstIsTexture) {
-+            WGPUTexelCopyTextureInfo src = textureInfo(srcLocation, srcX, srcY, srcZ);
-+            WGPUTexelCopyTextureInfo dst = textureInfo(dstLocation, dstX, dstY, dstZ);
++            WGPUTexelCopyTextureInfo src = textureInfo(srcLocation, srcX, srcY, srcZ, false);
++            WGPUTexelCopyTextureInfo dst = textureInfo(dstLocation, dstX, dstY, dstZ, false);
 +            wgpuCommandEncoderCopyTextureToTexture(encoder, &src, &dst, &extent);
 +        }
 +        else {
@@ -5623,6 +5624,7 @@ index 0000000..723d552
 +        float32Filterable = wgpuDeviceHasFeature(device, WGPUFeatureName_Float32Filterable);
 +        float32Blendable = wgpuDeviceHasFeature(device, WGPUFeatureName_Float32Blendable);
 +        depthClipControl = wgpuDeviceHasFeature(device, WGPUFeatureName_DepthClipControl);
++        depth32FloatStencil8 = wgpuDeviceHasFeature(device, WGPUFeatureName_Depth32FloatStencil8);
 +        capabilities.dualSourceBlending = wgpuDeviceHasFeature(device, WGPUFeatureName_DualSourceBlending);
 +
 +        WGPULimits limits = WGPU_LIMITS_INIT;
@@ -5958,7 +5960,12 @@ index 0000000..723d552
 +    }
 +
 +    RenderSampleCounts WebGPUDevice::getSampleCountsSupported(RenderFormat format) const {
-+        // Core WebGPU guarantees 1 and 4 samples for every renderable format.
++        // Core WebGPU guarantees 1 and 4 samples for every renderable format. D32_FLOAT_S8_UINT is an optional feature,
++        // depth32float-stencil8, and a device without it has no such format.
++        if ((format == RenderFormat::D32_FLOAT_S8_UINT) && !depth32FloatStencil8) {
++            return 0;
++        }
++
 +        return RenderSampleCount::COUNT_1 | RenderSampleCount::COUNT_4;
 +    }
 +
@@ -6006,10 +6013,10 @@ index 0000000..723d552
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..f7c167b
+index 0000000..27c1d9d
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,690 @@
+@@ -0,0 +1,691 @@
 +//
 +// plume
 +//
@@ -6635,6 +6642,7 @@ index 0000000..f7c167b
 +        bool float32Blendable = false;
 +        uint64_t pushConstantsChunkCount = 0;
 +        bool depthClipControl = false;
++        bool depth32FloatStencil8 = false;
 +        WGPUBindGroupLayout emptyLayout = nullptr;
 +        WGPUBindGroup emptyBindGroup = nullptr;
 +        WGPUBindGroupLayoutEntry pushConstantsEntry = {};
@@ -6702,10 +6710,10 @@ index 0000000..f7c167b
 +};
 diff --git a/plume_webgpu_device.js b/plume_webgpu_device.js
 new file mode 100644
-index 0000000..7a3c7c9
+index 0000000..115497c
 --- /dev/null
 +++ b/plume_webgpu_device.js
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,78 @@
 +// Link with --pre-js for plume's WebGPU backend. Requesting a WebGPU device is asynchronous, so this does it before
 +// main() runs and hands the device over as Module.preinitializedWebGPUDevice, which emscripten_webgpu_get_device()
 +// returns. Optional features plume can use are asked for when the adapter has them, and the adapter's own maximum for
@@ -6726,7 +6734,8 @@ index 0000000..7a3c7c9
 +      throw new Error('No WebGPU adapter.');
 +    }
 +
-+    const optionalFeatures = ['float32-filterable', 'float32-blendable', 'depth-clip-control', 'dual-source-blending', 'texture-compression-bc', 'timestamp-query'];
++    const optionalFeatures = ['float32-filterable', 'float32-blendable', 'depth-clip-control', 'dual-source-blending', 'texture-compression-bc', 'timestamp-query',
++      'depth32float-stencil8'];
 +    const requiredFeatures = optionalFeatures.filter((feature) => adapter.features.has(feature));
 +    const raisedLimits = ['maxSampledTexturesPerShaderStage', 'maxSamplersPerShaderStage', 'maxStorageBuffersPerShaderStage',
 +      'maxStorageTexturesPerShaderStage', 'maxBindingsPerBindGroup', 'maxStorageBufferBindingSize', 'maxBufferSize'];
