@@ -317,6 +317,11 @@ N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK b
                        page, for no more presents); Conker's page under a stand-in for the tick
                        (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
                        25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
+N64ModernRuntime       osStopThread on the thread itself leaves it STOPPED (ULTRAMODERN_LIBULTRA_THREAD_STOP), so the
+6515ea8                next osStartThread starts it: it kept the QUEUED it was scheduled with, and a start of a thread
+                       that isn't stopped does nothing. HAL's object manager stops each object's thread in ohWait until
+                       omRunProcess starts it the next frame, and Pokémon Snap's page stopped after the game's second
+                       frame
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
