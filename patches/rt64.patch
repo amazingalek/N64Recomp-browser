@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 2431add78267e23a7a2a878f963ce413c73a220f
+rt64: https://github.com/amazingalek/rt64-web b1a1230100d278212a7f33afe963112de0e0fdac
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1678,10 +1678,10 @@ index 7a8c13b..019e41d 100644
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
-index a870166..b4da82f 100644
+index a870166..1ef7dd9 100644
 --- a/src/hle/rt64_vi.cpp
 +++ b/src/hle/rt64_vi.cpp
-@@ -162,10 +162,18 @@ namespace RT64 {
+@@ -162,13 +162,22 @@ namespace RT64 {
      }
  
      uint32_t VIHistory::logicalRateFromFactors() {
@@ -1690,17 +1690,23 @@ index a870166..b4da82f 100644
 -            const uint32_t FullRate = 60; // TODO: PAL support.
              return FullRate / factors[0];
          }
+-        else {
+-            return 0;
 +#   if RT64_UNEVEN_FRAME_RATES
 +        // With RT64_UNEVEN_FRAME_RATES frames that took an uneven number of VIs (a game at 30 dropping to 20 when a frame
 +        // runs long, or VIs that come unevenly) are interpolated at the slowest of them, not left uninterpolated: a frame
-+        // that comes sooner ends the interpolated frames left of the one before (WorkloadQueue::renderThreadLoop).
-+        else if (std::none_of(factors.begin(), factors.end(), [](uint32_t factor) { return factor == 0; })) {
-+            return FullRate / *std::max_element(factors.begin(), factors.end());
-+        }
-+#   endif
-         else {
-             return 0;
++        // that comes sooner ends the interpolated frames left of the one before (WorkloadQueue::renderThreadLoop). Only
++        // while the slowest took at most twice the VIs of the fastest: a load or a hitch of dozens of VIs would set a rate
++        // of one or two frames a second, and RT64 keeps a color target for every display frame of a game frame.
++        const auto range = std::minmax_element(factors.begin(), factors.end());
++        if ((*range.first != 0) && (*range.second <= (*range.first * 2))) {
++            return FullRate / *range.second;
          }
++#   endif
++        return 0;
+     }
+ 
+     const VIHistory::Present &VIHistory::top() const {
 diff --git a/src/hle/rt64_workload.h b/src/hle/rt64_workload.h
 index 8ea27d5..0f4af83 100644
 --- a/src/hle/rt64_workload.h
