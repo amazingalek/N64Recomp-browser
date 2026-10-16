@@ -42,9 +42,20 @@
   const pipelineShader = new WeakMap();
   const passState = new WeakMap();
   let shaders = new Map();
+  // ?probe-skip=<KB>,...: draws whose fragment shader is that size are left out, to read what they cost.
+  const skip = new Set((new URLSearchParams(location.search).get('probe-skip') ?? '').split(',').filter((k) => k).map((k) => `${k} KB`));
+  const dump = new Set((new URLSearchParams(location.search).get('probe-dump') ?? '').split(',').filter((k) => k).map((k) => `${k} KB`));
+  const dumped = new Set();
+  if (skip.size) console.log(`passes: leaving out the draws of the ${[...skip].join(', ')} fragment shaders`);
   wrap(GPUDevice.prototype, 'createShaderModule', (original) => function (descriptor) {
     const module = original.apply(this, arguments);
-    moduleSize.set(module, descriptor?.code?.length ?? 0);
+    const code = descriptor?.code ?? '';
+    moduleSize.set(module, code.length);
+    // ?probe-dump=<KB>: each module of that size printed once, as a JSON string, to read or build alone.
+    if (dump.has(`${Math.round(code.length / 1024)} KB`) && !dumped.has(code)) {
+      dumped.add(code);
+      console.log(`passes: wgsl ${JSON.stringify(code)}`);
+    }
     return module;
   });
   const shaderOf = (descriptor) => descriptor?.fragment?.module ? `${Math.round((moduleSize.get(descriptor.fragment.module) ?? 0) / 1024)} KB` : 'none';
@@ -139,6 +150,7 @@
         s.draws++;
         s.pixels += area;
         shaders.set(state.shader, s);
+        if (skip.has(state.shader)) return undefined;
       }
       return original.apply(this, arguments);
     });
