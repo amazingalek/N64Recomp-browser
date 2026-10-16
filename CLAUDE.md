@@ -51,6 +51,10 @@ the work that builds, plays or measures every game opens it itself, beside the g
 - A game fork of an existing recomp is that recomp plus web support and nothing else, so its diff against upstream is
   exactly what the page needs: no new features (mouse aim, controls, enhancements) and no fix the page doesn't need.
   A request for one is answered that way, not filed against the fork.
+- Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and its
+  resolution Auto by default, in every game fork and every new port, whatever its recomp's desktop build defaults to
+  (the README, The recomp's own code). That is web support, not a feature: a page that shows its game's own 20 or 30
+  because of a default is a bug in that page.
 - Never open a PR, issue or discussion upstream at rt64, plume, N64Recomp, N64ModernRuntime, RecompFrontend,
   BanjoRecomp, Zelda64Recomp or Donkey-Kong-64-Recompiled: their CONTRIBUTING.md asks for no LLM-written code
   (plume's, no AI-made contribution and no AI talking to its maintainers). The forks stay forks. Each one's README opens
@@ -571,15 +575,15 @@ changes. Keep it current in the same work as what changes it, like the README:
 ## Frame rates
 
 - Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
-  setting, Display by default in every game but Diddy Kong Racing and Jet Force Gemini, interpolates between the
+  setting, Display by default on every page (the README, The recomp's own code: a game fork or a new port whose recomp
+  defaults to Original sets it with Emscripten, DKR-R's page plays its Modern profile), interpolates between the
   game's frames to the display's rate, each interpolated frame a full redraw, so a page presents 60 a second on a
   60 Hz display (144 on a 144 Hz one) whatever the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
   RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
 - The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
-  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
-  which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
-  it), Jet Force Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default, which
-  RT64 draws at its base's Original: no interpolation; 20 on a page, The game forks), and the other seven their
+  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, the desktop's
+  default, holds RT64 at Original; its Modern profile interpolates, and the page plays Modern), Jet Force Gemini 30
+  dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page, The game forks), and the other seven their
   cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
   races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.

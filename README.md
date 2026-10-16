@@ -94,6 +94,12 @@ way.
 
 What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 
+- RT64's Framerate at Display and its resolution at Auto by default, so that every page presents at the display's rate
+  (60 a second on a 60 Hz display, 144 on a 144 Hz one), RT64 interpolating between the game's frames, and draws at
+  the canvas's size, whatever the recomp's desktop build defaults to. RecompFrontend's defaults are those. A recomp
+  with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
+  `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
+  of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
