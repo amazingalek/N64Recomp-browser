@@ -106,8 +106,10 @@ states, the TLB-mapped pages and the heap, tail calls, sound, render to RAM and 
 sections and how they are recorded, Firefox's fixes.
 
 `amazingalek/wave-race-64-recomp-web` is Wave Race 64: Recompiled. Fast3D draws as it does natively, with no rt64-web
-change. Its water renderer's 16 shaders are included as WGSL blobs, and its list is in 13 sections, the menus passed
-with page_driver's `pressUntil` and the gas held with its `down`/`up`. Its docs/BUILDING.md (The web page) and the
+change. Its water renderer's 16 shaders are included as WGSL blobs. Its water patch is the web-patched tree's diff, so
+an rt64-web change beside its lines (rt64 179adb8) stops `git apply` and the patch is made again (applied with fuzz,
+then diffed). Its list is in 13 sections, the menus passed with page_driver's `pressUntil` and the gas held with
+its `down`/`up`. Its docs/BUILDING.md (The web page) and the
 headers of `tools/web_patch.sh`, `tools/patch_rt64_water.py`, `recomp/wr64.toml`, `tools/autopilot.js` and
 `src/rt64_shaders.txt` have the rest: how the submodules are patched (apply.cmake, the port's own scripts, the water
 patch), the microcode labels it ignores, render to RAM off and why, the shader list and how it was recorded, plays.
@@ -180,7 +182,11 @@ its survey.
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
 `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
-before the web's, so `pins.txt` has no row for it: `publish_pages.sh`'s build is what checks a tag against it. It always
+before the web's, so `pins.txt` has no row for it: `publish_pages.sh`'s build is what checks a tag against it. Where
+both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
+frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
+reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). rt64-web 0a9fcb6 keeps the web's
+lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
 plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's default, holds RT64 at Original
 and 30, and the page has no overlay to pick a profile), with its Match display passed on as RT64's Display, since SDL's
 Emscripten port reports no refresh rate. `record_shaders.mjs --from` goes on with a recording of its list stopped

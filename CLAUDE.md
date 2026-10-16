@@ -443,7 +443,10 @@ readback), is in docs/findings.md (WebGPU in Chrome and Firefox): read it before
 builds pipelines or presents on the web.
 
 - WebGPU checks a storage texture's format and access against every binding a shader declares, and a render pass's
-  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass.
+  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass. A pass can
+  sample its own depth target only if it is read-only, so each decal that RT64 draws reading the depth (the ubershader,
+  one specialized at run time) after a draw that wrote it ends the pass and begins another. Firefox's GPU process pays
+  25-70 us a pass and Chrome's ~7, so a game that does it often costs Firefox far more a present (rt64 0560318).
 - Two of the web paths run natively on Vulkan too, to check them against the stock ones: configure a game with
   `-DRT64_PER_DRAW_TEXTURES=ON` (rt64-0007: a texture set per draw, TMEM in one buffer; to test that pool, make
   `TMEMHasher::requiresRawTMEM` return true for a run) or `-DRT64_PACKED_RSP_INPUTS=ON` (rt64-0009).
