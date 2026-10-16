@@ -103,9 +103,10 @@ games' repos name each change by a short label (`plume-0003`, `rt64-0010`) or by
 c89ced0`): `docs/forks.md` has every one, a line each, and `git show` in the fork the rest. A change pushed to a
 fork gets its row there in the PR that moves `forks.txt` onto it.
 
-Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
+Five of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
 too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64
-179adb8) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
+179adb8), `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334) and `ULTRAMODERN_HOLD_BLOCKED_MESSAGES`
+(N64ModernRuntime 66539ab).
 
 ## What this repo adds besides the forks
 
@@ -337,7 +338,8 @@ changes. Keep it current in the same work as what changes it, like the README:
 - `play_page.mjs` reads the browser's GPU process's private bytes in each sample, and in Firefox about:memory's split
   of them at the play's start and end (page_driver.mjs's `gpuProcessMemory`): Firefox's own heap (its WebGPU and
   wgpu), the system heap (the D3D12 runtime, the driver, DXC) and the GPU memory it has committed. How each browser's
-  grows over 10 minutes of a page is in docs/findings.md (Memory).
+  grows over 10 minutes of a page is in docs/findings.md (Memory). Each read holds Firefox's page 120-200 ms, so a
+  play's gaps start after the first one.
 - One page plays at a time on a machine, in any browser: with two Firefox windows each playing a page, one window's
   animation frames came in bursts (docs/findings.md, Two pages at once). Where agents share a machine, each play (one
   `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's queue for the GPU, started
@@ -443,7 +445,10 @@ readback), is in docs/findings.md (WebGPU in Chrome and Firefox): read it before
 builds pipelines or presents on the web.
 
 - WebGPU checks a storage texture's format and access against every binding a shader declares, and a render pass's
-  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass.
+  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass. A pass can
+  sample its own depth target only if it is read-only, so each decal that RT64 draws reading the depth (the ubershader,
+  one specialized at run time) after a draw that wrote it ends the pass and begins another. Firefox's GPU process pays
+  25-70 us a pass and Chrome's ~7, so a game that does it often costs Firefox far more a present (rt64 0560318).
 - Two of the web paths run natively on Vulkan too, to check them against the stock ones: configure a game with
   `-DRT64_PER_DRAW_TEXTURES=ON` (rt64-0007: a texture set per draw, TMEM in one buffer; to test that pool, make
   `TMEMHasher::requiresRawTMEM` return true for a run) or `-DRT64_PACKED_RSP_INPUTS=ON` (rt64-0009).
@@ -465,6 +470,10 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   stack minutes in without it.
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
   runs one game thread at a time and delivers interrupts only inside OS calls (GoldenEye, docs/game-forks.md).
+- An interrupt's message to a queue the game leaves full (Jet Force Gemini's controller queue) waits in a list and is
+  tried first at each OS call and idle wait (N64ModernRuntime 66539ab). Put back into the external queue, which keeps no
+  order, it was taken again at once by the idle thread, which spun on it while the messages behind it, an RDP
+  completion among them, waited for a game thread's OS call, often the next retrace's.
 - A page's files are in the page's thread's file system, and every file call from another thread waits for that
   thread, which presents nothing meanwhile. An istreambuf_iterator, an ifstream loop or libc++'s
   `std::filesystem::copy_file` (fstreams, a few KB a call on Emscripten) takes a 64 MB ROM there in ~65,000 round

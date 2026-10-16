@@ -106,8 +106,10 @@ states, the TLB-mapped pages and the heap, tail calls, sound, render to RAM and 
 sections and how they are recorded, Firefox's fixes.
 
 `amazingalek/wave-race-64-recomp-web` is Wave Race 64: Recompiled. Fast3D draws as it does natively, with no rt64-web
-change. Its water renderer's 16 shaders are included as WGSL blobs, and its list is in 13 sections, the menus passed
-with page_driver's `pressUntil` and the gas held with its `down`/`up`. Its docs/BUILDING.md (The web page) and the
+change. Its water renderer's 16 shaders are included as WGSL blobs. Its water patch is the web-patched tree's diff, so
+an rt64-web change beside its lines (rt64 179adb8) stops `git apply` and the patch is made again (applied with fuzz,
+then diffed). Its list is in 13 sections, the menus passed with page_driver's `pressUntil` and the gas held with
+its `down`/`up`. Its docs/BUILDING.md (The web page) and the
 headers of `tools/web_patch.sh`, `tools/patch_rt64_water.py`, `recomp/wr64.toml`, `tools/autopilot.js` and
 `src/rt64_shaders.txt` have the rest: how the submodules are patched (apply.cmake, the port's own scripts, the water
 patch), the microcode labels it ignores, render to RAM off and why, the shader list and how it was recorded, plays.
@@ -170,9 +172,15 @@ saved before graphics config version 6 to Display once). In play it interpolated
 rt64 179adb8: the game draws its shadows' render targets in a display list of its own before each frame's, which RT64
 took for a frame, so the frame after it matched nothing and was never interpolated, and its frames take 2 and 3 VIs on a
 page, which upstream's original rate needs equal. With it the plan uncapped presents ~274 a second in Chrome 155 and
-~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070), but in Firefox its levels lose ~14% of their sound
-uncapped, against ~4% before: each game frame waits for its exact copy to RAM, which probably waits behind the
-interpolated frames' work on the page's thread (not measured yet). Its BUILDING.md and the headers of
+~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070). Its scheduler starts an audio task only once the
+graphics task has left the RSP, and the RSP's completion came once RT64 had drawn the list and copied it to RAM, behind
+the interpolated frames' work: over the plan Firefox 158 lost ~259,000 sound frames at the display's rate and 25-27% of
+them uncapped. The page sends the RSP's completion at the list's last full sync, and the RDP's once the list is drawn,
+which needed N64ModernRuntime 66539ab: the game leaves a controller message blocked for good, and the RDP's completion,
+alone now, waited behind it for the next retrace. With the RSP's completion moved, Firefox lost 0-28,000 at the display's
+rate; with the held list too, headless Chrome 155 uncapped 0-200 against 13,000-27,000, and Firefox uncapped 2% against
+25-27% (7-8% in test builds that traced each frame), the game thread still waiting ~40 ms a game frame for the RDP's completion, whose exact copy waits behind the
+interpolated frames there. Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how the
 base and its patches are built into a page, the recompile without call tracking, render to RAM kept exact and why, the
 game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
@@ -180,7 +188,11 @@ its survey.
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
 `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
-before the web's, so `pins.txt` has no row for it: `publish_pages.sh`'s build is what checks a tag against it. It always
+before the web's, so `pins.txt` has no row for it: `publish_pages.sh`'s build is what checks a tag against it. Where
+both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
+frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
+reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). rt64-web 0a9fcb6 keeps the web's
+lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
 plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's default, holds RT64 at Original
 and 30, and the page has no overlay to pick a profile), with its Match display passed on as RT64's Display, since SDL's
 Emscripten port reports no refresh rate. `record_shaders.mjs --from` goes on with a recording of its list stopped

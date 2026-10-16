@@ -184,6 +184,9 @@ RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's cop
                        gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
                        155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
 rt64 179adb8           RT64_OFFSCREEN_WORKLOADS and RT64_UNEVEN_FRAME_RATES: Jet Force Gemini's page interpolates
+plume db27484          a prebuilt decal draws in the pass that writes depth (depth32float-stencil8, where the adapter has
+rt64 0560318           it), its depth bounds drawn twice through the stencil, not in a pass of its own: Banjo-Tooie's
+                       58.2 passes a present 4.7, Firefox 158 uncapped 117-121 → 189-206
 plume 795cadf, 2950009 on WebGPU the ubershader's pipelines built behind the launcher; a build matching one in flight
 rt64 977ddca           waits for it
 RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
@@ -193,4 +196,11 @@ RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the byt
                        uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
                        second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 87-138 ms;
                        headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
+N64ModernRuntime       ULTRAMODERN_HOLD_BLOCKED_MESSAGES: an external message sent to a full queue and to be sent again
+66539ab, 39fa01e,      waits in a list of its own, tried first at the next OS call or idle wait, not put back into the
+ed4a797, f8e03f5       queue the idle thread took it from again at once and spun on (~12 million times a second) while
+                       the messages behind it waited for a game thread's OS call. Jet Force Gemini leaves a controller
+                       message blocked for good, and with its RSP completion sent at the list's last full sync its RDP
+                       completion waited for the next retrace: 4-6 retraces a game frame, 2 with the list (headless
+                       Chrome 155 uncapped, 3840x2000, its plan: 31,926 sound frames short → 0)
 ```
