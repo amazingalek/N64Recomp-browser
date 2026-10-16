@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web f313d0c47ea16b7f28026c6e8606d126e20b0d7c
+rt64: https://github.com/amazingalek/rt64-web 0a9fcb613513dbce88fee1fc44e17901bcae0553
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -710,7 +710,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..80367d1 100644
+index 785de27..6caea4c 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -762,18 +762,9 @@ index 785de27..80367d1 100644
          for (uint32_t creationAttempt = 0; (creationAttempt < CreationAttempts) && (device == nullptr); creationAttempt++) {
  #       ifdef _WIN64
              if (creationAttempt == 1) {
-@@ -316,7 +336,7 @@ namespace RT64 {
-         // Create the swap chain with the texture count specified from the configuration.
-         RenderSwapChainDesc swapChainDesc;
-         swapChainDesc.renderWindow = appWindow->windowHandle;
--        swapChainDesc.format = RenderFormat::B8G8R8A8_UNORM;
-+        swapChainDesc.format = device->getCapabilities().preferredSwapChainFormat;
-         swapChainDesc.textureCount = (userConfig.displayBuffering == UserConfiguration::DisplayBuffering::Triple) ? 3 : 2;
- 
-         // Enable present wait if supported by the device. We specify a max latency of 1 as we use it to wait right before the next
-@@ -333,6 +353,14 @@ namespace RT64 {
- 
-         swapChain = presentGraphicsWorker->commandQueue->createSwapChain(swapChainDesc);
+@@ -294,6 +314,14 @@ namespace RT64 {
+             break;
+         }
  
 +#   if defined(RT64_WGSL)
 +        // A depth target with a stencil, for the prebuilt decals (RasterShader::createPipeline()), where the device has
@@ -783,9 +774,18 @@ index 785de27..80367d1 100644
 +        }
 +#   endif
 +
-         // Before configuring multisampling, make sure the device actually supports it for the formats we'll use. If it doesn't, turn off antialiasing in the configuration.
-         const RenderSampleCounts colorSampleCounts = device->getSampleCountsSupported(RenderTarget::colorBufferFormat(usesHDR));
-         const RenderSampleCounts depthSampleCounts = device->getSampleCountsSupported(RenderTarget::depthBufferFormat());
+         // Call the init hook if one was attached.
+         RenderHookInit *initHook = GetRenderHookInit();
+         if (initHook != nullptr) {
+@@ -316,7 +344,7 @@ namespace RT64 {
+         // Create the swap chain with the texture count specified from the configuration.
+         RenderSwapChainDesc swapChainDesc;
+         swapChainDesc.renderWindow = appWindow->windowHandle;
+-        swapChainDesc.format = RenderFormat::B8G8R8A8_UNORM;
++        swapChainDesc.format = device->getCapabilities().preferredSwapChainFormat;
+         swapChainDesc.textureCount = (userConfig.displayBuffering == UserConfiguration::DisplayBuffering::Triple) ? 3 : 2;
+ 
+         // Enable present wait if supported by the device. We specify a max latency of 1 as we use it to wait right before the next
 @@ -350,7 +378,14 @@ namespace RT64 {
          // Create the shader caches.
          // Estimate the amount of shader compiler threads by trying to use about half of the system's available threads.

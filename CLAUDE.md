@@ -1132,9 +1132,11 @@ runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build
 `dependencies.lock.json` pins (rt64 at Banjo's commit, N64ModernRuntime ae1ffbb), applies DKR-R's own patches to them
 and then `apply.cmake` project by project; where the two change the same lines, `apply.cmake` leaves those files out
 and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's, and `patches/web/stage/` writes
-DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. rt64-web fced886 keeps the web's lines off those
+DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. rt64-web 0a9fcb6 keeps the web's lines off those
 DKR-R's and Jet Force Gemini's patches change (where `fullSync()` ends, `submitRasterScene()`'s RasterParams, the raster
-shader cache's first includes), as 03b9dcc and d5121c9 do for Conker's: their builds stop on a web line there. It patches from clean whenever `lib/N64Recomp-browser`
+shader cache's first includes, the application's
+lines after it creates the swap chain) and leaves RasterParams' `padding0` its name, which their base's SSAO shader reads, as
+03b9dcc and d5121c9 do for Conker's: their builds stop on a web line there. It patches from clean whenever `lib/N64Recomp-browser`
 or `patches/` moved (`build/web-patched`). Its checkouts carry DKR-R's patches before the web's, so `pins.txt` has no
 row for it: `publish_pages.sh`'s build is what checks a tag against it. The page has a launcher of its own
 (`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
