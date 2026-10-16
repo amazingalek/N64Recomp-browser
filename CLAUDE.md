@@ -576,6 +576,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- On a desktop GPU a page is played uncapped (`--uncapped`, as the retest and the stand-in are): capped, every page
+  and every build reads about 60 there (or Chrome's frames with no display, below), which tells none apart. A run at
+  the display's rate is for what uncapped switches off: RT64's pacing, the presents-in-flight cap and how late the
+  done callbacks come back (`?present-stats`), which held a laptop's Firefox at 20-30, and so a laptop's own runs,
+  played that way and on screen as a player's visit is (The games table).
 - Chrome on Windows times its animation frames by the display's vblank (DXGI's `WaitForVBlank` on the primary
   output). With no display to give one, a monitor switched off, that call fails at once (`DXGI_ERROR_INVALID_CALL`)
   and Chrome sleeps between frames instead, 17 ms and then up to a tick of the system timer: 17.9 ms at a 1 ms timer
