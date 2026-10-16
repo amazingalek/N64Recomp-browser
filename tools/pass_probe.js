@@ -115,7 +115,7 @@
     const depth = descriptor.depthStencilAttachment;
     const depthTexture = depth ? viewTexture.get(depth.view) : null;
     const formats = colorTextures.map((t) => t?.format ?? '?');
-    if (depthTexture) formats.push(depthTexture.format);
+    if (depthTexture) formats.push(depthTexture.format + (depth.depthReadOnly ? ' read-only' : ''));
     const clears = colors.some((a) => a.loadOp === 'clear') ? ' clear' : '';
     const record = { kind: `${size(colorTextures[0] ?? depthTexture)} ${formats.join('+')}${clears}`, work: 0, ns: null };
     const pass = original.call(this, begin(this, descriptor, record));
