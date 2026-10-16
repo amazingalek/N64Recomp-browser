@@ -346,8 +346,8 @@ rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only 
                        shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
                        only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
                        in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
-plume 88c6f6e, 14ab63a where pipelines build in the background (Chrome), setup ends with a list that draws a rect with the
-rt64 9dca70e           ubershader and none of its triangles (State::warmUpPipelines): plume resolves the layout of a draw
+plume 795cadf, 2950009 where pipelines build in the background (Chrome), setup ends with a list that draws a rect with the
+rt64 977ddca           ubershader and none of its triangles (State::warmUpPipelines): plume resolves the layout of a draw
                        of nothing and builds what waits for it, so the ubershader states and the prebuilt list build
                        behind the launcher, not in line on Chrome's GPU main thread at the game's first frame (Banjo's
                        page held 2.1 s after Start, Rush 2049's 1.4); and a background build whose shaders, constants
@@ -674,7 +674,7 @@ rt64 0034023), in every browser and on every adapter (rt64 bfe07cb).
   specializer reads no further. A game with many levels has a section a level or an area (GoldenEye, Majora's Mask,
   Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64, Mario Kart 64).
 - In Chrome the whole list is built behind the launcher and the game from the draw of nothing at setup (rt64
-  9dca70e; before it, from the game's first draw), and a frame that wants 4 or more unbuilt
+  977ddca; before it, from the game's first draw), and a frame that wants 4 or more unbuilt
   shaders of a section holds the game, for those, under the "Preparing graphics" indicator (rt64 950188f). Firefox
   builds nothing behind the game, so it waits for a list's boot before the first frame and for a section when the game
   gets there. A shader the list misses is built behind the game, and the page remembers it (`localStorage`) and builds
@@ -1190,7 +1190,7 @@ changing it:
   shaders' modules at setup (713 KB, ~0.7 s each), which hold the launcher's first presents ~1.4 s. The ubershader
   states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
   Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
-  9dca70e), one first and the rest from its compiled shader (plume 14ab63a): Chrome compiles a pipeline's shaders on
+  977ddca), one first and the rest from its compiled shader (plume 2950009): Chrome compiles a pipeline's shaders on
   its own for each, on its worker threads, and 8 at once beside the prebuilt list took every core for ~2 s and held
   the presents as long, though no task on the GPU process's main thread ran over 80 ms (a Perfetto trace,
   `--trace-startup`). The longest present gap after Load ROM, outside the boot and shader waits, against v0.51.0
