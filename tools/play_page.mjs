@@ -30,7 +30,7 @@
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
 //   {
-//     "page": "index.html",            the page, in the build dir or under the URL
+//     "page": "index.html",            the page, in the build dir or under the URL ("": its index.html)
 //     "load": [steps],                 first: e.g. wait for the launcher
 //     "setup": [steps],                then, if the profile is new: load the ROM
 //     "start": [steps],                then: e.g. press Start Game
