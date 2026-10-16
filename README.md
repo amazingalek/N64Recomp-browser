@@ -320,9 +320,11 @@ amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU
                                                                   offscreen pass in a display list of its own
                                                                   and frames of uneven VIs too) and paced
                                                                   evenly when the GPU falls behind, a game's
-                                                                  shaders specialized at build time; tile
-                                                                  copies reused from list to list (with render
-                                                                  to RAM off, each one was a new texture)
+                                                                  shaders specialized at build time, their
+                                                                  decals drawn without ending the render pass
+                                                                  (a depth test and the stencil); tile copies
+                                                                  reused from list to list (with render to RAM
+                                                                  off, each one was a new texture)
 amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU rounding mode on wasm; funcs.h
                                                                   declares every function the C calls; a mod
                                                                   recompiled to C ahead of time; functions a mod

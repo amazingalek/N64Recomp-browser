@@ -346,6 +346,14 @@ rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only 
                        shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
                        only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
                        in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
+plume db27484          a prebuilt decal draws in the pass that writes depth: with depth32float-stencil8 (an optional
+rt64 0560318           feature, asked for where the adapter has it) the depth target has a stencil, and the decal's pixel
+                       shader writes the bounds of the surface depths its check passes as its depth, drawn twice (the
+                       high bound marks the stencil, the low one draws where it's marked and clears it), where it read
+                       the depth in a pass of its own: Banjo-Tooie ended and began its pass ~25 times a frame, 58.2
+                       passes a present, each 25-70 us of Firefox's GPU process; 4.7 after, and uncapped 117-121 →
+                       189-206 presents a second in Firefox 158, 332 → 357 (the ceiling) in Chrome 155 (3840x2000, RTX
+                       2070); a decal the list missed, or a device without the feature, ends the pass as before
 ```
 
 Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -1273,7 +1281,11 @@ changing it:
   process spent 47% less CPU on GoldenEye's. Stripping their indentation measured nothing. Checked with the adapter
   reported as Intel to the page (a CDP script overriding `GPUAdapter.prototype.info`): they build, and the game draws.
 - WebGPU checks a storage texture's format and access against every binding a shader declares, and a render pass's
-  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass.
+  usage against every bound set, so a texture can't be sampled by a set and drawn into by the same pass. A pass can
+  sample its own depth target only if it is read-only, so each decal that RT64 draws reading the depth (the ubershader,
+  one specialized at run time) after a draw that wrote it ends the pass and begins another. Firefox's GPU process pays
+  25-70 us a pass and Chrome's ~7, so a game that does it often costs Firefox far more a present (Banjo-Tooie's 58 passes
+  a present, rt64 0560318).
 - RT64's render to RAM (on by default) draws each frame a second time at the N64's resolution and reads it back
   into RDRAM. In Chrome that readback makes the list wait 5-6 ms for the GPU process whatever its size (Rush 2049's
   CLAUDE.md, Step 2, has the measurements), so a game that never reads its frames on the CPU turns it off
