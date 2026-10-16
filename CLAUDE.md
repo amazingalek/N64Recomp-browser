@@ -500,6 +500,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
+- Headless Chrome's own frames come every 16.7 ms on some runs and every 18 ms (~56 a second) on others, for every page
+  alike, and a whole night's runs can sit at either: at 1256x645 a page then reads 55.6 presents a second against its
+  earlier 59.6, a gap between presents of 18 ms at the median, and `play_page.mjs` flags it. The page Pages serves,
+  played just before the new build in the same conditions (`--note` it), tells the browser from the build: on
+  2026-10-16 both read 54.8-55.6 in four games while the builds drew 150-346 uncapped.
 - A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
   (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
   them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
