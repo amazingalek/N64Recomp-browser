@@ -172,9 +172,15 @@ saved before graphics config version 6 to Display once). In play it interpolated
 rt64 179adb8: the game draws its shadows' render targets in a display list of its own before each frame's, which RT64
 took for a frame, so the frame after it matched nothing and was never interpolated, and its frames take 2 and 3 VIs on a
 page, which upstream's original rate needs equal. With it the plan uncapped presents ~274 a second in Chrome 155 and
-~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070), but in Firefox its levels lose ~14% of their sound
-uncapped, against ~4% before: each game frame waits for its exact copy to RAM, which probably waits behind the
-interpolated frames' work on the page's thread (not measured yet). Its BUILDING.md and the headers of
+~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070). Its scheduler starts an audio task only once the
+graphics task has left the RSP, and the RSP's completion came once RT64 had drawn the list and copied it to RAM, behind
+the interpolated frames' work: over the plan Firefox 158 lost ~259,000 sound frames at the display's rate and 25-27% of
+them uncapped. The page sends the RSP's completion at the list's last full sync, and the RDP's once the list is drawn,
+which needed N64ModernRuntime 66539ab: the game leaves a controller message blocked for good, and the RDP's completion,
+alone now, waited behind it for the next retrace. With the RSP's completion moved, Firefox lost 0-28,000 at the display's
+rate; with the held list too, headless Chrome 155 uncapped none against 13,000-27,000, and Firefox uncapped 7-8% against
+25-27%, the game thread still waiting ~40 ms a game frame for the RDP's completion, whose exact copy waits behind the
+interpolated frames there. Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how the
 base and its patches are built into a page, the recompile without call tracking, render to RAM kept exact and why, the
 game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
