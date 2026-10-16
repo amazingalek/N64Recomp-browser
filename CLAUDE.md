@@ -59,6 +59,12 @@ branches only: upstream's other branches, which a new fork copies, are deleted w
 - A game fork of an existing recomp is that recomp plus web support and nothing else, so its diff against upstream is
   exactly what the page needs: no new features (mouse aim, controls, enhancements) and no fix the page doesn't need.
   A request for one is answered that way, not filed against the fork.
+- Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and its
+  resolution Auto by default, in every game fork and every new port, whatever its recomp's desktop build defaults to
+  (the README, The recomp's own code). That is web support, not a feature: the pages are measured by what they can
+  present (`?uncapped`, The games table), and a page held to its game's own rate reads that rate however much a change
+  costs or saves (DKR-R's page 29.8-30.0 uncapped, Jet Force Gemini's 19-22, on Original), so a page that shows its
+  game's own 20 or 30 because of a default is a bug in that page.
 - Never open a PR, issue or discussion upstream at rt64, plume, N64Recomp, N64ModernRuntime, RecompFrontend,
   BanjoRecomp, Zelda64Recomp or Donkey-Kong-64-Recompiled: their CONTRIBUTING.md asks for no LLM-written code
   (plume's, no AI-made contribution and no AI talking to its maintainers). The forks stay forks. Each one's README opens
@@ -305,9 +311,9 @@ plume 54b3be7          where pipelines build in the background (Chrome), one mad
 rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slot one period after the last one's, not
                        the moment that one went out (a present a period late or more starts the slots again): the
                        sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
-                       the pages of games below the display's rate presented 55.6 a second in Chrome on some nights
-                       and 51-55 on a laptop's Intel UHD, where games at its rate, which never sleep there, presented
-                       60. Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       the pages of games below the display's rate presented 51-55 a second on a laptop's Intel UHD,
+                       where games at its rate, which never sleep there, presented 60 (Chrome's 55.6 on a desktop is
+                       its frames with no display, Playing a page). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
                        Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
                        it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
 rt64 254dee3           a framebuffer the CPU changed counted on the CPU (copyFromRAM, against a copy of the last upload
@@ -373,8 +379,10 @@ script), so commit to a fork from a separate clone of it:
    and still apply to every recomp's commits in `patches/pins.txt`; one that stops applying means the fork has to
    change.
 4. Before it merges, build a page on the branch and play it (Playing a page): a game fork's checkout with its
-   N64Recomp-browser at the branch's commit. Once it has merged, tag main `v0.<n+1>.0` and push the tag (a tag is a
-   release: a recomp checks this repo out at one). The pins move in the next retest (The pins).
+   N64Recomp-browser at the branch's commit. Once it has merged, CI tags main `v0.<n+1>.0` itself when its jobs pass
+   (ci.yml's `tag` job, for a merge that changes `forks.txt`, `patches/`, `frontend/` or `renderer/`): a tag is a
+   release, a recomp checks this repo out at one, and the retest builds the newest. Check that the tag came (`git
+   ls-remote --tags origin`). The pins move in the next retest (The pins).
 
 **The pins.** A change reaches the builds whose code it changes. A change to what a page runs (a fork, or anything
 here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
@@ -579,11 +587,25 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
-- Before rt64 c89ced0 a page whose game runs below the display's rate read 55.6 presents a second on some nights in
-  Chrome (a present every 18 ms) and 59.6 on others, every such page alike, while Pilotwings 64, a game at 60, read
-  60.0: RT64 timed each interpolated frame from when the last one went out, so the host's timer and the page's
-  thread set the rate, not the page. The page Pages serves, played just before a new build in the same conditions
-  (`--note` it), still tells the host from the build.
+- On a desktop GPU a page is played uncapped (`--uncapped`, as the retest and the stand-in are): capped, every page
+  and every build reads about 60 there (or Chrome's frames with no display, below), which tells none apart. A run at
+  the display's rate is for what uncapped switches off: RT64's pacing, the presents-in-flight cap and how late the
+  done callbacks come back (`?present-stats`), which held a laptop's Firefox at 20-30, and so a laptop's own runs,
+  played that way and on screen as a player's visit is (The games table).
+- Chrome on Windows times its animation frames by the display's vblank (DXGI's `WaitForVBlank` on the primary
+  output). With no display to give one, a monitor switched off, that call fails at once (`DXGI_ERROR_INVALID_CALL`)
+  and Chrome sleeps between frames instead, 17 ms and then up to a tick of the system timer: 17.9 ms at a 1 ms timer
+  resolution (55.6 frames a second), 17.4 at 0.5, on a blank page as on a game's, headless or in a window. plume reads
+  the display's rate from those frames, so then every page whose game runs below 60 presents ~55.6, and Pilotwings 64
+  and Rush 2049, games at 60, present 60. That was the 55.6 of 8 of the 11 pages in the v0.50.0 retest (frames
+  every 17.9 ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hour of 2026-10-16's
+  morning, frames every 16.7 ms) and 55.3-56.0 again once it wasn't: the 55.6 → 60.0 once put down to c89ced0 was
+  the display. Nor did c89ced0 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against
+  v0.50.0's 330 (headless Chrome 155, 3840x2000, both served from one port, interleaved).
+  play_page.mjs records the browser's animation frames a second beside the presents, and leaves presents out of its
+  comparison for a run at the display's rate with fewer than 57. Firefox times its frames itself and drew ~60 either
+  way. The page Pages serves, played just before a new build in the same conditions (`--note` it), still tells the
+  host from the build.
 - Firefox on Windows ends every timed wait on a page's thread on the system timer's tick, 15.6 ms at the default
   resolution, but a desktop's Firefox often runs at a finer one that another program asked for, and plays faster
   than a laptop's. `tools/timer_tick.c` (its header says how to link it into a test build) stretches each timed wait
@@ -598,15 +620,15 @@ changes. Keep it current in the same work as what changes it, like the README:
 ## Frame rates
 
 - Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
-  setting, Display by default in every game but Diddy Kong Racing and Jet Force Gemini, interpolates between the
+  setting, Display by default on every page (the README, The recomp's own code: a game fork or a new port whose recomp
+  defaults to Original sets it with Emscripten, DKR-R's page plays its Modern profile), interpolates between the
   game's frames to the display's rate, each interpolated frame a full redraw, so a page presents 60 a second on a
   60 Hz display (144 on a 144 Hz one) whatever the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
   RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
 - The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
-  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
-  which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
-  it), Jet Force Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default, which
-  RT64 draws at its base's Original: no interpolation; 20 on a page, The game forks), and the other seven their
+  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, the desktop's
+  default, holds RT64 at Original; its Modern profile interpolates, and the page plays Modern), Jet Force Gemini 30
+  dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page, The game forks), and the other seven their
   cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
   races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
@@ -1067,13 +1089,17 @@ hung for 11 retraces and stopped on its debug screen, so a hook of the page's st
 recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
-page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). It plays
-at 20 frames a second all the same, its game's own rate, not RT64's (the cells' †): the base's Framerate is Original by
-default, so RT64 interpolates nothing, and the game's own Frame Rate setting is Original too, 30 dropping to 20 when a
-frame runs long, which every frame does on the page: the game sends two display lists a frame, each 10-12 ms in RT64
-with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The
-early release took the sound short over its play plan (the first room of every planet in 160 s, headless Chrome 155)
-from 250,000-300,000 frames to 13,000-14,000.
+page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). Its game
+runs at 20 frames a second on the page: its own Frame Rate setting is Original, 30 dropping to 20 when a frame runs
+long, which every frame does there: the game sends two display lists a frame, each 10-12 ms in RT64 with the exact
+copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The early release took
+the sound short over its play plan (the first room of every planet in 160 s, headless Chrome 155) from
+250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display (`patches/web/dkr.patch` sets the base's
+`rr_default`, Original, to Display with Emscripten, and moves a page's settings saved before graphics config version 6
+to Display once), so RT64 interpolates through Skip Buffering, which `jfg-base.patch` switches on for it: RT64
+interpolates only while the frame on screen is the one the last workload drew. It does in the menus in both browsers
+and in play in Firefox, part of the time, but Chrome in play presents the game's 20, headless and headed (no pacing
+line: RT64 isn't interpolating there; not explained yet).
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
@@ -1086,15 +1112,19 @@ row for it: `publish_pages.sh`'s build is what checks a tag against it. The page
 (`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
 page opened behind another window never gets the focus event), render to RAM off (the CPU reads a frame only to hold
 the last one on screen while a level unloads) and the frontend's fixed 1536 MB heap (with growth on, it never grew past
-that through the list's recording and 27 maps in one visit). It presents the game's 30 (Frame rates), uncapped too.
+that through the list's recording and 27 maps in one visit). It always plays DKR-R's Modern profile, the only one that
+interpolates (Accurate, the desktop's default, holds RT64 at Original and 30, and the page has no overlay to pick a
+profile), with its Match display passed on as RT64's Display, since SDL's Emscripten port reports no refresh rate.
 Its list, `web/rt64_shaders.txt`, 107 descriptions (134 stages, 1.5 MB of WGSL) in 12 sections (the boot 23: logos and
 title; then the title's demo, the menus, Timber's Island, a section a world with its hub, races, battle and boss races,
 Future Fun Land, Wizpig's races, the trophy podium, a race's results), is recorded by code, a page load a map, the
 loads of a world merged into its section (`record_shaders.mjs`): `web/shader_survey.js` takes the game to a map through
 its own teleport and steers the player's kart toward each checkpoint, the turn's sign read from the kart's motion. The
 game's AI can't drive the player's kart: DKR-R's display list check then rejects every frame. A recording takes ~50
-minutes, and `record_shaders.mjs --from` goes on with one stopped partway. Its `web/play_plan.json` plays the title,
-the menus, Timber's Island and a Dino Domain race.
+minutes, and `record_shaders.mjs --from` goes on with one stopped partway. It was recorded in Accurate; in Modern,
+recorded with `?record-shaders` over the title, the menus, Timber's Island and Dino Domain, the game asked for 119
+descriptions, all in it but one, which differs from one in it only by the culling bit. Its `web/play_plan.json` plays
+the title, the menus, Timber's Island and a Dino Domain race.
 
 ## WebGPU in Chrome and Firefox
 
