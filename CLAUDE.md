@@ -331,10 +331,26 @@ N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK b
                        page, for no more presents); Conker's page under a stand-in for the tick
                        (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
                        25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
+N64ModernRuntime       on a page read_file reads in 4 MB pieces: an ifstream's reads were ~1 KB each, every one proxied
+b79d63b                to the page's thread, 65,624 for Conker's 64 MB ROM, which held its presents ~0.5 s at Load ROM
+RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's copy, hash and write) run on a thread of their
+                       own, not the launcher's drawing thread, and persistent_home.js stores a file of 1 MB or more from a
+                       worker (IndexedDB's put serialized 64 MB in ~120 ms on the page's thread): the launcher's present
+                       gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
+                       155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
+rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only to framebuffers the VI hasn't shown is a
+                       pass of the next list's frame, not a frame, and the queue holds six workloads, so the game can
+                       queue its next pass and frame while the frame before the pass is kept; RT64_UNEVEN_FRAME_RATES:
+                       frames whose VIs differ, the slowest at most twice the fastest, interpolated at the fastest's
+                       rate (upstream gave no rate unless the last three were equal). Jet Force Gemini draws its
+                       shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
+                       only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
+                       in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
 ```
 
-Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
-too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
+Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
+too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64
+179adb8) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
 
 ## What this repo adds besides the forks
 
@@ -348,6 +364,7 @@ thread (a mod that fails to load) into a console error instead of an exception t
 `thread_stdio.js`, which prints a thread's stdout and stderr from that thread: Emscripten proxies every write to the
 page's thread, WebGPU's, and waits, so each line held its thread for up to a frame (Banjo-Tooie's upstream logs ~100
 lines a second: its title screen's sound was 12,900-13,400 frames short of ~2.1 million before, 235-1,325 with it);
+`persistent_home.js`, HOME kept in IndexedDB, a file of 1 MB or more (a ROM) stored from a worker off the page's thread;
 `frontend/build_speed.cmake` (ccache) and `N64RECOMP_BROWSER_FAST_LINK` (Building with Emscripten); a page's link
 that fails on any wasm-ld warning (`--fatal-warnings`: a call whose signature doesn't match the function's links as a
 trap) and takes a game's own `-sINITIAL_MEMORY`, stack sizes and thread pool over `frontend/`'s;
@@ -1092,9 +1109,13 @@ the sound short over its play plan (the first room of every planet in 160 s, hea
 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display (`patches/web/dkr.patch` sets the base's
 `rr_default`, Original, to Display with Emscripten, and moves a page's settings saved before graphics config version 6
 to Display once), so RT64 interpolates through Skip Buffering, which `jfg-base.patch` switches on for it: RT64
-interpolates only while the frame on screen is the one the last workload drew. It does in the menus in both browsers
-and in play in Firefox, part of the time, but Chrome in play presents the game's 20, headless and headed (no pacing
-line: RT64 isn't interpolating there; not explained yet).
+interpolates only while the frame on screen is the one the last workload drew. In play it interpolated only now and
+then, in Firefox, until rt64 179adb8: the game draws its shadows' render targets in a display list of its own before
+each frame's, which RT64 took for a frame, so the frame after it matched nothing and was never interpolated, and its
+frames take 2 and 3 VIs on a page, which upstream's original rate needs equal. With it the plan uncapped presents
+~274 a second in Chrome 155 and ~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070), but in Firefox
+its levels lose ~14% of their sound uncapped, against ~4% before: each game frame waits for its exact copy to RAM,
+which probably waits behind the interpolated frames' work on the page's thread (not measured yet).
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
@@ -1298,6 +1319,12 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   stack minutes in without it.
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
   runs one game thread at a time and delivers interrupts only inside OS calls (GoldenEye, The game forks).
+- A page's files are in the page's thread's file system, and every file call from another thread waits for that
+  thread, which presents nothing meanwhile. An istreambuf_iterator, an ifstream loop or libc++'s
+  `std::filesystem::copy_file` (fstreams, a few KB a call on Emscripten) takes a 64 MB ROM there in ~65,000 round
+  trips: Conker's ROM-version check held its launcher 0.85 s in Chrome and 2.3 s in Firefox. Read a large file with
+  `read()` in 4 MB pieces and write it in one call, behind `__EMSCRIPTEN__` (N64ModernRuntime-web b79d63b,
+  CBFD-Recompiled-web 8de429c).
 - Emscripten's SDL2 port opens audio on the page's thread except one line that reads the audio context's rate on the
   calling thread, which fails from a pthread: `frontend/sdl_audio.js` works around it. It also plays on the page's
   thread, a ScriptProcessorNode taking 256 frames (5 ms) at a time, and the main thread is WebGPU's: in headless Chrome
