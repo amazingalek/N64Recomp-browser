@@ -463,6 +463,14 @@ changes. Keep it current in the same work as what changes it, like the README:
   Firefox headless has no WebGPU adapter. Such a window has no focus, so keys and clicks are dispatched from script,
   the ROM is sent to the page in pieces, and the viewport is set to one CSS pixel a pixel in both browsers, since the
   canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`).
+- Every game's `tools/play_plan.json` reaches a level the way a player does and plays it for a minute or more: the
+  menus where they are quick, the survey's warp or stage start where they aren't (each header says which). A plan's
+  walk goes out and back by as much each way, swaying about a spot away from the entrance: a blind walk in one
+  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance,
+  and the game's fade or respawn can end the plan on a black screen. Banjo-Tooie's plan, 2.5 s on W a world, ended
+  black in all three of a laptop's runs, 3.5 s after Cauldron Keep's walk, where the page draws the keep in both
+  browsers at every size tried; in Firefox the same walk carried Banjo off Cloud Cuckooland's island. A plan that ends
+  on black is the plan until a direct warp to that place draws black too.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
@@ -683,7 +691,11 @@ Conker's boot 7.2 s and Windy 11.2 s, then about 60 presents a second.
 patches their checkouts (a step before N64Recomp is built from them, and again when CMake configures): the web support
 without the forks as submodules. Built that way the page boots to the intro in headless Chrome, its 111 prebuilt
 pipelines built in 4.8 s cold. Its runtime is older than the forks', so `recomp::start` takes upstream Banjo's
-arguments, not a `recomp::Configuration`. It has no externs header. What porting it found is in this README.
+arguments, not a `recomp::Configuration`. It has no externs header. What porting it found is in this README. Start
+skips a new game's opening only once a save file isn't empty, so on a fresh profile its play plan reaches Spiral
+Mountain and Mumbo's Mountain through `tools/warp.js`, which leaves the map change the game's own code requests (the
+struct at 0x8037E8E0, from the decomp; the map is the word at 0x803835D4): about 3 minutes of A through the opening
+reached only the dialogue in Banjo's house.
 
 `amazingalek/Zelda64Recomp-web` is Majora's Mask on upstream's `recomp-frontend` branch (draft PR 722, which moves it
 onto RecompFrontend). Its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's, at the commits
