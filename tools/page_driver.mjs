@@ -14,11 +14,19 @@
 // clicks after replacing a file input's click() with one that sets its files to the ROM, sent to the page in pieces.
 // That works whether the page is served here or comes from elsewhere (GitHub Pages), which can't fetch from here.
 //
-// A step is one of: ["wait", ms], ["until", regex, ms] (a console line), ["click", x, y] (CSS pixels in the
-// viewport), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
+// onScreen puts either browser's window on the desktop instead, maximized, at the desktop's own scale and size, with
+// none of the overrides of one CSS pixel a pixel: as a player's window is, which Windows composites. Off the desktop it
+// never is, and on a laptop's Intel UHD that flattered Firefox: on screen it took ~30 more points of the Intel chip's 3D
+// engine, 3-5 times the GPU process's CPU, and Conker's page fell from 31.5 presents a second to 25.1 with its boot's
+// shader wait doubled (Chrome within 2). Its viewport is then whatever the window leaves the page (1920x889 for a
+// --size of 1920x945 there), which is why clicks follow the viewport, below.
+//
+// A step is one of: ["wait", ms], ["until", regex, ms] (a console line), ["click", x, y] (CSS pixels in a 1256x645
+// viewport, moved to where recompui puts the same spot in the viewport the page has at the time: it lays its launcher
+// and menus out by the viewport's height, about the centre), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
 // ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
 // n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
-// ["rom", x, y] (clicks there and gives the page the ROM), ["shot", file] (a screenshot of the page) and
+// ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM), ["shot", file] (a screenshot of the page) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
 // JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
 // press while it animates, is passed without timing the presses). A tool can add its own (record_shaders.mjs's
@@ -100,9 +108,9 @@ const rdramHelpers = `(() => {
 // as the browser can make them, not at the display's rate: Chrome with --disable-frame-rate-limit, Firefox with
 // layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how). cpuThrottle
 // (Chrome only) slows the page's thread that many times (CDP Emulation.setCPUThrottlingRate), a stand-in for a
-// laptop's CPU.
+// laptop's CPU. onScreen (above) leaves size to the window.
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, uncapped = false, cpuThrottle = 0, onLine = () => {}, log = console.log }) => {
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
@@ -110,11 +118,18 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
   if (cpuThrottle && browser !== 'chrome') throw new Error('cpuThrottle is Chrome\'s only');
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, uncapped, cpuThrottle, line });
-  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, uncapped, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line });
+  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
   page.profile = profile;
+  page.viewport = () => page.evaluate('[innerWidth, innerHeight, devicePixelRatio]');
+  // A plan's x and y, in 1256x645, in the viewport the page has now.
+  const place = async (x, y) => {
+    const [w, h] = await page.viewport();
+    const scale = h / 645;
+    return [Math.round(w / 2 + (x - 628) * scale), Math.round(h / 2 + (y - 322.5) * scale)];
+  };
   page.run = async (steps, extra = {}) => {
     for (const [op, ...a] of steps) {
       if (extra[op]) await extra[op](...a);
@@ -127,7 +142,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
           waiters.add(waiter);
         });
       }
-      else if (op === 'click') await page.click(a[0], a[1]);
+      else if (op === 'click') await page.click(...await place(a[0], a[1]));
       else if (op === 'key') { await page.key('down', a); await page.key('up', a); }
       else if (op === 'hold') { await page.key('down', a); await sleep(a[3]); await page.key('up', a); }
       else if (op === 'down' || op === 'up') await page.key(op, a);
@@ -148,7 +163,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
         try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; }
         if (value !== undefined) log(`${op}: ${JSON.stringify(value)}`);
       }
-      else if (op === 'rom') await page.rom(a[0], a[1]);
+      else if (op === 'rom') await page.rom(...await place(a[0], a[1]));
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else throw new Error(`unknown step ${op}`);
     }
@@ -159,18 +174,20 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, uncapped, cpuThrottle, line }) => {
-  // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to.
-  const mode = headed
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line }) => {
+  // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
+  // another window over it would hide it too).
+  const mode = headed || onScreen
     ? ['--disable-features=CalculateNativeWinOcclusion', '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding', '--no-default-browser-check']
     : ['--headless=new'];
   if (uncapped) mode.push('--disable-frame-rate-limit');
-  const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, '--enable-unsafe-webgpu', '--mute-audio',
-    '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--force-device-scale-factor=1',
-    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, `--window-size=${width},${height}`, 'about:blank'],
+  const size = onScreen ? ['--start-maximized'] : ['--force-device-scale-factor=1', `--window-size=${width},${height}`];
+  const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
+    '--no-first-run', '--autoplay-policy=no-user-gesture-required',
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'],
     { stdio: 'ignore' });
-  if (headed && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
+  if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
     line('page_driver: Chrome window not moved');
   }
   let targets = null;
@@ -206,7 +223,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   await send('Runtime.enable');
   await send('Page.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  if (!onScreen) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   if (cpuThrottle > 1) await send('Emulation.setCPUThrottlingRate', { rate: cpuThrottle });
   if (preload) await send('Page.addScriptToEvaluateOnNewDocument', { source: `(${preload})()` });
   const click = async (x, y) => {
@@ -248,11 +265,14 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
 };
 
 // Moves the window of the browser (its exe's name) whose command line names this profile off the desktop, big enough
-// for the viewport.
+// for the viewport, or with no size maximizes it on the desktop.
 // From a DPI-aware process, or a desktop scaled 175% makes it 1.75 times as big.
 const moveWindow = (exe, profile, width, height) => new Promise((resolve) => {
+  const place = width
+    ? `[W.U]::SetWindowPos($w, [IntPtr]::Zero, -${width + 200}, 0, ${width + 100}, ${height + 200}, 0x14)`
+    : '[W.U]::ShowWindow($w, 3)';
   const script = `
-Add-Type -Name U -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr a, int x, int y, int cx, int cy, uint f); [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
+Add-Type -Name U -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr h, System.IntPtr a, int x, int y, int cx, int cy, uint f); [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int c); [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
 [W.U]::SetProcessDPIAware() | Out-Null
 $w = 0
 for ($i = 0; $i -lt 100 -and -not $w; $i++) {
@@ -260,16 +280,17 @@ for ($i = 0; $i -lt 100 -and -not $w; $i++) {
   $w = Get-CimInstance Win32_Process -Filter "Name='${exe}'" | ? { $_.CommandLine -and $_.CommandLine.Contains($env:PAGE_DRIVER_PROFILE) } |
     % { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle } | ? { $_ -and $_ -ne 0 } | Select-Object -First 1
 }
-if ($w) { [W.U]::SetWindowPos($w, [IntPtr]::Zero, -${width + 200}, 0, ${width + 100}, ${height + 200}, 0x14) | Out-Null; 'moved' }`;
+if ($w) { ${place} | Out-Null; 'moved' }`;
   execFile('powershell', ['-NoProfile', '-Command', script], { env: { ...process.env, PAGE_DRIVER_PROFILE: profile } },
     (err, stdout) => resolve(!err && stdout.includes('moved')));
 });
 
-const openFirefox = async ({ profile, port, width, height, executable, rom, preload, uncapped, line }) => {
-  // No first-run pages or crash restore, one CSS pixel a pixel, sound allowed to start without a click but silent.
+const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, line }) => {
+  // No first-run pages or crash restore, one CSS pixel a pixel (but on screen), sound allowed to start without a click
+  // but silent.
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
     'browser.aboutwelcome.enabled': false, 'app.update.auto': false, 'browser.sessionstore.resume_from_crash': false,
-    'dom.webgpu.enabled': true, 'layout.css.devPixelsPerPx': '1.0', 'media.volume_scale': '0.0',
+    'dom.webgpu.enabled': true, 'media.volume_scale': '0.0', ...(onScreen ? {} : { 'layout.css.devPixelsPerPx': '1.0' }),
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? 0 : -1 };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
@@ -287,9 +308,11 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   await send('session.new', { capabilities: {} });
   await send('session.subscribe', { events: ['log.entryAdded'] });
   const context = (await send('browsingContext.getTree', {})).result.contexts[0].context;
-  if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, width, height)) line('page_driver: Firefox window not moved');
-  const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: 1 });
-  if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
+  if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, onScreen ? 0 : width, height)) line('page_driver: Firefox window not moved');
+  if (!onScreen) {
+    const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: 1 });
+    if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
+  }
   if (preload) await send('script.addPreloadScript', { functionDeclaration: preload });
   const evaluate = async (js) => {
     const r = await send('script.evaluate', { expression: asJson(js), target: { context }, awaitPromise: true });
