@@ -588,7 +588,9 @@ changes. Keep it current in the same work as what changes it, like the README:
   the display's rate from those frames, so then every page whose game runs below 60 presents ~55.6, and Pilotwings 64
   and Rush 2049, games at 60, present 60. That was the 55.6 of 8 of the 11 pages in the v0.50.0 retest (frames
   every 17.9 ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hour of 2026-10-16's
-  morning, frames every 16.7 ms) and 55.3-56.0 again once it wasn't: the 55.6 → 60.0 once put down to c89ced0 was the display.
+  morning, frames every 16.7 ms) and 55.3-56.0 again once it wasn't: the 55.6 → 60.0 once put down to c89ced0 was the display. Nor did
+  c89ced0 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against v0.50.0's 330 (headless
+  Chrome 155, 3840x2000, both served from one port, interleaved).
   play_page.mjs records the browser's animation frames a second beside the presents, and leaves presents out of its
   comparison for a run at the display's rate with fewer than 57. Firefox times its frames itself and drew ~60 either
   way. The page Pages serves, played just before a new build in the same conditions (`--note` it), still tells the
