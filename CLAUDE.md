@@ -59,6 +59,12 @@ branches only: upstream's other branches, which a new fork copies, are deleted w
 - A game fork of an existing recomp is that recomp plus web support and nothing else, so its diff against upstream is
   exactly what the page needs: no new features (mouse aim, controls, enhancements) and no fix the page doesn't need.
   A request for one is answered that way, not filed against the fork.
+- Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and its
+  resolution Auto by default, in every game fork and every new port, whatever its recomp's desktop build defaults to
+  (the README, The recomp's own code). That is web support, not a feature: the pages are measured by what they can
+  present (`?uncapped`, The games table), and a page held to its game's own rate reads that rate however much a change
+  costs or saves (DKR-R's page 29.8-30.0 uncapped, Jet Force Gemini's 19-22, on Original), so a page that shows its
+  game's own 20 or 30 because of a default is a bug in that page.
 - Never open a PR, issue or discussion upstream at rt64, plume, N64Recomp, N64ModernRuntime, RecompFrontend,
   BanjoRecomp, Zelda64Recomp or Donkey-Kong-64-Recompiled: their CONTRIBUTING.md asks for no LLM-written code
   (plume's, no AI-made contribution and no AI talking to its maintainers). The forks stay forks. Each one's README opens
@@ -595,15 +601,15 @@ changes. Keep it current in the same work as what changes it, like the README:
 ## Frame rates
 
 - Two rates: the game's own (its logic, input and display lists) and the presents a page makes. RT64's Framerate
-  setting, Display by default in every game but Diddy Kong Racing and Jet Force Gemini, interpolates between the
+  setting, Display by default on every page (the README, The recomp's own code: a game fork or a new port whose recomp
+  defaults to Original sets it with Emscripten, DKR-R's page plays its Modern profile), interpolates between the
   game's frames to the display's rate, each interpolated frame a full redraw, so a page presents 60 a second on a
   60 Hz display (144 on a 144 Hz one) whatever the game runs at. The games table's numbers are those presents; a `†` is a page showing its game's own rate, where
   RT64 paced presents to the game's frames (a GPU falling behind) or doesn't interpolate them.
 - The game's own rate (the game forks' code, 2026-10-15): Rush 2049 60 by default (its Game Frame Rate setting,
-  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, its default,
-  which RT64 draws at Original: no interpolation; its Modern profile interpolates, and a page has no launcher to pick
-  it), Jet Force Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default, which
-  RT64 draws at its base's Original: no interpolation; 20 on a page, The game forks), and the other seven their
+  Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong Racing 30 (DKR-R's Accurate profile, the desktop's
+  default, holds RT64 at Original; its Modern profile interpolates, and the page plays Modern), Jet Force Gemini 30
+  dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page, The game forks), and the other seven their
   cartridge's: Majora's Mask 20,
   Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in
   races, GoldenEye's and Conker's variable. None of the seven has an option to run faster.
@@ -1064,13 +1070,17 @@ hung for 11 retraces and stopped on its debug screen, so a hook of the page's st
 recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
-page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). It plays
-at 20 frames a second all the same, its game's own rate, not RT64's (the cells' †): the base's Framerate is Original by
-default, so RT64 interpolates nothing, and the game's own Frame Rate setting is Original too, 30 dropping to 20 when a
-frame runs long, which every frame does on the page: the game sends two display lists a frame, each 10-12 ms in RT64
-with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The
-early release took the sound short over its play plan (the first room of every planet in 160 s, headless Chrome 155)
-from 250,000-300,000 frames to 13,000-14,000.
+page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). Its game
+runs at 20 frames a second on the page: its own Frame Rate setting is Original, 30 dropping to 20 when a frame runs
+long, which every frame does there: the game sends two display lists a frame, each 10-12 ms in RT64 with the exact
+copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The early release took
+the sound short over its play plan (the first room of every planet in 160 s, headless Chrome 155) from
+250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display (`patches/web/dkr.patch` sets the base's
+`rr_default`, Original, to Display with Emscripten, and moves a page's settings saved before graphics config version 6
+to Display once), so RT64 interpolates through Skip Buffering, which `jfg-base.patch` switches on for it: RT64
+interpolates only while the frame on screen is the one the last workload drew. It does in the menus in both browsers
+and in play in Firefox, part of the time, but Chrome in play presents the game's 20, headless and headed (no pacing
+line: RT64 isn't interpolating there; not explained yet).
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
@@ -1083,15 +1093,19 @@ row for it: `publish_pages.sh`'s build is what checks a tag against it. The page
 (`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
 page opened behind another window never gets the focus event), render to RAM off (the CPU reads a frame only to hold
 the last one on screen while a level unloads) and the frontend's fixed 1536 MB heap (with growth on, it never grew past
-that through the list's recording and 27 maps in one visit). It presents the game's 30 (Frame rates), uncapped too.
+that through the list's recording and 27 maps in one visit). It always plays DKR-R's Modern profile, the only one that
+interpolates (Accurate, the desktop's default, holds RT64 at Original and 30, and the page has no overlay to pick a
+profile), with its Match display passed on as RT64's Display, since SDL's Emscripten port reports no refresh rate.
 Its list, `web/rt64_shaders.txt`, 107 descriptions (134 stages, 1.5 MB of WGSL) in 12 sections (the boot 23: logos and
 title; then the title's demo, the menus, Timber's Island, a section a world with its hub, races, battle and boss races,
 Future Fun Land, Wizpig's races, the trophy podium, a race's results), is recorded by code, a page load a map, the
 loads of a world merged into its section (`record_shaders.mjs`): `web/shader_survey.js` takes the game to a map through
 its own teleport and steers the player's kart toward each checkpoint, the turn's sign read from the kart's motion. The
 game's AI can't drive the player's kart: DKR-R's display list check then rejects every frame. A recording takes ~50
-minutes, and `record_shaders.mjs --from` goes on with one stopped partway. Its `web/play_plan.json` plays the title,
-the menus, Timber's Island and a Dino Domain race.
+minutes, and `record_shaders.mjs --from` goes on with one stopped partway. It was recorded in Accurate; in Modern,
+recorded with `?record-shaders` over the title, the menus, Timber's Island and Dino Domain, the game asked for 119
+descriptions, all in it but one, which differs from one in it only by the culling bit. Its `web/play_plan.json` plays
+the title, the menus, Timber's Island and a Dino Domain race.
 
 ## WebGPU in Chrome and Firefox
 
