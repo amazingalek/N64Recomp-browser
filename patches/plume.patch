@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 54b3be796e44c01285130061db2e14c817970682
+plume: https://github.com/amazingalek/plume-web cabe1acea36dc906f0aa58e858299edc3024b15f
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -859,10 +859,10 @@ index 0000000..03b3ea0
 +}
 diff --git a/plume_device_thread.cpp b/plume_device_thread.cpp
 new file mode 100644
-index 0000000..2d8578b
+index 0000000..2526da8
 --- /dev/null
 +++ b/plume_device_thread.cpp
-@@ -0,0 +1,1528 @@
+@@ -0,0 +1,1565 @@
 +//
 +// plume
 +//
@@ -887,6 +887,7 @@ index 0000000..2d8578b
 +
 +#if defined(__EMSCRIPTEN_PTHREADS__)
 +#include <emscripten/proxying.h>
++#include "plume_web_waits.h"
 +#endif
 +
 +namespace plume {
@@ -1011,7 +1012,7 @@ index 0000000..2d8578b
 +        // Each answer wakes a map() waiting for one.
 +        std::mutex answerMutex;
 +        std::condition_variable answerCondition;
-+        uint64_t answerCount = 0;
++        std::atomic<uint64_t> answerCount = 0;
 +
 +        bool isReady() const {
 +            return answer == ((executions << 1) | 1);
@@ -1037,14 +1038,25 @@ index 0000000..2d8578b
 +            mapped = false;
 +        }
 +
-+        // Waits for an answer after the one counted, or a millisecond.
++        // Waits for an answer after the one counted, or a millisecond. Where a timed wait ends late (plume_web_waits.h),
++        // it spins out the millisecond instead: Firefox's GPU process calls a map back only after a submission, which is
++        // what each question makes (isMapReady()), so a waiter that slept between questions asked one every 15.6 ms and
++        // its data arrived a tick or two late.
 +        void waitForAnswer(uint64_t counted) {
++#if defined(__EMSCRIPTEN_PTHREADS__)
++            if (timedWaitsEndLate()) {
++                const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
++                while ((answerCount == counted) && ((std::chrono::steady_clock::now() - start) < std::chrono::milliseconds(1))) {
++                }
++
++                return;
++            }
++#endif
 +            std::unique_lock lock(answerMutex);
 +            answerCondition.wait_for(lock, std::chrono::milliseconds(1), [&]() { return answerCount != counted; });
 +        }
 +
 +        uint64_t countAnswers() {
-+            std::lock_guard lock(answerMutex);
 +            return answerCount;
 +        }
 +    };
@@ -1052,8 +1064,18 @@ index 0000000..2d8578b
 +    // On a device thread: the READBACK buffers whose data hasn't arrived since their last copy was replayed.
 +    static thread_local std::vector<std::shared_ptr<DTMapState>> pendingReadbacks;
 +
++    static thread_local bool checkingReadbacks = false;
++
 +    static void checkPendingReadbacks() {
++        // The backend's readback callback can't come from inside a check (its callbacks come from its event loop), but if
++        // it did, the check in progress answers them all anyway.
++        if (checkingReadbacks) {
++            return;
++        }
++
++        checkingReadbacks = true;
 +        pendingReadbacks.erase(std::remove_if(pendingReadbacks.begin(), pendingReadbacks.end(), [](const std::shared_ptr<DTMapState> &state) { return state->check(); }), pendingReadbacks.end());
++        checkingReadbacks = false;
 +    }
 +
 +    void DTMapState::ask(DeviceThread *thread) {
@@ -1955,6 +1977,13 @@ index 0000000..2d8578b
 +            return runSync(thread, [&]() { return inner->isWaitReady(); });
 +        }
 +
++#if defined(__EMSCRIPTEN__)
++        // On the calling thread: it waits there, for frames the backend learns of on the device thread.
++        bool sleepUntil(std::chrono::steady_clock::time_point time) override {
++            return inner->sleepUntil(time);
++        }
++#endif
++
 +        bool resize() override {
 +            return runSync(thread, [&]() {
 +                const bool resized = inner->resize();
@@ -2152,6 +2181,14 @@ index 0000000..2d8578b
 +        DTDevice(DeviceThread *thread, std::unique_ptr<RenderDevice> inner) : thread(thread), inner(inner.release()) {
 +            capabilities = this->inner->getCapabilities();
 +            description = this->inner->getDescription();
++#if defined(__EMSCRIPTEN__)
++            // A READBACK buffer's data arrives in the backend's event loop, after the replay or present that last checked
++            // it, so the device thread answers its waiters when it does. Otherwise they learned it only when they asked
++            // again, after a wait of a millisecond, which on a page in Firefox on Windows ends on the system timer's
++            // 15.6 ms tick (plume_web_waits.h): each frame copied to RAM waited a
++            // tick or two, and Conker's page, which copies several a frame, presented 25-29 a second on a laptop.
++            thread->runAsync([device = this->inner]() { device->setReadbackCallback(&checkPendingReadbacks); });
++#endif
 +        }
 +
 +        ~DTDevice() override { destroyAsync(thread, inner); }
@@ -2477,10 +2514,18 @@ index 0000000..10b5a17
 +#endif
 +};
 diff --git a/plume_render_interface.h b/plume_render_interface.h
-index 2048557..20a519b 100644
+index 2048557..50d53e1 100644
 --- a/plume_render_interface.h
 +++ b/plume_render_interface.h
-@@ -26,6 +26,10 @@ namespace plume {
+@@ -7,6 +7,7 @@
+ 
+ #pragma once
+ 
++#include <chrono>
+ #include <climits>
+ 
+ #include "plume_render_interface_types.h"
+@@ -26,6 +27,10 @@ namespace plume {
          virtual void setName(const std::string &name) = 0;
          virtual uint64_t getDeviceAddress() const = 0;
  
@@ -2491,7 +2536,7 @@ index 2048557..20a519b 100644
          // Concrete implementation shortcuts.
          inline RenderBufferReference at(uint64_t offset) const {
              return RenderBufferReference(this, offset);
-@@ -59,6 +63,10 @@ namespace plume {
+@@ -59,6 +64,10 @@ namespace plume {
          virtual ~RenderPipeline() { }
          virtual void setName(const std::string &name) = 0;
          virtual RenderPipelineProgram getProgram(const std::string &name) const = 0;
@@ -2502,7 +2547,7 @@ index 2048557..20a519b 100644
      };
  
      struct RenderPipelineLayout {
-@@ -89,6 +97,12 @@ namespace plume {
+@@ -89,6 +98,20 @@ namespace plume {
          virtual ~RenderSwapChain() { }
          virtual bool present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) = 0;
          virtual void wait() = 0;
@@ -2512,9 +2557,29 @@ index 2048557..20a519b 100644
 +        // device's can wait for it to turn true.
 +        virtual bool isWaitReady() { return true; }
 +
++        // Holds the calling thread until about the given time, and ends on a frame of the display where the backend
++        // learns of them as they come (WebGPU's animation frames): on the first one less than half a frame before that
++        // time, or at the time if none comes by then. False at once where it can't or a timed sleep ends on time, and
++        // the caller sleeps itself. Any thread but the device's may call it.
++#if defined(__EMSCRIPTEN__)
++        virtual bool sleepUntil(std::chrono::steady_clock::time_point time) { return false; }
++#endif
++
          virtual bool resize() = 0;
          virtual bool needsResize() const = 0;
          virtual void setVsyncEnabled(bool vsyncEnabled) = 0;
+@@ -249,6 +272,11 @@ namespace plume {
+         virtual RenderSampleCounts getSampleCountsSupported(RenderFormat format) const = 0;
+         virtual bool beginCapture() = 0;
+         virtual bool endCapture() = 0;
++#if defined(__EMSCRIPTEN__)
++        // A backend that delivers a READBACK buffer's data asynchronously (WebGPU's) calls this back each time some
++        // arrives, on the thread it delivers it on, so a thread waiting for isMapReady() can be answered then.
++        virtual void setReadbackCallback(void (*callback)()) { }
++#endif
+     };
+ 
+     struct RenderInterface {
 diff --git a/plume_render_interface_types.h b/plume_render_interface_types.h
 index 9dcfedf..b352bb6 100644
 --- a/plume_render_interface_types.h
@@ -2574,12 +2639,73 @@ index 9dcfedf..b352bb6 100644
          // Framebuffers.
          uint64_t maxTextureSize = 0;
  
+diff --git a/plume_web_waits.h b/plume_web_waits.h
+new file mode 100644
+index 0000000..0b0ff01
+--- /dev/null
++++ b/plume_web_waits.h
+@@ -0,0 +1,55 @@
++//
++// plume
++//
++// Copyright (c) 2024 renderbag and contributors. All rights reserved.
++// Licensed under the MIT license. See LICENSE file for details.
++//
++
++// Whether a timed wait on a page's threads ends late, for code that would otherwise wait on a timer for something
++// another thread doesn't wake it for. In Firefox on Windows every one (an Atomics.wait with a timeout) ends on the
++// system timer's tick, 15.6 ms unless the browser's own process asks for a finer one (per process since Windows 10
++// 2004): a sleep of 100 us from a page's thread took 15.6 ms there on a laptop, and 2 ms in Chrome. A futex wake still
++// comes at once.
++//
++
++#pragma once
++
++#if defined(__EMSCRIPTEN_PTHREADS__)
++
++#include <algorithm>
++#include <atomic>
++#include <cstdint>
++#include <cstdio>
++
++#include <emscripten/emscripten.h>
++#include <emscripten/threading.h>
++
++namespace plume {
++    // Measured once, by the first thread other than the page's to ask: three waits of 100 us, late if the shortest took
++    // more than 4 ms. False on the page's thread until then, which can't wait.
++    inline bool timedWaitsEndLate() {
++        static std::atomic<int> state = 0; // 0 not measured, 1 on time, 2 late.
++        int measured = state;
++        if ((measured != 0) || emscripten_is_main_browser_thread()) {
++            return measured == 2;
++        }
++
++        static uint32_t futex = 0;
++        double shortest = 1e9;
++        for (int i = 0; i < 3; i++) {
++            const double start = emscripten_get_now();
++            emscripten_futex_wait(&futex, 0, 0.1);
++            shortest = std::min(shortest, emscripten_get_now() - start);
++        }
++
++        measured = (shortest > 4.0) ? 2 : 1;
++        int unmeasured = 0;
++        if (state.compare_exchange_strong(unmeasured, measured) && (measured == 2)) {
++            fprintf(stderr, "plume: a timed wait of 100 us on a thread of this page takes %.1f ms, so waits off the page's thread are woken or spun, not timed\n", shortest);
++        }
++
++        return state == 2;
++    }
++};
++
++#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..b02ab95
+index 0000000..3ae90d0
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3203 @@
+@@ -0,0 +1,3244 @@
 +//
 +// plume
 +//
@@ -2599,6 +2725,9 @@ index 0000000..b02ab95
 +
 +#include <emscripten/emscripten.h>
 +#include <emscripten/html5.h>
++#include <emscripten/threading.h>
++
++#include "plume_web_waits.h"
 +
 +// Whether the browser builds a pipeline made with createRenderPipelineAsync without holding up the device. Chrome builds
 +// it on threads of its own. Firefox (157, Windows) builds it on its GPU process's WebGPU thread, in line with everything
@@ -3075,6 +3204,10 @@ index 0000000..b02ab95
 +        }
 +    }
 +
++    // Called once a READBACK buffer's data has arrived (setReadbackCallback). One for every device: the callbacks of a
++    // device's maps can come after it is gone.
++    static void (*readbackCallback)() = nullptr;
++
 +    static void readbackMapped(WGPUMapAsyncStatus status, WGPUStringView message, void *userdata1, void *userdata2) {
 +        std::shared_ptr<WebGPUReadback> *pointer = static_cast<std::shared_ptr<WebGPUReadback> *>(userdata1);
 +        std::shared_ptr<WebGPUReadback> readback = std::move(*pointer);
@@ -3087,16 +3220,18 @@ index 0000000..b02ab95
 +
 +        readback->pending = false;
 +        WebGPUBuffer *buffer = readback->buffer;
-+        if ((status != WGPUMapAsyncStatus_Success) || (buffer == nullptr)) {
-+            return;
++        if ((status == WGPUMapAsyncStatus_Success) && (buffer != nullptr)) {
++            const void *data = wgpuBufferGetConstMappedRange(buffer->buffer, 0, buffer->shadow.size());
++            if (data != nullptr) {
++                memcpy(buffer->shadow.data(), data, buffer->shadow.size());
++            }
++
++            wgpuBufferUnmap(buffer->buffer);
 +        }
 +
-+        const void *data = wgpuBufferGetConstMappedRange(buffer->buffer, 0, buffer->shadow.size());
-+        if (data != nullptr) {
-+            memcpy(buffer->shadow.data(), data, buffer->shadow.size());
++        if (readbackCallback != nullptr) {
++            readbackCallback();
 +        }
-+
-+        wgpuBufferUnmap(buffer->buffer);
 +    }
 +
 +    // Called after a submission that copied into this buffer.
@@ -4066,10 +4201,14 @@ index 0000000..b02ab95
 +            // Until a few frames have been timed, 60 is what they run at on most displays.
 +            if (timer->frameIntervals.size() >= 5) {
 +                timer->refreshRate = displayRate(*timer);
++                timer->frameMs = 1000.0 / std::max(timer->refreshRate, 1U);
 +            }
 +        }
 +
 +        timer->lastFrameTime = time;
++        timer->frameNow = emscripten_get_now();
++        timer->frameSerial++;
++        emscripten_futex_wake(&timer->frameSerial, INT_MAX);
 +        return true;
 +    }
 +
@@ -4206,6 +4345,30 @@ index 0000000..b02ab95
 +        }
 +
 +        return true;
++    }
++
++    // Where a timed wait on a page's thread ends late (plume_web_waits.h: Firefox on Windows, on the system timer's 15.6
++    // ms tick), RT64's sleeps of 100 us until each present's time took a tick each, and a present was late by up to a
++    // tick. A wake through the futex comes at once, so there this waits for the animation frames, the display's own
++    // timing, and on a timer only until the time itself, for a page whose frames have stopped (hidden). Elsewhere it
++    // returns false and the caller sleeps as before: in Chrome on a laptop's Intel graphics, presents on the animation
++    // frames made the GPU busier and the gaps between frames longer than RT64's own sleeps.
++    bool WebGPUSwapChain::sleepUntil(std::chrono::steady_clock::time_point time) {
++        if (emscripten_is_main_browser_thread() || !timedWaitsEndLate()) {
++            return false;
++        }
++
++        const double endMs = emscripten_get_now() + std::chrono::duration<double, std::milli>(time - std::chrono::steady_clock::now()).count();
++        const double fromMs = endMs - frameTimer->frameMs / 2.0;
++        for (;;) {
++            const uint32_t serial = frameTimer->frameSerial;
++            const double now = emscripten_get_now();
++            if ((now >= endMs) || (frameTimer->frameNow >= fromMs)) {
++                return true;
++            }
++
++            emscripten_futex_wait(&frameTimer->frameSerial, serial, endMs - now);
++        }
 +    }
 +
 +    void WebGPUSwapChain::wait() {
@@ -5753,6 +5916,10 @@ index 0000000..b02ab95
 +        return false;
 +    }
 +
++    void WebGPUDevice::setReadbackCallback(void (*callback)()) {
++        readbackCallback = callback;
++    }
++
 +    // WebGPUInterface
 +
 +    WebGPUInterface::WebGPUInterface() {
@@ -5785,10 +5952,10 @@ index 0000000..b02ab95
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..4942e6f
+index 0000000..ce3c3e9
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,671 @@
+@@ -0,0 +1,682 @@
 +//
 +// plume
 +//
@@ -5873,7 +6040,9 @@ index 0000000..4942e6f
 +//   reports the display's rate as <rate> (360) and keeps 4 in flight, to measure how many presents a second a page can
 +//   make with the browser's own frames uncapped (the swap chain's constructor says how).
 +// - The browser doesn't say what the display's refresh rate is, so a swap chain times the animation frames with a
-+//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming.
++//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming. The loop wakes
++//   a thread in sleepUntil() at each frame, the one call another thread may make, where a timed sleep on a page's
++//   thread ends late (plume_web_waits.h).
 +// - Every call must come from the thread that owns the device's JavaScript object: WebGPU objects can't be shared
 +//   between workers.
 +// - Shaders are WGSL text (RenderShaderFormat::WGSL). Specialization constants are WGSL overrides named by their id,
@@ -5901,6 +6070,7 @@ index 0000000..4942e6f
 +
 +#include "plume_render_interface.h"
 +
++#include <atomic>
 +#include <list>
 +#include <map>
 +#include <set>
@@ -6142,6 +6312,12 @@ index 0000000..4942e6f
 +        uint32_t frameIntervalCursor = 0;
 +        uint32_t refreshRate = 60;
 +        uint32_t frameCount = 0;
++
++        // For sleepUntil() on other threads: the frames so far (a futex woken at each), when the last one came
++        // (emscripten_get_now()) and the display's frame in ms.
++        std::atomic<uint32_t> frameSerial = 0;
++        std::atomic<double> frameNow = 0.0;
++        std::atomic<double> frameMs = 1000.0 / 60.0;
 +    };
 +
 +    // The presents whose work the GPU hasn't finished, and for present-stats how long each one's took to be reported
@@ -6195,6 +6371,7 @@ index 0000000..4942e6f
 +        bool present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) override;
 +        void wait() override;
 +        bool isWaitReady() override;
++        bool sleepUntil(std::chrono::steady_clock::time_point time) override;
 +        bool resize() override;
 +        bool needsResize() const override;
 +        void setVsyncEnabled(bool vsyncEnabled) override;
@@ -6438,6 +6615,7 @@ index 0000000..4942e6f
 +        RenderSampleCounts getSampleCountsSupported(RenderFormat format) const override;
 +        bool beginCapture() override;
 +        bool endCapture() override;
++        void setReadbackCallback(void (*callback)()) override;
 +        WGPUBindGroupLayout getBindGroupLayout(const std::string &key, const std::vector<WGPUBindGroupLayoutEntry> &entries);
 +        WGPUBindGroup getBindGroup(const std::string &key, WGPUBindGroupLayout layout, const std::vector<WGPUBindGroupEntry> &entries);
 +        WGPUPipelineLayout getPipelineLayout(const std::vector<WGPUBindGroupLayout> &layouts);
