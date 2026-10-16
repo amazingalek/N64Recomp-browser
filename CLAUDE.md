@@ -40,6 +40,12 @@ fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`fork
 (moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here, and
 the work that builds, plays or measures every game opens it itself, beside the game forks' pushes (The pins).
 
+Branches don't outlive their work. This repo, `rush-2049-recomp`, the forks and the game forks delete a pull request's
+branch when it merges (GitHub's "Automatically delete head branches", on in every one of them). A branch pushed to a
+fork or game fork to keep work that isn't on its `main` yet (`web-wip`, `wip/<topic>`) is deleted by the work that
+lands it, once its commits are on `main`, or that drops it. A fork keeps `main`, `gh-pages` and those in-flight
+branches only: upstream's other branches, which a new fork copies, are deleted when it is made.
+
 ## Rules
 
 - The web support works for every N64 recomp, so a change to it is game-agnostic and behind
