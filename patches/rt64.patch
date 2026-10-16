@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 254dee351d73261d1c6a5ceade5e8ef0391a6318
+rt64: https://github.com/amazingalek/rt64-web 2e93be2691d6c4d5328bcd2ac85bb48af80b47cd
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1090,7 +1090,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..40d542f 100644
+index 3227ab1..75dd714 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1132,7 +1132,7 @@ index 3227ab1..40d542f 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -391,8 +409,28 @@ namespace RT64 {
+@@ -391,8 +409,31 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1142,26 +1142,29 @@ index 3227ab1..40d542f 100644
 +                    // to the page's thread) isn't added to every period. In Chrome the pages of games below the
 +                    // display's rate presented every 18 ms, 55.6 a second, where those at its rate, which never sleep
 +                    // here, presented 60. A present a whole period past its slot or more starts the slots from itself.
++                    // Where the swap chain learns of the display's frames as they come (WebGPU), the wait ends on one.
 +                    const auto presentPeriod = std::chrono::nanoseconds(1'000'000'000 / targetRate);
 +                    if ((presentSlot == Timestamp()) || ((presentTimestamp - presentSlot) >= presentPeriod)) {
 +                        presentSlot = presentTimestamp;
 +                    }
 +
 +                    presentSlot += presentPeriod;
-+                    Timer::preciseSleepUntil(presentSlot);
++                    if (!ext.swapChain->sleepUntil(std::chrono::steady_clock::now() + (presentSlot - Timer::current()))) {
++                        Timer::preciseSleepUntil(presentSlot);
++                    }
 +#               else
                      Timer::preciseSleepUntil(presentTimestamp + std::chrono::nanoseconds(1'000'000'000 / targetRate));
 +#               endif
-+                }
+                 }
 +#           if defined(__EMSCRIPTEN__)
 +                else {
 +                    presentSlot = Timestamp();
-                 }
++                }
 +#           endif
  
                  if (presentWaitEnabled) {
                      ext.swapChain->wait();
-@@ -416,6 +454,131 @@ namespace RT64 {
+@@ -416,6 +457,131 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1293,7 +1296,7 @@ index 3227ab1..40d542f 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +673,10 @@ namespace RT64 {
+@@ -510,6 +676,10 @@ namespace RT64 {
                      continue;
                  }
  
