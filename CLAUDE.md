@@ -412,7 +412,7 @@ critical fix, a change to a game's own repo or its shader list) does all of this
 - Records every run in `plays.jsonl`, committed with the row: `play_page.mjs --record plays.jsonl --game <name>
   --build <tag>`, with `--note` for anything a player's visit wouldn't have (a preload, a test build). It is the
   history of how each page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note`
-  saying so. A run without `--note` is compared with the last 5 like it (same game, browser, size and play) and
+  saying so and its `gpu` the laptop's adapter (WebGPU in Chrome and Firefox, Measuring the GPU). A run without `--note` is compared with the last 5 like it (same game, browser, size and play) and
   flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
   and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
@@ -423,17 +423,23 @@ critical fix, a change to a game's own repo or its shader list) does all of this
   number is a cheaper frame, 342 or more is the uncapped rate's ceiling, and the retest's runs are compared with
   earlier uncapped runs only (the first has none). A desktop GPU at a normal size plays every page, so it never fills a
   cell. The stand-in is gentler than a laptop and sees cost only: Banjo played 59-60 on it in Firefox and 20-30 on the
-  laptop, where callbacks that come back late and the browser's own frames held it back, so it finds a problem but
-  can't clear one, and a laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence:
+  laptop, where its done callbacks came back 25-45 ms late and RT64's pacing held it to the game's frames (A laptop,
+  measured), so it finds a problem but can't clear one, and a laptop result stays until a newer laptop run replaces it. A cell is a number, not a sentence:
   the median presents a second after the waits as of its date ("58", "240*"), `†` beside one that is the game's own
   frame rate ("20†"), a laptop's and the stand-in's both when the stand-in has a newer one ("20†; 240*"), words only where there is no number
   ("never boots", "not yet"), never "smooth" and never against an earlier result ("the crash is gone"). One whose laptop
   result a fix was made for gives the stand-in's number until it is played there again. A cell below 60 without a `†` has work filed
   to make it 60. A
-  laptop's Chrome cell is played in a window (`--headed`) as well as headless: headless Chrome draws to no display,
+  laptop's cell comes from a run on screen (`--on-screen`: the window maximized on the desktop at the laptop's own
+  scale, as a player's is) as well as the usual one off the desktop, and gives the on-screen number. Windows never
+  composites a window off the desktop, and on a laptop's Intel UHD that flattered Firefox: on screen its pages took
+  ~30 more points of the Intel chip's 3D engine (Banjo 75% against 45, Conker 72 against 44) and 3-5 times its GPU
+  process's CPU, and Conker fell from 31.5 presents a second to 25.1, its boot's shader wait doubled (11.4 s against
+  5.4); Chrome stayed within 2. A laptop's Chrome cell is played headless too: headless Chrome draws to no display,
   so its presents never wait for the compositor or the display the way a player's do. The stand-in's GPU load leaves
   a laptop's slower CPU out; Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) stands in
-  for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after).
+  for that, and found plume 6949d22's calls (Conker's page at 36-44 presents a second under it, 54-58 after), but it
+  isn't what holds Chrome at 51-55 on a laptop's Intel UHD (A laptop, measured).
 - Every change to a page is played in Firefox as well as Chrome, always: Firefox is where pages fall behind.
 
 A new game gets a row in the same work as its port, its Recomp cell naming the upstream recomp and its owner
@@ -467,7 +473,14 @@ changes. Keep it current in the same work as what changes it, like the README:
   window off the desktop with `--headed`, and Firefox always in a window off the desktop over WebDriver BiDi, since
   Firefox headless has no WebGPU adapter. Such a window has no focus, so keys and clicks are dispatched from script,
   the ROM is sent to the page in pieces, and the viewport is set to one CSS pixel a pixel in both browsers, since the
-  canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`).
+  canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`). `--on-screen` (a laptop's runs, The games table) maximizes
+  either browser's window on the desktop instead, at the desktop's scale, with none of those overrides, so the
+  viewport is what the window leaves the page: 1920x889 for a `--size` of 1920x945 on a laptop at 200%. A plan's
+  clicks are in 1256x645, and page_driver moves each to the viewport the page has as it clicks (`innerWidth`,
+  `innerHeight`), never to `--size`: scaled to 945, Load ROM's click landed between Load ROM and Controls.
+- On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with, the one the
+  browser's own 3D load lands on (by LUID), with nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is
+  the idle discrete GPU, and its numbers say nothing about the page.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
@@ -538,9 +551,9 @@ changes. Keep it current in the same work as what changes it, like the README:
   laptop's CPU pays for. For the frame rate on screen, or to measure a page, it buys nothing.
 - To measure what a page can do past the display, play it uncapped (`play_page.mjs --uncapped`, Playing a page). That
   measures cost: the GPU's, the page's thread's WebGPU calls and the browser's GPU process's, for each present. It
-  doesn't see what held Firefox at 20-30 on a laptop's Intel UHD while the GPU idled: done callbacks coming back 20-40
-  ms late, its refresh driver's frames, the compositor. Uncapped turns the last two off, and a fast GPU's callbacks
-  come back early. So a higher uncapped number on a desktop GPU is a cheaper frame everywhere, but it doesn't clear a
+  doesn't see what held Firefox at 20-30 on a laptop's Intel UHD with the GPU half idle: done callbacks coming back
+  25-45 ms late, which RT64's pacing takes for a GPU falling behind (WebGPU in Chrome and Firefox), and a fast GPU's
+  callbacks come back early. Nor does it see the compositor's cost on screen (A laptop, measured). So a higher uncapped number on a desktop GPU is a cheaper frame everywhere, but it doesn't clear a
   laptop result.
 
 ## Prebuilt shader lists
@@ -638,6 +651,48 @@ core busy with other work, 2026-10-15: Majora's Mask through its plan's whole cl
 included, 59 presents a second in Chrome 155 and Firefox 158, where before f0e0884 it stopped ~35 s in; Banjo, Donkey
 Kong 64, GoldenEye, Conker, Wave Race 64 and Rush 2049 through their boots and 25-60 s of play, 57-60 in Chrome and
 52-59 in Firefox (Conker's median holds its wait), Firefox's waits 3.2-18.9 s, no WebGPU errors or exceptions.
+
+## A laptop, measured
+
+On 2026-10-15, nine pages from Pages, all built on v0.46.0, on a laptop's Intel UHD (Tiger Lake GT1, 32 EU; Windows 11
+in its best power efficiency mode; a 3840x2160 display at 200%), every run on that adapter: Chrome 155 in a window and
+headless, Firefox 158, 1920x945 off the desktop, cold, `?present-stats`, each game's play plan (`--play 90` after the
+start for those without one). Presents a second after the waits (the README's cells), the Intel GPU's 3D engine busy
+(median, ~12% of it the idle desktop), and Firefox's waits in seconds/shaders (Chrome's in brackets; it waited for
+nothing else):
+
+```
+               presents       Intel busy
+               Chrome  Fx     Chrome  Fx    Firefox's waits
+Rush 2049        59    51       76%  95%    boot 3.1/21, race 6.2/41
+GoldenEye        54    47       53%  46%    boot 6.9/59
+Majora's Mask    52    20†      58%  48%    boot 4.0/39, attract demo 4.0/94
+Banjo            55    21†      70%  45%    boot 3.5/39 (1.8/4)
+Conker           52    32       55%  44%    boot 5.4/75
+Donkey Kong 64   54    30†      47%  46%    boot 1.1/10, the Rap 5.3/49
+Wave Race 64     54    20†      63%  36%    boot 5.1/50 (2.0/12)
+Pilotwings 64    59    60       56%  64%    ~19 s: boot 5.3/33, menus 6.9/47, 12 more (2.3/7)
+Banjo-Tooie      30†   30†      59%  56%    boot 4.6/59, worlds 0.2-1.3 (1.9/16)
+```
+
+Headless Chrome read within a present of the window. No WebGPU errors or exceptions in any of the 42 runs
+(`plays.jsonl`). Firefox's longest gaps, 4-7 s, were its shader waits; GoldenEye there had 118 gaps over 100 ms in 90 s
+of its intro, against 5 in Chrome.
+
+- Firefox's 20-30 is RT64's pacing, its done callbacks 25-45 ms late; with 1 ms timers it drew 59 (WebGPU in Chrome
+  and Firefox).
+- Chrome sat at 51-55 in six games with the Intel GPU 47-70% busy, the browser at 0.7-1.3 of 16 logical cores and the
+  host 10-23% busy, so a slow CPU isn't what holds it, and Chrome's 3x CPU throttling (The games table) doesn't stand
+  in for it: Conker drew 54-58 that way on the desktop and 52 on the laptop. RT64 paced Conker in Chrome 3 times; the
+  other 54s are unexplained.
+- Maximized on the desktop at its 200%, instead of off it, Firefox's Intel load rose ~30 points (Banjo 45 to 75%,
+  Conker 44 to 72%), its GPU process's CPU 1.4-4.6 times, Conker's presents fell from 31.5 to 25.1 and its boot wait
+  doubled (5.4 to 11.4 s); Chrome stayed within 2 presents. So an off-desktop Firefox run on a laptop reads better
+  than a player's visit. Chrome maximized there had a viewport of 1920x889, Firefox 1920x947: a plan's clicks at
+  another `--size` missed Load ROM.
+- In 10 minutes of Rush 2049 Firefox held 55-60, its callbacks ~20 ms late (30-42 where the Intel GPU reached ~97%),
+  the cap moving to 3 at 106 s and 4 at 140 s, while its GPU process's private memory grew from 1.05 to 3.14 GB, near
+  linearly, and the adapter's shared memory by 740 MB.
 
 ## The game forks
 
@@ -1085,8 +1140,8 @@ changing it:
   60 shows fewer frames, not later ones. How late: with `?present-stats`, Rush 2049's attract race on the RTX 2070 at
   1256x645 had each present's onSubmittedWorkDone back 11-16 ms after it (median, 14-18 at p90) in Firefox 158 and 3
   ms in Chrome 155 headless, both at 60 a second. The cap leaves two presents ~33 ms, so a callback that comes back
-  later than that costs presents while the GPU idles: the suspect for Firefox's 20-30 on a laptop's Intel graphics
-  (Banjo, Conker), where Chrome drew 40-48. The stand-in for it, on the same RTX 2070 (Firefox 158, 1256x645, a preload
+  later than that costs presents while the GPU idles, which was the suspect for Firefox's 20-30 on a laptop's Intel
+  graphics until a laptop run read the cap (below). The stand-in for it, on the same RTX 2070 (Firefox 158, 1256x645, a preload
   holding each `onSubmittedWorkDone` promise 20-40 ms past the browser's, in order): Banjo's intro drew ~50 presents a
   second with ~160 ms a second at the cap, and RT64's pacing then held it at the game's 20 for most of 90 s (median 20.0
   and 29.9 in two runs, the GPU ~35% busy), as on the laptop; with 3 in flight 58.3, with 4 59.4, each callback back
@@ -1100,8 +1155,17 @@ changing it:
   built its shaders behind the game. A slow
   GPU gains nothing from one more (2 gave 46 and 3 47 above), so there the try goes back. A page thread kept 60% busy
   (a preload spinning 10 ms of every 16) left Banjo in Firefox at 57.7 with no time at the cap, so a slow page thread
-  is not what holds Firefox there. What the stand-in can't imitate, Firefox's refresh driver holding animation frames
-  at 20-30 on that laptop, isn't ruled out until a laptop run with `?present-stats` reads its animation frames.
+  is not what holds Firefox there. On the laptop itself (Intel UHD, Firefox 158, `?present-stats`, A laptop, measured)
+  neither its animation frames nor the cap held it: they stayed at 60, and no time was spent at the cap at 2, 3 or 4
+  in flight. RT64's pacing did. Banjo's intro drew 30-35 with each callback back 25-31 ms after its present (p90
+  33-45), RT64 paced it to the game's frames at 39 s, and from then it drew 20.0 with callbacks 44-46 ms late and the
+  GPU ~40% busy, falling back each of the three times it tried the display's rate; Majora's Mask, Donkey Kong 64 and
+  Wave Race 64 were paced the same. Conker drew 24-37 with callbacks 23 ms late (p90 42) and no pacing, which these
+  lines don't explain. With the Gecko profiler sampling every 1 ms (`MOZ_PROFILER_STARTUP`), Banjo's callbacks came
+  back 12-16 ms after a present, RT64 never paced, and Firefox drew 59.3 and 59.4 in two runs; sampling every 10 ms,
+  44 ms, paced, 20.1. On Windows the profiler asks for 1 ms timers (`timeBeginPeriod`) only below 10 ms, so Firefox's
+  callbacks look bound to Windows' default 15.6 ms timer. Its own timer resolution can't be read: it is per process
+  since Windows 10 2004, and the global one read 1 ms already.
 - Chrome on Windows gives a page the integrated GPU on a laptop that has two, since it ignores `powerPreference`
   (crbug.com/369219127); `chrome://flags/#force-high-performance-gpu` gives it the other. On that laptop's Intel UHD
   (D3D12) Rush 2049's page crawled until its specialized pipelines were built (~1 fps for minutes in menus, 20-30 in
@@ -1140,6 +1204,9 @@ changing it:
 - Two of the web paths run natively on Vulkan too, to check them against the stock ones: configure a game with
   `-DRT64_PER_DRAW_TEXTURES=ON` (rt64-0007: a texture set per draw, TMEM in one buffer; to test that pool, make
   `TMEMHasher::requiresRawTMEM` return true for a run) or `-DRT64_PACKED_RSP_INPUTS=ON` (rt64-0009).
+- Measuring the GPU: `play_page.mjs`'s GPU fields are `nvidia-smi -i 0`, which on a laptop with an NVIDIA GPU beside
+  its integrated one reads the discrete GPU, idle while the page draws on the other. There, sum
+  `\GPU Engine(*engtype_3D)\Utilization Percentage` per adapter LUID and read the one carrying the load.
 - The browser has no GPU timestamps, so a page's GPU side is read from nvidia-smi's power and utilization against the
   idle desktop.
 
@@ -1170,6 +1237,11 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
 - RmlUi's FreeType must be the `freetype-legacysjlj` build (setjmp with wasm exceptions); the plain one leaves
   `emscripten_longjmp` undefined. Emscripten's `bits/limits.h` defines `PAGESIZE`, which breaks `slot_map.h`.
 - The `--pre-js` files and the shell are read at link time, so a page lists them in `LINK_DEPENDS`.
+- Every library a page links is static: a shared one (`.so`) makes emcc link the page relocatable, with the `pic`
+  system libraries, and wasm-ld then refuses the address of an EM_JS function ("recompile with -fPIC"). A game whose
+  CMake sets `BUILD_SHARED_LIBS OFF` as a normal variable before a subproject's `option(BUILD_SHARED_LIBS ... ON)`
+  (lunasvg's) gets the shared one on a build dir's first configure only (CMP0077's old behaviour), so its page sets
+  it in the cache (`FORCE`), as Jet Force Gemini's does, and only a fresh build dir shows it.
 - The web builds compile with `-msimd128` (hlslpp's wasm backend, the auto-vectorizer) and `-DXXH_HAS_INCLUDE(x)=0`
   (xxHash's NEON path through Emscripten's `arm_neon.h` doesn't compile in C++, so XXH3 stays scalar). Small (Rush
   2049's CLAUDE.md, Step 3, has the measurement), but free: every browser with WebGPU has wasm SIMD.
