@@ -53,8 +53,10 @@ the work that builds, plays or measures every game opens it itself, beside the g
   A request for one is answered that way, not filed against the fork.
 - Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and its
   resolution Auto by default, in every game fork and every new port, whatever its recomp's desktop build defaults to
-  (the README, The recomp's own code). That is web support, not a feature: a page that shows its game's own 20 or 30
-  because of a default is a bug in that page.
+  (the README, The recomp's own code). That is web support, not a feature: the pages are measured by what they can
+  present (`?uncapped`, The games table), and a page held to its game's own rate reads that rate however much a change
+  costs or saves (DKR-R's page 29.8-30.0 uncapped, Jet Force Gemini's 19-22, on Original), so a page that shows its
+  game's own 20 or 30 because of a default is a bug in that page.
 - Never open a PR, issue or discussion upstream at rt64, plume, N64Recomp, N64ModernRuntime, RecompFrontend,
   BanjoRecomp, Zelda64Recomp or Donkey-Kong-64-Recompiled: their CONTRIBUTING.md asks for no LLM-written code
   (plume's, no AI-made contribution and no AI talking to its maintainers). The forks stay forks. Each one's README opens
