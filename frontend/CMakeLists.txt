@@ -19,9 +19,14 @@
 # - a link that fails on any wasm-ld warning (--fatal-warnings), for the one that matters: a call to a function whose
 #   signature doesn't match the call (`function signature mismatch`) links as a trap, which stops the page only when
 #   the call is made, perhaps minutes in (a patch calling a native that doesn't take (rdram, ctx), README),
-# - a heap of 1536MB, 1 MB stacks and 32 threads made at the start, which a recomp's own target_link_options(<target>
-#   PRIVATE -sINITIAL_MEMORY=...) and the like override: they go first on the link line, and Emscripten takes a
-#   setting's last value.
+# - a heap of 1536MB, 1 MB stacks and a worker for each thread the page runs, made at the start, which a recomp's own
+#   target_link_options(<target> PRIVATE -sINITIAL_MEMORY=...) and the like override: they go first on the link line,
+#   and Emscripten takes a setting's last value. A thread started with no worker left waits while the browser makes
+#   one and instantiates the wasm in it, 130-240 ms in Chrome on a game thread's osCreateThread (32 workers held
+#   GoldenEye's Start 195 ms and Donkey Kong 64's boot 0.5 s). RT64 starts min(n, 16) shader prebuild threads and n/4
+#   texture stream threads for n cores (navigator.hardwareConcurrency), and its other threads, the runtime's and a
+#   game's take about 30 more: GoldenEye and Donkey Kong 64 ran 45 and 46 threads with 12, so the pool is the first
+#   two and 40.
 # A page with threads must be cross-origin isolated: served with Cross-Origin-Opener-Policy: same-origin and
 # Cross-Origin-Embedder-Policy: require-corp, or from a host that can't set headers (GitHub Pages) with
 # coi_serviceworker.js beside it, which adds them.
@@ -47,7 +52,8 @@ function(n64recomp_browser_frontend_page target)
     target_link_libraries(${target} PRIVATE n64recomp_browser_frontend)
     # The target's own options, first: an interface library's come after them, where they would win.
     target_link_options(${target} BEFORE PRIVATE
-        -sINITIAL_MEMORY=1536MB -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB -sPTHREAD_POOL_SIZE=32)
+        -sINITIAL_MEMORY=1536MB -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB
+        "-sPTHREAD_POOL_SIZE=Math.min(navigator.hardwareConcurrency,16)+Math.floor(navigator.hardwareConcurrency/4)+40")
     set_target_properties(${target} PROPERTIES SUFFIX ".html")
     # The page's scripts go into it at link time, so a change to one relinks it.
     set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
