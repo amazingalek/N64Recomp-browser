@@ -7,7 +7,7 @@
 #   WebGPU device (plume_device_thread.h), the file picker and the browser's events,
 # - the page, shell.html: a canvas filling the window, which SDL's window is and RT64 draws on, and a status line,
 # - persistent_home.js: HOME (/home/web_user, where RecompFrontend keeps settings, saves and the ROM it was given)
-#   kept in the browser's IndexedDB,
+#   kept in the browser's IndexedDB, a database for each page on a site,
 # - sdl_audio.js: SDL2's audio opened from a thread, which Emscripten's port can't do by itself,
 # - audio_output.h: sound played on the browser's audio thread, which a recomp uses instead of SDL's queue: SDL2's
 #   port plays it from the page's thread, where it breaks up whenever WebGPU keeps that thread busy,
