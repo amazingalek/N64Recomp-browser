@@ -289,6 +289,11 @@ rt64 730e980           createTexture() and an upload buffer's map() after its fi
                        changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
                        the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
                        Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
+plume 54b3be7          where pipelines build in the background (Chrome), one made without buildInBackground is built
+                       with createRenderPipelineAsync too once a draw resolves its layout, and stays ready at once: RT64's
+                       ubershader pipelines (a depth and coverage state each) were each built in line on the GPU process's
+                       main thread the first time a draw used its state, and Ocarina of Time's title, a third state 25 s
+                       after the boot, held the page's presents 0.96 s (longest gap 172 ms after, Chrome 155 headless)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -1034,8 +1039,11 @@ changing it:
 - Chrome parses and validates a shader module (Tint) in `createShaderModule`, on that same main thread, even for a
   pipeline it then builds async, in a time that grows faster than the WGSL (0.16 ms a KB at 24 KB, 0.56 at 180 KB,
   1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
-  RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the boot's few pipelines
-  made with `createRenderPipeline`/`createComputePipeline` (DXC on that thread, 13-64 ms each) and the spec constant
+  RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the pipelines a draw
+  wants before their background build is done, built in line (plume 54b3be7 builds every pipeline in the background
+  once a draw resolves its layout): the boot's fixed ones (13-64 ms each, DXC on that thread) and the ubershader states
+  its first frames draw with (245 KB of WGSL, ~0.9 s each: Banjo's page builds 4 at once at its boot); a
+  `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
   shaders' modules at setup (713 KB, ~0.7 s each). Dawn reuses a module whose WGSL matches one still alive, but
   keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
