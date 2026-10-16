@@ -390,6 +390,7 @@ N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or 
 moves with it). To move a fork to a newer upstream commit, merge that commit into `main` and say in the merge's message
 what upstream brought, and move its upstream commit in `patches/patches.txt`. With every change to either, run
 `tools/export_patches.sh` and commit the patches with it: CI checks that they match. A patch that stops applying to a
-recomp's commits in `patches/pins.txt` means the fork has to change. Tag a release once a recomp has run it.
+recomp's commits in `patches/pins.txt` means the fork has to change. Once a change to what a page is built from merges and passes CI, CI tags main with the
+next release.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.

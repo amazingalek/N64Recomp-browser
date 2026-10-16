@@ -49,12 +49,19 @@ export const option = (args, name, fallback) => {
 };
 
 // The build dir on 127.0.0.1, with the headers that give the page SharedArrayBuffer. The ROM and saves are kept per
-// origin, port included, so a profile kept between runs needs the same port.
+// origin, port included, so a profile kept between runs needs the same port. A path ending in / is its index.html, as
+// GitHub Pages serves it: a plan whose page is "" opens publish_page.sh's staged dir at /. A file it hasn't got is
+// printed once, since a page that 404s on its own files loads nothing and says nothing in its console.
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
+const missing = new Set();
 export const serve = (dir, port) => http.createServer((req, res) => {
-  const file = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  const file = path.join(dir, pathname.endsWith('/') ? pathname + 'index.html' : pathname);
   fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404); res.end(); return; }
+    if (err) {
+      if (!missing.has(pathname)) { missing.add(pathname); console.error(`serve: 404 ${pathname} (${err.code})`); }
+      res.writeHead(404); res.end(); return;
+    }
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store',
       'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' });
     res.end(data);
