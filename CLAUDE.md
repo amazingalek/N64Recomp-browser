@@ -373,8 +373,10 @@ script), so commit to a fork from a separate clone of it:
    and still apply to every recomp's commits in `patches/pins.txt`; one that stops applying means the fork has to
    change.
 4. Before it merges, build a page on the branch and play it (Playing a page): a game fork's checkout with its
-   N64Recomp-browser at the branch's commit. Once it has merged, tag main `v0.<n+1>.0` and push the tag (a tag is a
-   release: a recomp checks this repo out at one). The pins move in the next retest (The pins).
+   N64Recomp-browser at the branch's commit. Once it has merged, CI tags main `v0.<n+1>.0` itself when its jobs pass
+   (ci.yml's `tag` job, for a merge that changes `forks.txt`, `patches/`, `frontend/` or `renderer/`): a tag is a
+   release, a recomp checks this repo out at one, and the retest builds the newest. Check that the tag came (`git
+   ls-remote --tags origin`). The pins move in the next retest (The pins).
 
 **The pins.** A change reaches the builds whose code it changes. A change to what a page runs (a fork, or anything
 here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
