@@ -531,6 +531,18 @@ changes. Keep it current in the same work as what changes it, like the README:
   Windows 10 counts every open (KB4490156), so that one climbs by a canvas a frame, past a terabyte in 15 minutes, while
   the other two hold flat and the page plays on. nvidia-smi's memory is the whole GPU's, so a page that fills video
   memory beside another (Conker's in Firefox) shows as the other page's climb and its "Out of Memory".
+- `play_page.mjs` reads the browser's GPU process's private bytes in each sample, and in Firefox about:memory's split
+  of them at the play's start and end (page_driver.mjs's `gpuProcessMemory`): Firefox's own heap (its WebGPU and
+  wgpu), the system heap (the D3D12 runtime, the driver, DXC) and the GPU memory it has committed. Rush 2049's page
+  from Pages, 10 minutes of its attract demo, Firefox 158 on an RTX 2070 (a busy host): after the first minute 1.1 →
+  1.6 GB at 1920x945 and 1.7 → 2.1 GB at 3840x2000, a step of ~210 MB some 4 minutes in (GPU memory moving to
+  shared) and then 0.2-0.4 MB a second; from minute 1 to 10 Firefox's heap +4 MB, the system heap +207 MB, GPU
+  committed +245 MB (shared +179). Chrome 155 on the same page: 718 → 791 MB, levelling off. The page's WebGPU
+  objects don't pile up: a preload counting what it made and what JavaScript collected held ~2,000 textures, ~5,000
+  bind groups (plume 97f4e64's 4,096 among them) and ~1,800 command buffers alive over 6 minutes, making ~120 textures
+  and ~250 command buffers a second. On a laptop's Intel UHD (Firefox 158, 1920x945) it grew a steady 3.5 MB a
+  second, 2.1 GB in 10 minutes, the graphics' shared memory +740 MB: there every GPU allocation is system memory, and
+  which part grows there is not read yet.
 - One page at a time on the machine, in any browser. With two Firefox windows each playing a page, one window's
   animation frames came in bursts (a quarter of the intervals under 5 ms, up to 20 presents between two frames), which
   plume's displayTiming read as a display of hundreds of Hz before plume 16e608a, so RT64 interpolated to it: 80-150
@@ -1306,6 +1318,11 @@ running in a browser was found to learn from.
 
 ## Ruled out, so don't retry
 
+- One of plume's WebGPU calls as what grows Firefox's GPU process: on a test page submitting after each batch, empty
+  submissions (~650 a second), onSubmittedWorkDone (~600), 4 KB writeBuffers (~1,200), textures made, written and
+  destroyed (~160) and ~70 new pipelines grew it by nothing over 45-85 s each, and a 1920x945 canvas presenting 60 a
+  second ~1 KB a present (Firefox 158, RTX 2070). With no submission, writeBuffer and writeTexture grow it ~90 KB a
+  call until one comes (the writes wait for the next submit), so such a test page submits.
 - coi_serviceworker.js's reload missed because its worker got further than register()'s promise ('updatefound'
   fired before the listener, or the worker already activating): in ~100 cold Firefox 158 visits register() always
   resolved with the worker still installing, and the reload always came. A first visit that never started was the
