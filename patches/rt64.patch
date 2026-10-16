@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web 179adb8a8322f8fd6f3e5c2b2b5e867c6afeaedb
+rt64: https://github.com/amazingalek/rt64-web 977ddca892b8589b2e88cd6ef59b92be46bf85b4
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..0548747 100644
+index 79dfc38..b9145b8 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,13 @@ endif()
@@ -208,7 +208,7 @@ index 79dfc38..0548747 100644
  target_link_libraries(rt64 libzstd_static)
  target_link_libraries(rt64 plume)
  
-@@ -504,9 +604,112 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
+@@ -504,9 +604,131 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING")
@@ -268,6 +268,19 @@ index 79dfc38..0548747 100644
 +        message(FATAL_ERROR "spirv-opt not found: the prebuilt shaders need it. Install SPIRV-Tools or set RT64_SPIRV_OPT_EXECUTABLE.")
 +    endif()
 +    add_subdirectory(src/tools/shader_specializer)
++    # A decal's pixel shader writes its depth bounds instead of reading the depth buffer (RasterPS.hlsl,
++    # DECAL_DEPTH_BOUNDS), so that it draws in the pass that writes depth: SPIR-V only, for these.
++    foreach(PREBUILT_DECAL_VARIANT "" "Flat" "DualSource" "FlatDualSource")
++        set(PREBUILT_DECAL_DEFINES "-D" "SPEC_CONSTANT_RENDER_PARAMS" "-D" "DECAL_DEPTH_BOUNDS")
++        if (PREBUILT_DECAL_VARIANT MATCHES "Flat")
++            list(APPEND PREBUILT_DECAL_DEFINES "-D" "VERTEX_FLAT_COLOR")
++        endif()
++        if (PREBUILT_DECAL_VARIANT MATCHES "DualSource")
++            list(APPEND PREBUILT_DECAL_DEFINES "-D" "DUAL_SOURCE_BLENDING")
++        endif()
++        add_dxc_command(${CMAKE_BINARY_DIR}/src/shaders/RasterPSSpecConstant${PREBUILT_DECAL_VARIANT}Decal.hlsl.wgsl.spv
++            ${PROJECT_SOURCE_DIR}/src/shaders/RasterPS.hlsl ${DXC_SPV_OPTS} -D WEBGPU ${DXC_PS_OPTS} ${PREBUILT_DECAL_DEFINES})
++    endforeach()
 +    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${RT64_PREBUILT_SHADER_LIST})
 +    file(STRINGS ${RT64_PREBUILT_SHADER_LIST} PREBUILT_LINES REGEX "^[0-9a-fA-F]+( +[0-9a-fA-F]+)( +[0-9a-fA-F]+)( +[0-9a-fA-F]+)( +[0-9a-fA-F]+)")
 +    set(PREBUILT_DIR "${CMAKE_BINARY_DIR}/rt64_prebuilt_shaders")
@@ -287,16 +300,22 @@ index 79dfc38..0548747 100644
 +            math(EXPR PREBUILT_ID "${PREBUILT_ID} + 1")
 +        endforeach()
 +        string(JOIN " " PREBUILT_SPEC_CONSTANTS ${PREBUILT_SPEC_CONSTANTS})
-+        # The flags' fourth bit is smoothShade.
++        # The flags' fourth bit is smoothShade, and other mode L's bits 10 and 11 both set are a decal (ZMODE_DEC).
 +        math(EXPR PREBUILT_SMOOTH "(0x${PREBUILT_FLAGS} >> 3) & 1")
++        list(GET PREBUILT_WORDS 0 PREBUILT_OTHER_MODE_L)
++        math(EXPR PREBUILT_ZMODE "(0x${PREBUILT_OTHER_MODE_L} >> 10) & 3")
++        set(PREBUILT_PS_DECAL "")
++        if (PREBUILT_ZMODE EQUAL 3)
++            set(PREBUILT_PS_DECAL "Decal")
++        endif()
 +        if (PREBUILT_SMOOTH)
 +            set(PREBUILT_SPIRV_vs "${PREBUILT_SPIRV}/RasterVSSpecConstant.hlsl.wgsl.spv")
-+            set(PREBUILT_SPIRV_ps "${PREBUILT_SPIRV}/RasterPSSpecConstantDualSource.hlsl.wgsl.spv")
-+            set(PREBUILT_SPIRV_ps-single "${PREBUILT_SPIRV}/RasterPSSpecConstant.hlsl.wgsl.spv")
++            set(PREBUILT_SPIRV_ps "${PREBUILT_SPIRV}/RasterPSSpecConstantDualSource${PREBUILT_PS_DECAL}.hlsl.wgsl.spv")
++            set(PREBUILT_SPIRV_ps-single "${PREBUILT_SPIRV}/RasterPSSpecConstant${PREBUILT_PS_DECAL}.hlsl.wgsl.spv")
 +        else()
 +            set(PREBUILT_SPIRV_vs "${PREBUILT_SPIRV}/RasterVSSpecConstantFlat.hlsl.wgsl.spv")
-+            set(PREBUILT_SPIRV_ps "${PREBUILT_SPIRV}/RasterPSSpecConstantFlatDualSource.hlsl.wgsl.spv")
-+            set(PREBUILT_SPIRV_ps-single "${PREBUILT_SPIRV}/RasterPSSpecConstantFlat.hlsl.wgsl.spv")
++            set(PREBUILT_SPIRV_ps "${PREBUILT_SPIRV}/RasterPSSpecConstantFlatDualSource${PREBUILT_PS_DECAL}.hlsl.wgsl.spv")
++            set(PREBUILT_SPIRV_ps-single "${PREBUILT_SPIRV}/RasterPSSpecConstantFlat${PREBUILT_PS_DECAL}.hlsl.wgsl.spv")
 +        endif()
 +        set(PREBUILT_OUT "${PREBUILT_DIR}/${PREBUILT_KEY}")
 +        set(PREBUILT_COMMANDS)
@@ -691,7 +710,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..839b243 100644
+index 785de27..6c840e6 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -743,7 +762,22 @@ index 785de27..839b243 100644
          for (uint32_t creationAttempt = 0; (creationAttempt < CreationAttempts) && (device == nullptr); creationAttempt++) {
  #       ifdef _WIN64
              if (creationAttempt == 1) {
-@@ -316,7 +336,7 @@ namespace RT64 {
+@@ -294,6 +314,14 @@ namespace RT64 {
+             break;
+         }
+ 
++#   if defined(RT64_WGSL)
++        // A depth target with a stencil, for the prebuilt decals (RasterShader::createPipeline()), where the device has
++        // depth32float-stencil8, an optional feature of WebGPU.
++        if (device->getSampleCountsSupported(RenderFormat::D32_FLOAT_S8_UINT) & RenderSampleCount::COUNT_1) {
++            RenderTarget::setDepthBufferFormat(RenderFormat::D32_FLOAT_S8_UINT);
++        }
++#   endif
++
+         // Call the init hook if one was attached.
+         RenderHookInit *initHook = GetRenderHookInit();
+         if (initHook != nullptr) {
+@@ -316,7 +344,7 @@ namespace RT64 {
          // Create the swap chain with the texture count specified from the configuration.
          RenderSwapChainDesc swapChainDesc;
          swapChainDesc.renderWindow = appWindow->windowHandle;
@@ -752,7 +786,7 @@ index 785de27..839b243 100644
          swapChainDesc.textureCount = (userConfig.displayBuffering == UserConfiguration::DisplayBuffering::Triple) ? 3 : 2;
  
          // Enable present wait if supported by the device. We specify a max latency of 1 as we use it to wait right before the next
-@@ -350,7 +370,14 @@ namespace RT64 {
+@@ -350,7 +378,14 @@ namespace RT64 {
          // Create the shader caches.
          // Estimate the amount of shader compiler threads by trying to use about half of the system's available threads.
          // We need the ubershader pipelines done as soon as possible, so we use a different thread count that demands more of the system.
@@ -767,7 +801,7 @@ index 785de27..839b243 100644
          const uint32_t ubershaderThreads = uint32_t(std::max(int(threadsAvailable) - 2, 1));
          rasterShaderCache = std::make_unique<RasterShaderCache>(rasterShaderThreads, ubershaderThreads);
          rasterShaderCache->setup(device.get(), renderInterface->getCapabilities().shaderFormat, shaderLibrary.get(), multisampling);
-@@ -391,7 +418,12 @@ namespace RT64 {
+@@ -391,7 +426,12 @@ namespace RT64 {
          sharedQueueResources->setEmulatorConfig(emulatorConfig);
          sharedQueueResources->setEnhancementConfig(enhancementConfig);
          sharedQueueResources->setSwapChainSize(swapChain->getWidth(), swapChain->getHeight());
@@ -779,6 +813,20 @@ index 785de27..839b243 100644
 +#   endif
          sharedQueueResources->renderTargetManager.setMultisampling(multisampling);
          sharedQueueResources->renderTargetManager.setUsesHDR(usesHDR);
+ 
+@@ -455,6 +495,13 @@ namespace RT64 {
+         // Set up the RDP
+         state->rdp->setGBI();
+ 
++#   if defined(__EMSCRIPTEN__)
++        // Where pipelines build in the background (Chrome), the ubershader's are built before the game draws with them.
++        if (device->getCapabilities().backgroundPipelineBuilds) {
++            state->warmUpPipelines();
++        }
++#   endif
++
+         return SetupResult::Success;
+     }
  
 diff --git a/src/hle/rt64_application_window.cpp b/src/hle/rt64_application_window.cpp
 index 08f83e5..75800e1 100755
@@ -1367,7 +1415,7 @@ index 8858dac..933b80e 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..23ea976 100644
+index 2970e71..30799fb 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
 @@ -7,6 +7,13 @@
@@ -1531,7 +1579,25 @@ index 2970e71..23ea976 100644
          flush();
          submitFramebufferPair(FramebufferPair::FlushReason::ProcessDisplayListsEnd);
  
-@@ -1254,6 +1380,10 @@ namespace RT64 {
+@@ -809,6 +935,7 @@ namespace RT64 {
+         // Copy the current state's extended parameters into the workload.
+         workload.extended.ditherNoiseStrength = extended.ditherNoiseStrength;
+         workload.extended.texcoordWrapPoint = extended.texcoordWrapPoint;
++        workload.extended.pipelineWarmUp = extended.pipelineWarmUp;
+ 
+         auto emitTileWarning = [&](CommandWarning warning, size_t tileIndex) {
+             warning.indexType = CommandWarning::IndexType::TileIndex;
+@@ -1103,7 +1230,8 @@ namespace RT64 {
+ 
+                     // Submit the shader to the cache so compilation can start right away.
+                     // Ignore any calls that use fill type, as they're emulated without using a shader.
+-                    if (callDesc.otherMode.cycleType() != G_CYC_FILL) {
++                    // A pipeline warm-up's draw is the game's no more than its shader is (warmUpPipelines()).
++                    if ((callDesc.otherMode.cycleType() != G_CYC_FILL) && !extended.pipelineWarmUp) {
+                         ext.rasterShaderCache->submit(shaderDesc);
+                     }
+ 
+@@ -1254,6 +1382,10 @@ namespace RT64 {
                              resizedTargets.emplace(colorDepthPair.second);
                          }
                      }
@@ -1542,7 +1608,7 @@ index 2970e71..23ea976 100644
                  }
  
                  for (RenderTarget *renderTarget : resizedTargets) {
-@@ -1264,6 +1394,9 @@ namespace RT64 {
+@@ -1264,6 +1396,9 @@ namespace RT64 {
              };
  
              auto renderAndSynchronize = [&](uint32_t maxFramebufferPair) {
@@ -1552,7 +1618,7 @@ index 2970e71..23ea976 100644
                  // Preprocess all the framebuffer operations.
                  uint32_t pairCursor = framebufferPairCursor;
                  while (pairCursor < maxFramebufferPair) {
-@@ -1346,7 +1479,7 @@ namespace RT64 {
+@@ -1346,7 +1481,7 @@ namespace RT64 {
                  }
  
                  // Record all setup previous to drawing any of the recorded framebuffers.
@@ -1561,7 +1627,7 @@ index 2970e71..23ea976 100644
                  framebufferRenderer->recordSetup(ext.framebufferGraphicsWorker, bufferUploaders, queuedProcessor, nullptr, &workload.outputBuffers, false);
  
                  // Record the command list for the framebuffer pairs.
-@@ -1471,15 +1604,26 @@ namespace RT64 {
+@@ -1471,15 +1606,26 @@ namespace RT64 {
                  ext.framebufferGraphicsWorker->commandList->end();
                  framebufferRenderer->waitForUploaders();
                  ext.framebufferGraphicsWorker->execute();
@@ -1591,32 +1657,7 @@ index 2970e71..23ea976 100644
                          }
                      }
  
-@@ -1774,6 +1918,24 @@ namespace RT64 {
-             }
-         }
-         
-+        // Whether the workload draws to any framebuffer the VI has shown lately.
-+        bool viShowsAny = false;
-+        bool drawsShown = false;
-+        for (const VIHistory::Present &entry : viHistory.history) {
-+            if (!entry.vi.visible()) {
-+                continue;
-+            }
-+
-+            viShowsAny = true;
-+            for (uint32_t f = 0; (f < workload.fbPairCount) && !drawsShown; f++) {
-+                const FramebufferPair &fbPair = workload.fbPairs[f];
-+                drawsShown = !fbPair.drawColorRect.isEmpty() && (fbPair.colorImage.address == entry.vi.fbAddress()) &&
-+                    (fbPair.colorImage.width == entry.vi.fbSize().x) && (fbPair.colorImage.siz == entry.vi.fbSiz());
-+            }
-+        }
-+
-+        workload.offscreenOnly = viShowsAny && (workload.fbPairCount > 0) && !drawsShown;
-+
-         // Advance the workload queue at the end of a full synchronization.
-         advanceWorkload(workload, false);
-         ext.workloadQueue->advanceToNextWorkload();
-@@ -1836,6 +1998,10 @@ namespace RT64 {
+@@ -1836,6 +1982,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1627,7 +1668,7 @@ index 2970e71..23ea976 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2075,7 @@ namespace RT64 {
+@@ -1909,6 +2059,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {
@@ -1635,8 +1676,62 @@ index 2970e71..23ea976 100644
                          {
                              RenderWorkerExecution workerExecution(worker);
                              thread_local std::vector<uint32_t> fbDiscards;
+@@ -2660,6 +2811,27 @@ namespace RT64 {
+         workload.debuggerCamera = debuggerInspector.camera;
+         workload.debuggerRenderer = debuggerInspector.renderer;
+         workload.paused = paused;
++
++        // Whether the workload draws to any framebuffer the VI has shown lately, for a workload a full sync ends. It's
++        // worked out here, not where fullSync() ends, which the games' own patches of RT64 add to.
++        if (!paused) {
++            bool viShowsAny = false;
++            bool drawsShown = false;
++            for (const VIHistory::Present &entry : viHistory.history) {
++                if (!entry.vi.visible()) {
++                    continue;
++                }
++
++                viShowsAny = true;
++                for (uint32_t f = 0; (f < workload.fbPairCount) && !drawsShown; f++) {
++                    const FramebufferPair &fbPair = workload.fbPairs[f];
++                    drawsShown = !fbPair.drawColorRect.isEmpty() && (fbPair.colorImage.address == entry.vi.fbAddress()) &&
++                        (fbPair.colorImage.width == entry.vi.fbSize().x) && (fbPair.colorImage.siz == entry.vi.fbSiz());
++                }
++            }
++
++            workload.offscreenOnly = viShowsAny && (workload.fbPairCount > 0) && !drawsShown;
++        }
+     }
+ 
+     void State::advancePresent(Present &present, bool paused) {
+@@ -2724,6 +2896,25 @@ namespace RT64 {
+         extended.renderToRAM = renderToRAM;
+     }
+ 
++    // A list that draws a rect with the ubershader through the renderer, but none of its triangles (drawsNothing), and
++    // copies nothing to RAM: on WebGPU the draw of nothing resolves the layout of the sets the renderer draws with, which
++    // starts the pipelines made for it in the background (plume's WebGPUGraphicsPipeline), where the device builds them
++    // there. Done at setup, the ubershader's pipelines (one per depth and coverage state) are built behind the launcher;
++    // otherwise the game's first frame resolved the layout and built each state it drew in line, which in Chrome held the
++    // page's presents for as long (1.4-2.0 s for Banjo's four). The prebuilt list's pipelines wait for that layout too,
++    // so they build behind the launcher as well. Its draw asks the shader cache for no shader (fullSync()).
++    void State::warmUpPipelines() {
++        listProcessBegin();
++        rdp->setColorImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 320, 0x700000);
++        rdp->setOtherMode(G_CYC_1CYCLE, 0);
++        rdp->setScissor(0, 0, 0, 320 << 2, 240 << 2);
++        rdp->fillRect(0, 0, 16 << 2, 16 << 2);
++        setRenderToRAM(0);
++        extended.pipelineWarmUp = true;
++        fullSync();
++        listProcessEnd();
++    }
++
+     void State::setDitherNoiseStrength(float noiseStrength) {
+         extended.ditherNoiseStrength = noiseStrength;
+     }
 diff --git a/src/hle/rt64_state.h b/src/hle/rt64_state.h
-index 7a8c13b..019e41d 100644
+index 7a8c13b..551816c 100644
 --- a/src/hle/rt64_state.h
 +++ b/src/hle/rt64_state.h
 @@ -91,6 +91,28 @@ namespace RT64 {
@@ -1668,7 +1763,15 @@ index 7a8c13b..019e41d 100644
          GameConfiguration gameConfig;
          uint32_t displayListAddress;
          uint64_t displayListCounter;
-@@ -144,6 +166,8 @@ namespace RT64 {
+@@ -129,6 +151,7 @@ namespace RT64 {
+             bool vertexTestZActive = false;
+             float ditherNoiseStrength = 1.0f;
+             bool extendRDRAM = false;
++            bool pipelineWarmUp = false;
+         };
+ 
+         Extended extended;
+@@ -144,6 +167,8 @@ namespace RT64 {
          void flush();
          void submitFramebufferPair(FramebufferPair::FlushReason flushReason);
          void checkRDRAM();
@@ -1677,6 +1780,14 @@ index 7a8c13b..019e41d 100644
          void fullSync();
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
+@@ -162,6 +187,7 @@ namespace RT64 {
+         DisplayList *popReturnAddress();
+         void setRefreshRate(uint16_t refreshRate);
+         void setRenderToRAM(uint8_t renderToRAM);
++        void warmUpPipelines();
+         void setDitherNoiseStrength(float noiseStrength);
+         void setExtendedRDRAM(bool isExtended);
+         void setTexcoordWrapPoint(int16_t wrapU, int16_t wrapV);
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
 index a870166..05625cc 100644
 --- a/src/hle/rt64_vi.cpp
@@ -1707,8 +1818,20 @@ index a870166..05625cc 100644
      }
  
      const VIHistory::Present &VIHistory::top() const {
+diff --git a/src/hle/rt64_workload.cpp b/src/hle/rt64_workload.cpp
+index b4c85f5..6d3d99d 100644
+--- a/src/hle/rt64_workload.cpp
++++ b/src/hle/rt64_workload.cpp
+@@ -22,6 +22,7 @@ namespace RT64 {
+         workloadId = 0;
+         extended.testZIndexCount = 0;
+         extended.ditherNoiseStrength = 1.0f;
++        extended.pipelineWarmUp = false;
+ 
+         commandWarnings.clear();
+         spriteCommands.clear();
 diff --git a/src/hle/rt64_workload.h b/src/hle/rt64_workload.h
-index 8ea27d5..0f4af83 100644
+index 8ea27d5..f97f6c6 100644
 --- a/src/hle/rt64_workload.h
 +++ b/src/hle/rt64_workload.h
 @@ -226,6 +226,9 @@ namespace RT64 {
@@ -1721,8 +1844,16 @@ index 8ea27d5..0f4af83 100644
          DebuggerRenderer debuggerRenderer;
          DebuggerCamera debuggerCamera;
          std::multimap<uint32_t, uint32_t> transformIdMap;
+@@ -239,6 +242,7 @@ namespace RT64 {
+             uint32_t testZIndexCount = 0;
+             float ditherNoiseStrength = 1.0f;
+             hlslpp::float2 texcoordWrapPoint = {};
++            bool pipelineWarmUp = false;
+         } extended;
+ 
+         void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..e43adfa 100644
+index 5a331aa..1e6b70d 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -1761,7 +1892,17 @@ index 5a331aa..e43adfa 100644
              for (RenderTarget *renderTarget : resizedTargets) {
                  renderFramebufferManager->destroyAllWithRenderTarget(renderTarget);
              }
-@@ -701,7 +715,7 @@ namespace RT64 {
+@@ -635,7 +649,8 @@ namespace RT64 {
+                     drawParams.rtEnabled = workloadConfig.raytracingEnabled;
+                     drawParams.submissionFrame = workload.submissionFrame;
+                     drawParams.deltaTimeMs = deltaTimeMs;
+-                    drawParams.ubershadersOnly = ubershadersOnly;
++                    drawParams.ubershadersOnly = ubershadersOnly || workload.extended.pipelineWarmUp;
++                    drawParams.drawsNothing = workload.extended.pipelineWarmUp;
+                     drawParams.postBlendNoise = workloadConfig.postBlendNoise;
+                     drawParams.postBlendNoiseNegative = workloadConfig.postBlendNoiseNegative;
+                     drawParams.maxGameCall = std::min(gameCallCountMax - gameCallCursor, fbPair.gameCallCount);
+@@ -701,7 +716,7 @@ namespace RT64 {
              ext.workloadGraphicsWorker->commandList->begin();
              ext.workloadGraphicsWorker->commandList->resetQueryPool(queryPool.get(), 0, 2);
              ext.workloadGraphicsWorker->commandList->writeTimestamp(queryPool.get(), 0);
@@ -1770,7 +1911,7 @@ index 5a331aa..e43adfa 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -888,6 +902,9 @@ namespace RT64 {
+@@ -888,6 +903,9 @@ namespace RT64 {
          uint32_t displayRateForTicks = 0;
          int processCursor = -1;
          bool frameReduction = false;
@@ -1780,7 +1921,7 @@ index 5a331aa..e43adfa 100644
          while (threadsRunning) {
              {
                  std::unique_lock<std::mutex> cursorLock(cursorMutex);
-@@ -902,6 +919,12 @@ namespace RT64 {
+@@ -902,6 +920,12 @@ namespace RT64 {
              }
  
              if (processCursor >= 0) {
@@ -1793,7 +1934,7 @@ index 5a331aa..e43adfa 100644
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  Workload &workload = workloads[processCursor];
                  ext.presentQueue->waitForPresentId(workload.presentId);
-@@ -914,22 +937,36 @@ namespace RT64 {
+@@ -914,22 +938,36 @@ namespace RT64 {
                  workloadProfiler.start();
                  threadConfigurationUpdate(workload.viFbSize, workloadConfig);
  
@@ -1834,7 +1975,7 @@ index 5a331aa..e43adfa 100644
                      std::scoped_lock<std::mutex> managerLock(ext.sharedResources->managerMutex);
                      FramebufferManager &fbManager = ext.sharedResources->framebufferManager;
                      std::vector<uint32_t> &colorVector = ext.sharedResources->colorImageAddressVector;
-@@ -973,7 +1010,7 @@ namespace RT64 {
+@@ -973,7 +1011,7 @@ namespace RT64 {
                  float prevFrameWeight = 0.0f;
                  float curFrameWeight = 1.0f;
                  float deltaTimeMs = 1.0f / 30.0f;
@@ -1843,7 +1984,7 @@ index 5a331aa..e43adfa 100644
                  bool generateInterpolatedFrames = false;
                  bool velocityUploaderUsed = false;
                  bool tileInterpolationUsed = false;
-@@ -1022,7 +1059,7 @@ namespace RT64 {
+@@ -1022,7 +1060,7 @@ namespace RT64 {
                  
                  // Get the current and previous set of frame counters. The other set can be in use by the present queue. Skip if no new present event has arrived before this workload event.
                  InterpolatedFrameCounters &prevFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -1852,7 +1993,7 @@ index 5a331aa..e43adfa 100644
                  if (useDifferentCounters) {
                      ext.sharedResources->interpolatedFramesIndex = ext.sharedResources->interpolatedFramesIndex ^ 1;
                      lastPresentId = workload.presentId;
-@@ -1037,10 +1074,12 @@ namespace RT64 {
+@@ -1037,10 +1075,12 @@ namespace RT64 {
                  }
  
                  InterpolatedFrameCounters &curFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -1869,7 +2010,7 @@ index 5a331aa..e43adfa 100644
  
                  // Create as many render targets as required to store the interpolated targets.
                  auto &interpolatedTargets = ext.sharedResources->interpolatedColorTargets;
-@@ -1133,6 +1172,10 @@ namespace RT64 {
+@@ -1133,6 +1173,10 @@ namespace RT64 {
                          {
                              std::scoped_lock<std::mutex> cursorLock(cursorMutex);
                              skipWorkloadNow = ((frame + 1) < displayFrames) && (writeCursor != threadCursor);
@@ -1880,7 +2021,7 @@ index 5a331aa..e43adfa 100644
                          }
  
                          {
-@@ -1164,7 +1207,16 @@ namespace RT64 {
+@@ -1164,7 +1208,16 @@ namespace RT64 {
  
                  threadConfigurationValidate();
  
@@ -2115,7 +2256,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..dfaf629 100644
+index 9fae0d4..3f149e6 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -2135,6 +2276,15 @@ index 9fae0d4..dfaf629 100644
          dummyColorTargetView.reset();
          dummyDepthTargetView.reset();
          dummyColorTarget.reset();
+@@ -187,7 +190,7 @@ namespace RT64 {
+ 
+         // Create dummy depth target if it hasn't been created yet.
+         if (dummyDepthTarget == nullptr) {
+-            RenderTextureDesc dummyDepthDesc = RenderTextureDesc::DepthTarget(4, 4, RenderFormat::D32_FLOAT, multisampling);
++            RenderTextureDesc dummyDepthDesc = RenderTextureDesc::DepthTarget(4, 4, RenderTarget::depthBufferFormat(), multisampling);
+             dummyDepthTarget = worker->device->createTexture(dummyDepthDesc);
+             dummyDepthTarget->setName("Framebuffer Renderer Depth Dummy");
+             dummyDepthTargetView = dummyDepthTarget->createTextureView(RenderTextureViewDesc::Texture2D(dummyDepthDesc.format));
 @@ -310,12 +313,12 @@ namespace RT64 {
          assert(worker != nullptr);
          assert(drawBuffers != nullptr);
@@ -2213,7 +2363,24 @@ index 9fae0d4..dfaf629 100644
              worker->commandList->setGraphicsDescriptorSet(depthState ? descRealFbSet : descDummyFbSet, 3);
              worker->commandList->setViewports(framebuffer.viewport);
          };
-@@ -570,6 +607,14 @@ namespace RT64 {
+@@ -551,13 +588,14 @@ namespace RT64 {
+                 }
+ 
+                 // A new pass must be started if decals are required and something wrote to the depth buffer before this call.
++                // A prebuilt decal on WebGPU reads no depth and writes the stencil, so it needs the pass that writes them.
+                 const interop::OtherMode otherMode = triangles.shaderDesc.otherMode;
+                 bool depthDecal = (otherMode.zMode() == ZMODE_DEC);
+                 bool depthWrite = otherMode.zUpd();
+-                if (depthDecal) {
++                if (depthDecal && (triangles.decalMarkPipeline == nullptr)) {
+                     switchToDepthRead();
+                 }
+-                else if (!depthDecal && depthWrite) {
++                else if (depthWrite || (triangles.decalMarkPipeline != nullptr)) {
+                     switchToDepthWrite();
+                 }
+ 
+@@ -570,10 +608,30 @@ namespace RT64 {
                      worker->commandList->setPipeline(triangles.pipeline);
                      previousPipeline = triangles.pipeline;
                  }
@@ -2228,7 +2395,23 @@ index 9fae0d4..dfaf629 100644
                  
                  rasterParams.renderIndex = i;
                  rasterParams.screenScale = triangles.screenScale;
-@@ -618,7 +663,12 @@ namespace RT64 {
+                 rasterParams.screenOffset = triangles.screenOffset;
++
++                // A prebuilt decal's first draw marks the stencil where the surface is no deeper than its high bound
++                // (RasterShader::createPipeline()), padding0 1 for it: nothing else reads padding0 in a raster draw.
++                if (triangles.decalMarkPipeline != nullptr) {
++                    worker->commandList->setPipeline(triangles.decalMarkPipeline);
++                    rasterParams.padding0 = 1;
++                    worker->commandList->setGraphicsPushConstants(0, &rasterParams);
++                    drawCallTriangles(drawCall);
++                    worker->commandList->setPipeline(triangles.pipeline);
++                    rasterParams.padding0 = 0;
++                }
++
+                 worker->commandList->setGraphicsPushConstants(0, &rasterParams);
+ 
+                 drawCallTriangles(drawCall);
+@@ -618,7 +676,12 @@ namespace RT64 {
                  const interop::RSPVertexTestZCB &testZCB = drawCall.vertexTestZ;
                  switchToDepthRead();
  
@@ -2241,7 +2424,7 @@ index 9fae0d4..dfaf629 100644
                  const auto &rspVertexTestZ = useMSAA ? shaderLibrary->rspVertexTestZMS : shaderLibrary->rspVertexTestZ;
                  worker->commandList->barriers(RenderBarrierStage::COMPUTE, RenderBufferBarrier(testZIndexBuffer, RenderBufferAccess::WRITE));
                  worker->commandList->setPipeline(rspVertexTestZ.pipeline.get());
-@@ -1339,8 +1389,15 @@ namespace RT64 {
+@@ -1339,8 +1402,15 @@ namespace RT64 {
          memcpy(paramBufferBytes, &fbParams, sizeof(interop::FramebufferParams));
          framebuffer.paramsBuffer->unmap();
  
@@ -2257,7 +2440,27 @@ index 9fae0d4..dfaf629 100644
          framebuffer.descRealFbSet->setBuffer(framebuffer.descRealFbSet->FbParams, framebuffer.paramsBuffer.get(), sizeof(interop::FramebufferParams));
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundColor, backgroundColorTexture, RenderTextureLayout::SHADER_READ, backgroundColorTextureView);
          framebuffer.descRealFbSet->setTexture(framebuffer.descRealFbSet->gBackgroundDepth, p.fbStorage->depthTarget->texture.get(), RenderTextureLayout::DEPTH_READ, p.fbStorage->depthTarget->textureView.get());
-@@ -1760,7 +1817,205 @@ namespace RT64 {
+@@ -1608,8 +1678,10 @@ namespace RT64 {
+                         triangles.shaderDesc = call.shaderDesc;
+ 
+                         RasterShader *gpuShader = p.ubershadersOnly ? nullptr : p.rasterShaderCache->getGPUShader(call.shaderDesc);
++                        triangles.decalMarkPipeline = nullptr;
+                         if (gpuShader != nullptr) {
+                             triangles.pipeline = gpuShader->pipeline.get();
++                            triangles.decalMarkPipeline = gpuShader->decalMarkPipeline.get();
+                         }
+                         else {
+                             const bool copyMode = (call.shaderDesc.otherMode.cycleType() == G_CYC_COPY);
+@@ -1619,7 +1691,7 @@ namespace RT64 {
+                                 (call.shaderDesc.otherMode.cvgDst() == CVG_DST_WRAP) || (call.shaderDesc.otherMode.cvgDst() == CVG_DST_SAVE));
+                         }
+                         
+-                        triangles.faceCount = call.callDesc.triangleCount;
++                        triangles.faceCount = p.drawsNothing ? 0 : call.callDesc.triangleCount;
+                         triangles.vertexTestZ = (vertexTestZCallIndex >= 0);
+                         triangles.postBlendDitherNoise = false;
+ 
+@@ -1760,7 +1832,205 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
  
@@ -2464,7 +2667,7 @@ index 9fae0d4..dfaf629 100644
          bool shaderViewRtEnabled = false;
          std::vector<BufferUploader::Upload> shaderUploads = {
              { renderIndicesVector.data(), { 0, renderIndicesVector.size() }, sizeof(interop::RenderIndices), RenderBufferFlag::STORAGE, { }, &renderIndicesBuffer},
-@@ -1816,8 +2071,16 @@ namespace RT64 {
+@@ -1816,8 +2086,16 @@ namespace RT64 {
          }
  #   endif
  
@@ -2482,7 +2685,7 @@ index 9fae0d4..dfaf629 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..9ec3b6a 100644
+index 3add9c3..4efd5c4 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
 @@ -98,6 +98,41 @@ namespace RT64 {
@@ -2527,7 +2730,15 @@ index 3add9c3..9ec3b6a 100644
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -166,7 +201,9 @@ namespace RT64 {
+@@ -144,6 +179,7 @@ namespace RT64 {
+             uint64_t submissionFrame;
+             float deltaTimeMs;
+             bool ubershadersOnly;
++            bool drawsNothing = false; // Every draw of no triangles (State::warmUpPipelines()).
+             bool postBlendNoise;
+             bool postBlendNoiseNegative;
+             uint32_t maxGameCall;
+@@ -166,7 +202,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);
@@ -2538,6 +2749,19 @@ index 3add9c3..9ec3b6a 100644
          void recordSetup(RenderWorker *worker, std::vector<BufferUploader *> bufferUploaders, RSPProcessor *rspProcessor, VertexProcessor *vertexProcessor, const OutputBuffers *outputBuffers, bool rtEnabled);
          void recordFramebuffer(RenderWorker *worker, uint32_t framebufferIndex);
          void waitForUploaders();
+diff --git a/src/render/rt64_framebuffer_renderer_call.h b/src/render/rt64_framebuffer_renderer_call.h
+index f2eee70..1f87967 100644
+--- a/src/render/rt64_framebuffer_renderer_call.h
++++ b/src/render/rt64_framebuffer_renderer_call.h
+@@ -33,6 +33,8 @@ namespace RT64 {
+             struct {
+                 ShaderDescription shaderDesc;
+                 const RenderPipeline *pipeline;
++                // A prebuilt decal's first draw on WebGPU, which marks where it passes (RasterShader::decalMarkPipeline).
++                const RenderPipeline *decalMarkPipeline;
+                 interop::float2 screenScale;
+                 interop::float2 screenOffset;
+                 RenderRect scissor;
 diff --git a/src/render/rt64_native_target.cpp b/src/render/rt64_native_target.cpp
 index 6891b7b..9e3e52f 100644
 --- a/src/render/rt64_native_target.cpp
@@ -2742,7 +2966,7 @@ index 0000000..9984c41
 +}
 +#endif
 diff --git a/src/render/rt64_raster_shader.cpp b/src/render/rt64_raster_shader.cpp
-index 721a01e..219b340 100644
+index 721a01e..5c40345 100644
 --- a/src/render/rt64_raster_shader.cpp
 +++ b/src/render/rt64_raster_shader.cpp
 @@ -7,18 +7,51 @@
@@ -2927,7 +3151,7 @@ index 721a01e..219b340 100644
              // Choose the pre-compiled shader permutations.
              const respv::Shader *VS = nullptr;
              const respv::Shader *PS = nullptr;
-@@ -218,13 +322,42 @@ namespace RT64 {
+@@ -218,13 +322,54 @@ namespace RT64 {
  #       endif
          }
          
@@ -2947,10 +3171,17 @@ index 721a01e..219b340 100644
 +
 +        std::unique_ptr<RenderShader> vertexShader = device->createShader(vertexWGSL, vertexWGSLSize, "VSMain", RenderShaderFormat::WGSL);
 +        std::unique_ptr<RenderShader> pixelShader = device->createShader(pixelWGSL, pixelWGSLSize, "PSMain", RenderShaderFormat::WGSL);
-+        createPipelineFor(pipelineLayout, vertexShader.get(), pixelShader.get(), {}, multisampling);
++        createPipelineFor(pipelineLayout, vertexShader.get(), pixelShader.get(), {}, multisampling, prebuiltDecalStencil(desc));
 +    }
 +
-+    void RasterShader::createPipelineFor(const RenderPipelineLayout *pipelineLayout, const RenderShader *vertexShader, const RenderShader *pixelShader, const std::vector<RenderSpecConstant> &specConstants, const RenderMultisampling &multisampling) {
++    // A prebuilt decal's pixel shader writes its depth bounds (CMakeLists.txt) and draws with the stencil, which the
++    // depth target has where the device has depth32float-stencil8 (RT64::Application). Without it the prebuilt
++    // decals can't be used, and each is specialized at run time instead, as one the list missed.
++    bool RasterShader::prebuiltDecalStencil(const ShaderDescription &desc) {
++        return (desc.otherMode.zMode() == ZMODE_DEC);
++    }
++
++    void RasterShader::createPipelineFor(const RenderPipelineLayout *pipelineLayout, const RenderShader *vertexShader, const RenderShader *pixelShader, const std::vector<RenderSpecConstant> &specConstants, const RenderMultisampling &multisampling, bool decalStencil) {
          // Create root signature and PSO.
 -        const bool copyMode = (desc.otherMode.cycleType() == G_CYC_COPY);
          PipelineCreation creation;
@@ -2964,7 +3195,12 @@ index 721a01e..219b340 100644
 +        setPipelineState(desc, creation);
 +        creation.specConstants = specConstants;
 +        creation.multisampling = multisampling;
++        creation.decalStencil = decalStencil ? DecalStencil::Draw : DecalStencil::None;
 +        pipeline = createPipeline(creation);
++        if (decalStencil) {
++            creation.decalStencil = DecalStencil::Mark;
++            decalMarkPipeline = createPipeline(creation);
++        }
 +    }
 +
 +    // What of a description goes into its pipeline besides its shaders.
@@ -2973,7 +3209,7 @@ index 721a01e..219b340 100644
          creation.alphaBlend = !copyMode && interop::Blender::usesAlphaBlend(desc.otherMode);
          creation.culling = !copyMode && desc.flags.culling;
          creation.zCmp = !copyMode && desc.otherMode.zCmp() && (desc.otherMode.zMode() != ZMODE_DEC);
-@@ -232,11 +365,14 @@ namespace RT64 {
+@@ -232,11 +377,14 @@ namespace RT64 {
          creation.cvgAdd = (desc.otherMode.cvgDst() == CVG_DST_WRAP) || (desc.otherMode.cvgDst() == CVG_DST_SAVE);
          creation.NoN = desc.flags.NoN;
          creation.usesHDR = desc.flags.usesHDR;
@@ -2993,7 +3229,16 @@ index 721a01e..219b340 100644
      }
  
      RasterShader::~RasterShader() { }
-@@ -328,13 +464,16 @@ namespace RT64 {
+@@ -316,7 +464,7 @@ namespace RT64 {
+         pipelineDesc.depthEnabled = c.zCmp || c.zUpd;
+         pipelineDesc.depthFunction = c.zCmp ? RenderComparisonFunction::LESS : RenderComparisonFunction::ALWAYS;
+         pipelineDesc.depthWriteEnabled = c.zUpd;
+-        pipelineDesc.depthTargetFormat = RenderFormat::D32_FLOAT;
++        pipelineDesc.depthTargetFormat = RenderTarget::depthBufferFormat();
+         pipelineDesc.multisampling = c.multisampling;
+         pipelineDesc.inputSlots = RasterInputSlots;
+         pipelineDesc.inputSlotsCount = uint32_t(std::size(RasterInputSlots));
+@@ -328,13 +476,16 @@ namespace RT64 {
          pipelineDesc.pixelShader = c.pixelShader;
          pipelineDesc.specConstants = c.specConstants.data();
          pipelineDesc.specConstantsCount = uint32_t(c.specConstants.size());
@@ -3012,7 +3257,46 @@ index 721a01e..219b340 100644
              targetBlend.blendOp = RenderBlendOperation::ADD;
          }
  
-@@ -422,12 +561,33 @@ namespace RT64 {
+@@ -344,6 +495,38 @@ namespace RT64 {
+             targetBlend.dstBlendAlpha = RenderBlend::ONE;
+         }
+ 
++        // A prebuilt decal on WebGPU checks its depth with two depth tests and writes none (RasterPS.hlsl,
++        // DECAL_DEPTH_BOUNDS). The first draw writes the highest surface depth that passes and no color, and adds one
++        // to the stencil wherever the surface is no deeper; the second writes the lowest, draws where the stencil isn't
++        // zero and the surface is no nearer, and takes one off wherever the stencil isn't zero, so it ends at zero
++        // again, as a depth target's stencil is between draws. The two draws are the same fragments, which the same
++        // pixel shader discards alike, so each fragment of the second finds the first's mark, except where the decal
++        // covers a pixel twice and only one of its fragments passed the first test, where either may draw.
++        if (c.decalStencil != DecalStencil::None) {
++            const bool mark = (c.decalStencil == DecalStencil::Mark);
++            RenderStencilFaceDesc stencilFace;
++            if (mark) {
++                stencilFace.compareFunction = RenderComparisonFunction::ALWAYS;
++                stencilFace.passOp = RenderStencilOp::INCREMENT_AND_CLAMP;
++                targetBlend.renderTargetWriteMask = 0;
++            }
++            else {
++                stencilFace.compareFunction = RenderComparisonFunction::NOT_EQUAL;
++                stencilFace.passOp = RenderStencilOp::DECREMENT_AND_CLAMP;
++                stencilFace.depthFailOp = RenderStencilOp::DECREMENT_AND_CLAMP;
++            }
++
++            pipelineDesc.depthEnabled = true;
++            pipelineDesc.depthWriteEnabled = false;
++            pipelineDesc.depthFunction = mark ? RenderComparisonFunction::GREATER_EQUAL : RenderComparisonFunction::LESS_EQUAL;
++            pipelineDesc.stencilEnabled = true;
++            pipelineDesc.stencilReadMask = 0xFF;
++            pipelineDesc.stencilWriteMask = 0xFF;
++            pipelineDesc.stencilReference = 0;
++            pipelineDesc.stencilFrontFace = stencilFace;
++            pipelineDesc.stencilBackFace = stencilFace;
++        }
++
+         return c.device->createGraphicsPipeline(pipelineDesc);
+     }
+     
+@@ -422,12 +605,33 @@ namespace RT64 {
              PSBlobSize = uint32_t(useMSAA ? std::size(RasterPSDynamicMSBlobDXIL) : std::size(RasterPSDynamicBlobDXIL));
              break;
  #   endif
@@ -3034,7 +3318,7 @@ index 721a01e..219b340 100644
 +                PSBlob = dualSource ? RasterPSDynamicDualSourceBlobWGSL : RasterPSDynamicBlobWGSL;
 +                PSBlobSize = uint32_t(dualSource ? sizeof(RasterPSDynamicDualSourceBlobWGSL) : sizeof(RasterPSDynamicBlobWGSL));
 +            }
-+            break;
+             break;
 +        }
 +#   else
 +        case RenderShaderFormat::SPIRV: {
@@ -3045,13 +3329,13 @@ index 721a01e..219b340 100644
 +            PSBlob = PS.data;
 +            VSBlobSize = uint32_t(VS.size);
 +            PSBlobSize = uint32_t(PS.size);
-             break;
++            break;
 +        }
 +#   endif
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              VSBlob = RasterVSDynamicBlobMSL;
-@@ -445,14 +605,12 @@ namespace RT64 {
+@@ -445,14 +649,12 @@ namespace RT64 {
          pixelShader = device->createShader(PSBlob, PSBlobSize, "PSMain", shaderFormat);
  
          FramebufferRendererDescriptorCommonSet descriptorCommonSet(shaderLibrary->samplerLibrary, device->getCapabilities().raytracing);
@@ -3067,7 +3351,7 @@ index 721a01e..219b340 100644
          layoutBuilder.addDescriptorSet(descriptorFramebufferSet);
          layoutBuilder.end();
          pipelineLayout = layoutBuilder.create(device);
-@@ -502,11 +660,24 @@ namespace RT64 {
+@@ -502,11 +704,24 @@ namespace RT64 {
              postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobDXIL, std::size(PostBlendDitherNoiseSubNegativePSBlobDXIL), "PSMain", shaderFormat);
              break;
  #   endif
@@ -3096,8 +3380,17 @@ index 721a01e..219b340 100644
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobMSL, std::size(PostBlendDitherNoiseAddPSBlobMSL), "PSMain", shaderFormat);
+@@ -524,7 +739,7 @@ namespace RT64 {
+         postBlendDesc.renderTargetFormat[0] = RenderTarget::colorBufferFormat(shaderLibrary->usesHDR);
+         postBlendDesc.renderTargetCount = 1;
+         postBlendDesc.cullMode = RenderCullMode::NONE;
+-        postBlendDesc.depthTargetFormat = RenderFormat::D32_FLOAT;
++        postBlendDesc.depthTargetFormat = RenderTarget::depthBufferFormat();
+         postBlendDesc.multisampling = multisampling;
+         postBlendDesc.inputSlots = RasterInputSlots;
+         postBlendDesc.inputSlotsCount = uint32_t(std::size(RasterInputSlots));
 diff --git a/src/render/rt64_raster_shader.h b/src/render/rt64_raster_shader.h
-index 3b991ff..f7a5889 100644
+index 3b991ff..3200b7d 100644
 --- a/src/render/rt64_raster_shader.h
 +++ b/src/render/rt64_raster_shader.h
 @@ -9,6 +9,7 @@
@@ -3108,7 +3401,7 @@ index 3b991ff..f7a5889 100644
  
  #include "re-spirv/re-spirv.h"
  
-@@ -36,7 +37,18 @@ namespace RT64 {
+@@ -36,7 +37,25 @@ namespace RT64 {
          respv::Shader rasterPSFlat;
          respv::Shader rasterPSFlatMS;
  
@@ -3125,20 +3418,34 @@ index 3b991ff..f7a5889 100644
 +        // The vertex and pixel shader for a shading mode, created on first use.
 +        void get(RenderDevice *device, bool smoothShade, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader);
 +        const RenderShader *get(RenderDevice *device, const void *blob, uint64_t size, const char *entryPointName);
++    };
++
++    // A prebuilt decal's two draws on WebGPU (RasterShader::createPipeline()).
++    enum class DecalStencil {
++        None,
++        Mark,
++        Draw
      };
  
      struct PipelineCreation {
-@@ -53,6 +65,7 @@ namespace RT64 {
+@@ -53,6 +72,8 @@ namespace RT64 {
          bool usesHDR;
          std::vector<RenderSpecConstant> specConstants;
          RenderMultisampling multisampling;
 +        bool buildInBackground = false;
++        DecalStencil decalStencil = DecalStencil::None;
      };
  
      struct RasterShaderText {
-@@ -66,9 +79,17 @@ namespace RT64 {
+@@ -65,10 +86,24 @@ namespace RT64 {
+         RenderDevice *device;
          std::unique_ptr<RenderPipeline> pipeline;
  
++        // A prebuilt decal's pixel shader writes the bounds of the decal check as its depth (RasterPS.hlsl,
++        // DECAL_DEPTH_BOUNDS), and the decal draws twice in the pass that writes depth: with this pipeline and then
++        // with the one above (createPipeline()). Null for every other shader.
++        std::unique_ptr<RenderPipeline> decalMarkPipeline;
++
          RasterShader(RenderDevice *device, const ShaderDescription &desc, const RenderPipelineLayout *pipelineLayout, RenderShaderFormat shaderFormat, const RenderMultisampling &multisampling, 
 -            const ShaderCompiler *shaderCompiler, const OptimizerCacheSPIRV *optimizerCacheSPIRV);
 +            const ShaderCompiler *shaderCompiler, const OptimizerCacheSPIRV *optimizerCacheSPIRV, ShaderCacheWGSL *shaderCacheWGSL);
@@ -3149,17 +3456,18 @@ index 3b991ff..f7a5889 100644
 +            const char *vertexWGSL, size_t vertexWGSLSize, const char *pixelWGSL, size_t pixelWGSLSize);
  
          ~RasterShader();
-+        void createPipelineFor(const RenderPipelineLayout *pipelineLayout, const RenderShader *vertexShader, const RenderShader *pixelShader, const std::vector<RenderSpecConstant> &specConstants, const RenderMultisampling &multisampling);
++        void createPipelineFor(const RenderPipelineLayout *pipelineLayout, const RenderShader *vertexShader, const RenderShader *pixelShader, const std::vector<RenderSpecConstant> &specConstants, const RenderMultisampling &multisampling, bool decalStencil = false);
++        static bool prebuiltDecalStencil(const ShaderDescription &desc);
 +        static void setPipelineState(const ShaderDescription &desc, PipelineCreation &creation);
 +        static uint32_t pipelineStateKey(const ShaderDescription &desc);
          static RasterShaderText generateShaderText(const ShaderDescription &desc, bool multisampling);
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..e9a70c7 100644
+index bf7b669..42bf31e 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
-@@ -6,6 +6,51 @@
+@@ -6,6 +6,52 @@
  
  #include "common/rt64_thread.h"
  
@@ -3172,6 +3480,7 @@ index bf7b669..e9a70c7 100644
 +#   include <zstd.h>
 +#   include "common/rt64_elapsed_timer.h"
 +#   include "rt64_prebuilt_shaders.h"
++#   include "rt64_render_target.h"
 +
 +// The size of the pixel shader built for a prebuilt shader, on a device with dual-source blending or without.
 +static uint32_t prebuiltPixelSize(const RT64PrebuiltShader &entry, bool dualSource) {
@@ -3211,7 +3520,7 @@ index bf7b669..e9a70c7 100644
  #define ENABLE_OPTIMIZED_SHADER_GENERATION
  
  namespace RT64 {
-@@ -60,7 +105,7 @@ namespace RT64 {
+@@ -60,7 +106,7 @@ namespace RT64 {
                  assert((shaderCache->shaderUber != nullptr) && "Ubershader should've been created by the time a new shader is submitted to the cache.");
                  const RenderPipelineLayout *uberPipelineLayout = shaderCache->shaderUber->pipelineLayout.get();
                  const RenderMultisampling multisampling = shaderCache->multisampling;
@@ -3220,7 +3529,7 @@ index bf7b669..e9a70c7 100644
  
                  {
                      const std::unique_lock<std::mutex> lock(shaderCache->GPUShadersMutex);
-@@ -93,6 +138,15 @@ namespace RT64 {
+@@ -93,6 +139,15 @@ namespace RT64 {
  
      RasterShaderCache::~RasterShaderCache() {
          compilationThreads.clear();
@@ -3236,7 +3545,7 @@ index bf7b669..e9a70c7 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +159,485 @@ namespace RT64 {
+@@ -105,13 +160,485 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -3297,7 +3606,7 @@ index bf7b669..e9a70c7 100644
 +    // ubershader meanwhile: a wait for one shader would cost more than it saves.
 +    //
 +    // Where pipelines build in the background (Chrome), the game waits only for what a frame wants. One thread builds
-+    // the whole list behind the game from its first draw (prebuildAhead), a section at a time in the list's order, the
++    // the whole list behind the game from the first draw (prebuildAhead), a section at a time in the list's order, the
 +    // order the recording reached them in; a round moves the rest of its section to the front, and strays go before
 +    // that. Section 0, the boot, has only a few seconds of logos before the game wants the rest, and section 1 is
 +    // usually what follows it by itself or a press of Start later (the attract demo, the menus), so half the threads
@@ -3311,7 +3620,8 @@ index bf7b669..e9a70c7 100644
 +    // every shader of its section not yet built, and the game waits for strays too.
 +    //
 +    // A pipeline is built for the WebGPU layout a draw with its pipeline layout resolved (plume_webgpu.h), so section 0
-+    // waits for the first frame's draws. A round is built on as many threads as the host has cores (2-16), since the
++    // waits for the first frame's draws; where pipelines build in the background (Chrome) that is the draw of nothing
++    // at setup (State::warmUpPipelines()), and the list builds behind the launcher. A round is built on as many threads as the host has cores (2-16), since the
 +    // game waits and the browser's GPU process has nothing else to do, largest first: a shader's WGSL size goes with
 +    // its build time, and the largest (370 KB against a median of 65 KB) started last would leave the other threads idle
 +    // while it finished. Rush 2049's 105 took 15.6-16.7 s six at a time in the list's order, and 6.9-7.2 s twelve at a
@@ -3601,18 +3911,17 @@ index bf7b669..e9a70c7 100644
 +
 +            lock.unlock();
 +
-+            ShaderDescription desc;
++            ShaderDescription desc = (index < RT64PrebuiltShaderCount) ? prebuiltDescription(RT64PrebuiltShaderList[index]) : prebuildLearned[index - RT64PrebuiltShaderCount];
 +            std::unique_ptr<RasterShader> shader;
-+            if (index < RT64PrebuiltShaderCount) {
++            const bool decalStencil = (RenderTarget::depthBufferFormat() == RenderFormat::D32_FLOAT_S8_UINT);
++            if ((index < RT64PrebuiltShaderCount) && (decalStencil || !RasterShader::prebuiltDecalStencil(desc))) {
 +                const RT64PrebuiltShader &entry = RT64PrebuiltShaderList[index];
-+                desc = prebuiltDescription(entry);
 +                const char *text = prebuildText.data();
 +                const uint32_t pixelOffset = dualSource ? entry.pixelOffset : entry.pixelSingleOffset;
 +                shader = std::make_unique<RasterShader>(device, desc, shaderUber->pipelineLayout.get(), multisampling,
 +                    text + entry.vertexOffset, entry.vertexSize, text + pixelOffset, prebuiltPixelSize(entry, dualSource));
 +            }
 +            else {
-+                desc = prebuildLearned[index - RT64PrebuiltShaderCount];
 +                shader = std::make_unique<RasterShader>(device, desc, shaderUber->pipelineLayout.get(), shaderFormat, multisampling,
 +                    shaderCompiler.get(), &optimizerCacheSPIRV, &shaderCacheWGSL);
 +            }
@@ -3723,7 +4032,7 @@ index bf7b669..e9a70c7 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +651,22 @@ namespace RT64 {
+@@ -125,6 +652,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -3746,7 +4055,7 @@ index bf7b669..e9a70c7 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +707,18 @@ namespace RT64 {
+@@ -165,6 +708,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
@@ -3870,13 +4179,34 @@ index 5c40c18..bdf6569 100644
          RasterShader *getGPUShader(const ShaderDescription &desc);
          RasterShaderUber *getGPUShaderUber() const;
 diff --git a/src/render/rt64_render_target.cpp b/src/render/rt64_render_target.cpp
-index 81917bc..1d8e43b 100644
+index 81917bc..896a77a 100644
 --- a/src/render/rt64_render_target.cpp
 +++ b/src/render/rt64_render_target.cpp
-@@ -512,4 +512,26 @@ namespace RT64 {
-     RenderFormat RenderTarget::depthBufferFormat() {
-         return RenderFormat::D32_FLOAT;
+@@ -109,7 +109,7 @@ namespace RT64 {
+         downsampledTextureMultiplier = 0;
+         format = depthBufferFormat();
+         
+-        RenderClearValue clearValue = RenderClearValue::Depth(RenderDepth(), RenderFormat::D32_FLOAT);
++        RenderClearValue clearValue = RenderClearValue::Depth(RenderDepth(), format);
+         texture = worker->device->createTexture(RenderTextureDesc::DepthTarget(width, height, format, multisampling, &clearValue));
+         textureView = texture->createTextureView(RenderTextureViewDesc::Texture2D(format));
+         texture->setName("Render Target Depth #" + std::to_string(addressForName));
+@@ -509,7 +509,37 @@ namespace RT64 {
+         return usesHDR ? RenderFormat::R16G16B16A16_UNORM : RenderFormat::R8G8B8A8_UNORM;
      }
+ 
++    // D32_FLOAT, or on WebGPU D32_FLOAT_S8_UINT where the device has it, for the prebuilt decals' stencil
++    // (RasterShader::createPipeline()). Set once, before anything is made with it.
++    static RenderFormat depthFormat = RenderFormat::D32_FLOAT;
++
+     RenderFormat RenderTarget::depthBufferFormat() {
+-        return RenderFormat::D32_FLOAT;
++        return depthFormat;
++    }
++
++    void RenderTarget::setDepthBufferFormat(RenderFormat format) {
++        depthFormat = format;
++    }
 +
 +    void RenderTarget::matchColorToDepthTargets(RenderWorker *worker, const std::vector<std::pair<RenderTarget *, RenderTarget *>> &colorDepthPairs, std::unordered_set<RenderTarget *> &resizedTargets) {
 +        // A color target that grows loses what was drawn on it, as any target does when it grows. Targets only grow, so
@@ -3898,11 +4228,11 @@ index 81917bc..1d8e43b 100644
 +                }
 +            }
 +        }
-+    }
+     }
  };
 \ No newline at end of file
 diff --git a/src/render/rt64_render_target.h b/src/render/rt64_render_target.h
-index 82d8a36..77f9847 100644
+index 82d8a36..b5f1d39 100644
 --- a/src/render/rt64_render_target.h
 +++ b/src/render/rt64_render_target.h
 @@ -5,6 +5,8 @@
@@ -3914,10 +4244,11 @@ index 82d8a36..77f9847 100644
  
  #include "common/rt64_common.h"
  #include "hle/rt64_framebuffer.h"
-@@ -74,5 +76,11 @@ namespace RT64 {
+@@ -74,5 +76,12 @@ namespace RT64 {
          static hlslpp::float2 computeFixedResolutionScale(uint32_t nativeWidth, hlslpp::float2 resolutionScale);
          static RenderFormat colorBufferFormat(bool usesHDR);
          static RenderFormat depthBufferFormat();
++        static void setDepthBufferFormat(RenderFormat format);
 +
 +        // WebGPU needs every attachment of a render pass to be the same size, where elsewhere a depth target only has to
 +        // be as big as its color target. Grows the targets of each pair to the bigger of the two until every pair
@@ -4051,7 +4382,7 @@ index 25c0cf9..3260fa0 100644
          RSPProcessor(RenderDevice *device);
          ~RSPProcessor();
 diff --git a/src/render/rt64_shader_library.cpp b/src/render/rt64_shader_library.cpp
-index d1c5273..9b86e00 100644
+index d1c5273..469fafa 100644
 --- a/src/render/rt64_shader_library.cpp
 +++ b/src/render/rt64_shader_library.cpp
 @@ -4,54 +4,105 @@
@@ -4536,7 +4867,7 @@ index d1c5273..9b86e00 100644
              RenderGraphicsPipelineDesc pipelineDesc;
              pipelineDesc.pipelineLayout = fbChangesDrawColor.pipelineLayout.get();
              pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
-@@ -775,7 +870,7 @@ namespace RT64 {
+@@ -775,13 +870,13 @@ namespace RT64 {
              pipelineDesc.multisampling = multisampling;
              fbChangesDrawColor.pipeline = device->createGraphicsPipeline(pipelineDesc);
  
@@ -4545,6 +4876,22 @@ index d1c5273..9b86e00 100644
              pipelineDesc.pipelineLayout = fbChangesDrawDepth.pipelineLayout.get();
              pipelineDesc.pixelShader = depthShader.get();
              pipelineDesc.depthEnabled = true;
+             pipelineDesc.depthFunction = RenderComparisonFunction::ALWAYS;
+             pipelineDesc.depthWriteEnabled = true;
+-            pipelineDesc.depthTargetFormat = RenderFormat::D32_FLOAT;
++            pipelineDesc.depthTargetFormat = RenderTarget::depthBufferFormat();
+             fbChangesDrawDepth.pipeline = device->createGraphicsPipeline(pipelineDesc);
+         }
+ 
+@@ -818,7 +913,7 @@ namespace RT64 {
+             pipelineDesc.depthEnabled = true;
+             pipelineDesc.depthFunction = RenderComparisonFunction::ALWAYS;
+             pipelineDesc.depthWriteEnabled = true;
+-            pipelineDesc.depthTargetFormat = RenderFormat::D32_FLOAT;
++            pipelineDesc.depthTargetFormat = RenderTarget::depthBufferFormat();
+             pipelineDesc.pipelineLayout = rtCopyColorToDepth.pipelineLayout.get();
+             pipelineDesc.pixelShader = colorToDepthShader.get();
+             pipelineDesc.multisampling = RenderMultisampling();
 @@ -840,7 +935,7 @@ namespace RT64 {
              layoutBuilder.end();
              postProcess.pipelineLayout = layoutBuilder.create(device);
@@ -5537,13 +5884,48 @@ index 205dc4c..2aeed21 100644
      dstNorm[vertexOffsetIndex] = worldNorm;
      dstVel[vertexOffsetIndex] = worldPos - prevWorldPos;
 diff --git a/src/shaders/RasterPS.hlsl b/src/shaders/RasterPS.hlsl
-index e7895c3..dd05459 100644
+index e7895c3..3edf47d 100644
 --- a/src/shaders/RasterPS.hlsl
 +++ b/src/shaders/RasterPS.hlsl
-@@ -45,9 +45,43 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
+@@ -45,9 +45,78 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
  }
  #endif
  
++#if defined(DECAL_DEPTH_BOUNDS)
++// A decal's pixel shader on WebGPU, prebuilt: it reads no depth, so a decal draws in the pass that writes depth. A pass
++// can read the depth it draws to only if it writes none, and RT64 elsewhere ends the pass for each decal that follows
++// a draw that wrote depth and begins it again after: Banjo-Tooie ~25 times a frame, each pass ~70 us of Firefox's GPU
++// process. The decal check, |pixel - surface| <= max(CoplanarDepthTolerance(surface), dz), is two depth tests against
++// the surface's depth instead, in two draws with the stencil between them (RasterShader::createPipeline()): the first
++// writes the highest surface depth that passes (greater-equal; RasterParams' padding0 is 1 for it) and marks the
++// pixels, the second the lowest (less-equal), drawn where a mark is, which it takes back.
++static float decalDepth = 0.0f;
++
++// CoplanarDepthTolerance() is the same over each band of FloatToFixedDepth()'s exponent (0, 1, 2, 3 and more), so a
++// side's bound is the farthest one of the bands gives. Two depth tests pass one interval, and the check can pass two
++// pieces: within 0.0005 of where a band starts, a surface in the band below passes with its wider tolerance
++// while one in the pixel's own band just past its narrower one doesn't, and the interval draws there too.
++float decalDepthBound(float pixelDepth, float dz, bool high) {
++    // Where the exponent becomes 1, 2 and 3: FloatToFixedDepth() rounds, so half a step below 0x20000, 0x30000, 0x38000.
++    const float bandStart[4] = { 0.0f, 131071.5f / 262143.0f, 196607.5f / 262143.0f, 229375.5f / 262143.0f };
++    float bound = high ? (pixelDepth + dz) : (pixelDepth - dz);
++    for (uint e = 0; e < 4; e++) {
++        const float tolerance = 0.0005f / float(1U << e);
++        const float start = bandStart[e];
++        const float end = (e < 3) ? bandStart[e + 1] : 2.0f;
++        if (high && (pixelDepth + tolerance >= start)) {
++            // The band's surface depths up to the pixel's plus its tolerance: the last one below the next band at most.
++            bound = max(bound, min(pixelDepth + tolerance, asfloat(asuint(end) - 1U)));
++        }
++        else if (!high && (pixelDepth - tolerance < end)) {
++            bound = min(bound, max(pixelDepth - tolerance, start));
++        }
++    }
++
++    return bound;
++}
++#endif
++
 +#if defined(WEBGPU) && defined(PER_DRAW_TEXTURES)
 +// Samples texture 0 or 1 (t) as the two blocks below RasterPS's #else do. With mip LOD the tiles are picked per pixel,
 +// so each tile's texture slot is a switch anyway (TextureSampler.hlsli), and RasterPS samples both in a loop the shader
@@ -5584,7 +5966,18 @@ index e7895c3..dd05459 100644
      const OtherMode otherMode = { rp.omL, rp.omH };
  #if defined(DYNAMIC_RENDER_PARAMS)
      if ((otherMode.cycleType() != G_CYC_COPY) && renderFlagCulling(rp.flags) && isFrontFace) {
-@@ -100,7 +134,7 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -89,37 +158,51 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+     }
+ 
+     if (depthDecal) {
+-        // Sample the depth buffer for this pixel to compare for the decal check.
+-        int2 pixelPos = floor(vertexPosition.xy);
+-        uint sampleCount = 1U << renderFlagSampleCount(rp.flags);
+-        float surfaceDepth = sampleBackgroundDepth(pixelPos, sampleCount);
+-
+         // Calculate the decal depth tolerance based on the depth derivatives (or the prim dz value if prim depth source is enabled).
+         float dz;
+         if (zSourcePrim) {
              dz = instanceRDPParams[instanceIndex].primDepth.y;
          }
          else {
@@ -5592,9 +5985,23 @@ index e7895c3..dd05459 100644
 +            dz = (abs(ddxDepth) + abs(ddyDepth)) * FbParams.resolutionScale.y;
          }
  
++        const float pixelDepth = select(depthClampNear, max(vertexPosition.z, 0.0f), vertexPosition.z);
++#if defined(DECAL_DEPTH_BOUNDS)
++        // The depth tests do the check (decalDepthBound()).
++        decalDepth = decalDepthBound(pixelDepth, dz, gConstants.padding0 != 0);
++#else
++        // Sample the depth buffer for this pixel to compare for the decal check.
++        int2 pixelPos = floor(vertexPosition.xy);
++        uint sampleCount = 1U << renderFlagSampleCount(rp.flags);
++        float surfaceDepth = sampleBackgroundDepth(pixelPos, sampleCount);
++
          // Perform the decal depth tolerance check.
-@@ -111,15 +145,24 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+         const float DepthTolerance = max(CoplanarDepthTolerance(surfaceDepth), dz);
+-        const float pixelDepth = select(depthClampNear, max(vertexPosition.z, 0.0f), vertexPosition.z);
+         if (abs(pixelDepth - surfaceDepth) > DepthTolerance) {
+             return false;
          }
++#endif
      }
      
 -    float2 ddxVertexUV = ddx(vertexUV);
@@ -5621,7 +6028,7 @@ index e7895c3..dd05459 100644
      int tileIndex0 = 0;
      int tileIndex1 = 1;
      float lodFraction;
-@@ -132,6 +175,40 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -132,6 +215,40 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
  
      float4 texVal0 = float4(0.0f, 0.0f, 0.0f, 1.0f);
      float4 texVal1 = float4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -5662,7 +6069,7 @@ index e7895c3..dd05459 100644
      if (renderFlagUsesTexture0(rp.flags)) {
          const uint globalTileIndex = instanceRenderIndices[gConstants.renderIndex].rdpTileIndex + tileIndex0;
          RDPTile rdpTile = RDPTiles[globalTileIndex];
-@@ -141,14 +218,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -141,14 +258,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = renderFlagNativeSampler0(rp.flags);
          }
          
@@ -5681,7 +6088,7 @@ index e7895c3..dd05459 100644
          RDPTile rdpTile = RDPTiles[globalTileIndex];
          if (!renderFlagDynamicTiles(rp.flags)) {
              rdpTile.cms = oneCycleHardwareBug ? renderCMS0(rp.flags) : renderCMS1(rp.flags);
-@@ -156,12 +234,13 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -156,12 +274,13 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = oneCycleHardwareBug ? renderFlagNativeSampler0(rp.flags) : renderFlagNativeSampler1(rp.flags);
          }
          
@@ -5698,7 +6105,7 @@ index e7895c3..dd05459 100644
      // Color combiner.
      float4 shadeColor = vertexColor;
      float4 combinerColor;
-@@ -254,6 +333,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -254,6 +373,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
          resultColor.a = resultCvg;
      }
      
@@ -5713,7 +6120,7 @@ index e7895c3..dd05459 100644
      // Add highlight color to the last step.
      uint highlightColorUint = instanceRenderIndices[gConstants.renderIndex].highlightColor;
      if (highlightColorUint > 0) {
-@@ -290,8 +377,12 @@ void PSMain(
+@@ -290,8 +417,15 @@ void PSMain(
  #if defined(DYNAMIC_RENDER_PARAMS)
      , bool isFrontFace : SV_IsFrontFace
  #endif
@@ -5723,13 +6130,19 @@ index e7895c3..dd05459 100644
      , [[vk::location(0)]] [[vk::index(0)]] out float4 pixelColor : SV_TARGET0
      , [[vk::location(0)]] [[vk::index(1)]] out float4 pixelAlpha : SV_TARGET1
 +#endif
++#if defined(DECAL_DEPTH_BOUNDS)
++    , out float pixelDepth : SV_Depth
++#endif
  )
  {
  #if !defined(DYNAMIC_RENDER_PARAMS)
-@@ -308,6 +399,8 @@ void PSMain(
+@@ -308,6 +442,11 @@ void PSMain(
      }
  
      pixelColor = resultColor;
++#if defined(DECAL_DEPTH_BOUNDS)
++    pixelDepth = decalDepth;
++#endif
 +#if !defined(WEBGPU) || defined(DUAL_SOURCE_BLENDING)
      pixelAlpha = resultAlpha;
 +#endif
