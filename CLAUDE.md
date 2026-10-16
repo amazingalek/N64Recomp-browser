@@ -338,8 +338,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   of them at the play's start and end (page_driver.mjs's `gpuProcessMemory`): Firefox's own heap (its WebGPU and
   wgpu), the system heap (the D3D12 runtime, the driver, DXC) and the GPU memory it has committed. How each browser's
   grows over 10 minutes of a page is in docs/findings.md (Memory).
-- One page at a time on the machine, in any browser: with two Firefox windows each playing a page, one window's
-  animation frames came in bursts (docs/findings.md, Two pages at once).
+- One page plays at a time on a machine, in any browser: with two Firefox windows each playing a page, one window's
+  animation frames came in bursts (docs/findings.md, Two pages at once). Where agents share a machine, each play (one
+  `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's queue for the GPU, started
+  in the background and waited on, one play a turn so that other agents' turns come between a long series of them.
+  Agents never message each other about turns (an order, who is next, done): the queue says it.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
 - On a desktop GPU a page is played uncapped (`--uncapped`, as the retest and the stand-in are): capped, every page
