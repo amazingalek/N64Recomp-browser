@@ -332,7 +332,7 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   OSThread's context past libultra's thprof on
                                                                   a 32-bit host; game timers on time where a
                                                                   page's timed waits end late (Firefox on
-                                                                  Windows)
+                                                                  Windows); a ROM read in 4 MB pieces
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
                                                                   and its copy a display list late as another
@@ -358,7 +358,7 @@ take the web support without moving its submodules to the forks (Using it in a r
   and `pins.txt`, the upstream commits recomps pin, which CI patches.
 - `frontend/`: what makes a recomp built on RecompFrontend a page, as link options and `n64recomp_browser_frontend_page()`
   (`recomp_web_frontend_page()` works too)
-  (its header says what each part does): threads, the page, HOME kept in IndexedDB, a thread's prints without
+  (its header says what each part does): threads, the page, HOME kept in IndexedDB (a ROM stored from a worker), a thread's prints without
   waiting for the page's thread, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the browser's file picker for a recomp with menus of its own
   (`file_picker.h`), the WebGPU device, a notice in Firefox recommending Chrome or Edge, and `coi_serviceworker.js`.
