@@ -37,8 +37,8 @@ The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Re
 the game forks (below) take no pull requests and have never had one: a change there is a commit pushed straight to the
 fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`forks.txt` here, a game fork's submodule).
 `rush-2049-recomp` is the one game with a repo of its own that works by pull requests: what it needs from a change here
-(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here (The
-pins).
+(moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here, and
+the work that builds, plays or measures every game opens it itself, beside the game forks' pushes (The pins).
 
 ## Rules
 
@@ -370,9 +370,12 @@ no worse than its row and its earlier runs moves its fork's N64Recomp-browser on
 published and gets its row updated (The games table). One that plays worse stays on Pages as it was, its fork on its
 last tag, and has work filed to fix it. So Pages holds only pages that were played, and a fork's `main` is what its
 page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
-to look when it plays worse. Rush 2049 is retested with them, built and played the same way; only its pin moves
-differently: its `lib/N64Recomp-browser` moves to the tag in a pull request on its own repo, which builds those same
-bytes, runs the desktop game and publishes the page once it merges, and the retest updates its row. Its pin moves to a
+to look when it plays worse. Rush 2049 is retested with them, in the same work, built, played and measured the same
+way; only its pin moves differently: the retest opens a pull request on its own repo that moves its
+`lib/N64Recomp-browser` to the tag and writes what was played in its CLAUDE.md, which builds those same bytes, runs the
+desktop game and publishes the page once it merges, and the retest updates its row. Any other work that builds, plays
+or measures every game (a critical fix, a measurement across the pages) takes Rush 2049 along the same way, not as work
+of its own afterwards. Its pin moves to a
 tag that left its page's bytes alone too, since its desktop build can still take something from it (below).
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages, the version players have, that crashes, never
