@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 730e980ff486f1d1c410feab179ab047d85fe289
+rt64: https://github.com/amazingalek/rt64-web bbe988421ec6b5b8b733e27b68e8895a901dfe2a
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1090,7 +1090,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..2d6595a 100644
+index 3227ab1..a23d055 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1264,12 +1264,15 @@ index 3227ab1..2d6595a 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +653,10 @@ namespace RT64 {
+@@ -510,6 +653,13 @@ namespace RT64 {
                      continue;
                  }
  
 +#           if defined(__EMSCRIPTEN__)
 +                pace(skipPresent && !ext.swapChain->isEmpty());
++                if (skipPresent && !ext.swapChain->isEmpty() && !uncapped) {
++                    ext.workloadQueue->ext.rasterShaderCache->presentDropped();
++                }
 +#           endif
 +
                  if (skipPresent) {
@@ -2790,10 +2793,10 @@ index 3b991ff..f7a5889 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..e9a70c7 100644
+index bf7b669..b85b848 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
-@@ -6,6 +6,51 @@
+@@ -6,6 +6,54 @@
  
  #include "common/rt64_thread.h"
  
@@ -2831,6 +2834,9 @@ index bf7b669..e9a70c7 100644
 +// How many of a section's shaders a frame must want for the game to wait for the section (startPrebuild()).
 +static const uint32_t PrebuildSectionMinimum = 4;
 +
++// How long the one thread building the list behind the game waits after a dropped present (presentDropped()).
++static const std::chrono::milliseconds PrebuildDropPause(500);
++
 +// The most shaders a page remembers the list missed (learnPrebuild()).
 +static const uint32_t LearnedMaximum = 1000;
 +
@@ -2845,7 +2851,7 @@ index bf7b669..e9a70c7 100644
  #define ENABLE_OPTIMIZED_SHADER_GENERATION
  
  namespace RT64 {
-@@ -60,7 +105,7 @@ namespace RT64 {
+@@ -60,7 +108,7 @@ namespace RT64 {
                  assert((shaderCache->shaderUber != nullptr) && "Ubershader should've been created by the time a new shader is submitted to the cache.");
                  const RenderPipelineLayout *uberPipelineLayout = shaderCache->shaderUber->pipelineLayout.get();
                  const RenderMultisampling multisampling = shaderCache->multisampling;
@@ -2854,7 +2860,7 @@ index bf7b669..e9a70c7 100644
  
                  {
                      const std::unique_lock<std::mutex> lock(shaderCache->GPUShadersMutex);
-@@ -93,6 +138,15 @@ namespace RT64 {
+@@ -93,6 +141,15 @@ namespace RT64 {
  
      RasterShaderCache::~RasterShaderCache() {
          compilationThreads.clear();
@@ -2870,7 +2876,7 @@ index bf7b669..e9a70c7 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +159,485 @@ namespace RT64 {
+@@ -105,13 +162,509 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -2940,7 +2946,13 @@ index bf7b669..e9a70c7 100644
 +    // so that Firefox draws the title before it builds the menus) waited 3-8 s in Chrome on the menus' 28-36 after Start,
 +    // where with them in the boot it never had. So the first frame waits only for its own shaders, the panel the page showed for a whole section before the
 +    // game started is mostly gone, and a level reached after a minute of play is usually built before the game gets
-+    // there. Where building a pipeline holds up the device (Firefox, setup()), anything built behind the game would
++    // there. That one thread waits PrebuildDropPause after a present the present thread dropped before it starts the
++    // next (presentDropped()): each build takes the browser's GPU process from the page's frames for a moment (Chrome
++    // parses its WGSL on the thread that takes its presents, the WebGPU in Chrome and Firefox notes), which goes
++    // unseen while the frames have room and drops them while the game is busy too, at a scene's first frames. Conker's
++    // page at 3840x2000 drew 50-56 presents a second for 5-10 s after its intro's second scene while the list built
++    // behind it, and 58-59 there with nothing built behind it (Chrome 155 headless, RTX 2070, cold, a host 21-58%
++    // busy). Where building a pipeline holds up the device (Firefox, setup()), anything built behind the game would
 +    // stall its frames, so nothing is: section 0 is built before the game gets past its first frame, a round builds
 +    // every shader of its section not yet built, and the game waits for strays too.
 +    //
@@ -3218,6 +3230,16 @@ index bf7b669..e9a70c7 100644
 +            }
 +
 +            const bool inRound = (prebuildRoundNext < prebuildRound.size());
++            if (!inRound && !prebuildBoot[prebuildAhead.front()] &&
++                ((std::chrono::steady_clock::now() - prebuildDropped) < PrebuildDropPause)) {
++                prebuildPauses++;
++                prebuildChanged.wait_until(lock, prebuildDropped + PrebuildDropPause, [this]() {
++                    return prebuildStop || (prebuildRoundNext < prebuildRound.size());
++                });
++
++                continue;
++            }
++
 +            uint32_t index;
 +            if (inRound) {
 +                index = prebuildRound[prebuildRoundNext++];
@@ -3275,11 +3297,19 @@ index bf7b669..e9a70c7 100644
 +
 +            if (++prebuildBuilt == prebuildCount) {
 +                prebuildText = std::string();
-+                printf("RT64: all %u prebuilt shaders built\n", prebuildCount);
++                printf("RT64: all %u prebuilt shaders built, paused %u times after a dropped present\n", prebuildCount, prebuildPauses);
 +            }
 +
 +            prebuildChanged.notify_all();
 +        }
++#   endif
++    }
++
++    // A present was dropped: the one thread building the list behind the game waits a moment (startPrebuild()).
++    void RasterShaderCache::presentDropped() {
++#   if defined(RT64_PREBUILT_SHADERS)
++        const std::unique_lock<std::mutex> lock(prebuildMutex);
++        prebuildDropped = std::chrono::steady_clock::now();
 +#   endif
 +    }
 +
@@ -3357,7 +3387,7 @@ index bf7b669..e9a70c7 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +651,22 @@ namespace RT64 {
+@@ -125,6 +678,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -3380,7 +3410,7 @@ index bf7b669..e9a70c7 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +707,18 @@ namespace RT64 {
+@@ -165,6 +734,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
@@ -3400,15 +3430,16 @@ index bf7b669..e9a70c7 100644
          }
  
 diff --git a/src/render/rt64_raster_shader_cache.h b/src/render/rt64_raster_shader_cache.h
-index 5c40c18..bdf6569 100644
+index 5c40c18..2385fc0 100644
 --- a/src/render/rt64_raster_shader_cache.h
 +++ b/src/render/rt64_raster_shader_cache.h
-@@ -4,15 +4,24 @@
+@@ -4,15 +4,25 @@
  
  #pragma once
  
 +#include <algorithm>
  #include <atomic>
++#include <chrono>
  #include <condition_variable>
 +#include <deque>
  #include <filesystem>
@@ -3428,7 +3459,7 @@ index 5c40c18..bdf6569 100644
  #include "rt64_raster_shader.h"
  
  namespace RT64 {
-@@ -30,13 +39,14 @@ namespace RT64 {
+@@ -30,13 +40,14 @@ namespace RT64 {
          RenderDevice *device;
          std::unique_ptr<RasterShaderUber> shaderUber;
          OptimizerCacheSPIRV optimizerCacheSPIRV;
@@ -3444,7 +3475,7 @@ index 5c40c18..bdf6569 100644
          std::mutex GPUShadersMutex;
          std::list<std::unique_ptr<CompilationThread>> compilationThreads;
          uint32_t threadCount;
-@@ -45,12 +55,57 @@ namespace RT64 {
+@@ -45,12 +56,60 @@ namespace RT64 {
          std::unique_ptr<ShaderCompiler> shaderCompiler;
          RenderMultisampling multisampling;
          bool usesHDR = false;
@@ -3486,6 +3517,8 @@ index 5c40c18..bdf6569 100644
 +        std::vector<std::vector<uint32_t>> prebuildSections;
 +        std::vector<std::vector<uint64_t>> prebuildAliases;
 +        std::atomic<uint32_t> prebuildSection = 0;
++        std::chrono::steady_clock::time_point prebuildDropped;
++        uint32_t prebuildPauses = 0;
 +
          RasterShaderCache(uint32_t threadCount, uint32_t ubershaderThreadCount);
          ~RasterShaderCache();
@@ -3498,6 +3531,7 @@ index 5c40c18..bdf6569 100644
 +        void wantPrebuild(uint64_t shaderHash);
 +        void reportPrebuild(uint32_t done, uint32_t count, uint64_t sizeDone, uint64_t sizeStarted, uint64_t size);
 +        bool waitForPrebuild();
++        void presentDropped();
 +        void learnPrebuild();
 +        void reportMissed(const ShaderDescription &desc);
          void destroyAll();
