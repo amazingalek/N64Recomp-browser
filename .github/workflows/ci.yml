@@ -2,7 +2,8 @@
 # game, so nothing links into a page and nothing draws: a recomp's own CI and runs do that.
 #
 # A change to nothing but docs (*.md), plays.jsonl, the games' page (site/) and the tools that play, serve and publish
-# pages, which CI never runs, skips every job but changes: they report as skipped, not failed. A tag builds everything. The compiles go through ccache (the
+# pages, which CI never runs, skips every job but changes: they report as skipped, not failed. A tag builds everything.
+# A green push to main that changes what a page is built from is tagged as the next release (the tag job). The compiles go through ccache (the
 # emscripten job, frontend/build_speed.cmake), so a PR whose forks, patches/ and sources are main's mostly hits; the
 # cache a PR saves is its own, main's is every PR's.
 name: CI
@@ -228,3 +229,40 @@ jobs:
             echo "frontend_signature_mismatch linked"; exit 1
           fi
           grep "function signature mismatch: native" mismatch.log
+
+  # A push to main that changes what a page is built from (forks.txt, patches/, frontend/, renderer/) is tagged
+  # v0.<n+1>.0 once its jobs pass: a tag is a release, and the retest builds the newest one, so a change left untagged
+  # reaches no page. It compares against the newest tag, not the push before, so a run cancelled by the next merge is
+  # covered by that one's, a docs-only push's included. A tag pushed with GITHUB_TOKEN starts no workflow: this run,
+  # on the same commit, is its CI.
+  tag:
+    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, emscripten]
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          last="$(git tag -l 'v0.*.0' --sort=-v:refname | head -1)"
+          if git diff --quiet "$last" HEAD -- forks.txt patches frontend renderer; then
+            echo "Nothing a page is built from has changed since $last."; exit 0
+          fi
+          minor="${last#v0.}"; next="v0.$(( ${minor%%.*} + 1 )).0"
+          {
+            echo "$next"; echo
+            # Each merge's pull request title, its message's body.
+            for c in $(git rev-list --first-parent "$last"..HEAD); do
+              title="$(git log -1 --format=%b "$c" | head -1)"
+              echo "- ${title:-$(git log -1 --format=%s "$c")}"
+            done
+          } > tag-message.txt
+          cat tag-message.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next" -F tag-message.txt
+          git push origin "$next"

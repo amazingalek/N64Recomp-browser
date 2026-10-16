@@ -28,8 +28,8 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 30†; 335* | 30†; 124* | 2026-10-16, v0.50.0; laptop 2026-10-15, v0.46.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 346* | 334* | 2026-10-16, v0.50.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 335* | 196* | 2026-10-16, v0.50.0 |
-| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 30†* | 30†* | 2026-10-16, v0.50.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 19†* | 22†* | 2026-10-16, v0.50.0 |
+| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 340* | 173* | 2026-10-16, v0.50.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 22†* | 293* | 2026-10-16, v0.50.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, Chrome in a window; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -94,6 +94,12 @@ way.
 
 What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 
+- RT64's Framerate at Display and its resolution at Auto by default, so that every page presents at the display's rate
+  (60 a second on a 60 Hz display, 144 on a 144 Hz one), RT64 interpolating between the game's frames, and draws at
+  the canvas's size, whatever the recomp's desktop build defaults to. RecompFrontend's defaults are those. A recomp
+  with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
+  `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
+  of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
@@ -384,6 +390,7 @@ N64ModernRuntime-web commit too when the change was in plume-web, hlslpp-web or 
 moves with it). To move a fork to a newer upstream commit, merge that commit into `main` and say in the merge's message
 what upstream brought, and move its upstream commit in `patches/patches.txt`. With every change to either, run
 `tools/export_patches.sh` and commit the patches with it: CI checks that they match. A patch that stops applying to a
-recomp's commits in `patches/pins.txt` means the fork has to change. Tag a release once a recomp has run it.
+recomp's commits in `patches/pins.txt` means the fork has to change. Once a change to what a page is built from merges and passes CI, CI tags main with the
+next release.
 
 Licensed GPLv3 (`COPYING`), as the recomp it came from; the forks keep their upstream licenses.
