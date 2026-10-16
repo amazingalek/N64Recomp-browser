@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 730e980ff486f1d1c410feab179ab047d85fe289
+rt64: https://github.com/amazingalek/rt64-web 9498a9b65504ac639e12b91b2a574940cbac9b05
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1090,7 +1090,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..2d6595a 100644
+index 3227ab1..0f4f76d 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1132,7 +1132,28 @@ index 3227ab1..2d6595a 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -416,6 +434,131 @@ namespace RT64 {
+@@ -399,7 +417,20 @@ namespace RT64 {
+                 }
+ 
+                 RenderCommandSemaphore *waitSemaphore = drawSemaphores[swapChainIndex].get();
++#           if defined(__EMSCRIPTEN__)
++                // A present takes the slot one period after the last one's rather than the moment it goes out, so the
++                // time spent past a slot (the sleep waking on the browser's timer, wait()'s trip to the page's thread)
++                // isn't added to every period: on a page the interpolated frames went out every 18 ms, 55.6 a second,
++                // where a game at the display's rate, which never sleeps here, presented 60. A present a whole period
++                // late or more starts the slots again from itself.
++                const Timestamp presentNow = Timer::current();
++                const auto presentPeriod = std::chrono::nanoseconds(1'000'000'000 / std::max(targetRate, 1U));
++                const bool presentOnSlot = (presentTimestamp != Timestamp()) && (targetRate > viOriginalRate) &&
++                    ((presentNow - presentTimestamp) < (2 * presentPeriod));
++                presentTimestamp = presentOnSlot ? (presentTimestamp + presentPeriod) : presentNow;
++#           else
+                 presentTimestamp = Timer::current();
++#           endif
+                 swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
+                 presentProfiler.logAndRestart();
+             }
+@@ -416,6 +447,131 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1264,7 +1285,7 @@ index 3227ab1..2d6595a 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +653,10 @@ namespace RT64 {
+@@ -510,6 +666,10 @@ namespace RT64 {
                      continue;
                  }
  

@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>]
+//     [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>] [--preload <file>]
 //     [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
@@ -21,6 +21,8 @@
 // browser, a size or a build with another where every page would read 60 at the display's rate; a run at 342 or more
 // (95% of 360) is held by the rate, not the page, and says so. --cpu-throttle 3 (Chrome only) slows the page's thread
 // 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
+// --preload runs a JavaScript file of your own in every document before the page's scripts, after play_page's own
+// (a probe that wraps a WebGPU call, a stand-in for a slow GPU's callbacks): its console lines come out with the rest.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -88,6 +90,7 @@ const recordFile = option(args, '--record', null);
 const game = option(args, '--game', null);
 const build = option(args, '--build', null);
 const note = option(args, '--note', null);
+const preloadFile = option(args, '--preload', null);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg (publish_pages.sh\'s names)');
   process.exit(1);
@@ -95,7 +98,7 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -134,7 +137,7 @@ const onLine = (text) => {
 };
 
 // Presents: every getCurrentTexture call on a WebGPU canvas, and the gap in ms since the one before (taken each sample).
-const preload = `() => {
+const ownPreload = `() => {
   window.__presents = 0;
   window.__gaps = [];
   let lastPresent = 0;
@@ -155,6 +158,10 @@ const preload = `() => {
     return context;
   };
 }`;
+const preload = preloadFile ? `() => {
+(${ownPreload})();
+${fs.readFileSync(preloadFile, 'utf8')}
+}` : ownPreload;
 
 // The GPU, from nvidia-smi's own loop, if there is one.
 let gpu = null;
