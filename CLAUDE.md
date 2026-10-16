@@ -467,7 +467,8 @@ changes. Keep it current in the same work as what changes it, like the README:
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
   shaders never hits at all. Chrome killed before it has closed loses what it wrote to its caches: close it with
-  `Browser.close` and wait for the process to end.
+  `Browser.close` and wait for the process to end. A debugging port (`--port`'s next) another browser on the machine
+  holds is refused (`page_driver.mjs`): shared, the second Chrome took `[::1]` and the tool drove the first one's page.
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key has reached RmlUi): Enter starts the game
   on the second press, or click Start Game. Every RecompFrontend game does the same, the desktop build too.
