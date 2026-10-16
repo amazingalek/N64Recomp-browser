@@ -338,10 +338,19 @@ RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's cop
                        worker (IndexedDB's put serialized 64 MB in ~120 ms on the page's thread): the launcher's present
                        gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
                        155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
+rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only to framebuffers the VI hasn't shown is a
+                       pass of the next list's frame, not a frame, and the queue holds six workloads, so the game can
+                       queue its next pass and frame while the frame before the pass is kept; RT64_UNEVEN_FRAME_RATES:
+                       frames whose VIs differ, the slowest at most twice the fastest, interpolated at the fastest's
+                       rate (upstream gave no rate unless the last three were equal). Jet Force Gemini draws its
+                       shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
+                       only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
+                       in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
 ```
 
-Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
-too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
+Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
+too: `RT64_FLIPPED_RECT_HIGH_RES` (rt64 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64
+179adb8) and `ULTRAMODERN_LIBULTRA_THREAD_STOP` (N64ModernRuntime 0df8334).
 
 ## What this repo adds besides the forks
 
@@ -1100,9 +1109,13 @@ the sound short over its play plan (the first room of every planet in 160 s, hea
 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display (`patches/web/dkr.patch` sets the base's
 `rr_default`, Original, to Display with Emscripten, and moves a page's settings saved before graphics config version 6
 to Display once), so RT64 interpolates through Skip Buffering, which `jfg-base.patch` switches on for it: RT64
-interpolates only while the frame on screen is the one the last workload drew. It does in the menus in both browsers
-and in play in Firefox, part of the time, but Chrome in play presents the game's 20, headless and headed (no pacing
-line: RT64 isn't interpolating there; not explained yet).
+interpolates only while the frame on screen is the one the last workload drew. In play it interpolated only now and
+then, in Firefox, until rt64 179adb8: the game draws its shadows' render targets in a display list of its own before
+each frame's, which RT64 took for a frame, so the frame after it matched nothing and was never interpolated, and its
+frames take 2 and 3 VIs on a page, which upstream's original rate needs equal. With it the plan uncapped presents
+~274 a second in Chrome 155 and ~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070), but in Firefox
+its levels lose ~14% of their sound uncapped, against ~4% before: each game frame waits for its exact copy to RAM,
+which probably waits behind the interpolated frames' work on the page's thread (not measured yet).
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
