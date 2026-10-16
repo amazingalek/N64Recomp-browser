@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 1f468556e51d4252a0c8ef8e5b38f9d21dc16a86
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web b79d63bda5e8bb871d276fac06dc8110ef159031
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -486,10 +486,23 @@ index 0f7de83..9bec0ec 100644
      hook_slots.clear();
      processed_hook_slots.clear();
 diff --git a/librecomp/src/recomp.cpp b/librecomp/src/recomp.cpp
-index ea1c49b..f621182 100644
+index ea1c49b..7dda401 100644
 --- a/librecomp/src/recomp.cpp
 +++ b/librecomp/src/recomp.cpp
-@@ -90,7 +90,9 @@ bool recomp::register_game(const recomp::GameEntry& entry) {
+@@ -32,6 +32,12 @@
+ #    include <sys/mman.h>
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++#    include <fcntl.h>
++#    include <sys/stat.h>
++#    include <unistd.h>
++#endif
++
+ #if defined(_WIN32)
+ #define PATHFMT "%ls"
+ #else
+@@ -90,7 +96,9 @@ bool recomp::register_game(const recomp::GameEntry& entry) {
  }
  
  void recomp::mods::initialize_mods() {
@@ -499,7 +512,7 @@ index ea1c49b..f621182 100644
      std::filesystem::create_directories(config_path / mods_directory);
      std::filesystem::create_directories(config_path / mod_config_directory);
      mod_context->set_mods_config_path(config_path / "mods.json");
-@@ -102,6 +104,11 @@ void recomp::mods::register_embedded_mod(const std::string &mod_id, std::span<co
+@@ -102,6 +110,11 @@ void recomp::mods::register_embedded_mod(const std::string &mod_id, std::span<co
      mod_context->register_embedded_mod(mod_id, mod_bytes);
  }
  
@@ -511,6 +524,44 @@ index ea1c49b..f621182 100644
  void recomp::mods::register_deprecated_mod(const std::string& mod_id, recomp::mods::DeprecationStatus deprecation_status, const Version& maximum_version) {
      std::lock_guard<std::mutex> lock(mod_context_mutex);
      mod_context->register_deprecated_mod(mod_id, deprecation_status, maximum_version);
+@@ -169,6 +182,29 @@ bool check_hash(const std::vector<uint8_t>& rom_data, uint64_t expected_hash) {
+ static std::vector<uint8_t> read_file(const std::filesystem::path& path) {
+     std::vector<uint8_t> ret;
+ 
++#ifdef __EMSCRIPTEN__
++    // A page's files are in the page's thread's file system, and every read from another thread waits for that thread:
++    // an ifstream reads a ROM there 1 KB at a time, 65,536 round trips for a 64 MB one (0.5 s in Chrome), and the
++    // launcher, which loads the ROM, draws nothing meanwhile. So it is read in 4 MB pieces, a millisecond or two each.
++    int fd = open(path.c_str(), O_RDONLY);
++    struct stat st;
++    if (fd >= 0 && fstat(fd, &st) == 0) {
++        ret.resize(st.st_size);
++        size_t done = 0;
++        while (done < ret.size()) {
++            ssize_t got = read(fd, ret.data() + done, std::min<size_t>(ret.size() - done, 4 << 20));
++            if (got <= 0) {
++                break;
++            }
++            done += got;
++        }
++        ret.resize(done);
++    }
++    if (fd >= 0) {
++        close(fd);
++    }
++    return ret;
++#else
+     std::ifstream file{ path, std::ios::binary};
+ 
+     if (file.good()) {
+@@ -180,6 +216,7 @@ static std::vector<uint8_t> read_file(const std::filesystem::path& path) {
+     }
+ 
+     return ret;
++#endif
+ }
+ 
+ bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
 diff --git a/ultramodern/CMakeLists.txt b/ultramodern/CMakeLists.txt
 index 5593172..30d4f51 100644
 --- a/ultramodern/CMakeLists.txt
@@ -589,7 +640,7 @@ index f9c0fa1..f522697 100644
  
      return false;
 diff --git a/ultramodern/src/threads.cpp b/ultramodern/src/threads.cpp
-index 6e3ed18..b78b8a2 100644
+index 6e3ed18..00eefe6 100644
 --- a/ultramodern/src/threads.cpp
 +++ b/ultramodern/src/threads.cpp
 @@ -147,6 +147,15 @@ void ultramodern::set_native_thread_name(const std::string& name) {
@@ -635,8 +686,15 @@ index 6e3ed18..b78b8a2 100644
          ultramodern::check_running_queue(PASS_RDRAM1);
      }
      // Otherwise, immediately start the thread and terminate this one.
-@@ -278,9 +306,28 @@ extern "C" void osStopThread(RDRAM_ARG PTR(OSThread) t_) {
+@@ -276,11 +304,35 @@ extern "C" void osStopThread(RDRAM_ARG PTR(OSThread) t_) {
+     }
+     // Check if the thread is stopping itself (arg is null or thread_self).
      if (t_ == thread_self) {
++#if ULTRAMODERN_LIBULTRA_THREAD_STOP
++        // Stopped, so that osStartThread starts it again: a running thread's state is still QUEUED from when it was
++        // scheduled, and osStartThread ignores a thread that isn't stopped.
++        TO_PTR(OSThread, t_)->state = OSThreadState::STOPPED;
++#endif
          ultramodern::run_next_thread_and_wait(PASS_RDRAM1);
      }
 +#if ULTRAMODERN_LIBULTRA_THREAD_STOP

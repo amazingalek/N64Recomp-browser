@@ -47,14 +47,17 @@
 // takes a screenshot of the page when the play steps end.
 //
 // Every console line goes to stdout as it comes, with the seconds since start (rt64 shader: lines aside), and every
-// --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the sound frames the
+// --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the browser's animation
+// frames a second (requestAnimationFrame callbacks, which plume reads the display's rate from), the sound frames the
 // audio thread found its ring empty for (Module.recompAudioStats()), and, where they can be read, the GPU's load and
 // the cores the browser's GPU process and the whole browser took, and the GPU process's private bytes. The GPU on
 // Windows is the adapter the page draws with, from Windows' counters (the one the browser's own 3D load lands on, by
 // LUID, since a laptop's nvidia-smi GPU 0 can be its idle second GPU): its 3D engines' utilization summed over every
 // process, as Task Manager's, and its dedicated and shared memory (GPU Adapter Memory), with nvidia-smi's GPU 0 beside
 // it (utilization and power); elsewhere nvidia-smi's utilization, power, clock and memory. A summary at the end covers
-// the "play" steps: median presents a second and the range, the gaps between presents, frames short, each prebuilt
+// the "play" steps: median presents a second and the range, the gaps between presents, the median animation frames a
+// second (in Chrome on Windows ~55.6 when the display gives it no vblank, a monitor that is off: then a page that
+// interpolates presents ~55.6 too, and the run says so), frames short, each prebuilt
 // shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the cores, and
 // the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
 // Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
@@ -65,8 +68,8 @@
 // mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg), --build what the page was built from (a tag of this repo, or Pages),
 // and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
-// between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms), each sample's presents, sound
-// short and GPU load, the page, the query and the host's processor load over the play.
+// between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms; the animation frames a second),
+// each sample's presents, sound short and GPU load, the page, the query and the host's processor load over the play.
 //
 // A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
 // freshness of profile, uncapped or not and on screen or not, none with a note, failed or without a frame (one with
@@ -75,6 +78,8 @@
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
 // or waits for shaders over 2 s and half again longer than the longest of theirs: outside
 // the runs' own noise, but a busy host reads the same, so a flag is a reason to look again (CLAUDE.md, The pins).
+// Presents aren't compared for a run at the display's rate whose browser drew fewer than 57 animation frames a second:
+// the host had no display to pace them, and every page that interpolates reads the same.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -151,6 +156,9 @@ const onLine = (text) => {
 const ownPreload = `() => {
   window.__presents = 0;
   window.__gaps = [];
+  window.__animationFrames = 0;
+  const frame = () => { window.__animationFrames++; requestAnimationFrame(frame); };
+  requestAnimationFrame(frame);
   let lastPresent = 0;
   const getContext = HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext = function (kind) {
@@ -302,13 +310,14 @@ let sampleBusy = false;
 const sample = async () => {
   if (sampleBusy) return;
   sampleBusy = true;
-  let presents = null, audio = null, gaps = [];
+  let presents = null, animationFrames = null, audio = null, gaps = [];
   try {
     presents = await page.evaluate('window.__presents ?? null');
+    animationFrames = await page.evaluate('window.__animationFrames ?? null');
     gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()'));
     audio = await page.evaluate(audioStats);
   } catch {}
-  const now = { at: seconds(), presents, audio, cpu: procCpu() };
+  const now = { at: seconds(), presents, animationFrames, audio, cpu: procCpu() };
   const gpu = gpuNow();
   const nvidia = countersAnswered ? smiGpu : null;
   if (last) {
@@ -317,6 +326,7 @@ const sample = async () => {
     const s = {
       at: Math.round(now.at), playing,
       presents: (presents !== null && last.presents !== null) ? (presents - last.presents) / dt : null,
+      animationFrames: (animationFrames !== null && last.animationFrames !== null) ? (animationFrames - last.animationFrames) / dt : null,
       short: (audio && last.audio) ? audio.short - last.audio.short : null,
       gaps, gpu, nvidia,
       gpuProcess: fresh ? (now.cpu.gpuProcess - last.cpu.gpuProcess) / (now.cpu.at - last.cpu.at) : null,
@@ -324,7 +334,7 @@ const sample = async () => {
       gpuProcessMB: now.cpu?.gpuProcessMB || null,
     };
     samples.push(s);
-    const parts = [`presents/s ${s.presents?.toFixed(1) ?? '-'}`, `audio short ${s.short ?? (audio ? 0 : '-')}`];
+    const parts = [`presents/s ${s.presents?.toFixed(1) ?? '-'}`, `frames/s ${s.animationFrames?.toFixed(1) ?? '-'}`, `audio short ${s.short ?? (audio ? 0 : '-')}`];
     if (gpu && countersAnswered) parts.push(`GPU ${gpu.busy}% ${gpu.mib} MiB, ${gpu.sharedMib} MiB shared`);
     else if (gpu) parts.push(`GPU ${gpu.busy}% ${gpu.watts} W ${gpu.mhz} MHz ${gpu.mib} MiB`);
     if (nvidia) parts.push(`nvidia-smi ${nvidia.busy}% ${nvidia.watts} W`);
@@ -380,6 +390,10 @@ const hostAfter = hostTimes();
 
 const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
+const animationFrames = median(during.map((s) => s.animationFrames));
+// At the display's rate, a browser drawing fewer than 57 frames a second had no display to pace it (CLAUDE.md, Playing a
+// page): Chrome on Windows then sleeps 17 ms and a timer tick between frames, and plume takes that for the display.
+const noDisplay = !uncapped && animationFrames !== null && animationFrames < 57;
 const audioAfter = last?.audio ?? null;
 const percentile = (values, q) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -401,6 +415,7 @@ const summary = {
   ...(onScreen ? { onScreen, devicePixelRatio: viewport ? Math.round(viewport[2] * 100) / 100 : null } : {}), freshProfile, uncapped, seconds: Math.round(seconds()),
   presents: presents.length ? { median: median(presents), p10: percentile(presents, 0.1), min: Math.min(...presents),
     max: Math.max(...presents) } : null,
+  animationFrames: animationFrames === null ? null : Math.round(animationFrames * 10) / 10,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
     longestMs: Math.max(...gaps), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
     over250Ms: gaps.filter((g) => g > 250).length } : null,
@@ -420,6 +435,8 @@ console.log(`  presents/s ${summary.presents ? `${r(summary.presents.median)} ($
   (atCeiling ? ', held by the uncapped rate (360), not the page' : ''));
 if (summary.frames) console.log(`  frame gaps p50 ${summary.frames.p50Ms} ms, p99 ${summary.frames.p99Ms} ms, longest ${summary.frames.longestMs} ms, ` +
   `${summary.frames.over50Ms} over 50 ms, ${summary.frames.over100Ms} over 100, ${summary.frames.over250Ms} over 250`);
+if (summary.animationFrames !== null) console.log(`  animation frames/s ${summary.animationFrames}` +
+  (noDisplay ? ': the browser had no display to pace it, so a page that interpolates presents as many' : ''));
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
 console.log(`  shader waits ${shaderWaits.length ? shaderWaits.map((w) => `${w.seconds} s for ${w.shaders} at ${w.at} s`).join(', ') : 'none'}`);
 console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
@@ -440,7 +457,7 @@ if (recordFile) {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
     ...(onScreen ? { onScreen, devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
-    frames: summary.frames, audioShort: summary.audio?.short ?? null, shaderWaits,
+    frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
     interval, series: { presents: during.map((s) => s.presents === null ? null : Math.round(s.presents * 10) / 10),
       short: during.map((s) => s.short), gpuBusy: during.map((s) => s.gpu?.busy ?? null),
@@ -480,7 +497,8 @@ function compare(run, lines) {
   if (run.webgpuErrors && before.at(-1).webgpuErrors === 0) found.push(`${run.webgpuErrors} WebGPU errors, where the last run like it had none`);
   // Uncapped, presents run to the hundreds and wander with them: 10% below the lowest, not 3.
   const allowed = run.uncapped ? Math.min(...medians) * 0.1 : 3;
-  if (run.presents && medians.length && run.presents.median < Math.min(...medians) - allowed) {
+  if (noDisplay) console.log(`compared: presents a second left out, the browser's animation frames at ${run.animationFrames} a second`);
+  else if (run.presents && medians.length && run.presents.median < Math.min(...medians) - allowed) {
     found.push(`${run.presents.median} presents a second, against ${Math.min(...medians)}-${Math.max(...medians)} before`);
   }
   const p99s = before.map((p) => p.frames?.p99Ms).filter((m) => typeof m === 'number');
