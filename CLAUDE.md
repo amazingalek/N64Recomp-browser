@@ -311,9 +311,9 @@ plume 54b3be7          where pipelines build in the background (Chrome), one mad
 rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slot one period after the last one's, not
                        the moment that one went out (a present a period late or more starts the slots again): the
                        sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
-                       the pages of games below the display's rate presented 55.6 a second in Chrome on some nights
-                       and 51-55 on a laptop's Intel UHD, where games at its rate, which never sleep there, presented
-                       60. Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       the pages of games below the display's rate presented 51-55 a second on a laptop's Intel UHD,
+                       where games at its rate, which never sleep there, presented 60 (Chrome's 55.6 on a desktop is
+                       its frames with no display, Playing a page). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
                        Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
                        it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
 rt64 254dee3           a framebuffer the CPU changed counted on the CPU (copyFromRAM, against a copy of the last upload
@@ -331,6 +331,13 @@ N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK b
                        page, for no more presents); Conker's page under a stand-in for the tick
                        (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
                        25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
+N64ModernRuntime       on a page read_file reads in 4 MB pieces: an ifstream's reads were ~1 KB each, every one proxied
+b79d63b                to the page's thread, 65,624 for Conker's 64 MB ROM, which held its presents ~0.5 s at Load ROM
+RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's copy, hash and write) run on a thread of their
+                       own, not the launcher's drawing thread, and persistent_home.js stores a file of 1 MB or more from a
+                       worker (IndexedDB's put serialized 64 MB in ~120 ms on the page's thread): the launcher's present
+                       gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
+                       155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
 rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only to framebuffers the VI hasn't shown is a
                        pass of the next list's frame, not a frame, and the queue holds six workloads, so the game can
                        queue its next pass and frame while the frame before the pass is kept; RT64_UNEVEN_FRAME_RATES:
@@ -357,6 +364,7 @@ thread (a mod that fails to load) into a console error instead of an exception t
 `thread_stdio.js`, which prints a thread's stdout and stderr from that thread: Emscripten proxies every write to the
 page's thread, WebGPU's, and waits, so each line held its thread for up to a frame (Banjo-Tooie's upstream logs ~100
 lines a second: its title screen's sound was 12,900-13,400 frames short of ~2.1 million before, 235-1,325 with it);
+`persistent_home.js`, HOME kept in IndexedDB, a file of 1 MB or more (a ROM) stored from a worker off the page's thread;
 `frontend/build_speed.cmake` (ccache) and `N64RECOMP_BROWSER_FAST_LINK` (Building with Emscripten); a page's link
 that fails on any wasm-ld warning (`--fatal-warnings`: a call whose signature doesn't match the function's links as a
 trap) and takes a game's own `-sINITIAL_MEMORY`, stack sizes and thread pool over `frontend/`'s;
@@ -591,11 +599,25 @@ changes. Keep it current in the same work as what changes it, like the README:
   second at 1256x645 and 3840x2000, the memory flat.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
   what else was running beside a number.
-- Before rt64 c89ced0 a page whose game runs below the display's rate read 55.6 presents a second on some nights in
-  Chrome (a present every 18 ms) and 59.6 on others, every such page alike, while Pilotwings 64, a game at 60, read
-  60.0: RT64 timed each interpolated frame from when the last one went out, so the host's timer and the page's
-  thread set the rate, not the page. The page Pages serves, played just before a new build in the same conditions
-  (`--note` it), still tells the host from the build.
+- On a desktop GPU a page is played uncapped (`--uncapped`, as the retest and the stand-in are): capped, every page
+  and every build reads about 60 there (or Chrome's frames with no display, below), which tells none apart. A run at
+  the display's rate is for what uncapped switches off: RT64's pacing, the presents-in-flight cap and how late the
+  done callbacks come back (`?present-stats`), which held a laptop's Firefox at 20-30, and so a laptop's own runs,
+  played that way and on screen as a player's visit is (The games table).
+- Chrome on Windows times its animation frames by the display's vblank (DXGI's `WaitForVBlank` on the primary
+  output). With no display to give one, a monitor switched off, that call fails at once (`DXGI_ERROR_INVALID_CALL`)
+  and Chrome sleeps between frames instead, 17 ms and then up to a tick of the system timer: 17.9 ms at a 1 ms timer
+  resolution (55.6 frames a second), 17.4 at 0.5, on a blank page as on a game's, headless or in a window. plume reads
+  the display's rate from those frames, so then every page whose game runs below 60 presents ~55.6, and Pilotwings 64
+  and Rush 2049, games at 60, present 60. That was the 55.6 of 8 of the 11 pages in the v0.50.0 retest (frames
+  every 17.9 ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hour of 2026-10-16's
+  morning, frames every 16.7 ms) and 55.3-56.0 again once it wasn't: the 55.6 → 60.0 once put down to c89ced0 was
+  the display. Nor did c89ced0 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against
+  v0.50.0's 330 (headless Chrome 155, 3840x2000, both served from one port, interleaved).
+  play_page.mjs records the browser's animation frames a second beside the presents, and leaves presents out of its
+  comparison for a run at the display's rate with fewer than 57. Firefox times its frames itself and drew ~60 either
+  way. The page Pages serves, played just before a new build in the same conditions (`--note` it), still tells the
+  host from the build.
 - Firefox on Windows ends every timed wait on a page's thread on the system timer's tick, 15.6 ms at the default
   resolution, but a desktop's Firefox often runs at a finer one that another program asked for, and plays faster
   than a laptop's. `tools/timer_tick.c` (its header says how to link it into a test build) stretches each timed wait
@@ -1297,6 +1319,12 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   stack minutes in without it.
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
   runs one game thread at a time and delivers interrupts only inside OS calls (GoldenEye, The game forks).
+- A page's files are in the page's thread's file system, and every file call from another thread waits for that
+  thread, which presents nothing meanwhile. An istreambuf_iterator, an ifstream loop or libc++'s
+  `std::filesystem::copy_file` (fstreams, a few KB a call on Emscripten) takes a 64 MB ROM there in ~65,000 round
+  trips: Conker's ROM-version check held its launcher 0.85 s in Chrome and 2.3 s in Firefox. Read a large file with
+  `read()` in 4 MB pieces and write it in one call, behind `__EMSCRIPTEN__` (N64ModernRuntime-web b79d63b,
+  CBFD-Recompiled-web 8de429c).
 - Emscripten's SDL2 port opens audio on the page's thread except one line that reads the audio context's rate on the
   calling thread, which fails from a pthread: `frontend/sdl_audio.js` works around it. It also plays on the page's
   thread, a ScriptProcessorNode taking 256 frames (5 ms) at a time, and the main thread is WebGPU's: in headless Chrome
