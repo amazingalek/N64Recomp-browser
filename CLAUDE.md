@@ -346,6 +346,13 @@ rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only 
                        shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
                        only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
                        in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
+RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
+                       copies the whole buffer otherwise (writeBuffer), recompui's 1 MB upload buffer at every present
+                       (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB
+                       for Banjo's 4037x4000 background), again at every later image. Banjo's launcher, 3840x2000
+                       uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
+                       second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 117-138 ms;
+                       headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
 ```
 
 Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
