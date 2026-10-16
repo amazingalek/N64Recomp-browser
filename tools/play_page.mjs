@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>]
+//     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>]
 //     [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
@@ -12,15 +12,20 @@
 // a profile of its own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
-// another size a click goes where recompui puts the same spot: it lays its launcher and menus out by the viewport's
-// height, about the centre. --query is added to the page's URL. --headed runs Chrome in a window off the desktop, as a
-// player's Chrome presents, instead of headless (page_driver.mjs; Firefox is always in a window). --uncapped measures how
+// another size a click goes where recompui puts the same spot (page_driver.mjs). --query is added to the page's URL.
+// --headed runs Chrome in a window off the desktop, as a player's Chrome presents, instead of headless (page_driver.mjs;
+// Firefox is always in a window). --on-screen runs either browser maximized on the desktop at its own scale, as a
+// player's window is and Windows composites it, for a laptop's runs (page_driver.mjs says what off the desktop
+// flattered there): --size is then the window's, and the run records the viewport the page had, with onScreen and the
+// device pixel ratio, and is compared only with on-screen runs. --uncapped measures how
 // fast the page can present, not how it plays: the page gets ?uncapped (plume reports the display at 360 Hz, RT64
 // interpolates to it and paces nothing) and the browser animation frames at no fixed rate (page_driver.mjs), so its
 // presents a second are what the GPU, the page's thread and the browser's GPU process can take. That compares a
 // browser, a size or a build with another where every page would read 60 at the display's rate; a run at 342 or more
 // (95% of 360) is held by the rate, not the page, and says so. --cpu-throttle 3 (Chrome only) slows the page's thread
 // 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
+// --preload runs a JavaScript file of your own in every document before the page's scripts, after play_page's own
+// (a probe that wraps a WebGPU call, a stand-in for a slow GPU's callbacks): its console lines come out with the rest.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -39,14 +44,17 @@
 //
 // Every console line goes to stdout as it comes, with the seconds since start (rt64 shader: lines aside), and every
 // --interval seconds (5) a line of: presents a second (the page's getCurrentTexture calls), the sound frames the
-// audio thread found its ring empty for (Module.recompAudioStats()), and, where they can be read, the GPU's
-// utilization, power, clock and memory (nvidia-smi) and the cores the browser's GPU process and the whole browser
-// took, and the GPU process's private bytes. A summary at the end covers the "play" steps: median presents a second
-// and the range, the gaps between presents, frames short, each prebuilt shader wait (RT64's "built in ... the game
-// waiting" lines), WebGPU errors and exceptions, the GPU and the cores, and the GPU process's private bytes from the
-// first sample to the last and MB a second between them (a leak's rate), in Firefox with its own report of which part
-// grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too. The GPU readings are the whole GPU's, so
-// note what else ran beside a number.
+// audio thread found its ring empty for (Module.recompAudioStats()), and, where they can be read, the GPU's load and
+// the cores the browser's GPU process and the whole browser took, and the GPU process's private bytes. The GPU on
+// Windows is the adapter the page draws with, from Windows' counters (the one the browser's own 3D load lands on, by
+// LUID, since a laptop's nvidia-smi GPU 0 can be its idle second GPU): its 3D engines' utilization summed over every
+// process, as Task Manager's, and its dedicated and shared memory (GPU Adapter Memory), with nvidia-smi's GPU 0 beside
+// it (utilization and power); elsewhere nvidia-smi's utilization, power, clock and memory. A summary at the end covers
+// the "play" steps: median presents a second and the range, the gaps between presents, frames short, each prebuilt
+// shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the cores, and
+// the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
+// Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
+// The GPU readings are the whole adapter's, so note what else ran beside a number.
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
@@ -56,9 +64,9 @@
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms), each sample's presents, sound
 // short and GPU load, the page, the query and the host's processor load over the play.
 //
-// A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play and
-// freshness of profile, none with a note, failed or without a frame (one with no play or profile recorded, as a line
-// recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
+// A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
+// freshness of profile, uncapped or not and on screen or not, none with a note, failed or without a frame (one with
+// no play or profile recorded, as a line recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
 // or waits for shaders over 2 s and half again longer than the longest of theirs: outside
@@ -72,6 +80,8 @@ import { open, option, serve, sleep } from './page_driver.mjs';
 const args = process.argv.slice(2);
 const headed = args.includes('--headed');
 if (headed) args.splice(args.indexOf('--headed'), 1);
+const onScreen = args.includes('--on-screen');
+if (onScreen) args.splice(args.indexOf('--on-screen'), 1);
 const uncapped = args.includes('--uncapped');
 if (uncapped) args.splice(args.indexOf('--uncapped'), 1);
 const cpuThrottle = Number(option(args, '--cpu-throttle', '0'));
@@ -90,6 +100,7 @@ const recordFile = option(args, '--record', null);
 const game = option(args, '--game', null);
 const build = option(args, '--build', null);
 const note = option(args, '--note', null);
+const preloadFile = option(args, '--preload', null);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg (publish_pages.sh\'s names)');
   process.exit(1);
@@ -97,16 +108,11 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed] [--uncapped] [--cpu-throttle <rate>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
-// A plan's clicks and ROM clicks, from 1256x645 to the size asked for.
-const scale = size[1] / 645;
-const place = (steps) => steps?.map((s) => (s[0] === 'click' || s[0] === 'rom')
-  ? [s[0], Math.round(size[0] / 2 + (s[1] - 628) * scale), Math.round(size[1] / 2 + (s[2] - 322.5) * scale), ...s.slice(3)]
-  : s);
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
   console.error(section ? `the plan has no section ${section}` : 'the plan has no "play" steps (or give --section)');
@@ -136,7 +142,7 @@ const onLine = (text) => {
 };
 
 // Presents: every getCurrentTexture call on a WebGPU canvas, and the gap in ms since the one before (taken each sample).
-const preload = `() => {
+const ownPreload = `() => {
   window.__presents = 0;
   window.__gaps = [];
   let lastPresent = 0;
@@ -157,16 +163,74 @@ const preload = `() => {
     return context;
   };
 }`;
+const preload = preloadFile ? `() => {
+(${ownPreload})();
+${fs.readFileSync(preloadFile, 'utf8')}
+}` : ownPreload;
 
-// The GPU, from nvidia-smi's own loop, if there is one.
-let gpu = null;
+// Each whole line a helper process prints: a pipe's chunk can end mid-line.
+const eachLine = (stream, onLine) => {
+  let pending = '';
+  stream.on('data', (data) => {
+    const lines = (pending + data).split('\n');
+    pending = lines.pop();
+    for (const text of lines) if (text.trim()) onLine(text.trim());
+  });
+};
+
+// The GPU, from nvidia-smi's own loop, if there is one, and on Windows from a PowerShell loop of Windows' counters
+// (Get-Counter takes ~2.5 s), for every adapter by LUID: the page's is the one with the most of the browser's 3D load
+// so far.
+let smiGpu = null;
+let adapterGpu = null;
+let countersAnswered = false;
+const adapterLoad = {};
+const gpuNow = () => countersAnswered ? adapterGpu : smiGpu;
 const smi = spawn('nvidia-smi', ['-i', '0', '--query-gpu=utilization.gpu,power.draw,clocks.gr,memory.used',
   '--format=csv,noheader,nounits', '-lms', String(interval * 1000)], { stdio: ['ignore', 'pipe', 'ignore'] });
 smi.on('error', () => {});
-smi.stdout.on('data', (data) => {
-  const [busy, watts, mhz, mib] = data.toString().trim().split('\n').pop().split(',').map(Number);
-  gpu = { busy, watts, mhz, mib };
+eachLine(smi.stdout, (text) => {
+  const [busy, watts, mhz, mib] = text.split(',').map(Number);
+  if (![busy, watts, mhz, mib].some(Number.isNaN)) smiGpu = { busy, watts, mhz, mib };
 });
+let counters = null;
+if (process.platform === 'win32') {
+  const script = `
+$paths = '\\GPU Engine(*engtype_3D)\\Utilization Percentage', '\\GPU Adapter Memory(*)\\Dedicated Usage', '\\GPU Adapter Memory(*)\\Shared Usage'
+while ($true) {
+  $start = Get-Date
+  $all = Get-CimInstance Win32_Process -Filter "Name='chrome.exe' OR Name='firefox.exe'"
+  $ids = @($all | ? { $_.CommandLine -and $_.CommandLine.Contains($env:PLAY_PAGE_PROFILE) } | % { [int]$_.ProcessId })
+  $ids += @($all | ? { $_.CommandLine -match '-parentPid (\\d+)' -and $ids -contains [int]$Matches[1] } | % { [int]$_.ProcessId })
+  $a = @{}
+  foreach ($c in (Get-Counter -Counter $paths -ErrorAction SilentlyContinue).CounterSamples) {
+    if ($c.InstanceName -notmatch 'luid_(0x[0-9a-f]+_0x[0-9a-f]+)') { continue }
+    $l = $Matches[1]
+    if (-not $a.ContainsKey($l)) { $a[$l] = @{ busy = 0; mine = 0; dedicated = 0; shared = 0 } }
+    if ($c.Path -like '*utilization percentage') {
+      $a[$l].busy += $c.CookedValue
+      if ($c.InstanceName -match '^pid_(\\d+)_' -and $ids -contains [int]$Matches[1]) { $a[$l].mine += $c.CookedValue }
+    } elseif ($c.Path -like '*dedicated usage') { $a[$l].dedicated += $c.CookedValue } else { $a[$l].shared += $c.CookedValue }
+  }
+  ConvertTo-Json -Compress -InputObject $a
+  $left = ${interval} - ((Get-Date) - $start).TotalSeconds
+  if ($left -gt 0) { Start-Sleep -Milliseconds ([int]($left * 1000)) }
+}`;
+  counters = spawn('powershell', ['-NoProfile', '-Command', script],
+    { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PLAY_PAGE_PROFILE: profile } });
+  counters.on('error', () => {});
+  eachLine(counters.stdout, (text) => {
+    let adapters;
+    try { adapters = JSON.parse(text); } catch { return; }
+    if (!Object.keys(adapters).length) return;
+    countersAnswered = true;
+    for (const [luid, a] of Object.entries(adapters)) adapterLoad[luid] = (adapterLoad[luid] ?? 0) + a.mine;
+    const luid = Object.keys(adapterLoad).filter((l) => adapterLoad[l] > 0).sort((x, y) => adapterLoad[y] - adapterLoad[x])[0];
+    const a = adapters[luid];
+    if (a) adapterGpu = { adapter: luid, busy: Math.min(100, Math.round(a.busy)), mib: Math.round(a.dedicated / 2 ** 20),
+      sharedMib: Math.round(a.shared / 2 ** 20) };
+  });
+}
 
 // CPU seconds of the browser's processes (those naming the profile, and Firefox's children of them) and of its GPU
 // process, and the GPU process's private bytes (what a leak there grows): from a PowerShell loop of its own on Windows,
@@ -190,9 +254,9 @@ while ($true) {
   sampler = spawn('powershell', ['-NoProfile', '-Command', script],
     { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PLAY_PAGE_PROFILE: profile } });
   sampler.on('error', () => {});
-  sampler.stdout.on('data', (data) => {
-    const [all, gpuProcess, gpuProcessMB] = data.toString().trim().split('\n').pop().split(' ').map(Number);
-    cpu = { at: seconds(), all, gpuProcess, gpuProcessMB };
+  eachLine(sampler.stdout, (text) => {
+    const [all, gpuProcess, gpuProcessMB] = text.split(' ').map(Number);
+    if (!Number.isNaN(all) && !Number.isNaN(gpuProcess)) cpu = { at: seconds(), all, gpuProcess, gpuProcessMB };
   });
 }
 const procCpu = () => {
@@ -217,8 +281,8 @@ const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, uncapped, cpuThrottle, onLine, log });
-log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${size[0]}x${size[1]}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
+  preload, headed, onScreen, uncapped, cpuThrottle, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 const samples = [];
@@ -239,6 +303,8 @@ const sample = async () => {
     audio = await page.evaluate(audioStats);
   } catch {}
   const now = { at: seconds(), presents, audio, cpu: procCpu() };
+  const gpu = gpuNow();
+  const nvidia = countersAnswered ? smiGpu : null;
   if (last) {
     const dt = now.at - last.at;
     const fresh = now.cpu && last.cpu && now.cpu.at > last.cpu.at;
@@ -246,14 +312,16 @@ const sample = async () => {
       at: Math.round(now.at), playing,
       presents: (presents !== null && last.presents !== null) ? (presents - last.presents) / dt : null,
       short: (audio && last.audio) ? audio.short - last.audio.short : null,
-      gaps, gpu,
+      gaps, gpu, nvidia,
       gpuProcess: fresh ? (now.cpu.gpuProcess - last.cpu.gpuProcess) / (now.cpu.at - last.cpu.at) : null,
       browser: fresh ? (now.cpu.all - last.cpu.all) / (now.cpu.at - last.cpu.at) : null,
       gpuProcessMB: now.cpu?.gpuProcessMB || null,
     };
     samples.push(s);
     const parts = [`presents/s ${s.presents?.toFixed(1) ?? '-'}`, `audio short ${s.short ?? (audio ? 0 : '-')}`];
-    if (gpu) parts.push(`GPU ${gpu.busy}% ${gpu.watts} W ${gpu.mhz} MHz ${gpu.mib} MiB`);
+    if (gpu && countersAnswered) parts.push(`GPU ${gpu.busy}% ${gpu.mib} MiB, ${gpu.sharedMib} MiB shared`);
+    else if (gpu) parts.push(`GPU ${gpu.busy}% ${gpu.watts} W ${gpu.mhz} MHz ${gpu.mib} MiB`);
+    if (nvidia) parts.push(`nvidia-smi ${nvidia.busy}% ${nvidia.watts} W`);
     if (s.gpuProcess !== null) parts.push(`GPU process ${s.gpuProcess.toFixed(2)} cores${s.gpuProcessMB ? ` ${Math.round(s.gpuProcessMB)} MB` : ''}, browser ${s.browser.toFixed(2)}`);
     log(parts.join(' · '));
   }
@@ -265,7 +333,7 @@ const sampling = setInterval(sample, interval * 1000);
 const finish = async (code) => {
   clearInterval(sampling);
   await page.close();
-  for (const child of [smi, sampler]) { try { child?.kill(); } catch {} }
+  for (const child of [smi, sampler, counters]) { try { child?.kill(); } catch {} }
   server?.close();
   if (profileOption === null) { try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} }
   process.exit(code);
@@ -280,16 +348,18 @@ const hostTimes = () => os.cpus().reduce((t, c) => {
   return { all: t.all + all, idle: t.idle + c.times.idle };
 }, { all: 0, idle: 0 });
 let hostBefore = null;
+let viewport = null;
 const steps = { keep: () => {} };  // record_shaders.mjs's own step, in a shader plan's sections
 try {
   await page.navigate(pageUrl);
-  await page.run(place([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])]), steps);
+  await page.run([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])], steps);
   audioBefore = last?.audio ?? null;
   memoryBefore = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
   playing = true;
   hostBefore = hostTimes();
-  log('play');
-  await page.run(place(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play), steps);
+  viewport = await page.viewport();
+  log(`play, the page's viewport ${viewport[0]}x${viewport[1]} at ${viewport[2]} device pixels a CSS pixel`);
+  await page.run(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play, steps);
   await sample();
   playing = false;
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
@@ -309,10 +379,18 @@ const percentile = (values, q) => {
 };
 // Every gap between two presents while playing: the dips a sample's average hides.
 const gaps = during.flatMap((s) => s.gaps ?? []);
+// The medians of a sample's GPU readings (gpu or nvidia), and which adapter.
+const gpuMedians = (key) => {
+  const m = Object.fromEntries(['busy', 'watts', 'mib', 'sharedMib']
+    .map((k) => [k, median(during.map((s) => s[key]?.[k] ?? null))]).filter(([, v]) => v !== null));
+  const adapter = during.find((s) => s[key]?.adapter)?.[key].adapter;
+  return Object.keys(m).length ? { ...m, ...(adapter ? { adapter } : {}) } : null;
+};
 // The GPU process's private bytes from the first sample of the play to the last: flat, or a leak's MB a second.
 const memory = during.filter((s) => s.gpuProcessMB);
 const summary = {
-  browser, page: pageUrl, size: `${size[0]}x${size[1]}`, freshProfile, uncapped, seconds: Math.round(seconds()),
+  browser, page: pageUrl, size: onScreen && viewport ? `${viewport[0]}x${viewport[1]}` : `${size[0]}x${size[1]}`,
+  ...(onScreen ? { onScreen, devicePixelRatio: viewport ? Math.round(viewport[2] * 100) / 100 : null } : {}), freshProfile, uncapped, seconds: Math.round(seconds()),
   presents: presents.length ? { median: median(presents), p10: percentile(presents, 0.1), min: Math.min(...presents),
     max: Math.max(...presents) } : null,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
@@ -320,7 +398,7 @@ const summary = {
     over250Ms: gaps.filter((g) => g > 250).length } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
   shaderWaits, webgpuErrors: errors, exceptions,
-  gpu: during.some((s) => s.gpu) ? { busy: median(during.map((s) => s.gpu?.busy ?? null)), watts: median(during.map((s) => s.gpu?.watts ?? null)) } : null,
+  gpu: gpuMedians('gpu'), nvidia: gpuMedians('nvidia'),
   cores: during.some((s) => s.gpuProcess !== null) ?
     { gpuProcess: median(during.map((s) => s.gpuProcess)), browser: median(during.map((s) => s.browser)) } : null,
   gpuProcessMB: memory.length > 1 ? { first: Math.round(memory[0].gpuProcessMB), last: Math.round(memory.at(-1).gpuProcessMB),
@@ -337,7 +415,9 @@ if (summary.frames) console.log(`  frame gaps p50 ${summary.frames.p50Ms} ms, p9
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
 console.log(`  shader waits ${shaderWaits.length ? shaderWaits.map((w) => `${w.seconds} s for ${w.shaders} at ${w.at} s`).join(', ') : 'none'}`);
 console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
-if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
+if (summary.gpu?.adapter) console.log(`  GPU ${summary.gpu.busy}% busy (3D), ${summary.gpu.mib} MiB, ${summary.gpu.sharedMib} MiB shared (medians, the page's adapter ${summary.gpu.adapter})`);
+else if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
+if (summary.nvidia) console.log(`  nvidia-smi's GPU 0 ${summary.nvidia.busy}% busy, ${summary.nvidia.watts} W (medians)`);
 if (summary.cores) console.log(`  GPU process ${r(summary.cores.gpuProcess, 2)} cores, browser ${r(summary.cores.browser, 2)} (medians)`);
 if (summary.gpuProcessMB) console.log(`  GPU process private bytes ${summary.gpuProcessMB.first} -> ${summary.gpuProcessMB.last} MB, ` +
   `${summary.gpuProcessMB.perSecond} MB a second`);
@@ -350,7 +430,7 @@ if (recordFile) {
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
   const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
-    freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    ...(onScreen ? { onScreen, devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, audioShort: summary.audio?.short ?? null, shaderWaits,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
@@ -358,6 +438,7 @@ if (recordFile) {
       short: during.map((s) => s.short), gpuBusy: during.map((s) => s.gpu?.busy ?? null),
       gpuProcessMB: during.map((s) => s.gpuProcessMB === null ? null : Math.round(s.gpuProcessMB)) },
     webgpuErrors: errors.length, firstErrors: [...new Set(errors)].slice(0, 3), exceptions, gpu: summary.gpu,
+    ...(summary.nvidia ? { nvidia: summary.nvidia } : {}),
     cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
     gpuProcessMB: summary.gpuProcessMB,
     ...(summary.gpuProcessMemory ? { gpuProcessMemory: summary.gpuProcessMemory } : {}),
@@ -375,7 +456,7 @@ function compare(run, lines) {
   const like = (a, b) => a === null || a === undefined || b === null || b === undefined || a === b;
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
-      like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped &&
+      like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped && !p.onScreen === !run.onScreen &&
       (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1))
     .slice(-5);
   if (!before.length) {
