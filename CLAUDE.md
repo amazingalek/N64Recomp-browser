@@ -578,6 +578,18 @@ changes. Keep it current in the same work as what changes it, like the README:
   3840x2000); `?record-shaders` prints the shaders the game asks for; the console reports
   each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode`
   in a preload, take `processorOptions.ring` and sample its two counters every few ms.
+- What a page's GPU time goes on: `--preload tools/pass_probe.js` (its header says how) prints each kind of pass, how
+  many a present has, their draws and GPU time (Chrome's timestamp queries; Firefox gives counts only), and the draws
+  by fragment shader, and `--query probe-skip=<KB>` leaves one shader's draws out to see what they cost. Uncapped at
+  3840x2000 in Chrome 155 (RTX 2070, a busy host), RT64 draws a canvas of that size at Auto's ceil(2000/240) = 9 times
+  the N64's lines, 4224x2200 for Rush 2049 and 4148x2169 for Majora's Mask, and every interpolated present redraws the
+  whole frame there. Rush 2049: ~12 passes a present, 7.1 ms of GPU passes, 83% of it the draws of one 70 KB pixel
+  shader, one with mip LOD whose tile is picked per pixel (228 draws a present): without them 1.25 ms and 316 presents a
+  second against 150. Majora's Mask: 32-35 passes a present, 12-13 of the scene (~60 draws each, 2.7-3.3 ms) with as
+  many of its decals between them (depth read-only, ~3 draws, 0.8 ms), 3.7-4.3 ms in all; with every draw skipped
+  0.10 ms and 315 presents a second against 210, and no one shader's draws more than about a tenth of it. Render to
+  RAM's 320x240 passes cost ~0.01 ms. So both pages' GPU time is RT64's own pixel shaders at that resolution, as on a
+  desktop build, not anything of the web's (Ruled out).
 - Read video memory from the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` counter and nvidia-smi, not the
   per-process `\GPU Process Memory(*)\Dedicated Usage`: Firefox opens its shared canvas texture again every frame, and
   Windows 10 counts every open (KB4490156), so that one climbs by a canvas a frame, past a terabyte in 15 minutes, while
@@ -1424,3 +1436,13 @@ running in a browser was found to learn from.
   because ccache can't cache a file that includes one.
 - A fixed heap in place of memory growth (Conker's 3 GB measured no faster), and `-sGROWABLE_ARRAYBUFFERS=2`
   (emdawnwebgpu passes WebGPU views of the heap, which Chrome refuses over a growable buffer).
+- A cheaper GPU frame for Rush 2049's and Majora's Mask's pages, the dearest uncapped (Playing a page, what a page's GPU
+  time goes on), in the web's own parts: the pass breaks (a decal's read-only depth, plume's barriers), render to RAM's
+  passes and the copies cost ~0.1 ms of a 4-7 ms present. Nor is it rt64 008f380's loops: Rush 2049 built with them,
+  without them (re-spirv then spirv-opt), with either one alone, and with neither as dxc writes it presented 122-154 a
+  second uncapped at 3840x2000 in Chrome 155, all five within the runs' noise (GPU 91-98% busy, interleaved, one server),
+  and in Firefox 158 112 with them against 123 without, the race section's wait 4.5 s against 7.0. What costs is what
+  the desktop build draws too: the mip LOD shader's taps (two levels of two tiles, four each, by hand, since a tile
+  picked per pixel can't use a hardware sampler, upstream's rule in rt64_state.cpp), and Auto's resolution, rounded up
+  to a whole multiple of 240 lines (18-21% more pixels at 2000 lines, 3% at a laptop's 945). Either would draw
+  differently from the desktop's RT64.
