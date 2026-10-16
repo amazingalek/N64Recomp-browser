@@ -337,7 +337,8 @@ changes. Keep it current in the same work as what changes it, like the README:
 - `play_page.mjs` reads the browser's GPU process's private bytes in each sample, and in Firefox about:memory's split
   of them at the play's start and end (page_driver.mjs's `gpuProcessMemory`): Firefox's own heap (its WebGPU and
   wgpu), the system heap (the D3D12 runtime, the driver, DXC) and the GPU memory it has committed. How each browser's
-  grows over 10 minutes of a page is in docs/findings.md (Memory).
+  grows over 10 minutes of a page is in docs/findings.md (Memory). Each read holds Firefox's page 120-200 ms, so a
+  play's gaps start after the first one.
 - One page plays at a time on a machine, in any browser: with two Firefox windows each playing a page, one window's
   animation frames came in bursts (docs/findings.md, Two pages at once). Where agents share a machine, each play (one
   `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's queue for the GPU, started
