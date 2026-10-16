@@ -287,7 +287,8 @@ times Chrome's gaps over 100 ms.
   runs). Firefox calls back only on a submission or its 100 ms timer (`WebGPUDevice::pollQueue`): a test page's empty
   submission came back in ~50 ms on the timer and in 2 ms with a `submit([])` every millisecond, which the swap chain's
   wait sends, so the timer is not this wait. `play_page.mjs`'s about:memory read (`gpuProcessMemory`) held Firefox's
-  presents and animation frames 137-171 ms each time, at the play's start and end, so a play's gaps start after it.
+  presents and animation frames 134-203 ms each time, at the play's start and end, and a settled launcher's play
+  counted the first as its longest gap (136 and 202 ms, 13.5 and 14.7 without it), so a play's gaps start after it.
 - Chrome on Windows gives a page the integrated GPU on a laptop that has two, since it ignores `powerPreference`
   (crbug.com/369219127); `chrome://flags/#force-high-performance-gpu` gives it the other. On that laptop's Intel UHD
   (D3D12) Rush 2049's page crawled until its specialized pipelines were built (~1 fps for minutes in menus, 20-30 in
