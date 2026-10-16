@@ -16,7 +16,7 @@
 #    a page whose code didn't change is left alone, and one built from an older main but the same bytes stays too.
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
-#    (tools/play_page.mjs) with the game's own tools/shader_plan.json: launcher, ROM, Start Game, then 20 s of the
+#    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, or web/): launcher, ROM, Start Game, then 20 s of the
 #    game running by itself, which has to present frames with no WebGPU error. Each run goes into plays.jsonl
 #    (play_page.mjs --record), to be committed with the Games table's rows.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
@@ -77,6 +77,7 @@ mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-we
 oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web
 dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
+snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -271,6 +272,10 @@ build_dkr() {
     # Patches its dependencies from clean whenever N64Recomp-browser or its patches moved (build/web-patched).
     bash scripts/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
+build_snap() {
+    # Patches its submodules from clean whenever N64Recomp-browser or patches/web moved (build-web-prep/web-patched).
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
 
 # --- Here ---
 
@@ -343,9 +348,13 @@ for g in "${published[@]}"; do
         sleep 10
     done
     if [[ $g == rush ]]; then rom="$rush/roms/rush2049.us.z64" clone="$rush"; else rom="$ROMS/$g.z64" clone="$cache/$g"; fi
-    mkdir -p "$work/$g-tools"  # the plan with the scripts its steps load (shader_survey.js)
-    git -C "$clone" archive origin/main tools | tar xf - -C "$work/$g-tools"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-tools/tools/shader_plan.json" --play 20 --port $((20000 + RANDOM % 9000)) \
+    # The plan with the scripts its steps load (shader_survey.js), from tools/ or, in a fork whose tools/ is upstream's
+    # (DKR-R's, Snap64 Recomp's), web/.
+    plan=tools/shader_plan.json
+    git -C "$clone" cat-file -e "origin/main:$plan" 2> /dev/null || plan=web/shader_plan.json
+    mkdir -p "$work/$g-tools"
+    git -C "$clone" archive origin/main "${plan%/*}" | tar xf - -C "$work/$g-tools"
+    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$work/$g-tools/$plan" --play 20 --port $((20000 + RANDOM % 9000)) \
         --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true
