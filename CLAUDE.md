@@ -981,6 +981,8 @@ scripts, all from clean submodules by its `tools/web_patch.sh`. Its modern water
 web patch moves, so `tools/patch_rt64_water.py` applies a version for a web-patched RT64
 (`tools/patches/rt64-water-web.patch`): its 16 shaders included as WGSL blobs, and WaterSprayVS's
 `!all(isfinite(v))` written `!all(abs(v) <= FLT_MAX)`, since naga rejected `||` between a `vec4<bool>` and a bool.
+It is the web-patched tree's diff, so an rt64-web change beside its lines (WorkloadQueue's thread, rt64 179adb8) stops
+`git apply`, and the patch is made again: the water patch applied with fuzz to the web-patched RT64, then diffed.
 `wr64.toml` ignores `gspFast3DTextStart` and `aspMainTextStart`: the Docker image's binutils hand N64Recomp the
 microcode's splat labels as functions. Fast3D draws as it does natively, with no rt64-web change. Render to RAM is off
 on the page: the CPU's one read of a frame, `sys_main.c`'s copy of the last frame in display modes 1 and 2, is never
@@ -1130,7 +1132,9 @@ runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build
 `dependencies.lock.json` pins (rt64 at Banjo's commit, N64ModernRuntime ae1ffbb), applies DKR-R's own patches to them
 and then `apply.cmake` project by project; where the two change the same lines, `apply.cmake` leaves those files out
 and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's, and `patches/web/stage/` writes
-DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. It patches from clean whenever `lib/N64Recomp-browser`
+DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. rt64-web fced886 keeps the web's lines off those
+DKR-R's and Jet Force Gemini's patches change (where `fullSync()` ends, `submitRasterScene()`'s RasterParams, the raster
+shader cache's first includes), as 03b9dcc and d5121c9 do for Conker's: their builds stop on a web line there. It patches from clean whenever `lib/N64Recomp-browser`
 or `patches/` moved (`build/web-patched`). Its checkouts carry DKR-R's patches before the web's, so `pins.txt` has no
 row for it: `publish_pages.sh`'s build is what checks a tag against it. The page has a launcher of its own
 (`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
