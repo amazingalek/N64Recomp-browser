@@ -10,8 +10,10 @@ through WebGPU (README). Almost all of it is written by AI agents, so this file 
 - **Comments beside the code**, for how something works and why: each file's header (`frontend/CMakeLists.txt`,
   `patches/apply.cmake`, every script in `tools/`), and in the forks each commit's message. Read the header of the file
   you are changing first, and update it in the same commit as the code.
-- **A game's own repo**, for what was played and measured on that game: a game fork's README or BUILDING.md, Rush
-  2049's CLAUDE.md (The web target, Steps 1-3). Never this repo's README.
+- **`plays.jsonl`**, for every run of a page: what was played, in which browser, on what GPU and when (The games
+  table). It is the one record of a play: never this repo's README, and not written out again in a game's repo.
+- **A game's own repo**, for a finding that explains that game's code: a game fork's README or BUILDING.md, Rush
+  2049's CLAUDE.md (The web target, Steps 1-3).
 - **This file**, for what an agent can't get from those: how work lands, the rules, how to change, publish and play
   the web support, what is known about Chrome's and Firefox's WebGPU, and what has been ruled out.
 
@@ -388,8 +390,8 @@ last tag, and has work filed to fix it. So Pages holds only pages that were play
 page was built from. `git log <played>..<built>` here lists what a page took since it was last played, which is where
 to look when it plays worse. Rush 2049 is retested with them, in the same work, built, played and measured the same
 way; only its pin moves differently: the retest opens a pull request on its own repo that moves its
-`lib/N64Recomp-browser` to the tag and writes what was played in its CLAUDE.md, which builds those same bytes, runs the
-desktop game and publishes the page once it merges, and the retest updates its row. Any other work that builds, plays
+`lib/N64Recomp-browser` to the tag, which builds those same bytes, runs the desktop game and publishes the page once
+it merges, and the retest records its runs in `plays.jsonl` and updates its row. Any other work that builds, plays
 or measures every game (a critical fix, a measurement across the pages) takes Rush 2049 along the same way, not as work
 of its own afterwards. Its pin moves to a
 tag that left its page's bytes alone too, since its desktop build can still take something from it (below).
@@ -439,14 +441,13 @@ critical fix, a change to a game's own repo or its shader list) does all of this
 - Plays the page in both Chrome and Firefox, its build before it is published (The pins) and from Pages after:
   launcher, Load ROM, the wait for the shaders, menus, a level or race, sound, the frame rate, WebGPU errors in the
   console (Playing a page). Look at the menus too (a `shot` step).
-- Writes what was played, in which browser, on what GPU and when, in that game's repo, beside its other measurements
-  (a game fork's README or BUILDING.md; Rush 2049's CLAUDE.md, Step 3), never in this README.
-- Records every run in `plays.jsonl`, committed with the row: `play_page.mjs --record plays.jsonl --game <name>
-  --build <tag>`, with `--note` for anything a player's visit wouldn't have (a preload, a test build). It is the
-  history of how each page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note`
-  saying so and its `gpu` the laptop's adapter (WebGPU in Chrome and Firefox, Measuring the GPU). A run without `--note` is compared with the last 5 like it (same game, browser, size and play) and
-  flagged `regression:` when it is clearly worse (its header says by how much). The first 216 lines, 2026-10-14
-  and 10-15, were recovered from the runs' logs (`recovered`).
+- `plays.jsonl` is the record. Every run goes in it, committed with the row (`play_page.mjs --record plays.jsonl
+  --game <name> --build <tag>`, with `--note` for anything a player's visit wouldn't have: a preload, a test build),
+  and nowhere else: a game's repo keeps prose only for a finding that explains its code. It is the history of how each
+  page plays, one line a run, failed runs too; a laptop report goes in by hand, its `note` saying so and its `gpu` the
+  laptop's adapter (WebGPU in Chrome and Firefox, Measuring the GPU). A run without `--note` is compared with the last
+  5 like it (same game, browser, size and play) and flagged `regression:` when it is clearly worse (its header says by
+  how much). The first 216 lines, 2026-10-14 and 10-15, were recovered from the runs' logs (`recovered`).
 - Writes a table cell from a run on integrated graphics (a laptop report, or a hand test there), or else from the
   stand-in for one, marked `*`: the page from Pages on a desktop GPU with a 3840x2000 canvas, about 7 times
   the pixels of a laptop's window, in both browsers at one CSS pixel a pixel, uncapped (`play_page.mjs --uncapped
