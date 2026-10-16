@@ -351,7 +351,7 @@ RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the byt
                        (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB
                        for Banjo's 4037x4000 background), again at every later image. Banjo's launcher, 3840x2000
                        uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
-                       second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 117-138 ms;
+                       second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 87-138 ms;
                        headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
 ```
 
