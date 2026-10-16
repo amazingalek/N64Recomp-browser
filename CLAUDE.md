@@ -779,8 +779,8 @@ on a black page, and the logos alone 0.5-0.7 s, then 6.5 s as the Rap begins. Co
 Majora's Mask's boot 2.4 and 0.1 s (16.4 and 10.9 s as one list), Clock Town 1.6 s either way; Donkey Kong 64's 5.0 and
 0.4 s (9.6 and 5.2 as one list), Frantic Factory 0.9-1.0 s. Firefox 157 keeps no built pipelines between visits, so
 every visit waits as long: Majora's Mask's boot 4.5-4.7 s and Clock Town 14-16 s, Donkey Kong 64's 15-17 s (26 s as one
-list) and the Factory 3.6 s. Then each draws with no WebGPU errors. Those Chrome numbers are from before rt64 950188f,
-which builds the whole list behind the game; on v0.28.0, cold in headless Chrome 155 (RTX 2070, a busy host, 2026-10-14):
+list) and the Factory 3.6 s. Those Chrome numbers are from before rt64 950188f, which builds the whole list behind the
+game; on v0.28.0, cold in headless Chrome 155 (RTX 2070, a busy host, 2026-10-14):
 Banjo waited 1.8-2.6 s at the start instead of 3.5, Majora's Mask nothing at the start and 0.5 s for Clock Town, Donkey
 Kong 64 nothing at all, the Factory included, Conker nothing at the start and 3.5 s for Windy, reached before its boot
 section was built. The cost is frames while the list builds: Banjo, Majora's Mask and Conker drew 28-42 a second for
@@ -791,19 +791,12 @@ even pacing, not the build threads: each pipeline built behind the game drops a 
 second paced every game frame to one present, 8-12 a second in GoldenEye's credits (on an idle host the DK Rap played
 alike with its boot section on 6, 3, 2 or 1 threads, and waiting for it up front lost 90k-140k audio frames). With rt64
 6734747, cold on an idle host, GoldenEye drew 48-62 through its boot and credits (173k-223k audio frames short in 120 s
-against 525k-1.2M) and Donkey Kong 64 55-56 once its boot's ~3 s of black ended, none short. On 7b80155, cold, local
-builds in headless Chrome 155 (RTX 2070, an idle host, 2026-10-14): Banjo waited 1.4 s for 12 shaders and drew 55 a
-second, Majora's Mask 0.3 s for Clock Town, Donkey Kong 64 and GoldenEye nothing, Factory and Dam included (GoldenEye
-48-60 through its boot, credits and Dam, all 202 built 72 s in), Conker 2.8 s for Windy, each with no WebGPU error.
-Firefox waits for each section as before; from Pages in Firefox 158 on 7b80155: Banjo 5.2 s, Majora's Mask's boot 2.8 s
-and Clock Town 7.8 s, Donkey Kong 64's boot 12.5 s and the Factory 2.3 s, GoldenEye's boot 8.1 s and Dam 13.4 s,
-Conker's boot 7.2 s and Windy 11.2 s, then about 60 presents a second.
+against 525k-1.2M) and Donkey Kong 64 55-56 once its boot's ~3 s of black ended, none short.
 
 `amazingalek/BanjoRecomp-web` is Banjo-Kazooie: Recompiled, the second recomp the web support was tried on. Its
 `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream Banjo's, at its commits, and `patches/apply.cmake`
 patches their checkouts (a step before N64Recomp is built from them, and again when CMake configures): the web support
-without the forks as submodules. Built that way the page boots to the intro in headless Chrome, its 111 prebuilt
-pipelines built in 4.8 s cold. Its runtime is older than the forks', so `recomp::start` takes upstream Banjo's
+without the forks as submodules. Its runtime is older than the forks', so `recomp::start` takes upstream Banjo's
 arguments, not a `recomp::Configuration`. It has no externs header. What porting it found is in this README. Start
 skips a new game's opening only once a save file isn't empty, so on a fresh profile its play plan reaches Spiral
 Mountain and Mumbo's Mountain through `tools/warp.js`, which leaves the map change the game's own code requests (the
@@ -918,13 +911,11 @@ General tab holds (upstream's code). It records its shader list, `host/rt64_shad
 has no patches library: it starts a chapter's checkpoint through the bar menus' fade-then-call): 499 descriptions, 403
 pipelines, in 19 sections, the boot 75 (the intro and the bar's menus), then each chapter (It's War in two) and seven
 multiplayer modes against bots; no split screen. In headless Chrome 155 (RTX 2070) the boot took 3.0 s cold and 0.2 s
-warm (7.8 and 3.2 s as one list), Windy 3.5 and 2.5 s, and the game draws with no WebGPU errors. In Firefox 157 the
-boot took 12.4 s and Windy 14.7 s, then the bar drew 55 frames a second and Windy 57 (Chrome 155: 59 and 59), on the
-forks; on upstream's tools with `patches/` the boot took 10.4 s and the bar drew with sound. Before plume 97f4e64,
-Firefox 158 lost the WebGPU device further into Windy, after its checkpoint 33's cutscene ("Out of Memory" creating a
-bind group, the GPU's memory flat); on b1c35d1's page it played the plan's whole Windy section at 60, at 1256x645 and
-3840x2000, the live bind groups about 4,500. Before plume 94a4795 Firefox refused `setBindGroup`'s dynamic offsets as
-a view of the heap past 2 GB and the page never started, and before rt64 d070e5c it drew 9-13. Render to RAM stays on:
+warm (7.8 and 3.2 s as one list), Windy 3.5 and 2.5 s. Before plume 97f4e64, Firefox 158 lost the WebGPU device
+further into Windy, after its checkpoint 33's cutscene ("Out of Memory" creating a bind group, the GPU's memory flat);
+with it the plan's whole Windy section plays, the live bind groups about 4,500. Before plume 94a4795 Firefox refused
+`setBindGroup`'s dynamic offsets as a view of the heap past 2 GB and the page never started, and before rt64 d070e5c
+it drew 9-13. Render to RAM stays on:
 the camera reads a row of the depth buffer to step aside from walls and the lens flares read it to hide behind them
 (without it, only the game's far fill). On the page it made a list take 20-27 ms against 7-11 off, so the page copies
 a frame into RDRAM a list late (rt64 73e9ca0): in Windy, headless Chrome 155 on a busy host, 10.7-11.8 ms a list
@@ -946,17 +937,14 @@ web patch moves, so `tools/patch_rt64_water.py` applies a version for a web-patc
 `wr64.toml` ignores `gspFast3DTextStart` and `aspMainTextStart`: the Docker image's binutils hand N64Recomp the
 microcode's splat labels as functions. Fast3D draws as it does natively, with no rt64-web change. Render to RAM is off
 on the page: the CPU's one read of a frame, `sys_main.c`'s copy of the last frame in display modes 1 and 2, is never
-reached (nothing sets `D_800DAB1C` to either; the pause dims the live scene). Its list, 139 descriptions and 100
-pipelines in 13 sections, the boot 63 (launcher to course select), is recorded by code (`tools/record_shaders.sh`,
+reached (nothing sets `D_800DAB1C` to either; the pause dims the live scene). On and off measure alike in a race (a
+20 fps game: it costs a list's wall time, not frames or CPU). Its list, 139 descriptions and 100 pipelines in 13
+sections, the boot 63 (launcher to course select), is recorded by code (`tools/record_shaders.sh`,
 `tools/shader_plan.json`): the menus passed with page_driver's `pressUntil` on `gGameState` (0x800DAB24), a course
 picked by its place in the course select cursor (0x800DA9D0), and each of the nine raced 50 s with the gas held
 (page_driver's `down`/`up`) while `tools/autopilot.js` steers for the next buoy on its side, from the camera and the
 buoy table in RDRAM, the countdown that retires a rider off the course held up; then Championship and Stunt Mode, no
-2P. From Pages (main b4bcb9d, N64Recomp-browser 421f902), cold, menus and a Sunset Bay race, RTX 2070: Chrome 155
-headless waited 1.8 s (14 of the boot) and drew 59.6, all 100 built 3-4 s later; Firefox 158 waited 3.5 s for the
-boot's 50 and 0.5 s for the course's 13 and drew 59.6; at 3840x2000 59.6 and 59.4, no WebGPU errors, sound short only
-in the waits. Render to RAM on and off measured alike there (a 20 fps game: it costs a list's wall time, not frames or
-CPU).
+2P.
 
 `amazingalek/BanjoTooieRecompiled-web` is Banjo-Tooie: Recompiled (GPL-3.0, US). Its `lib/rt64`,
 `lib/N64ModernRuntime`, `lib/RecompFrontend` and `lib/N64Recomp` are upstream's, patched by its own `patches/`
@@ -974,12 +962,9 @@ world), is recorded by code: `tools/shader_survey.js` sends Banjo to a map throu
 leaves at 0x80127630 (the map it is on is the halfword at 0x80132DC2), and `tools/make_plans.py` writes the shader plan
 and `tools/play_plan.json`, the first map of every world. The word at 0x800459C8 counts 30 a second in every world,
 not frames drawn. The desktop build draws Terrydactyland at 12 game frames a second and Hailfire Peaks at 10 (the other
-worlds 30), and didn't crash entering Ordnance Storage or Mayahem Temple on Windows. From Pages (main c829a51,
-N64Recomp-browser 7277a2e), cold, RTX 2070, a busy host: Chrome 155 headless waited 2.0 s (18 of the boot), Firefox 158
-4.0 s for the boot's 59 and up to 1.6 s a world; Chrome drew 59 presents a second up to Jolly Roger's Lagoon, Firefox
-49-58 with its waits, and both 12-45 in Terrydactyland, Grunty Industries, Hailfire Peaks, Cloud Cuckooland and
-Cauldron Keep, the game's own rate, where rt64's pacing switches on (the game's frames uneven, the GPU 30-39% busy); at
-3840x2000 59.4 and 59.2; no WebGPU errors, sound short only in the boot's wait. Upstream prints diagnostics of its own
+worlds 30), and didn't crash entering Ordnance Storage or Mayahem Temple on Windows. On the page, in Terrydactyland,
+Grunty Industries, Hailfire Peaks, Cloud Cuckooland and Cauldron Keep the game's frames come unevenly and rt64's pacing
+switches on, so it presents the game's own rate there, the GPU far from busy. Upstream prints diagnostics of its own
 (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are.
 
 `amazingalek/pilotwings-64-recomp-web` is Pilotwings 64: Recompiled (MIT, itself written with Claude; US only). It
@@ -1004,15 +989,7 @@ Firefox draws the title before it builds them; with the menus in the boot (80) i
 frame, split 7-9 s. Its scheduler took a frame busy for 50 retraces for a hung RCP and sent itself the RDP's done message, so
 during Firefox's boot wait it built frames into display lists RT64 hadn't read, and the page stopped on the mix (a
 palette load past the end of memory, a texture 8404 texels wide) in two runs of three; `patches/sched.c` takes the
-timeouts out. From Pages (main 550269d, N64Recomp-browser 33d43a9), cold, RTX 2070: Firefox 158 waited 19-29 s for the
-boot, 2.2-2.8 s for a glider test's section and 10-11 s for a gyrocopter test's, then drew 59-60 with no sound short
-after the waits, three runs of three; Chrome 155 headless (the same files served locally) waited 5.9 s once and drew
-57 beside another page; no WebGPU errors. On 7277a2e (main 4448311), from Pages, cold, RTX 2070: Chrome 155 headless
-waited 4.1 s for 9 and drew 58.2, Firefox 158 18.2 s for the boot and drew 57.8, sound short only in the waits, no
-WebGPU errors; at 3840x2000 Chrome waited 5.0 s and drew 58.2, Firefox 30.7 s and drew 60. On bcdcb78 (main 2a5ba44),
-the menus a section of their own, from Pages, cold, RTX 2070, a busy host: Firefox 158 waited 6.7-7.3 s for the boot,
-18-19 s for the menus after Start, then drew 56-57; Chrome 155 headless 4.2-4.9 s for 9 at the title and nothing
-after Start (3.1-3.3 s for 34 of the menus without rt64 ee2dd6a), then 58-59.
+timeouts out.
 
 `amazingalek/MarioKart64Recomp-web` is MarioKart 64: Recompiled (GPL-3.0, US). Its upstream carries a copy of Zelda 64:
 Recompiled's menus and pins an older runtime and rt64, so, as GoldenEye's, it is moved onto RecompFrontend: its
@@ -1032,10 +1009,7 @@ list, `src/rt64_shaders.txt`, 813 descriptions, 136 shaders and 112 pipelines in
 logos and title; the menus 8; each of 16 courses; four arenas with four players; Versus, Time Trials, results, the
 ceremony, the credits), is recorded by code: `tools/shader_survey.js` starts any course in any mode the way the pause
 menu's Retry does and hands every kart to the game's own AI. Its `tools/play_plan.json` is a 50cc Grand Prix's Luigi
-Raceway on that AI. From Pages (main 9f6bcf3, N64Recomp-browser 28a5f14), cold, RTX 2070, an idle host: Chrome 155
-headless waited for nothing and drew 59.6 presents a second; Firefox 158 waited 0.4 s for the boot, ~0.3 s in ones and
-twos through the menus (wanted shaders under a section's 4) and 1.6 s for the course's 35, then drew 59.2; at 3840x2000
-59.6 and 59.0; no WebGPU errors, sound short only in Firefox's course wait.
+Raceway on that AI.
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an
 interface of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`), the desktop build D3D12 only. Its
@@ -1059,13 +1033,10 @@ since clearing them mid-cutscene hung the game on a black screen), and warps thr
 state's `linkAgeOnLoad`, which `Player_Destroy` copies into the save; the save's `linkAge` alone is overwritten).
 While a cutscene index is set a warp lands in the entrance's cutscene layer, another place. Its launcher's sizes are
 dp, and on a page RmlUi's dp ratio is the canvas's height over 720 (0.75 at least), so the launcher fills a 3840x2000
-canvas as it fills a laptop's window. A local build before its publish (Chrome 155 headless and Firefox 158, RTX 2070, a
-busy host, cold, `tools/play_plan.json`: house, Kokiri Forest, the pause menu, Hyrule Field, the market, the Forest
-Temple): Chrome 59 presents a second at 1256x645 and 3840x2000 and no shader waits; Firefox 54-55 counting its waits
-(the boot 4.9-5.6 s for 58, then 0.7-3.8 s a region) and 57-60 between them; no WebGPU errors. Its plan's survey once waited
-for the file select's hand-over in a loop of messages to itself, and Chrome held the picture 3-8 s as the file loaded
-(Playing a page); waiting on a timer, the same plan from Pages kept Chrome's longest gap under a second (a pipeline
-built in line at the title).
+canvas as it fills a laptop's window. Its `tools/play_plan.json` plays Link's house, Kokiri Forest, the pause menu,
+Hyrule Field, the market and the Forest Temple. Its plan's survey once waited for the file select's hand-over in a loop
+of messages to itself, and Chrome held the picture 3-8 s as the file loaded (Playing a page); it waits on a timer now,
+and Chrome's longest gap there is under a second.
 
 `amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled (GPL-3.0, US). Upstream is a set of patches
 and code (`patches/`, `src/jfg/`) on another recomp, a Diddy Kong Racing one that `build_linux.sh` downloads at a
@@ -1095,14 +1066,9 @@ page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is
 at 20 frames a second all the same, its game's own rate, not RT64's (the cells' †): the base's Framerate is Original by
 default, so RT64 interpolates nothing, and the game's own Frame Rate setting is Original too, 30 dropping to 20 when a
 frame runs long, which every frame does on the page: the game sends two display lists a frame, each 10-12 ms in RT64
-with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). A local
-build before its publish (v0.49.0's patches, Chrome 155 headless and Firefox 158, RTX 2070, a quiet host, cold,
-`tools/play_plan.json`, the first room of every planet in 160 s): Chrome 19.6-19.8 presents a second at 1256x645 and
-3840x2000 uncapped, no shader waits, 13,000-14,000 sound frames short (250,000-300,000 before the early release);
-Firefox 20.8-21.2, 8.9-9.4 s of waits (the boot's 35 in 2.9-3.2 s, a planet's 72 in 3.1-3.3 s), its sound short in and
-after them; no WebGPU errors. From Pages (main 6ddeb6d, N64Recomp-browser v0.49.0), the same plan, a quiet host: Chrome
-155 headless 19.4-19.8, no shader waits, 12,000-19,000 sound frames short; Firefox 158 21.4-22.0, 8.4-9.3 s of waits; no
-WebGPU errors.
+with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The
+early release took the sound short over its play plan (the first room of every planet in 160 s, headless Chrome 155)
+from 250,000-300,000 frames to 13,000-14,000.
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
@@ -1122,12 +1088,8 @@ Future Fun Land, Wizpig's races, the trophy podium, a race's results), is record
 loads of a world merged into its section (`record_shaders.mjs`): `web/shader_survey.js` takes the game to a map through
 its own teleport and steers the player's kart toward each checkpoint, the turn's sign read from the kart's motion. The
 game's AI can't drive the player's kart: DKR-R's display list check then rejects every frame. A recording takes ~50
-minutes, and `record_shaders.mjs --from` goes on with one stopped partway. From Pages (main 082ab50, N64Recomp-browser
-3175875), cold, RTX 2070, a quiet host, `web/play_plan.json` (title, menus, Timber's Island, a Dino Domain race):
-Chrome 155 headless waited for no shader and drew 30.0 presents a second, in a window 30.0, with the page's thread
-throttled 3 times 30.0 (the browser 1.54 cores against 0.52); Firefox 158 waited 2.4 s for the boot's 23, 0.5 s for
-the menus and 0.6 s for the race, then drew 30.0; at 3840x2000 uncapped 29.8 and 30.0; no sound short, no WebGPU
-errors.
+minutes, and `record_shaders.mjs --from` goes on with one stopped partway. Its `web/play_plan.json` plays the title,
+the menus, Timber's Island and a Dino Domain race.
 
 ## WebGPU in Chrome and Firefox
 
