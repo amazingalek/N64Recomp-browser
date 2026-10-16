@@ -302,6 +302,11 @@ rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slo
                        60. Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
                        Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
                        it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
+rt64 254dee3           a framebuffer the CPU changed counted on the CPU (copyFromRAM, against a copy of the last upload
+                       to that read buffer while nothing else wrote it), not by a readback that waits for the GPU and the
+                       page's thread: Pilotwings 64 copies each compressed file into a framebuffer before decompressing
+                       it, and the display list thread waited 8-16 ms on every screen change for it, 97 ms at the
+                       title; 0-1 after (all 19 counts of a test build equal to the GPU's)
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -1307,11 +1312,16 @@ running in a browser was found to learn from.
   program's own fetches before the reload (shell.html says how).
 - Making the browser's render-to-RAM readback cheaper: upload buffers mapped without a trip to the main thread, and
   polling the readback without sleeps, left the time per list where it was. Chrome paces the readback itself.
-- Pilotwings 64's frame gaps of 110-180 ms as its screens change (file menu, test overview, vehicle select) as the
-  page's thread or the texture uploads: they come in Firefox too, which builds nothing behind the game, the game never
-  waited for an upload in one, and plume f2863d8 took most of the waits for the page's thread away and left them. Each
-  is the game's own time between two display lists (65-84 ms, against 16-33) plus RT64's work on the new screen's first
-  one (12-87 ms, 87 at the file menu), the burst of new textures after it.
+- Pilotwings 64's frame gaps of 85-180 ms as its screens change (file menu, test overview, vehicle select, a test's
+  start) as the page's: they come in Firefox too, and a CPU profile of every thread (Chrome 155 headless) puts the game
+  thread in all of each one. Its screen change stops the music with `uvaSeqStop`, which polls until the sequence player
+  has stopped: libultra stops it only after its voices' 50 ms release (`KILL_TIME`), counted in audio frames, one a
+  retrace, so it holds 42-75 ms on a console and natively too. Then it loads the next screen (`uvLevelAppend`,
+  `uvMemLoadDS`, `mio0_decompress`), 10-33 ms, the recompiled code ~1.7 times native's (`mio0_decompress` 347 MB/s in
+  V8 against 580 natively, clang 18 -O3). RT64 waits 4-21 ms for the new screen's texture uploads (the upload thread's
+  new buffers and descriptor sets, made through the page's thread), and its wait for the count of changed pixels is gone
+  (rt64 254dee3). Right after the boot's wait in Chrome, on a busy host, gaps of 200-480 ms come with every page thread
+  idle and the prebuild threads waiting for Chrome's GPU process; on a quiet host 3 cold runs of 4 had none.
 - Holding back the list built behind the game in Chrome (a pause after each dropped present, fewer threads): on
   v0.50.0 the build cost Conker's page at 3840x2000 a little (57.0-57.9 presents a second against 58.7-58.8 with
   nothing built behind it, the low after its intro's second scene 50-56 against 58-59), and on rt64 c89ced0's present
