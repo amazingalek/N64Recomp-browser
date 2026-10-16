@@ -1090,18 +1090,26 @@ hung for 11 retraces and stopped on its debug screen, so a hook of the page's st
 recorded by code
 (`tools/make_plans.py` writes `tools/shader_plan.json` and `tools/play_plan.json`, `tools/record_shaders.sh`):
 `tools/shader_survey.js` warps to every room of a planet's regions through the desktop F10 toolbar's warp, which the
-page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). It plays
-at 20 frames a second all the same, its game's own rate, not RT64's (the cells' †): the base's Framerate is Original by
-default, so RT64 interpolates nothing, and the game's own Frame Rate setting is Original too, 30 dropping to 20 when a
-frame runs long, which every frame does on the page: the game sends two display lists a frame, each 10-12 ms in RT64
-with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). A local
-build before its publish (v0.49.0's patches, Chrome 155 headless and Firefox 158, RTX 2070, a quiet host, cold,
+page exports as `jfg_web_warp` (`mainChangeLevel` at the next tick; the level is the halfword at 0x800A323C). Its game
+runs at 20 frames a second on the page: its own Frame Rate setting is Original, 30 dropping to 20 when a frame runs
+long, which every frame does there: the game sends two display lists a frame, each 10-12 ms in RT64
+with the exact copy, about 6 of it the readback (4-5 ms with the late copy, with which a test build held 30). The page's
+Framerate is Display (`patches/web/dkr.patch` sets the base's `rr_default`, Original, to Display with Emscripten, and
+moves a page's settings saved before graphics config version 6 to Display once), so RT64 interpolates through Skip
+Buffering, which `jfg-base.patch` switches on for it: RT64 interpolates only while the frame on screen is the one the
+last workload drew. It does in the menus in both browsers and in play in Firefox, part of the time, but Chrome in
+play presents the game's 20 (no pacing line: RT64 isn't interpolating there; not explained yet). On Original
+(v0.49.0's patches, Chrome 155 headless and Firefox 158, RTX 2070, a quiet host, cold,
 `tools/play_plan.json`, the first room of every planet in 160 s): Chrome 19.6-19.8 presents a second at 1256x645 and
 3840x2000 uncapped, no shader waits, 13,000-14,000 sound frames short (250,000-300,000 before the early release);
 Firefox 20.8-21.2, 8.9-9.4 s of waits (the boot's 35 in 2.9-3.2 s, a planet's 72 in 3.1-3.3 s), its sound short in and
 after them; no WebGPU errors. From Pages (main 6ddeb6d, N64Recomp-browser v0.49.0), the same plan, a quiet host: Chrome
 155 headless 19.4-19.8, no shader waits, 12,000-19,000 sound frames short; Firefox 158 21.4-22.0, 8.4-9.3 s of waits; no
-WebGPU errors.
+WebGPU errors. On Display, a local build of a9be4d7 (main 4e0adda's code, N64Recomp-browser v0.50.0) before its publish, the same plan,
+1256x645, cold, a host 30-40% busy: Chrome 155 headless and headed 20.0 (37-54 in the menus, exactly 20 from the first
+level), no shader waits, 13,000-15,000 sound frames short; Firefox 158 48.2 (38-60 in play), 8.8 s of waits, its sound
+short in and after them; no WebGPU errors. From Pages, uncapped at 3840x2000, 25 s after Start: Chrome 22.4, Firefox
+293.
 
 `amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), Diddy Kong Racing recompiled from the DKR decomp's ELF of US v1.0, on a
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
@@ -1114,7 +1122,9 @@ row for it: `publish_pages.sh`'s build is what checks a tag against it. The page
 (`web_page.cpp`: Load ROM, Start Game), sound through `audio_output.h`, input read whatever SDL's window focus says (a
 page opened behind another window never gets the focus event), render to RAM off (the CPU reads a frame only to hold
 the last one on screen while a level unloads) and the frontend's fixed 1536 MB heap (with growth on, it never grew past
-that through the list's recording and 27 maps in one visit). It presents the game's 30 (Frame rates), uncapped too.
+that through the list's recording and 27 maps in one visit). It always plays DKR-R's Modern profile, the only one that
+interpolates (Accurate, the desktop's default, holds RT64 at Original and 30, and the page has no overlay to pick a
+profile), with its Match display passed on as RT64's Display, since SDL's Emscripten port reports no refresh rate.
 Its list, `web/rt64_shaders.txt`, 107 descriptions (134 stages, 1.5 MB of WGSL) in 12 sections (the boot 23: logos and
 title; then the title's demo, the menus, Timber's Island, a section a world with its hub, races, battle and boss races,
 Future Fun Land, Wizpig's races, the trophy podium, a race's results), is recorded by code, a page load a map, the
@@ -1126,7 +1136,12 @@ minutes, and `record_shaders.mjs --from` goes on with one stopped partway. From 
 Chrome 155 headless waited for no shader and drew 30.0 presents a second, in a window 30.0, with the page's thread
 throttled 3 times 30.0 (the browser 1.54 cores against 0.52); Firefox 158 waited 2.4 s for the boot's 23, 0.5 s for
 the menus and 0.6 s for the race, then drew 30.0; at 3840x2000 uncapped 29.8 and 30.0; no sound short, no WebGPU
-errors.
+errors. That was Accurate. In Modern, recorded with `?record-shaders` over the title, the menus, Timber's Island and
+Dino Domain, the game asked for 119 descriptions, all in the list recorded in Accurate but one, which differs from one
+in it only by the culling bit. Main b8eefc5 (N64Recomp-browser v0.50.0), a local build before its publish, the same
+plan, cold, a host 30-40% busy: Chrome 155 headless 55.2 presents a second (its animation frames 56.4 a second), no
+shader waits; Firefox 158 60.0, 4.2 s of waits; no sound short, no WebGPU errors, the racers drawn once. From Pages,
+uncapped at 3840x2000, 25 s after Start: Chrome 340, Firefox 173.
 
 ## WebGPU in Chrome and Firefox
 
