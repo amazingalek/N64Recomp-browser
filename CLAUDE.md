@@ -1131,7 +1131,9 @@ which probably waits behind the interpolated frames' work on the page's thread (
 runtime and a launcher of its own (ImGui, no RecompFrontend). Its `scripts/build_web.sh` fetches the dependencies
 `dependencies.lock.json` pins (rt64 at Banjo's commit, N64ModernRuntime ae1ffbb), applies DKR-R's own patches to them
 and then `apply.cmake` project by project; where the two change the same lines, `apply.cmake` leaves those files out
-and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's, and `patches/web/stage/` writes
+and the fork's `patches/web/<project>.patch` makes the web's change on top of DKR-R's (rt64's RasterPS.hlsl,
+TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game frame and workload queue: a change here to one
+of them reaches DKR-R's page only once that patch makes it too, as rt64 0560318's decal bounds needed), and `patches/web/stage/` writes
 DKR-R's staged patches (`StagedPatch.cmake`) over the web's lines. rt64-web 0a9fcb6 keeps the web's lines off those
 DKR-R's and Jet Force Gemini's patches change (where `fullSync()` ends, `submitRasterScene()`'s RasterParams, the raster
 shader cache's first includes, the application's
