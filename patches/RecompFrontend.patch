@@ -1,4 +1,4 @@
-RecompFrontend: https://github.com/amazingalek/RecompFrontend-web 7bbaa3c158a9b610e6079946e7edcb47e1a933d7
+RecompFrontend: https://github.com/amazingalek/RecompFrontend-web cfd443b9242c8ec06fb69540c2f93537e8ff4cd0
 on upstream b2c5c18d73054416c844486611fd2c2b9d8a4927 (tools/export_patches.sh)
 
 diff --git a/recompinput/CMakeLists.txt b/recompinput/CMakeLists.txt
@@ -337,7 +337,7 @@ index a7954c7..76a3fe9 100644
      return sample_positions_supported;
  }
 diff --git a/recompui/src/renderer/ui_renderer.cpp b/recompui/src/renderer/ui_renderer.cpp
-index 5ca5349..96d4685 100644
+index 5ca5349..0606010 100644
 --- a/recompui/src/renderer/ui_renderer.cpp
 +++ b/recompui/src/renderer/ui_renderer.cpp
 @@ -15,12 +15,19 @@
@@ -412,7 +412,53 @@ index 5ca5349..96d4685 100644
          pipeline_desc.renderTargetCount = 1;
          pipeline_desc.cullMode = plume::RenderCullMode::NONE;
          pipeline_desc.inputSlots = &vertex_slot_;
-@@ -588,8 +603,8 @@ public:
+@@ -280,6 +295,19 @@ public:
+         copy_command_fence_ = device->createCommandFence();
+     }
+ 
++    // Unmaps an upload buffer the CPU wrote the first `written` bytes of. On WebGPU unmap() copies what it is told was
++    // written into the buffer (writeBuffer), all of it if not told: the 1 MB upload buffer at every frame, and the copy
++    // buffer, as large as the largest image yet (94 MB for a 4K launcher's background), at every image the menus load.
++    static void unmap_written(plume::RenderBuffer *buffer, uint64_t written) {
++#ifdef __EMSCRIPTEN__
++        const plume::RenderRange range(0, written);
++        buffer->unmap(0, &range);
++#else
++        (void)written;
++        buffer->unmap();
++#endif
++    }
++
+     void reset_dynamic_buffer(DynamicBuffer &dynamic_buffer) {
+         assert(dynamic_buffer.mapped_data_ == nullptr);
+         dynamic_buffer.bytes_used_ = 0;
+@@ -288,14 +316,14 @@ public:
+ 
+     void end_dynamic_buffer(DynamicBuffer &dynamic_buffer) {
+         assert(dynamic_buffer.mapped_data_ != nullptr);
+-        dynamic_buffer.buffer_->unmap();
++        unmap_written(dynamic_buffer.buffer_.get(), dynamic_buffer.bytes_used_);
+         dynamic_buffer.mapped_data_ = nullptr;
+     }
+ 
+     void resize_dynamic_buffer(DynamicBuffer &dynamic_buffer, uint32_t new_size, bool map = true) {
+         // Unmap the buffer if it's mapped
+         if (dynamic_buffer.mapped_data_ != nullptr) {
+-            dynamic_buffer.buffer_->unmap();
++            unmap_written(dynamic_buffer.buffer_.get(), dynamic_buffer.bytes_used_);
+         }
+         
+         // If there's already a buffer, move it into the stale buffers so it persists until the start of next frame.
+@@ -535,7 +563,7 @@ public:
+                 }
+             }
+ 
+-            copy_buffer_->unmap();
++            unmap_written(copy_buffer_.get(), uploaded_size_bytes);
+ 
+             // Reset the command list.
+             copy_command_list_->begin();
+@@ -588,8 +616,8 @@ public:
          if (multisampling_.sampleCount > 1) {
              if (window_width_ != image_width || window_height_ != image_height) {
                  screen_framebuffer_.reset();
