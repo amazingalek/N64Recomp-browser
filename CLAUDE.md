@@ -1193,8 +1193,14 @@ changing it:
   9dca70e), one first and the rest from its compiled shader (plume 14ab63a): Chrome compiles a pipeline's shaders on
   its own for each, on its worker threads, and 8 at once beside the prebuilt list took every core for ~2 s and held
   the presents as long, though no task on the GPU process's main thread ran over 80 ms (a Perfetto trace,
-  `--trace-startup`). What is left over 100 ms after Start is not the GPU process: the page makes no WebGPU call
-  at all for 0.2-0.5 s between the launcher's last frame and the game's first, and at a game's loads. Dawn reuses a module whose WGSL matches one still alive, but
+  `--trace-startup`). The longest present gap after Load ROM, outside the boot and shader waits, against v0.51.0
+  (headless Chrome 155, 3840x2000 uncapped, cold, RTX 2070, a quiet host, `plays.jsonl`): Banjo 2.08 → 0.30 s, Rush
+  2049 1.35 → 0.25, Conker 2.97 → 0.61 (Load ROM's, on both), Ocarina of Time 2.27 → 0.44, Mario Kart 64 2.53 →
+  0.67, GoldenEye 1.79 → 1.65 and Donkey Kong 64 1.78 → 1.54, their second gap gone; Firefox 158 the same on
+  both. What is left over 100 ms after Start is not the GPU process: the page makes no WebGPU call for the game
+  between the launcher's last frame and the game's first, 0.2-0.5 s in most games, ~1.65 s in GoldenEye's and two
+  of ~1.5 s in Donkey Kong 64's boot, while Chrome goes on answering the list's builds, and 0.1-0.5 s at a game's
+  loads. Dawn reuses a module whose WGSL matches one still alive, but
   keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
