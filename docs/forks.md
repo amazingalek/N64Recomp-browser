@@ -1,0 +1,199 @@
+# The forks, one commit per change
+
+Every web-support commit on the forks' `main`, by the label CLAUDE.md, the docs and the games' repos name it by: a
+fork's Nth web commit (`plume-0003`) or its fork and short SHA (`rt64 c89ced0`). A line says what the commit does;
+`git show <sha>` in the fork says why and what it measured. Where a row says more, the commit's message doesn't hold
+it. CLAUDE.md, The forks, says how the forks are laid out; a change pushed to a fork gets its row here in the PR that
+moves `forks.txt` onto it.
+
+
+```
+N64ModernRuntime-0003  Emscripten: no live recompiler (mods off), RDRAM without a guard region, SDL window handle,
+                       thread names
+N64Recomp-0001         wasm: the FPU rounding mode kept per thread and applied by cvt.w/cvt.l (fesetround is a no-op)
+plume-0001             WebGPU backend; WGSL from HLSL with dxc and naga; the examples build for the browser
+plume-0002             plume_device_thread: any backend run on one thread for every caller (WebGPU's device is one
+                       thread's)
+plume-0003             WebGPU: waiting READBACK maps, texel buffers, rect clears, paced presents, push constants,
+                       webgpu_checks
+plume-0004             WebGPU for RT64: declared overrides only, per-stage bindings, unfilterable depth, word copies,
+                       16-byte rows
+plume-0006             WebGPU: buildInBackground pipelines built with createRenderPipelineAsync once a draw has used
+                       their layout
+rt64-0006              no Idle thread on Emscripten
+rt64-0007              without descriptor indexing (WebGPU), a texture set per draw and TMEM in one buffer
+rt64-0008              the shaders compile to WGSL (RT64_WGSL, on with Emscripten); WebGPU.hlsli says how
+rt64-0009              the RSP compute shaders read their inputs from one buffer (RT64_PACKED_RSP_INPUTS): 8 storage
+                       buffers a stage
+rt64-0010              RT64 on WebGPU: builds with Emscripten, draws on the page's canvas from the WGSL blobs,
+                       ubershaders only
+rt64-0011              specialized shaders on WebGPU, built in the background while the ubershader draws
+RecompFrontend-0003    Emscripten: recompui's shaders as WGSL, the canvas as RT64's window, a file picker on the page
+RecompFrontend-0004    render to RAM an option of the render context (set_render_to_ram), on by default as in RT64
+RecompFrontend-0005    Emscripten: no Mods, Exit or Quit, dropped files aren't mods, rumble through the Gamepad API
+plume 1988176          the swap chain and menus in the browser's preferred canvas format (bgra8unorm on Windows)
+rt64 e46bf19
+RecompFrontend e6da1be
+rt64 f443403           src/contrib/hlslpp is hlslpp-web (568fbc2): its wasm SIMD backend's wrong movehl, dot4, load3,
+                       shifts fixed
+N64Recomp 025cab9      funcs.h declares every function the recompiled C calls (wasm traps an undeclared call)
+N64Recomp 8eb7338      recomp_trigger_event declared for a patches library's own events
+N64Recomp 9eb59c4      a patch's call to a reimplemented, ignored or renamed function goes to <name>_recomp
+every fork             upstream merged in at the commits Zelda64Recomp's `recomp-frontend` branch pins: the runtime's
+                       recomp::start takes a recomp::Configuration, with a MessageQueueControl (defaults as before)
+plume ba97511          the display's rate timed from the browser's animation frames (displayTiming), so Display
+rt64 d92a792           interpolates on a page
+rt64 551f33e           the RSP's vertex Z test picks its multisampled shader only for a sample count above 1
+plume 9c69058          backgroundPipelineBuilds, false in Firefox: there every draw uses the ubershader
+rt64 fcc6fe4
+rt64 0fa77cf           file_to_c, run in node at build time, linked at -O1 whatever the build's level
+plume f6d48d3          backgroundPipelineBuilds false on an Intel adapter too, and no spec constant WGSL at setup
+rt64 524a570           without it
+N64Recomp 8038212      a tail call written RECOMP_TAIL_CALL, a forced return_call with -mtail-call (Conker overflowed
+                       the stack)
+rt64 9e37a5b           a pass's color and depth targets grown until every pair matches (WebGPU dropped mismatched
+                       passes)
+rt64 25a65b7           RasterPS on WebGPU without the slot switch around the texel's address or the linear samplers
+rt64 0034023           prebuilt shaders: a game's RT64_PREBUILT_SHADER_LIST specialized at build time; ?record-shaders
+plume 90bb27d          background pipeline builds on an Intel adapter after all (f6d48d3 reverted)
+rt64 ada5231
+N64Recomp 9aabea3      a jump table outside its function's section read from the section that holds it (GoldenEye)
+N64Recomp ec0748e      a function the config renames is renamed in a patch's calls to it too (GoldenEye's strtol)
+rt64 bfe07cb           the prebuilt shaders built in every browser and on every adapter, each also without dual-source
+                       blending
+rt64 e839610           the game waits only for prebuilt shaders above the list's "background" line; one thread builds
+                       the rest
+rt64 de43acc           prebuilt shaders the game waits for built largest first, one in flight a core, progress by WGSL
+                       size
+rt64 a01b00f           the prebuilt shaders run through spirv-opt -O between re-spirv and naga (a RasterPS ~45% smaller)
+rt64 7910126           a shader rebuilt when an .hlsli or shared header it includes changes (dxc's depfile, with
+                       Ninja and Makefiles): an incremental build kept the old WGSL, and Conker's page failed with it
+rt64 657c222           the prebuilt list in sections, a shader it missed learned for the next visit, one build per
+                       pipeline
+plume 0ddac9b          at most 2 presents in flight on WebGPU (presentWait), RT64 skipping those the GPU falls behind on
+rt64 b8bdd0d
+rt64 b47ed32           a shader the list missed reported in Firefox too, which builds none during play
+plume 4f0a97e          an empty submission once a millisecond while a readback or a present waits (Firefox's 100 ms
+rt64 d070e5c           poll)
+plume 94a4795          setBindGroup's dynamic offsets copied out of a heap past 2 GB, which Firefox refuses
+rt64 c3d781a
+rt64 73e9ca0           render to RAM's copy a display list late for a game that opts in (renderToRAMLate,
+RecompFrontend 06468f9 set_render_to_ram_late)
+rt64 e8e162e           frames paced evenly on WebGPU while the GPU falls behind (2 dropped presents in a second)
+plume 01a7bac          the display's rate from the shortest quarter of the animation frame intervals, not their median
+rt64 f0e6217
+rt64 cb75c5c           render to RAM's late copy converted outside RDRAM and written a word at a time, each only if
+                       it still holds what it held when the list ended: a hash check and then a copy and a byte swap
+                       in place overwrote what the CPU wrote meanwhile (Conker writes to a framebuffer with a pending
+                       copy in every chapter, 30 of 89 times while it landed); each write is reported, not the first
+rt64 950188f           where pipelines build in the background (Chrome), the whole prebuilt list built behind the game
+plume 6949a48          a delete through plume_device_thread waits for the command lists that had recorded something
+rt64 6790eaa
+rt64 918deb3           a reload of the replacement directories waits for the texture upload thread's batch
+rt64 c6cf6c4           a per-draw texture's slot in a GPUTile field of its own (drawSlot), so a shader without LOD reads
+                       one
+rt64 6734747, 0fda089  presents paced only while one in ten or more is dropped over 2 s, 4 at least; the console says so
+plume 16e608a          the display's rate from the period that explains the most animation frames (Firefox's extra
+rt64 07d608e           callbacks)
+plume 97f4e64          bind groups kept by their layout and what they bind (a serial per handle), the 4096 last used:
+                       a browser frees one only when JavaScript collects it, and RT64's sets rewritten every frame made
+                       4,000-14,000 a second in Conker's Windy (checkpoint 33), where Firefox lost the device ("Out of
+                       Memory", wgpu's D3D12 descriptor heap) whenever they outran a collection; 99% repeated one
+                       made in the last 2 s, and the scene makes 40-400 a second now
+rt64 53f8e55           CPU hot paths, on every build (the same hashes and matches): a TMEM hash in one XXH3 call, the
+                       palette indices it uses as byte flags, frame matching in sorted vectors, not multimaps and sets;
+                       on Rush 2049's headless page a list's send_dl took 4.76-4.81 ms median against 5.39-5.58
+                       without (title and attract races, Chrome 155 headless, RTX 2070, a busy host, two runs each
+                       interleaved), the whole browser's CPU the same within the noise (210-219 s in 100 s)
+rt64 fe91344           RT64_FLIPPED_RECT_HIGH_RES: a high-res replacement on a backwards rect sampled on the RDP's texel
+N64ModernRuntime       ULTRAMODERN_LIBULTRA_THREAD_STOP: osStopThread/osStartThread on another thread as libultra does
+0df8334, f0e0884       them
+rt64 58fc4e4           presents paced only on drops over a whole 2 s, and never for a game at about the display's rate
+rt64 9ed449d           pacing's count started again a second after a prebuilt shader wait
+N64ModernRuntime       OSThread's context pointer past libultra's thprof (0x1C) on a 32-bit host (Banjo-Tooie writes
+2e6aa0a                thprof)
+RecompFrontend 75fe596 the dummy workload (before a game starts) not copied to RDRAM on a page
+plume 90ef8e5          ?present-stats and ?presents-in-flight=<1-8> in the page's query, to see what holds presents back
+rt64 f34b19c
+rt64 8bea892           tile copies reused from one display list to the next, on every build (Banjo-Tooie's page leaked)
+rt64 7734fe4           native builds only: per-draw texture SPIR-V too, picked on Vulkan without descriptor indexing
+rt64 b052049           on WebGPU a pixel shader that picks its slot per pixel (mip LOD) finds every tap's texel first
+                       and loads them in one switch over the draw's slots, not a switch a tap: GoldenEye's largest
+                       224 → 185 KB of WGSL, its list 19.0 → 16.3 MB, Firefox's waits for its boot and Dam a fifth
+                       and nearly a third shorter
+rt64 ee2dd6a           where pipelines build behind the game (Chrome), the boot's threads build section 1 too
+plume 009957c          while the presents-in-flight cap holds presents, one more (up to 4) tried every 2 s, kept if
+rt64 2306d25           presents rise
+plume 6949d22          fewer and cheaper WebGPU calls on the page's thread for each draw: 94a4795's copy of the offsets
+rt64 bf509dd           in Firefox only (in Chrome it took ~1.4 us a call against 0.13, a new array each), bind group
+                       keys as bytes, not snprintf's text, and a pass given only the state that changed since its last
+                       draw: with the page's thread slowed 3 times (Chrome's CPU throttling, a stand-in for a laptop's
+                       CPU), Conker's page presented 54-58 a second in Chrome 155, where it had presented 36-44
+plume 3c23b44          009957c's try only from a steady window (no gap over 100 ms, presents held over 10% of it)
+rt64 57c0fed
+plume 81344f5          a READBACK buffer's isMapReady() and map() through plume_device_thread don't wait behind its
+                       queue
+plume ba93421          a swap chain's needsResize() and getRefreshRate() likewise, published at each present
+rt64 a5bc25d
+rt64 29f50e6           the prebuilt shaders' phi variables (naga's `var phi_<n>_` in a function) moved to module scope as
+                       var<private>: Chrome parses a module on the thread that takes the page's presents, a 180 KB
+                       RasterPS in 100-120 ms, ~30 after; Pilotwings 64's page, while its list built behind the game in
+                       Chrome 155, 17-19 frame gaps over 100 ms → 4 on a quiet host, Firefox's waits no longer
+rt64 f01c3a6           with Emscripten a workload's draw buffers bound as a zeroed buffer until it makes its own
+rt64 008f380           on WebGPU a mip LOD pixel shader samples its levels and tiles in loops it keeps; spirv-opt alone
+plume 904b26c          ?uncapped: the display reported at 360 Hz, 4 presents in flight, RT64 interpolating to it unpaced
+rt64 e408ed4
+plume 7a7e3bc          the canvas's buffer takes a new size only in the present that draws at it
+plume 3238ba3          through plume_device_thread a READBACK buffer's map() asks at most once a millisecond (it asked as
+plume f2863d8          fast as the page's thread answered, each answer Dawn commands for Chrome's GPU process), and
+rt64 730e980           createTexture() and an upload buffer's map() after its first don't wait for the page's thread
+                       (RT64 makes two textures for each the game loads, ~570 in 100 ms at Pilotwings 64's screen
+                       changes, and maps ~1,700 upload buffers a second): calls waiting for it 252 → 53 per 100 ms,
+                       the browser's CPU 1.95 → 1.79 cores (Pilotwings 64, Chrome 155 headless, a quiet host); in
+                       Firefox 158 1.09-1.12 → 0.86-0.87, its shader waits as long (16.8-17.7 s against 15.8-21.8)
+plume 54b3be7          where pipelines build in the background (Chrome), one made without buildInBackground is built
+                       with createRenderPipelineAsync too once a draw resolves its layout, and stays ready at once: RT64's
+                       ubershader pipelines (a depth and coverage state each) were each built in line on the GPU process's
+                       main thread the first time a draw used its state, and Ocarina of Time's title, a third state 25 s
+                       after the boot, held the page's presents 0.96 s (longest gap 172 ms after, Chrome 155 headless)
+rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slot one period after the last one's, not
+                       the moment that one went out (a present a period late or more starts the slots again): the
+                       sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
+                       the pages of games below the display's rate presented 51-55 a second on a laptop's Intel UHD,
+                       where games at its rate, which never sleep there, presented 60 (Chrome's 55.6 on a desktop is
+                       its frames with no display, Playing a page). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
+                       it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
+rt64 254dee3           a framebuffer the CPU changed counted on the CPU, not by a GPU readback (Pilotwings 64's screen
+                       changes)
+plume cabe1ac          where a timed wait on a page's thread ends late (Firefox on Windows: on the system timer's 15.6
+rt64 2e93be2           ms tick; plume_web_waits.h measures it once), the waits a page's speed hangs on are woken or
+N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK buffer's waiters when its data arrives
+1f46855                (in every browser) and a waiter spins out its millisecond, RT64's present thread waits for the
+                       animation frame nearest a present's slot instead of sleeping 100 us at a time, and the runtime's
+                       timer thread polls for a timer less than 2 ms away (a farther one waits on a timer as before:
+                       polling up to a tick before each cost the browser ~0.6 cores under the stand-in with Banjo's
+                       page, for no more presents); Conker's page under a stand-in for the tick
+                       (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
+                       25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
+N64ModernRuntime       on a page read_file reads in 4 MB pieces, not through an ifstream's ~1 KB proxied reads
+b79d63b
+RecompFrontend 7bbaa3c on a page the file picker and its callback (the ROM's copy, hash and write) run on a thread of their
+                       own, not the launcher's drawing thread, and persistent_home.js stores a file of 1 MB or more from a
+                       worker (IndexedDB's put serialized 64 MB in ~120 ms on the page's thread): the launcher's present
+                       gaps at Load ROM, Conker 598-672 ms and Banjo 224 from Pages, none over 100 ms in headless Chrome
+                       155 (3840x2000 uncapped, a quiet host); Firefox's left are its own pauses, with no ROM too
+rt64 179adb8           RT64_OFFSCREEN_WORKLOADS and RT64_UNEVEN_FRAME_RATES: Jet Force Gemini's page interpolates
+plume db27484          a prebuilt decal draws in the pass that writes depth (depth32float-stencil8, where the adapter has
+rt64 0560318           it), its depth bounds drawn twice through the stencil, not in a pass of its own: Banjo-Tooie's
+                       58.2 passes a present 4.7, Firefox 158 uncapped 117-121 → 189-206
+plume 795cadf, 2950009 on WebGPU the ubershader's pipelines built behind the launcher; a build matching one in flight
+rt64 977ddca           waits for it
+RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
+                       copies the whole buffer otherwise (writeBuffer), recompui's 1 MB upload buffer at every present
+                       (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB
+                       for Banjo's 4037x4000 background), again at every later image. Banjo's launcher, 3840x2000
+                       uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
+                       second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 87-138 ms;
+                       headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
+```
