@@ -481,17 +481,6 @@ changes. Keep it current in the same work as what changes it, like the README:
   window off the desktop with `--headed`, and Firefox always in a window off the desktop over WebDriver BiDi, since
   Firefox headless has no WebGPU adapter. Such a window has no focus, so keys and clicks are dispatched from script,
   the ROM is sent to the page in pieces, and the viewport is set to one CSS pixel a pixel in both browsers, since the
-<<<<<<< HEAD
-  canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`).
-- Every game's `tools/play_plan.json` reaches a level the way a player does and plays it for a minute or more: the
-  menus where they are quick, the survey's warp or stage start where they aren't (each header says which). A plan's
-  walk goes out and back by as much each way, swaying about a spot away from the entrance: a blind walk in one
-  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance,
-  and the game's fade or respawn can end the plan on a black screen. Banjo-Tooie's plan, 2.5 s on W a world, ended
-  black in all three of a laptop's runs, 3.5 s after Cauldron Keep's walk, where the page draws the keep in both
-  browsers at every size tried; in Firefox the same walk carried Banjo off Cloud Cuckooland's island. A plan that ends
-  on black is the plan until a direct warp to that place draws black too.
-=======
   canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`). `--on-screen` (a laptop's runs, The games table) maximizes
   either browser's window on the desktop instead, at the desktop's scale, with none of those overrides, so the
   viewport is what the window leaves the page: 1920x889 for a `--size` of 1920x945 on a laptop at 200%. A plan's
@@ -500,7 +489,14 @@ changes. Keep it current in the same work as what changes it, like the README:
 - On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with, the one the
   browser's own 3D load lands on (by LUID), with nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is
   the idle discrete GPU, and its numbers say nothing about the page.
->>>>>>> origin/main
+- Every game's `tools/play_plan.json` reaches a level the way a player does and plays it for a minute or more: the
+  menus where they are quick, the survey's warp or stage start where they aren't (each header says which). A plan's
+  walk goes out and back by as much each way, swaying about a spot away from the entrance: a blind walk in one
+  direction, or back the way it came in, carries the character off a ledge, into water or out through the entrance,
+  and the game's fade or respawn can end the plan on a black screen. Banjo-Tooie's plan, 2.5 s on W a world, ended
+  black in all three of a laptop's runs, 3.5 s after Cauldron Keep's walk, where the page draws the keep in both
+  browsers at every size tried; in Firefox the same walk carried Banjo off Cloud Cuckooland's island. A plan that ends
+  on black is the plan until a direct warp to that place draws black too.
 - Keep `--profile` between runs for a warm one, on a fixed port (it is): IndexedDB belongs to the origin, port
   included, so a random port starts every run empty. To measure a cold visit in Chrome, start a new `--user-data-dir`
   once on the launcher first: a profile's first run stores nothing that hits later, and one whose first run built the
