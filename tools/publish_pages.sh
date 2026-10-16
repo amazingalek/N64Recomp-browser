@@ -27,7 +27,8 @@
 # commit of its own on top of main that is synced there and pushed nowhere. It names the pages that build differently
 # from what Pages serves, and their builds stay in the copies to fetch with remote_build.sh -n <copy> get and play.
 # Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
-# the same bytes and publishes them.
+# the same bytes and publishes them. PAGES_COPY=<prefix> builds in copies of its own, <prefix>-<game> (Rush 2049's
+# too), for a test build of a branch beside others' builds in the usual copies.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
@@ -283,7 +284,7 @@ for g in "${selected[@]}"; do
     start=$SECONDS
     echo "== $g: $repo"
     if [[ $g == rush ]]; then
-        clone="$rush" copy=publish
+        clone="$rush" copy="${PAGES_COPY:+$PAGES_COPY-rush}" copy="${copy:-publish}"
         git -C "$clone" fetch -q origin main
         target=origin/main
         if [[ -n "$browser" ]]; then
@@ -298,7 +299,7 @@ for g in "${selected[@]}"; do
             unset GIT_INDEX_FILE
         fi
     else
-        clone="$cache/$g" copy="pages-$g" target=origin/main
+        clone="$cache/$g" copy="${PAGES_COPY:-pages}-$g" target=origin/main
         [[ -d "$clone/.git" ]] || git clone -q --filter=blob:none --no-checkout "https://github.com/$repo" "$clone"
         git -C "$clone" fetch -q origin main
     fi
@@ -365,7 +366,7 @@ if [[ -n "$browser" ]]; then
     echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
     for g in "${differ[@]}"; do
         read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && echo publish || echo pages-$g) get $dir <dir>"
+        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n $PAGES_COPY ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
     done
 fi
 $dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }

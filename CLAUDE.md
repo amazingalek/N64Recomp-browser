@@ -354,6 +354,20 @@ rt64 0560318           feature, asked for where the adapter has it) the depth ta
                        passes a present, each 25-70 us of Firefox's GPU process; 4.7 after, and uncapped 117-121 →
                        189-206 presents a second in Firefox 158, 332 → 357 (the ceiling) in Chrome 155 (3840x2000, RTX
                        2070); a decal the list missed, or a device without the feature, ends the pass as before
+plume 795cadf, 2950009 where pipelines build in the background (Chrome), setup ends with a list that draws a rect with the
+rt64 977ddca           ubershader and none of its triangles (State::warmUpPipelines): plume resolves the layout of a draw
+                       of nothing and builds what waits for it, so the ubershader states and the prebuilt list build
+                       behind the launcher, not in line on Chrome's GPU main thread at the game's first frame (Banjo's
+                       page held 2.1 s after Start, Rush 2049's 1.4); and a background build whose shaders, constants
+                       and layout match one in flight waits for it, since Chrome compiled the one 240 KB ubershader 8
+                       times at once and the launcher held 2.6 s more for it
+RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
+                       copies the whole buffer otherwise (writeBuffer), recompui's 1 MB upload buffer at every present
+                       (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB
+                       for Banjo's 4037x4000 background), again at every later image. Banjo's launcher, 3840x2000
+                       uncapped, a quiet host: Firefox 158 338-342 → 22-38 MB/s written, 292-297 → 329-348 presents a
+                       second, the gap as it loads its images (ten whole copies of 64-72 ms) 251-298 → 87-138 ms;
+                       headless Chrome 155 396 → 18 MB/s, at the uncapped ceiling either way
 ```
 
 Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -579,6 +593,18 @@ changes. Keep it current in the same work as what changes it, like the README:
   3840x2000); `?record-shaders` prints the shaders the game asks for; the console reports
   each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode`
   in a preload, take `processorOptions.ring` and sample its two counters every few ms.
+- What a page's GPU time goes on: `--preload tools/pass_probe.js` (its header says how) prints each kind of pass, how
+  many a present has, their draws and GPU time (Chrome's timestamp queries; Firefox gives counts only), and the draws
+  by fragment shader, and `--query probe-skip=<KB>` leaves one shader's draws out to see what they cost. Uncapped at
+  3840x2000 in Chrome 155 (RTX 2070, a busy host), RT64 draws a canvas of that size at Auto's ceil(2000/240) = 9 times
+  the N64's lines, 4224x2200 for Rush 2049 and 4148x2169 for Majora's Mask, and every interpolated present redraws the
+  whole frame there. Rush 2049: ~12 passes a present, 7.1 ms of GPU passes, 83% of it the draws of one 70 KB pixel
+  shader, one with mip LOD whose tile is picked per pixel (228 draws a present): without them 1.25 ms and 316 presents a
+  second against 150. Majora's Mask: 32-35 passes a present, 12-13 of the scene (~60 draws each, 2.7-3.3 ms) with as
+  many of its decals between them (depth read-only, ~3 draws, 0.8 ms), 3.7-4.3 ms in all; with every draw skipped
+  0.10 ms and 315 presents a second against 210, and no one shader's draws more than about a tenth of it. Render to
+  RAM's 320x240 passes cost ~0.01 ms. So both pages' GPU time is RT64's own pixel shaders at that resolution, as on a
+  desktop build, not anything of the web's (Ruled out).
 - Read video memory from the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` counter and nvidia-smi, not the
   per-process `\GPU Process Memory(*)\Dedicated Usage`: Firefox opens its shared canvas texture again every frame, and
   Windows 10 counts every open (KB4490156), so that one climbs by a canvas a frame, past a terabyte in 15 minutes, while
@@ -674,7 +700,8 @@ rt64 0034023), in every browser and on every adapter (rt64 bfe07cb).
 - In sections (rt64 657c222): `section <name>` lines, the first the boot. A section's name is one word: rt64's shader
   specializer reads no further. A game with many levels has a section a level or an area (GoldenEye, Majora's Mask,
   Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64, Mario Kart 64).
-- In Chrome the whole list is built behind the game from its first draw, and a frame that wants 4 or more unbuilt
+- In Chrome the whole list is built behind the launcher and the game from the draw of nothing at setup (rt64
+  977ddca; before it, from the game's first draw), and a frame that wants 4 or more unbuilt
   shaders of a section holds the game, for those, under the "Preparing graphics" indicator (rt64 950188f). Firefox
   builds nothing behind the game, so it waits for a list's boot before the first frame and for a section when the game
   gets there. A shader the list misses is built behind the game, and the page remembers it (`localStorage`) and builds
@@ -1192,10 +1219,23 @@ changing it:
   1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
   RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the pipelines a draw
   wants before their background build is done, built in line (plume 54b3be7 builds every pipeline in the background
-  once a draw resolves its layout): the boot's fixed ones (13-64 ms each, DXC on that thread) and the ubershader states
-  its first frames draw with (245 KB of WGSL, ~0.9 s each: Banjo's page builds 4 at once at its boot); a
+  once a draw resolves its layout): the boot's fixed ones and the RSP's compute shaders at the game's first frame
+  (13-64 ms each, DXC on that thread; under 50 ms each in a trace of Banjo's Start); a
   `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
-  shaders' modules at setup (713 KB, ~0.7 s each). Dawn reuses a module whose WGSL matches one still alive, but
+  shaders' modules at setup (713 KB, ~0.7 s each), which hold the launcher's first presents ~1.4 s. The ubershader
+  states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
+  Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
+  977ddca), one first and the rest from its compiled shader (plume 2950009): Chrome compiles a pipeline's shaders on
+  its own for each, on its worker threads, and 8 at once beside the prebuilt list took every core for ~2 s and held
+  the presents as long, though no task on the GPU process's main thread ran over 80 ms (a Perfetto trace,
+  `--trace-startup`). The longest present gap after Load ROM, outside the boot and shader waits, against v0.51.0
+  (headless Chrome 155, 3840x2000 uncapped, cold, RTX 2070, a quiet host, `plays.jsonl`): Banjo 2.08 → 0.30 s, Rush
+  2049 1.35 → 0.25, Conker 2.97 → 0.61 (Load ROM's, on both), Ocarina of Time 2.27 → 0.44, Mario Kart 64 2.53 →
+  0.67, GoldenEye 1.79 → 1.65 and Donkey Kong 64 1.78 → 1.54, their second gap gone; Firefox 158 the same on
+  both. What is left over 100 ms after Start is not the GPU process: the page makes no WebGPU call for the game
+  between the launcher's last frame and the game's first, 0.2-0.5 s in most games, ~1.65 s in GoldenEye's and two
+  of ~1.5 s in Donkey Kong 64's boot, while Chrome goes on answering the list's builds, and 0.1-0.5 s at a game's
+  loads. Dawn reuses a module whose WGSL matches one still alive, but
   keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
@@ -1437,3 +1477,13 @@ running in a browser was found to learn from.
   because ccache can't cache a file that includes one.
 - A fixed heap in place of memory growth (Conker's 3 GB measured no faster), and `-sGROWABLE_ARRAYBUFFERS=2`
   (emdawnwebgpu passes WebGPU views of the heap, which Chrome refuses over a growable buffer).
+- A cheaper GPU frame for Rush 2049's and Majora's Mask's pages, the dearest uncapped (Playing a page, what a page's GPU
+  time goes on), in the web's own parts: the pass breaks (a decal's read-only depth, plume's barriers), render to RAM's
+  passes and the copies cost ~0.1 ms of a 4-7 ms present. Nor is it rt64 008f380's loops: Rush 2049 built with them,
+  without them (re-spirv then spirv-opt), with either one alone, and with neither as dxc writes it presented 122-154 a
+  second uncapped at 3840x2000 in Chrome 155, all five within the runs' noise (GPU 91-98% busy, interleaved, one server),
+  and in Firefox 158 112 with them against 123 without, the race section's wait 4.5 s against 7.0. What costs is what
+  the desktop build draws too: the mip LOD shader's taps (two levels of two tiles, four each, by hand, since a tile
+  picked per pixel can't use a hardware sampler, upstream's rule in rt64_state.cpp), and Auto's resolution, rounded up
+  to a whole multiple of 240 lines (18-21% more pixels at 2000 lines, 3% at a laptop's 945). Either would draw
+  differently from the desktop's RT64.

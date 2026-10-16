@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 0a9fcb613513dbce88fee1fc44e17901bcae0553
+rt64: https://github.com/amazingalek/rt64-web 977ddca892b8589b2e88cd6ef59b92be46bf85b4
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -710,7 +710,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..6caea4c 100644
+index 785de27..6c840e6 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -813,6 +813,20 @@ index 785de27..6caea4c 100644
 +#   endif
          sharedQueueResources->renderTargetManager.setMultisampling(multisampling);
          sharedQueueResources->renderTargetManager.setUsesHDR(usesHDR);
+ 
+@@ -455,6 +495,13 @@ namespace RT64 {
+         // Set up the RDP
+         state->rdp->setGBI();
+ 
++#   if defined(__EMSCRIPTEN__)
++        // Where pipelines build in the background (Chrome), the ubershader's are built before the game draws with them.
++        if (device->getCapabilities().backgroundPipelineBuilds) {
++            state->warmUpPipelines();
++        }
++#   endif
++
+         return SetupResult::Success;
+     }
  
 diff --git a/src/hle/rt64_application_window.cpp b/src/hle/rt64_application_window.cpp
 index 08f83e5..75800e1 100755
@@ -1401,7 +1415,7 @@ index 8858dac..933b80e 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..d102288 100644
+index 2970e71..30799fb 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
 @@ -7,6 +7,13 @@
@@ -1565,7 +1579,25 @@ index 2970e71..d102288 100644
          flush();
          submitFramebufferPair(FramebufferPair::FlushReason::ProcessDisplayListsEnd);
  
-@@ -1254,6 +1380,10 @@ namespace RT64 {
+@@ -809,6 +935,7 @@ namespace RT64 {
+         // Copy the current state's extended parameters into the workload.
+         workload.extended.ditherNoiseStrength = extended.ditherNoiseStrength;
+         workload.extended.texcoordWrapPoint = extended.texcoordWrapPoint;
++        workload.extended.pipelineWarmUp = extended.pipelineWarmUp;
+ 
+         auto emitTileWarning = [&](CommandWarning warning, size_t tileIndex) {
+             warning.indexType = CommandWarning::IndexType::TileIndex;
+@@ -1103,7 +1230,8 @@ namespace RT64 {
+ 
+                     // Submit the shader to the cache so compilation can start right away.
+                     // Ignore any calls that use fill type, as they're emulated without using a shader.
+-                    if (callDesc.otherMode.cycleType() != G_CYC_FILL) {
++                    // A pipeline warm-up's draw is the game's no more than its shader is (warmUpPipelines()).
++                    if ((callDesc.otherMode.cycleType() != G_CYC_FILL) && !extended.pipelineWarmUp) {
+                         ext.rasterShaderCache->submit(shaderDesc);
+                     }
+ 
+@@ -1254,6 +1382,10 @@ namespace RT64 {
                              resizedTargets.emplace(colorDepthPair.second);
                          }
                      }
@@ -1576,7 +1608,7 @@ index 2970e71..d102288 100644
                  }
  
                  for (RenderTarget *renderTarget : resizedTargets) {
-@@ -1264,6 +1394,9 @@ namespace RT64 {
+@@ -1264,6 +1396,9 @@ namespace RT64 {
              };
  
              auto renderAndSynchronize = [&](uint32_t maxFramebufferPair) {
@@ -1586,7 +1618,7 @@ index 2970e71..d102288 100644
                  // Preprocess all the framebuffer operations.
                  uint32_t pairCursor = framebufferPairCursor;
                  while (pairCursor < maxFramebufferPair) {
-@@ -1346,7 +1479,7 @@ namespace RT64 {
+@@ -1346,7 +1481,7 @@ namespace RT64 {
                  }
  
                  // Record all setup previous to drawing any of the recorded framebuffers.
@@ -1595,7 +1627,7 @@ index 2970e71..d102288 100644
                  framebufferRenderer->recordSetup(ext.framebufferGraphicsWorker, bufferUploaders, queuedProcessor, nullptr, &workload.outputBuffers, false);
  
                  // Record the command list for the framebuffer pairs.
-@@ -1471,15 +1604,26 @@ namespace RT64 {
+@@ -1471,15 +1606,26 @@ namespace RT64 {
                  ext.framebufferGraphicsWorker->commandList->end();
                  framebufferRenderer->waitForUploaders();
                  ext.framebufferGraphicsWorker->execute();
@@ -1625,7 +1657,7 @@ index 2970e71..d102288 100644
                          }
                      }
  
-@@ -1836,6 +1980,10 @@ namespace RT64 {
+@@ -1836,6 +1982,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1636,7 +1668,7 @@ index 2970e71..d102288 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2057,7 @@ namespace RT64 {
+@@ -1909,6 +2059,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {
@@ -1644,7 +1676,7 @@ index 2970e71..d102288 100644
                          {
                              RenderWorkerExecution workerExecution(worker);
                              thread_local std::vector<uint32_t> fbDiscards;
-@@ -2660,6 +2809,27 @@ namespace RT64 {
+@@ -2660,6 +2811,27 @@ namespace RT64 {
          workload.debuggerCamera = debuggerInspector.camera;
          workload.debuggerRenderer = debuggerInspector.renderer;
          workload.paused = paused;
@@ -1672,8 +1704,34 @@ index 2970e71..d102288 100644
      }
  
      void State::advancePresent(Present &present, bool paused) {
+@@ -2724,6 +2896,25 @@ namespace RT64 {
+         extended.renderToRAM = renderToRAM;
+     }
+ 
++    // A list that draws a rect with the ubershader through the renderer, but none of its triangles (drawsNothing), and
++    // copies nothing to RAM: on WebGPU the draw of nothing resolves the layout of the sets the renderer draws with, which
++    // starts the pipelines made for it in the background (plume's WebGPUGraphicsPipeline), where the device builds them
++    // there. Done at setup, the ubershader's pipelines (one per depth and coverage state) are built behind the launcher;
++    // otherwise the game's first frame resolved the layout and built each state it drew in line, which in Chrome held the
++    // page's presents for as long (1.4-2.0 s for Banjo's four). The prebuilt list's pipelines wait for that layout too,
++    // so they build behind the launcher as well. Its draw asks the shader cache for no shader (fullSync()).
++    void State::warmUpPipelines() {
++        listProcessBegin();
++        rdp->setColorImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 320, 0x700000);
++        rdp->setOtherMode(G_CYC_1CYCLE, 0);
++        rdp->setScissor(0, 0, 0, 320 << 2, 240 << 2);
++        rdp->fillRect(0, 0, 16 << 2, 16 << 2);
++        setRenderToRAM(0);
++        extended.pipelineWarmUp = true;
++        fullSync();
++        listProcessEnd();
++    }
++
+     void State::setDitherNoiseStrength(float noiseStrength) {
+         extended.ditherNoiseStrength = noiseStrength;
+     }
 diff --git a/src/hle/rt64_state.h b/src/hle/rt64_state.h
-index 7a8c13b..019e41d 100644
+index 7a8c13b..551816c 100644
 --- a/src/hle/rt64_state.h
 +++ b/src/hle/rt64_state.h
 @@ -91,6 +91,28 @@ namespace RT64 {
@@ -1705,7 +1763,15 @@ index 7a8c13b..019e41d 100644
          GameConfiguration gameConfig;
          uint32_t displayListAddress;
          uint64_t displayListCounter;
-@@ -144,6 +166,8 @@ namespace RT64 {
+@@ -129,6 +151,7 @@ namespace RT64 {
+             bool vertexTestZActive = false;
+             float ditherNoiseStrength = 1.0f;
+             bool extendRDRAM = false;
++            bool pipelineWarmUp = false;
+         };
+ 
+         Extended extended;
+@@ -144,6 +167,8 @@ namespace RT64 {
          void flush();
          void submitFramebufferPair(FramebufferPair::FlushReason flushReason);
          void checkRDRAM();
@@ -1714,6 +1780,14 @@ index 7a8c13b..019e41d 100644
          void fullSync();
          void fullSyncFramebufferPairTiles(Workload &workload, FramebufferPair &fbPair, uint32_t &loadOpCursor, uint32_t &rdpTileCursor);
          void listProcessBegin();
+@@ -162,6 +187,7 @@ namespace RT64 {
+         DisplayList *popReturnAddress();
+         void setRefreshRate(uint16_t refreshRate);
+         void setRenderToRAM(uint8_t renderToRAM);
++        void warmUpPipelines();
+         void setDitherNoiseStrength(float noiseStrength);
+         void setExtendedRDRAM(bool isExtended);
+         void setTexcoordWrapPoint(int16_t wrapU, int16_t wrapV);
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
 index a870166..05625cc 100644
 --- a/src/hle/rt64_vi.cpp
@@ -1744,8 +1818,20 @@ index a870166..05625cc 100644
      }
  
      const VIHistory::Present &VIHistory::top() const {
+diff --git a/src/hle/rt64_workload.cpp b/src/hle/rt64_workload.cpp
+index b4c85f5..6d3d99d 100644
+--- a/src/hle/rt64_workload.cpp
++++ b/src/hle/rt64_workload.cpp
+@@ -22,6 +22,7 @@ namespace RT64 {
+         workloadId = 0;
+         extended.testZIndexCount = 0;
+         extended.ditherNoiseStrength = 1.0f;
++        extended.pipelineWarmUp = false;
+ 
+         commandWarnings.clear();
+         spriteCommands.clear();
 diff --git a/src/hle/rt64_workload.h b/src/hle/rt64_workload.h
-index 8ea27d5..0f4af83 100644
+index 8ea27d5..f97f6c6 100644
 --- a/src/hle/rt64_workload.h
 +++ b/src/hle/rt64_workload.h
 @@ -226,6 +226,9 @@ namespace RT64 {
@@ -1758,8 +1844,16 @@ index 8ea27d5..0f4af83 100644
          DebuggerRenderer debuggerRenderer;
          DebuggerCamera debuggerCamera;
          std::multimap<uint32_t, uint32_t> transformIdMap;
+@@ -239,6 +242,7 @@ namespace RT64 {
+             uint32_t testZIndexCount = 0;
+             float ditherNoiseStrength = 1.0f;
+             hlslpp::float2 texcoordWrapPoint = {};
++            bool pipelineWarmUp = false;
+         } extended;
+ 
+         void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..e43adfa 100644
+index 5a331aa..1e6b70d 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -1798,7 +1892,17 @@ index 5a331aa..e43adfa 100644
              for (RenderTarget *renderTarget : resizedTargets) {
                  renderFramebufferManager->destroyAllWithRenderTarget(renderTarget);
              }
-@@ -701,7 +715,7 @@ namespace RT64 {
+@@ -635,7 +649,8 @@ namespace RT64 {
+                     drawParams.rtEnabled = workloadConfig.raytracingEnabled;
+                     drawParams.submissionFrame = workload.submissionFrame;
+                     drawParams.deltaTimeMs = deltaTimeMs;
+-                    drawParams.ubershadersOnly = ubershadersOnly;
++                    drawParams.ubershadersOnly = ubershadersOnly || workload.extended.pipelineWarmUp;
++                    drawParams.drawsNothing = workload.extended.pipelineWarmUp;
+                     drawParams.postBlendNoise = workloadConfig.postBlendNoise;
+                     drawParams.postBlendNoiseNegative = workloadConfig.postBlendNoiseNegative;
+                     drawParams.maxGameCall = std::min(gameCallCountMax - gameCallCursor, fbPair.gameCallCount);
+@@ -701,7 +716,7 @@ namespace RT64 {
              ext.workloadGraphicsWorker->commandList->begin();
              ext.workloadGraphicsWorker->commandList->resetQueryPool(queryPool.get(), 0, 2);
              ext.workloadGraphicsWorker->commandList->writeTimestamp(queryPool.get(), 0);
@@ -1807,7 +1911,7 @@ index 5a331aa..e43adfa 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -888,6 +902,9 @@ namespace RT64 {
+@@ -888,6 +903,9 @@ namespace RT64 {
          uint32_t displayRateForTicks = 0;
          int processCursor = -1;
          bool frameReduction = false;
@@ -1817,7 +1921,7 @@ index 5a331aa..e43adfa 100644
          while (threadsRunning) {
              {
                  std::unique_lock<std::mutex> cursorLock(cursorMutex);
-@@ -902,6 +919,12 @@ namespace RT64 {
+@@ -902,6 +920,12 @@ namespace RT64 {
              }
  
              if (processCursor >= 0) {
@@ -1830,7 +1934,7 @@ index 5a331aa..e43adfa 100644
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  Workload &workload = workloads[processCursor];
                  ext.presentQueue->waitForPresentId(workload.presentId);
-@@ -914,22 +937,36 @@ namespace RT64 {
+@@ -914,22 +938,36 @@ namespace RT64 {
                  workloadProfiler.start();
                  threadConfigurationUpdate(workload.viFbSize, workloadConfig);
  
@@ -1871,7 +1975,7 @@ index 5a331aa..e43adfa 100644
                      std::scoped_lock<std::mutex> managerLock(ext.sharedResources->managerMutex);
                      FramebufferManager &fbManager = ext.sharedResources->framebufferManager;
                      std::vector<uint32_t> &colorVector = ext.sharedResources->colorImageAddressVector;
-@@ -973,7 +1010,7 @@ namespace RT64 {
+@@ -973,7 +1011,7 @@ namespace RT64 {
                  float prevFrameWeight = 0.0f;
                  float curFrameWeight = 1.0f;
                  float deltaTimeMs = 1.0f / 30.0f;
@@ -1880,7 +1984,7 @@ index 5a331aa..e43adfa 100644
                  bool generateInterpolatedFrames = false;
                  bool velocityUploaderUsed = false;
                  bool tileInterpolationUsed = false;
-@@ -1022,7 +1059,7 @@ namespace RT64 {
+@@ -1022,7 +1060,7 @@ namespace RT64 {
                  
                  // Get the current and previous set of frame counters. The other set can be in use by the present queue. Skip if no new present event has arrived before this workload event.
                  InterpolatedFrameCounters &prevFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -1889,7 +1993,7 @@ index 5a331aa..e43adfa 100644
                  if (useDifferentCounters) {
                      ext.sharedResources->interpolatedFramesIndex = ext.sharedResources->interpolatedFramesIndex ^ 1;
                      lastPresentId = workload.presentId;
-@@ -1037,10 +1074,12 @@ namespace RT64 {
+@@ -1037,10 +1075,12 @@ namespace RT64 {
                  }
  
                  InterpolatedFrameCounters &curFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -1906,7 +2010,7 @@ index 5a331aa..e43adfa 100644
  
                  // Create as many render targets as required to store the interpolated targets.
                  auto &interpolatedTargets = ext.sharedResources->interpolatedColorTargets;
-@@ -1133,6 +1172,10 @@ namespace RT64 {
+@@ -1133,6 +1173,10 @@ namespace RT64 {
                          {
                              std::scoped_lock<std::mutex> cursorLock(cursorMutex);
                              skipWorkloadNow = ((frame + 1) < displayFrames) && (writeCursor != threadCursor);
@@ -1917,7 +2021,7 @@ index 5a331aa..e43adfa 100644
                          }
  
                          {
-@@ -1164,7 +1207,16 @@ namespace RT64 {
+@@ -1164,7 +1208,16 @@ namespace RT64 {
  
                  threadConfigurationValidate();
  
@@ -2152,7 +2256,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..d7534a2 100644
+index 9fae0d4..3f149e6 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -2347,6 +2451,15 @@ index 9fae0d4..d7534a2 100644
                          }
                          else {
                              const bool copyMode = (call.shaderDesc.otherMode.cycleType() == G_CYC_COPY);
+@@ -1619,7 +1691,7 @@ namespace RT64 {
+                                 (call.shaderDesc.otherMode.cvgDst() == CVG_DST_WRAP) || (call.shaderDesc.otherMode.cvgDst() == CVG_DST_SAVE));
+                         }
+                         
+-                        triangles.faceCount = call.callDesc.triangleCount;
++                        triangles.faceCount = p.drawsNothing ? 0 : call.callDesc.triangleCount;
+                         triangles.vertexTestZ = (vertexTestZCallIndex >= 0);
+                         triangles.postBlendDitherNoise = false;
+ 
 @@ -1760,7 +1832,205 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
@@ -2572,7 +2685,7 @@ index 9fae0d4..d7534a2 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..9ec3b6a 100644
+index 3add9c3..4efd5c4 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
 @@ -98,6 +98,41 @@ namespace RT64 {
@@ -2617,7 +2730,15 @@ index 3add9c3..9ec3b6a 100644
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -166,7 +201,9 @@ namespace RT64 {
+@@ -144,6 +179,7 @@ namespace RT64 {
+             uint64_t submissionFrame;
+             float deltaTimeMs;
+             bool ubershadersOnly;
++            bool drawsNothing = false; // Every draw of no triangles (State::warmUpPipelines()).
+             bool postBlendNoise;
+             bool postBlendNoiseNegative;
+             uint32_t maxGameCall;
+@@ -166,7 +202,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);
@@ -3343,7 +3464,7 @@ index 3b991ff..3200b7d 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..1dad260 100644
+index bf7b669..42bf31e 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,52 @@
@@ -3424,7 +3545,7 @@ index bf7b669..1dad260 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +160,484 @@ namespace RT64 {
+@@ -105,13 +160,485 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -3485,7 +3606,7 @@ index bf7b669..1dad260 100644
 +    // ubershader meanwhile: a wait for one shader would cost more than it saves.
 +    //
 +    // Where pipelines build in the background (Chrome), the game waits only for what a frame wants. One thread builds
-+    // the whole list behind the game from its first draw (prebuildAhead), a section at a time in the list's order, the
++    // the whole list behind the game from the first draw (prebuildAhead), a section at a time in the list's order, the
 +    // order the recording reached them in; a round moves the rest of its section to the front, and strays go before
 +    // that. Section 0, the boot, has only a few seconds of logos before the game wants the rest, and section 1 is
 +    // usually what follows it by itself or a press of Start later (the attract demo, the menus), so half the threads
@@ -3499,7 +3620,8 @@ index bf7b669..1dad260 100644
 +    // every shader of its section not yet built, and the game waits for strays too.
 +    //
 +    // A pipeline is built for the WebGPU layout a draw with its pipeline layout resolved (plume_webgpu.h), so section 0
-+    // waits for the first frame's draws. A round is built on as many threads as the host has cores (2-16), since the
++    // waits for the first frame's draws; where pipelines build in the background (Chrome) that is the draw of nothing
++    // at setup (State::warmUpPipelines()), and the list builds behind the launcher. A round is built on as many threads as the host has cores (2-16), since the
 +    // game waits and the browser's GPU process has nothing else to do, largest first: a shader's WGSL size goes with
 +    // its build time, and the largest (370 KB against a median of 65 KB) started last would leave the other threads idle
 +    // while it finished. Rush 2049's 105 took 15.6-16.7 s six at a time in the list's order, and 6.9-7.2 s twelve at a
@@ -3910,7 +4032,7 @@ index bf7b669..1dad260 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +651,22 @@ namespace RT64 {
+@@ -125,6 +652,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -3933,7 +4055,7 @@ index bf7b669..1dad260 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +707,18 @@ namespace RT64 {
+@@ -165,6 +708,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
