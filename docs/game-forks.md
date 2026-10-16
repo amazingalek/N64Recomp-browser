@@ -178,8 +178,8 @@ the interpolated frames' work: over the plan Firefox 158 lost ~259,000 sound fra
 them uncapped. The page sends the RSP's completion at the list's last full sync, and the RDP's once the list is drawn,
 which needed N64ModernRuntime 66539ab: the game leaves a controller message blocked for good, and the RDP's completion,
 alone now, waited behind it for the next retrace. With the RSP's completion moved, Firefox lost 0-28,000 at the display's
-rate; with the held list too, headless Chrome 155 uncapped none against 13,000-27,000, and Firefox uncapped 7-8% against
-25-27%, the game thread still waiting ~40 ms a game frame for the RDP's completion, whose exact copy waits behind the
+rate; with the held list too, headless Chrome 155 uncapped 0-200 against 13,000-27,000, and Firefox uncapped 2% against
+25-27% (7-8% in test builds that traced each frame), the game thread still waiting ~40 ms a game frame for the RDP's completion, whose exact copy waits behind the
 interpolated frames there. Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how the
 base and its patches are built into a page, the recompile without call tracking, render to RAM kept exact and why, the
