@@ -365,6 +365,11 @@ try {
   await page.run([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])], steps);
   audioBefore = last?.audio ?? null;
   memoryBefore = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
+  // That report runs every process's memory reporters, which held a Firefox page's presents and animation frames 137-171
+  // ms (Banjo's and Conker's launchers, none in the same runs without it), so the play's gaps start once it has passed,
+  // and none from before the play comes into them.
+  if (memoryBefore) await sleep(500);
+  await page.evaluate('window.__gaps = []; undefined').catch(() => {});
   playing = true;
   hostBefore = hostTimes();
   viewport = await page.viewport();

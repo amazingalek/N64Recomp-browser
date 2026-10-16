@@ -273,6 +273,21 @@ times Chrome's gaps over 100 ms.
   (the graphics thread's 1 ms, the thread cleaner's 10) stays timed. Under the stand-in a page's sound is short all
   through (Conker 77,000-81,000 frames in 60 s, main and the fix alike), which the laptop's Firefox runs don't show
   (0-232), so read presents from it, not sound.
+- A launcher's first frame in Firefox 158 (Banjo's and Conker's from Pages, 3840x2000 uncapped, RTX 2070, a preload
+  timing each WebGPU call): the page submits its first four presents within ~20 ms and gets their onSubmittedWorkDone
+  back 94-290 ms later, all at once, and from then on no two presents are more than 80 ms apart. Nothing reaches the
+  canvas before the first of them, so that wait is the launcher's first frame being made, not a pause in a launcher on
+  screen. Firefox's `CanvasRenderer` does the page's setup in order ahead of them: the pipelines made just before (one
+  compute, three render, ~100 ms each there, above), RT64's eight targets at Auto's resolution (4148x2169 at 2000
+  lines: a depth target and seven colour targets, five of them uncapped's interpolated frames; 19-44 ms with their
+  clears in a test page) and recompui's images. Banjo's background is an SVG rasterized at the window's width,
+  4037x4000 with half its rows off screen, and its 62 MB took a test page 103-176 ms by every route tried: writeBuffer
+  into a new buffer as recompui does, into one kept, in 4 MB pieces, writeTexture, a buffer mapped at creation (about
+  1.7 ms a MB, half of it 84-104; Chrome 83). Conker's launcher uploads 4 MB and waited as long (233-290 ms, two
+  runs). Firefox calls back only on a submission or its 100 ms timer (`WebGPUDevice::pollQueue`): a test page's empty
+  submission came back in ~50 ms on the timer and in 2 ms with a `submit([])` every millisecond, which the swap chain's
+  wait sends, so the timer is not this wait. `play_page.mjs`'s about:memory read (`gpuProcessMemory`) held Firefox's
+  presents and animation frames 137-171 ms each time, at the play's start and end, so a play's gaps start after it.
 - Chrome on Windows gives a page the integrated GPU on a laptop that has two, since it ignores `powerPreference`
   (crbug.com/369219127); `chrome://flags/#force-high-performance-gpu` gives it the other. On that laptop's Intel UHD
   (D3D12) Rush 2049's page crawled until its specialized pipelines were built (~1 fps for minutes in menus, 20-30 in
