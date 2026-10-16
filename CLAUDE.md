@@ -38,14 +38,15 @@ the code: a finding that explains code goes beside that code, and a measurement 
 
 A change here ends in one pull request on this repo: `forks.txt` and `patches/`,
 `frontend/`, `renderer/`, `tests/`, `tools/`, the README, this file. CI runs on it, and it merges once CI is green and
-what it changes has been played (Changing it).
+what it changes has been played (Changing it). Work found while doing other work is filed and not started, unless it
+is a critical fix (The pins); which work starts is in the Rules.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks (below) take no pull requests and have never had one: a change there is a commit pushed straight to the
 fork's `main` as a fast-forward, and what builds on it pins it by its SHA (`forks.txt` here, a game fork's submodule).
 `rush-2049-recomp` is the one game with a repo of its own that works by pull requests: what it needs from a change here
 (moving its `lib/N64Recomp-browser`, publishing its page) is a pull request on that repo, not a commit from here, and
-the work that builds, plays or measures every game opens it itself, beside the game forks' pushes (The pins).
+the retest or a critical fix opens it itself, beside the game forks' pushes (The pins).
 
 Branches don't outlive their work. This repo, `rush-2049-recomp`, the forks and the game forks delete a pull request's
 branch when it merges (GitHub's "Automatically delete head branches", on in every one of them). A branch pushed to a
@@ -61,6 +62,10 @@ branches only: upstream's other branches, which a new fork copies, are deleted w
   fixed in the shared support (a fork, this repo) unless it really is that game's, so every game and both browsers get
   it, and what one game does better (a shader list in sections, the late copy) is tried on the others. Only what is the
   game's own stays in its repo.
+- Work that is started: a critical fix (The pins), a new port, and work whose likely cause is shared code, measured on
+  two games or more. Polish of one game (one browser's sound in one game, 100 ms gaps at one game's screen change) is
+  filed and waits until it is asked for. A change to the shared support plays the game it was made for and one other
+  (Changing it, step 4); playing or measuring every game is the retest's.
 - A game fork of an existing recomp is that recomp plus web support and nothing else, so its diff against upstream is
   exactly what the page needs: no new features (mouse aim, controls, enhancements) and no fix the page doesn't need.
   A request for one is answered that way, not filed against the fork.
@@ -145,15 +150,15 @@ script), so commit to a fork from a separate clone of it:
    `tools/export_patches.sh`, commit `patches/` with it, and open the PR. CI checks that the patches match the forks
    and still apply to every recomp's commits in `patches/pins.txt`; one that stops applying means the fork has to
    change.
-4. Before it merges, build a page on the branch and play it (Playing a page): a game fork's checkout with its
-   N64Recomp-browser at the branch's commit. Once it has merged, CI tags main `v0.<n+1>.0` itself when its jobs pass
+4. Before it merges, build pages on the branch and play them (Playing a page): the game it was made for and one other,
+   each a game fork's checkout with its N64Recomp-browser at the branch's commit. Once it has merged, CI tags main `v0.<n+1>.0` itself when its jobs pass
    (ci.yml's `tag` job, for a merge that changes `forks.txt`, `patches/`, `frontend/` or `renderer/`): a tag is a
    release, a recomp checks this repo out at one, and the retest builds the newest. Check that the tag came (`git
    ls-remote --tags origin`). The pins move in the next retest (The pins).
 
 **The pins.** A change reaches the builds whose code it changes. A change to what a page runs (a fork, or anything
 here a page is built from: `forks.txt`, `patches/`, `frontend/`) ends at its merge and its tag, played on the game it
-was made for (Changing it, step 4). Every game takes it in the next retest, a run on a schedule that takes every change
+was made for and one other (Changing it, step 4). Every game takes it in the next retest, a run on a schedule that takes every change
 since the last one at once. For each game fork it builds the page on main's newest tag and, if the page's files
 changed, plays that build in Chrome and Firefox (Playing a page), each run recorded in `plays.jsonl` and compared with
 the earlier runs like it there (`play_page.mjs --record`, The games table). A run it flags as a regression is played
@@ -166,9 +171,8 @@ page was built from. `git log <played>..<built>` here lists what a page took sin
 to look when it plays worse. Rush 2049 is retested with them, in the same work, built, played and measured the same
 way; only its pin moves differently: the retest opens a pull request on its own repo that moves its
 `lib/N64Recomp-browser` to the tag, which builds those same bytes, runs the desktop game and publishes the page once
-it merges, and the retest records its runs in `plays.jsonl` and updates its row. Any other work that builds, plays
-or measures every game (a critical fix, a measurement across the pages) takes Rush 2049 along the same way, not as work
-of its own afterwards. Its pin moves to a
+it merges, and the retest records its runs in `plays.jsonl` and updates its row. A critical fix that
+builds and plays every game takes Rush 2049 along the same way, not as work of its own afterwards. Its pin moves to a
 tag that left its page's bytes alone too, since its desktop build can still take something from it (below).
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages, the version players have, that crashes, never
