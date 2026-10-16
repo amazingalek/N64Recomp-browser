@@ -346,6 +346,13 @@ rt64 179adb8           RT64_OFFSCREEN_WORKLOADS: a display list that draws only 
                        shadows in a list of their own and its frames take 2 and 3 VIs on a page, so it interpolated
                        only in its menus: its plan uncapped 19.8 → 273.8 presents a second in Chrome 155, 19.6 → 208.6
                        in Firefox 158 (3840x2000, RTX 2070); Banjo the same as before
+plume 88c6f6e, 14ab63a where pipelines build in the background (Chrome), setup ends with a list that draws a rect with the
+rt64 9dca70e           ubershader and none of its triangles (State::warmUpPipelines): plume resolves the layout of a draw
+                       of nothing and builds what waits for it, so the ubershader states and the prebuilt list build
+                       behind the launcher, not in line on Chrome's GPU main thread at the game's first frame (Banjo's
+                       page held 2.1 s after Start, Rush 2049's 1.4); and a background build whose shaders, constants
+                       and layout match one in flight waits for it, since Chrome compiled the one 240 KB ubershader 8
+                       times at once and the launcher held 2.6 s more for it
 ```
 
 Four of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -666,7 +673,8 @@ rt64 0034023), in every browser and on every adapter (rt64 bfe07cb).
 - In sections (rt64 657c222): `section <name>` lines, the first the boot. A section's name is one word: rt64's shader
   specializer reads no further. A game with many levels has a section a level or an area (GoldenEye, Majora's Mask,
   Donkey Kong 64, Conker, Wave Race 64, Banjo-Tooie, Pilotwings 64, Mario Kart 64).
-- In Chrome the whole list is built behind the game from its first draw, and a frame that wants 4 or more unbuilt
+- In Chrome the whole list is built behind the launcher and the game from the draw of nothing at setup (rt64
+  9dca70e; before it, from the game's first draw), and a frame that wants 4 or more unbuilt
   shaders of a section holds the game, for those, under the "Preparing graphics" indicator (rt64 950188f). Firefox
   builds nothing behind the game, so it waits for a list's boot before the first frame and for a section when the game
   gets there. A shader the list misses is built behind the game, and the page remembers it (`localStorage`) and builds
@@ -1176,10 +1184,17 @@ changing it:
   1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
   RasterPS while its list built behind the game, until rt64 29f50e6. What is left there: the pipelines a draw
   wants before their background build is done, built in line (plume 54b3be7 builds every pipeline in the background
-  once a draw resolves its layout): the boot's fixed ones (13-64 ms each, DXC on that thread) and the ubershader states
-  its first frames draw with (245 KB of WGSL, ~0.9 s each: Banjo's page builds 4 at once at its boot); a
+  once a draw resolves its layout): the boot's fixed ones and the RSP's compute shaders at the game's first frame
+  (13-64 ms each, DXC on that thread; under 50 ms each in a trace of Banjo's Start); a
   `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
-  shaders' modules at setup (713 KB, ~0.7 s each). Dawn reuses a module whose WGSL matches one still alive, but
+  shaders' modules at setup (713 KB, ~0.7 s each), which hold the launcher's first presents ~1.4 s. The ubershader
+  states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
+  Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
+  9dca70e), one first and the rest from its compiled shader (plume 14ab63a): Chrome compiles a pipeline's shaders on
+  its own for each, on its worker threads, and 8 at once beside the prebuilt list took every core for ~2 s and held
+  the presents as long, though no task on the GPU process's main thread ran over 80 ms (a Perfetto trace,
+  `--trace-startup`). What is left over 100 ms after Start is not the GPU process: the page makes no WebGPU call
+  at all for 0.2-0.5 s between the launcher's last frame and the game's first, and at a game's loads. Dawn reuses a module whose WGSL matches one still alive, but
   keeping a list's ~280 alive cost ~750 MB in the GPU process, and JavaScript only lets one go when it collects it.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and

@@ -165,11 +165,11 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   everything else, builds none during play, so it would draw everything with it. The list is a file of shader descriptions, five hex words a line (a line
   starting with `#` is a comment), in sections: those above the first line reading `section <name>` (one word) are the boot, and
   each section after it a level or a part of the game. In Chrome, which builds pipelines on threads of its own, the
-  page builds the whole list behind the game from its first draw, in the list's order, the boot and the section after
+  page builds the whole list behind the launcher and the game from when it starts, in the list's order, the boot and the section after
   it on half the cores and the rest one at a time, and the game waits only when a frame asks for at least 4 shaders of one section that aren't
   built, for those, holding its frame under a small "Preparing graphics" indicator in a corner; the rest of that
-  section is built next. Rush 2049's page, cold, builds its 75 pipelines ~9 s after Start Game, behind the logos and
-  the title, waiting at most half a second. Firefox waits instead, since anything built behind the game stalls its
+  section is built next. Rush 2049's page, cold, has its 75 pipelines built ~5 s after it opens, behind the
+  launcher. Firefox waits instead, since anything built behind the game stalls its
   frames: for the boot before the game's first frame, and for a whole section when a frame first asks for 4 of its
   shaders. So a list's boot is what the game shows before its first level, and the rest goes in sections: Rush
   2049's boot (logos, title, menus) is 21 pipelines and 2 s in Firefox, against 75 and 9.8 s as one list, and its
