@@ -305,7 +305,9 @@ amazingalek/plume-web                    renderbag/plume          a WebGPU backe
                                                                   where the GPU reports them done late;
                                                                   ?presents-in-flight=<n>; ?present-stats prints
                                                                   what holds presents back every 5 s);
-                                                                  any backend run on one thread
+                                                                  any backend run on one thread; waits that
+                                                                  don't end on Windows' 15.6 ms timer tick,
+                                                                  as Firefox's timed waits do there
 amazingalek/rt64-web                     rt64/rt64                RT64 on WebGPU: WGSL shaders, no descriptor
                                                                   indexing, background pipeline builds, frames
                                                                   interpolated to the display's rate and paced
@@ -322,7 +324,9 @@ amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten:
                                                                   without a guard region; built-in mods linked
                                                                   in, their replacements and hooks as redirects;
                                                                   OSThread's context past libultra's thprof on
-                                                                  a 32-bit host
+                                                                  a 32-bit host; game timers on time where a
+                                                                  page's timed waits end late (Firefox on
+                                                                  Windows)
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker, render to RAM as an option
                                                                   and its copy a display list late as another
@@ -359,7 +363,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   how). A page holds the recompiled code, so it is built where the ROM is, never in CI. `publish_pages.sh` is the
   deploy after a change: it rebuilds every game's page in the Games table from its main on a build host, publishes
   only those whose files differ from what Pages serves (a commit builds the same bytes in any checkout), and boots
-  each one it published from Pages in headless Chrome. `record_shaders.mjs` records a
+  each one it published from Pages in headless Chrome. `timer_tick.c`, linked into a test build, makes a desktop's
+  timed waits end on Windows' default 15.6 ms tick, as Firefox's do on a laptop. `record_shaders.mjs` records a
   prebuilt shader list by a plan, and `play_page.mjs` plays a page, a build or one on Pages, by the same kind of plan in
   Chrome or Firefox and measures it: presents a second, sound frames short, WebGPU errors, the shader waits, the GPU's
   load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table;

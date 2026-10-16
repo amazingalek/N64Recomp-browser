@@ -307,6 +307,16 @@ rt64 254dee3           a framebuffer the CPU changed counted on the CPU (copyFro
                        page's thread: Pilotwings 64 copies each compressed file into a framebuffer before decompressing
                        it, and the display list thread waited 8-16 ms on every screen change for it, 97 ms at the
                        title; 0-1 after (all 19 counts of a test build equal to the GPU's)
+plume cabe1ac          where a timed wait on a page's thread ends late (Firefox on Windows: on the system timer's 15.6
+rt64 2e93be2           ms tick; plume_web_waits.h measures it once), the waits a page's speed hangs on are woken or
+N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK buffer's waiters when its data arrives
+1f46855                (in every browser) and a waiter spins out its millisecond, RT64's present thread waits for the
+                       animation frame nearest a present's slot instead of sleeping 100 us at a time, and the runtime's
+                       timer thread polls for a timer less than 2 ms away (a farther one waits on a timer as before:
+                       polling up to a tick before each cost the browser ~0.6 cores under the stand-in with Banjo's
+                       page, for no more presents); Conker's page under a stand-in for the tick
+                       (tools/timer_tick.c, Firefox 158, RTX 2070) 27.0 → 57.8 presents a second, where a laptop drew
+                       25-29; Chrome 155 the same within the noise (55.3-56.0 either way), its browser within 0.1 core
 ```
 
 Two of the options are off by default on a desktop build and on with Emscripten, and a game can set them natively
@@ -562,6 +572,11 @@ changes. Keep it current in the same work as what changes it, like the README:
   60.0: RT64 timed each interpolated frame from when the last one went out, so the host's timer and the page's
   thread set the rate, not the page. The page Pages serves, played just before a new build in the same conditions
   (`--note` it), still tells the host from the build.
+- Firefox on Windows ends every timed wait on a page's thread on the system timer's tick, 15.6 ms at the default
+  resolution, but a desktop's Firefox often runs at a finer one that another program asked for, and plays faster
+  than a laptop's. `tools/timer_tick.c` (its header says how to link it into a test build) stretches each timed wait
+  to that tick: `?timer-tick=15.625`, with `?timer-trace=<n>` to see which waits are left and `?timer-exempt=<name>` to
+  see what one costs. A wait a page's speed hangs on is never timed on a page (WebGPU in Chrome and Firefox).
 - A script in the page waits on a timer (`setTimeout`, 4 ms at the shortest), never in a loop of messages to itself
   (`MessageChannel`, a promise that resolves at once): those are ~10,000 tasks a second on the page's thread, none of
   them long, and in Chrome they starve the tasks that carry the device thread's WebGPU work to it, so presents stop
@@ -871,10 +886,12 @@ osTvType, osRomBase and osMemSize at 0x80000300.
 work, but nothing has been offered to it). It keeps its tools as submodules in `tools/`, patched by `build.sh` from
 `recomp/*.patch`; on the fork they stay upstream's, with those patches as upstream has them, and `build.sh` then
 applies this repo's `patches/` on top (`tools/N64Recomp-browser`) a project at a time with the fork's
-`tools/web_patch.sh`, which `host/CMakeLists.txt` and `tools/publish_pages.sh` run too. It leaves out two files
+`tools/web_patch.sh`, which `host/CMakeLists.txt` and `tools/publish_pages.sh` run too. It leaves out three files
 (apply.cmake's file list): N64Recomp's `src/analysis.cpp`, whose jump table in another section Conker's own patch finds
-its own way, and rt64's `src/hle/rt64_game_frame.h`, whose one line Conker's patch now changes beside, put back on top of
-it by the fork's `tools/web_rt64_game_frame.patch`. Upstream's save states sign each thread's wait with its native call
+its own way, rt64's `src/hle/rt64_game_frame.h`, whose one line Conker's patch now changes beside, put back on top of
+it by the fork's `tools/web_rt64_game_frame.patch`, and N64ModernRuntime's `ultramodern/src/timer.cpp`, which Conker's
+patch rewrites: the fork's `tools/web_timer.patch` makes its timer thread poll for a timer less than 2 ms away on a
+page, as N64ModernRuntime 1f46855 does upstream's. Upstream's save states sign each thread's wait with its native call
 stack, which wasm can't walk at every wait: `tools/web_save_states.patch` builds that file without one and the page sets
 up no save states. Where the web patches and a game's own touch the same lines, `build.sh` can't tell its patch is in, so
 it records what it left patched (`.git/patched-tools`) and patches from scratch when that changes. rt64-web 03b9dcc
@@ -1208,7 +1225,19 @@ changing it:
   back 12-16 ms after a present, RT64 never paced, and Firefox drew 59.3 and 59.4 in two runs; sampling every 10 ms,
   44 ms, paced, 20.1. On Windows the profiler asks for 1 ms timers (`timeBeginPeriod`) only below 10 ms, so Firefox's
   callbacks look bound to Windows' default 15.6 ms timer. Its own timer resolution can't be read: it is per process
-  since Windows 10 2004, and the global one read 1 ms already.
+  since Windows 10 2004, and the global one read 1 ms already. A pthread of a test page timing its own waits there read
+  it: a sleep of 100 us took 15.56 ms in Firefox and 1.95 ms in Chrome, and a futex wake from an animation frame
+  reached the thread in 0.06-0.08 ms. So every timed wait off the page's thread ends on a tick in Firefox there. On
+  rt64 c89ced0's fixed timeline, which keeps a late present sleep from pushing back the presents after it, the laptop
+  drew Banjo at 59.1 in Firefox and GoldenEye at 59.3 (1 gap over 100 ms in 90 s, against 118 from Pages the day
+  before), but Conker at 25-29 in every build: its frames are copied to RAM, each waited a tick or two for its
+  readback's answer, and the game's timers, 0.4 ms or less, fired a tick late. A stand-in on a desktop
+  (`tools/timer_tick.c`, which stretches each timed wait to a tick of its own) held Conker at 27.0 as the laptop did and
+  Banjo at 58-59, and showed the waits one by one: a wait a page's speed hangs on is woken (a futex, the animation
+  frame) or spun once a probe finds timed waits late (plume cabe1ac and the others with it), and one that only idles
+  (the graphics thread's 1 ms, the thread cleaner's 10) stays timed. Under the stand-in a page's sound is short all
+  through (Conker 77,000-81,000 frames in 60 s, main and the fix alike), which the laptop's Firefox runs don't show
+  (0-232), so read presents from it, not sound.
 - Chrome on Windows gives a page the integrated GPU on a laptop that has two, since it ignores `powerPreference`
   (crbug.com/369219127); `chrome://flags/#force-high-performance-gpu` gives it the other. On that laptop's Intel UHD
   (D3D12) Rush 2049's page crawled until its specialized pipelines were built (~1 fps for minutes in menus, 20-30 in
@@ -1321,6 +1350,11 @@ running in a browser was found to learn from.
 
 ## Ruled out, so don't retry
 
+- Presents on WebGPU waiting for the animation frame in every browser, not only where timed waits end late: on a
+  laptop's Intel UHD, Chrome 155 headed drew as many (Banjo 59.9 against 60.0, Conker 53.9 against 54.0), but the
+  GPU went 71 → 86% busy for Banjo and 63 → 75% for Conker, the browser 1.02 → 1.47 and 1.36 → 1.95 cores, and
+  Banjo's gaps over 50 ms 98 → 188 in 90 s (one run each). So plume's sleepUntil() waits for frames only where a
+  timed wait ends late.
 - One of plume's WebGPU calls as what grows Firefox's GPU process: on a test page submitting after each batch, empty
   submissions (~650 a second), onSubmittedWorkDone (~600), 4 KB writeBuffers (~1,200), textures made, written and
   destroyed (~160) and ~70 new pipelines grew it by nothing over 45-85 s each, and a 1920x945 canvas presenting 60 a
