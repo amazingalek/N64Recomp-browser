@@ -101,7 +101,7 @@ const rdramHelpers = `(() => {
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra),
-//   close(), pid, profile.
+//   close(), pid, profile, and in Firefox gpuProcessMemory() (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -309,7 +309,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
-    '--remote-debugging-port', String(port), 'about:blank'], { stdio: 'ignore' });
+    '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'], { stdio: 'ignore' });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
     try {
@@ -343,6 +343,26 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   })()`);
   return {
     pid: proc.pid,
+    // What about:memory says of the GPU process, in MB (null if Firefox has none): private bytes, Firefox's own heap
+    // (mozjemalloc: Gecko's WebGPU code and wgpu), the system heap (Windows' heaps: the D3D12 runtime, the GPU's
+    // driver, DXC) and the GPU memory it has committed, dedicated and shared. Read from nsIMemoryReporterManager in
+    // the browser's chrome context, which BiDi reaches only with --remote-allow-system-access; about:memory itself
+    // can't be opened from BiDi. A leak there shows which of them grows, so whose it is.
+    gpuProcessMemory: async () => {
+      const chrome = (await send('browsingContext.getTree', { 'moz:scope': 'chrome' })).result?.contexts?.[0]?.context;
+      if (!chrome) return null;
+      const r = await send('script.evaluate', { target: { context: chrome }, awaitPromise: true, expression: `new Promise((resolve) => {
+        const paths = { 'private': 'private', 'heap-allocated': 'heap', 'system-heap-allocated': 'systemHeap',
+          'gpu-committed': 'gpuCommitted', 'gpu-dedicated': 'gpuDedicated', 'gpu-shared': 'gpuShared' };
+        const out = {};
+        Cc['@mozilla.org/memory-reporter-manager;1'].getService(Ci.nsIMemoryReporterManager).getReports(
+          (process, path, kind, units, amount) => {
+            if (/^GPU /.test(process) && paths[path]) out[paths[path]] = Math.round(amount / 1048576);
+          }, null, () => resolve(JSON.stringify(out)), null, false);
+      })` });
+      const value = r.result?.result?.value;
+      return value && value !== '{}' ? JSON.parse(value) : null;
+    },
     navigate: (url) => send('browsingContext.navigate', { context, url, wait: 'none' }),
     evaluate,
     click,
