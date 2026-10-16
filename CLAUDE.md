@@ -1298,6 +1298,11 @@ running in a browser was found to learn from.
   waited for an upload in one, and plume f2863d8 took most of the waits for the page's thread away and left them. Each
   is the game's own time between two display lists (65-84 ms, against 16-33) plus RT64's work on the new screen's first
   one (12-87 ms, 87 at the file menu), the burst of new textures after it.
+- Holding back the list built behind the game in Chrome (a pause after each dropped present, fewer threads): on
+  v0.50.0 the build cost Conker's page at 3840x2000 a little (57.0-57.9 presents a second against 58.7-58.8 with
+  nothing built behind it, the low after its intro's second scene 50-56 against 58-59), and on rt64 c89ced0's present
+  timeline nothing: no present dropped while it built, and the page drew 58.6-60.0 either way, 278-292 uncapped, the
+  same dip to 55-57 at that scene with no build behind it (Chrome 155 headless, RTX 2070, cold, a host 7-37% busy).
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to the same thread of
   its GPU process, so Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from one (Firefox
   158). Nor does the driver's own shader cache spare it: the same 75 built five times in fresh profiles took as long
