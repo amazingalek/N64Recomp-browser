@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 0560318d714ff5299b18d8902a8fed32be7f0215
+rt64: https://github.com/amazingalek/rt64-web fced8869758badde3e5c761fb6d223483378dd9a
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1401,7 +1401,7 @@ index 8858dac..933b80e 100644
          EnhancementConfiguration enhancementConfig;
          EmulatorConfiguration emulatorConfig;
 diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
-index 2970e71..23ea976 100644
+index 2970e71..d102288 100644
 --- a/src/hle/rt64_state.cpp
 +++ b/src/hle/rt64_state.cpp
 @@ -7,6 +7,13 @@
@@ -1625,32 +1625,7 @@ index 2970e71..23ea976 100644
                          }
                      }
  
-@@ -1774,6 +1918,24 @@ namespace RT64 {
-             }
-         }
-         
-+        // Whether the workload draws to any framebuffer the VI has shown lately.
-+        bool viShowsAny = false;
-+        bool drawsShown = false;
-+        for (const VIHistory::Present &entry : viHistory.history) {
-+            if (!entry.vi.visible()) {
-+                continue;
-+            }
-+
-+            viShowsAny = true;
-+            for (uint32_t f = 0; (f < workload.fbPairCount) && !drawsShown; f++) {
-+                const FramebufferPair &fbPair = workload.fbPairs[f];
-+                drawsShown = !fbPair.drawColorRect.isEmpty() && (fbPair.colorImage.address == entry.vi.fbAddress()) &&
-+                    (fbPair.colorImage.width == entry.vi.fbSize().x) && (fbPair.colorImage.siz == entry.vi.fbSiz());
-+            }
-+        }
-+
-+        workload.offscreenOnly = viShowsAny && (workload.fbPairCount > 0) && !drawsShown;
-+
-         // Advance the workload queue at the end of a full synchronization.
-         advanceWorkload(workload, false);
-         ext.workloadQueue->advanceToNextWorkload();
-@@ -1836,6 +1998,10 @@ namespace RT64 {
+@@ -1836,6 +1980,10 @@ namespace RT64 {
      }
      
      void State::updateScreen(const VI &newVI, bool fromEarlyPresent) {
@@ -1661,7 +1636,7 @@ index 2970e71..23ea976 100644
          // If the debugger has paused the plugin, keep submitting the last workload and screen VI for rendering and a present event.
          if (debuggerInspector.paused && !fromEarlyPresent) {
              if (ext.userConfig->developerMode) {
-@@ -1909,6 +2075,7 @@ namespace RT64 {
+@@ -1909,6 +2057,7 @@ namespace RT64 {
                      const uint8_t *fbRAM = &RDRAM[screenFb->addressStart];
                      uint64_t currentHash = XXH3_64bits(fbRAM, screenFb->RAMBytes);
                      if (currentHash != screenFb->RAMHash) {
@@ -1669,6 +1644,34 @@ index 2970e71..23ea976 100644
                          {
                              RenderWorkerExecution workerExecution(worker);
                              thread_local std::vector<uint32_t> fbDiscards;
+@@ -2660,6 +2809,27 @@ namespace RT64 {
+         workload.debuggerCamera = debuggerInspector.camera;
+         workload.debuggerRenderer = debuggerInspector.renderer;
+         workload.paused = paused;
++
++        // Whether the workload draws to any framebuffer the VI has shown lately, for a workload a full sync ends. It's
++        // worked out here, not where fullSync() ends, which the games' own patches of RT64 add to.
++        if (!paused) {
++            bool viShowsAny = false;
++            bool drawsShown = false;
++            for (const VIHistory::Present &entry : viHistory.history) {
++                if (!entry.vi.visible()) {
++                    continue;
++                }
++
++                viShowsAny = true;
++                for (uint32_t f = 0; (f < workload.fbPairCount) && !drawsShown; f++) {
++                    const FramebufferPair &fbPair = workload.fbPairs[f];
++                    drawsShown = !fbPair.drawColorRect.isEmpty() && (fbPair.colorImage.address == entry.vi.fbAddress()) &&
++                        (fbPair.colorImage.width == entry.vi.fbSize().x) && (fbPair.colorImage.siz == entry.vi.fbSiz());
++                }
++            }
++
++            workload.offscreenOnly = viShowsAny && (workload.fbPairCount > 0) && !drawsShown;
++        }
+     }
+ 
+     void State::advancePresent(Present &present, bool paused) {
 diff --git a/src/hle/rt64_state.h b/src/hle/rt64_state.h
 index 7a8c13b..019e41d 100644
 --- a/src/hle/rt64_state.h
@@ -2149,7 +2152,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..51f9529 100644
+index 9fae0d4..ef53d50 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -2230,12 +2233,8 @@ index 9fae0d4..51f9529 100644
  
          // Make sure the versions vector matches the texture cache size.
          descriptorTextureVersions.resize(textureCacheSize, 0);
-@@ -470,9 +499,10 @@ namespace RT64 {
-         bool previousVertexTestZ = false;
-         const RenderPipeline *previousPipeline = nullptr;
-         RenderRect previousScissor;
--        interop::RasterParams rasterParams;
-+        interop::RasterParams rasterParams = {};
+@@ -473,6 +502,7 @@ namespace RT64 {
+         interop::RasterParams rasterParams;
          RenderDescriptorSet *descRealFbSet = framebuffer.descRealFbSet->get();
          RenderDescriptorSet *descDummyFbSet = framebuffer.descDummyFbSet->get();
 +        const RenderDescriptorSet *previousDrawTextureSet = nullptr;
@@ -3344,14 +3343,12 @@ index 3b991ff..3200b7d 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..9d047f5 100644
+index bf7b669..1dad260 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
-@@ -5,7 +5,53 @@
- #include "rt64_raster_shader_cache.h"
+@@ -6,6 +6,52 @@
  
  #include "common/rt64_thread.h"
-+#include "rt64_render_target.h"
  
 +#if defined(__EMSCRIPTEN__)
 +#   include <emscripten/emscripten.h>
@@ -3362,6 +3359,7 @@ index bf7b669..9d047f5 100644
 +#   include <zstd.h>
 +#   include "common/rt64_elapsed_timer.h"
 +#   include "rt64_prebuilt_shaders.h"
++#   include "rt64_render_target.h"
 +
 +// The size of the pixel shader built for a prebuilt shader, on a device with dual-source blending or without.
 +static uint32_t prebuiltPixelSize(const RT64PrebuiltShader &entry, bool dualSource) {
