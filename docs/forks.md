@@ -212,4 +212,9 @@ ed4a797, f8e03f5       queue the idle thread took it from again at once and spun
                        message blocked for good, and with its RSP completion sent at the list's last full sync its RDP
                        completion waited for the next retrace: 4-6 retraces a game frame, 2 with the list (headless
                        Chrome 155 uncapped, 3840x2000, its plan: 31,926 sound frames short → 0)
+rt64 4cced71           a draw's texture marked used when the state prepares its workload, on every build: the state
+                       evicts up to WORKLOAD_QUEUE_SIZE workloads ahead of the one drawn, so a texture drawn again
+                       after its maximum age went while a queued draw still used it, which read slot 0, another
+                       texture (a menu letter of Rush 2049 flickering to a piece of another font). Rush 2049 carried
+                       it as runtime-patches/rt64-0007, which its pin moving onto this drops, or it no longer applies
 ```
