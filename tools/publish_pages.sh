@@ -366,7 +366,7 @@ if [[ -n "$browser" ]]; then
     echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
     for g in "${differ[@]}"; do
         read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n $PAGES_COPY ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
+        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n ${PAGES_COPY:-} ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
     done
 fi
 $dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }
