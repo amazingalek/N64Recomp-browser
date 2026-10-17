@@ -400,6 +400,8 @@ try {
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
+  // A run that failed before the play still records the viewport it had, on screen the window's, not --size.
+  viewport ??= await page.viewport().catch(() => null);
   if (!recordFile) await finish(1);
 }
 const hostAfter = hostTimes();

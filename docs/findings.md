@@ -462,6 +462,13 @@ The measurements behind rules CLAUDE.md states without them.
   page at 36-44 presents a second under it, 54-58 after.
 - Clicks scaled to `--size` instead of the page's viewport: at 945, Load ROM's click landed between Load ROM and
   Controls (an on-screen Chrome at 200% has a 1920x889 viewport for a `--size` of 1920x945).
+- A click scaled to the viewport reaches no launcher's Load ROM that sits below a list growing by whole rows: Ocarina of
+  Time's bar is 67-102 CSS pixels from the bottom at 1256x645, 75-126 at 1920x945 and 268-378 at 3840x2000, and its
+  plan's click missed it at 1920x945 and 1920x889. Its plan presses Enter on the launcher's focused Load ROM instead (a
+  `rom` step with a key, `page_driver.mjs`). And a click while Chrome builds the shader list behind the launcher, a
+  laptop's Intel UHD at 99% on screen, was not taken (Wave Race 64's 100, done at 11.1 s): its plan waits for
+  `RT64: all <n> prebuilt shaders built`. Firefox builds none there, so its misses on screen there have another cause,
+  not yet seen.
 - A debugging port shared by two browsers: the second Chrome took `[::1]` and the tool drove the first one's page, which
   is why `page_driver.mjs` refuses a port another browser holds.
 - Firefox's `\GPU Process Memory(*)\Dedicated Usage` climbs by a canvas a frame, past a terabyte in 15 minutes, while
