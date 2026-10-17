@@ -191,7 +191,10 @@ its survey.
 before the web's, so `pins.txt` has no row for it: `publish_pages.sh`'s build is what checks a tag against it. Where
 both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
 frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
-reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). rt64-web 0a9fcb6 keeps the web's
+reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). N64ModernRuntime's
+`mesgqueue.cpp` takes DKR-R's alone, without the web's held messages (66539ab): DKR-R's own
+`runtime-deferred-events.patch` does the same, a blocked external message kept in a list of its own until a receive
+frees its queue, and is staged over that file at configure time. rt64-web 0a9fcb6 keeps the web's
 lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
 plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's default, holds RT64 at Original
 and 30, and the page has no overlay to pick a profile), with its Match display passed on as RT64's Display, since SDL's
