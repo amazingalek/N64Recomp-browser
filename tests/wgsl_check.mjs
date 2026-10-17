@@ -83,7 +83,9 @@ const server = http.createServer((req, res) => {
 
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'wgsl-check-'));
-const chromePath = process.env.CHROME || 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
+// Where Windows puts it: Program Files since Chrome 155, Program Files (x86) before.
+const chromePath = process.env.CHROME || ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'].find((p) => fs.existsSync(p));
 const chrome = spawn(chromePath, ['--headless=new', '--enable-unsafe-webgpu', '--remote-debugging-port=0',
     `--user-data-dir=${profile}`, ...(process.env.CHROME_FLAGS || '').split(' ').filter(Boolean), 'about:blank'],
     { stdio: 'ignore' });

@@ -68,8 +68,12 @@ export const serve = (dir, port) => http.createServer((req, res) => {
   });
 }).listen(port, '127.0.0.1');
 
+// Chrome on Windows is in Program Files since Chrome 155, Program Files (x86) before.
 const defaultExecutable = {
-  chrome: process.platform === 'win32' ? 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe' : 'google-chrome',
+  chrome: process.platform === 'win32'
+    ? ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe']
+      .find((p) => fs.existsSync(p)) ?? 'chrome.exe'
+    : 'google-chrome',
   firefox: process.platform === 'win32' ? 'C:/Program Files/Mozilla Firefox/firefox.exe' : 'firefox',
 };
 
