@@ -171,8 +171,8 @@ times Chrome's gaps over 100 ms.
   there is no WebGPU layout to build it for, so it waits for one, and the spec constant shaders are created at
   setup, because a shader reading a binding from a new stage gives every pipeline a new layout. Without those two,
   boot ran at 17-20 display lists a second for ~10 s and about one run in fifteen froze for good. One compilation
-  thread: six at once took ~9 cores and halved the frame rate. The wasm grows from 7.3 to 16.6 MB (the spec
-  constant shaders).
+  thread: six at once took ~9 cores and halved the frame rate. The wasm grew from 7.3 to 16.6 MB (the spec
+  constant shaders), and since rt64 85a6ad5 links 4.4 MB less of them (GoldenEye's 17.2 → 12.8 MB).
 - Chrome parses and validates a shader module (Tint) in `createShaderModule`, on that same main thread, even for a
   pipeline it then builds async, in a time that grows faster than the WGSL (0.16 ms a KB at 24 KB, 0.56 at 180 KB,
   1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
@@ -181,7 +181,8 @@ times Chrome's gaps over 100 ms.
   once a draw resolves its layout): the boot's fixed ones and the RSP's compute shaders at the game's first frame
   (13-64 ms each, DXC on that thread; under 50 ms each in a trace of Banjo's Start); a
   `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
-  shaders' modules at setup (713 KB, ~0.7 s each), which hold the launcher's first presents ~1.4 s. The ubershader
+  shaders' module at setup, which held the launcher's first presents 1.1-1.8 s while there were two (below, The
+  launcher). The ubershader
   states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
   Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
   977ddca), one first and the rest from its compiled shader (plume 2950009): Chrome compiles a pipeline's shaders on
@@ -341,9 +342,16 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   GoldenEye's first present came 1325-1330 ms against 1120-1198 (Donkey Kong 64's 1665-1754 either way).
   `performance.measureUserAgentSpecificMemory` counts the shared heap once a worker (15-25 GB with 55): read the
   process's own counters.
-- The launcher: 1.4-2.0 s about a second after its first frame in every game, Chrome's GPU main thread parsing the
-  spec constant shaders' modules (703 and 730 ms for two of ~671 KB, `DeviceBase::APICreateShaderModule`) and building
-  three compute pipelines in line (55, 43, 78 ms).
+- The launcher: 1.1-1.8 s after its first frame in Chrome (the page's first presents are queued behind it, so the
+  launcher shows that much later), its GPU main thread parsing the spec constant shaders' modules, the flat and the
+  smooth RasterPS, 670 KB of WGSL each (560-950 ms each, `DeviceBase::APICreateShaderModule`), after the ubershader's
+  245 KB (140-190 ms). rt64 85a6ad5 draws every shading mode with the flat pair and keeps the ubershader's loops in its
+  RasterPS, 250 KB (145-150 ms), which also builds its pipelines in about a third of the time (a test page, six of
+  GoldenEye's shaders: 1.0-1.6 s each → 0.29-0.46). Two interleaved rounds each, cold profiles, uncapped 3840x2000, a
+  quiet host: in headless Chrome 155 GoldenEye's gap 1643-1814 → 427-451 ms and its 300th present 4.4-4.6 s → 2.5-3.2
+  s after navigation, Donkey Kong 64's 1092-1235 → none over 100 ms; in Firefox 158 GoldenEye's 319-362 → 127-175,
+  Donkey Kong 64's 0-111 → none. What is left of GoldenEye's in Chrome: the two modules, a compute pipeline (56 ms)
+  and four render pipelines a draw wanted before their background build (21-40 ms each), all in line.
 - GoldenEye's Start (1.6 s): the boss thread's first retraces (~0.6 s), then on a profile with no save its first boot
   validating the EEPROM (`fileValidateSaves` → `fileResetSave` → `fileWriteSave`), 48 EEPROM calls, each between
   `joyDisablePoll` and `joyEnablePoll`, which wait a retrace for the controller thread (~0.77 s); a second visit, with the save, waits 1.05 s. The display list
@@ -355,4 +363,87 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   v0.51.0) is 0.1 s.
 - Mario Kart 64's loads (0.43-0.46 s before a race, 0.55 s at its start): the game thread in `audio_reset_session_eu`
   ~470 ms while the audio thread resets its session, the page's thread, the display list thread and the GPU process
-  idle.
+  idle. The game's own, a console's too: its audio reset takes 29 audio frames, one a retrace, and every retrace reached
+  the scheduler (MarioKart64Recomp-web's BUILDING.md, What porting it found). The profile's one long `osRecvMesg` on
+  the scheduler and audio threads is each retrace's wake being shorter than a sample.
+
+## Behind CLAUDE.md's rules
+
+The measurements behind rules CLAUDE.md states without them.
+
+- `thread_stdio.js`: Emscripten proxies every write to stdout or stderr to the page's thread, WebGPU's, and waits, so
+  each line held its thread for up to a frame. Banjo-Tooie's upstream logs ~100 lines a second: its title screen's sound
+  was 12,900-13,400 frames short of ~2.1 million before, 235-1,325 with it.
+- Banjo-Tooie's play plan, 2.5 s on W a world, ended black in all three of a laptop's runs, after Cauldron Keep's walk,
+  where the page draws the keep in both browsers at every size tried: the walks took Banjo off Hailfire Peaks' and
+  Cloud Cuckooland's ledges or through an exit, and in one Chrome run, once the game had begun a change of map of its
+  own (its jigsaw wipe) in Hailfire Peaks, every world warped to after it drew black, though each warp reached its map.
+  Its plan now visits ten worlds and doesn't walk (Banjo jumps and attacks where he lands), and its survey's warp waits
+  for a change the game began.
+- A loop of messages to itself in a page's script: Ocarina of Time's survey waited for the file select's hand-over with
+  one (`MessageChannel`), ~10,000 tasks a second on the page's thread, none of them long. In Chrome they starved the
+  tasks that carry the device thread's WebGPU work to it, and its page held 3-8 s as the file loaded, only while the
+  loop ran, the thread looking free and the GPU process idle.
+- Reading a ROM through fstreams (a few KB a call on Emscripten, each a round trip to the page's thread): Conker's
+  ROM-version check held its launcher 0.85 s in Chrome and 2.3 s in Firefox.
+- Emscripten's SDL2 audio, a ScriptProcessorNode on the page's thread taking 256 frames (5 ms) at a time: in headless
+  Chrome 368 of 7541 callbacks came more than two buffers late in 40 s of attract demo.
+- Off the desktop or on it, on a laptop's Intel UHD (A laptop, measured): on screen Firefox's pages took ~30 more points
+  of the Intel chip's 3D engine (Banjo 75% against 45, Conker 72 against 44) and 3-5 times its GPU process's CPU, and
+  Conker fell from 31.5 presents a second to 25.1, its boot's shader wait doubled (11.4 s against 5.4); Chrome stayed
+  within 2. The stand-in is gentler than a laptop: Banjo played 59-60 on it in Firefox and 20-30 on the laptop, where
+  its done callbacks came back 25-45 ms late and RT64's pacing held it to the game's frames.
+- Chrome's CPU throttling of the page (CDP `Emulation.setCPUThrottlingRate`, 3) found plume 6949d22's calls: Conker's
+  page at 36-44 presents a second under it, 54-58 after.
+- Clicks scaled to `--size` instead of the page's viewport: at 945, Load ROM's click landed between Load ROM and
+  Controls (an on-screen Chrome at 200% has a 1920x889 viewport for a `--size` of 1920x945).
+- A debugging port shared by two browsers: the second Chrome took `[::1]` and the tool drove the first one's page, which
+  is why `page_driver.mjs` refuses a port another browser holds.
+- Firefox's `\GPU Process Memory(*)\Dedicated Usage` climbs by a canvas a frame, past a terabyte in 15 minutes, while
+  the adapter's counter and nvidia-smi hold flat and the page plays on. Conker's page filling video memory in Firefox
+  beside another page showed as the other page's climb and its "Out of Memory".
+- Build times: for Rush 2049 the build went from 590-810 s to 382 s with ccache, and 116 s with the fast link (its
+  CLAUDE.md, Step 3). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
+  Mask's 150 of 932, with the other two building beside it), and a second fresh dir of the same game 753, 673 and 932.
+  Their builds went from ~2050-2100 s to 480-650 s, of which the link was 250-330 s; configure took 230-590 s either
+  way. On a 16-core Linux host `tests/build`'s libraries build in 47 s, and in 5 s from a second fresh dir.
+
+## Ruled out, measured
+
+What CLAUDE.md's Ruled out rests on.
+
+- Presents waiting for the animation frame in every browser: on a laptop's Intel UHD, Chrome 155 headed drew as many
+  (Banjo 59.9 against 60.0, Conker 53.9 against 54.0), but the GPU went 71 → 86% busy for Banjo and 63 → 75% for
+  Conker, the browser 1.02 → 1.47 and 1.36 → 1.95 cores, and Banjo's gaps over 50 ms 98 → 188 in 90 s (one run each).
+- Firefox's GPU process growth: on a test page submitting after each batch, empty submissions (~650 a second),
+  onSubmittedWorkDone (~600), 4 KB writeBuffers (~1,200), textures made, written and destroyed (~160) and ~70 new
+  pipelines grew it by nothing over 45-85 s each, and a 1920x945 canvas presenting 60 a second ~1 KB a present (Firefox
+  158, RTX 2070). With no submission, writeBuffer and writeTexture grow it ~90 KB a call until one comes (the writes
+  wait for the next submit).
+- coi_serviceworker.js: in ~100 cold Firefox 158 visits register() always resolved with the worker still installing
+  ("updatefound" never fired before the listener, the worker never already activating), and the reload always came.
+- Pilotwings 64's frame gaps of 85-180 ms as its screens change (file menu, test overview, vehicle select, a test's
+  start) come in Firefox too, and a CPU profile of every thread (Chrome 155 headless) puts the game thread in all of
+  each one. Its screen change stops the music with `uvaSeqStop`, which polls until the sequence player has stopped:
+  libultra stops it only after its voices' 50 ms release (`KILL_TIME`), counted in audio frames, one a retrace, so it
+  holds 42-75 ms on a console and natively too. Then it loads the next screen (`uvLevelAppend`, `uvMemLoadDS`,
+  `mio0_decompress`), 10-33 ms, the recompiled code ~1.7 times native's (`mio0_decompress` 347 MB/s in V8 against 580
+  natively, clang 18 -O3). RT64 waits 4-21 ms for the new screen's texture uploads (the upload thread's new buffers and
+  descriptor sets, made through the page's thread), and its wait for the count of changed pixels is gone (rt64
+  254dee3). Right after the boot's wait in Chrome, on a busy host, gaps of 200-480 ms come with every page thread idle
+  and the prebuild threads waiting for Chrome's GPU process; on a quiet host 3 cold runs of 4 had none.
+- Chrome's list build behind the game: on v0.50.0 it cost Conker's page at 3840x2000 a little (57.0-57.9 presents a
+  second against 58.7-58.8 with nothing built behind it, the low after its intro's second scene 50-56 against 58-59),
+  and on rt64 c89ced0's present timeline nothing: no present dropped while it built, and the page drew 58.6-60.0 either
+  way, 278-292 uncapped, the same dip to 55-57 at that scene with no build behind it (Chrome 155 headless, RTX 2070,
+  cold, a host 7-37% busy).
+- Firefox's pipelines in parallel: Rush 2049's 75 took 15.5-16.7 s from three devices at once against 13.3-14.6 from
+  one (Firefox 158). The same 75 built five times in fresh profiles took as long each time.
+- Rush 2049's and Majora's Mask's GPU frame (A page's GPU time): the pass breaks (a decal's read-only depth, plume's
+  barriers), render to RAM's passes and the copies cost ~0.1 ms of a 4-7 ms present. Rush 2049 built with rt64
+  008f380's loops, without them (re-spirv then spirv-opt), with either one alone, and with neither as dxc writes it
+  presented 122-154 a second uncapped at 3840x2000 in Chrome 155, all five within the runs' noise (GPU 91-98% busy,
+  interleaved, one server), and in Firefox 158 112 with them against 123 without, the race section's wait 4.5 s
+  against 7.0. The mip LOD shader takes two levels of two tiles, four taps each, by hand; Auto's rounding to a multiple
+  of 240 lines is 18-21% more pixels at 2000 lines, 3% at a laptop's 945.
+- A fixed heap: Conker's 3 GB measured no faster than memory growth.
