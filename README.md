@@ -267,8 +267,9 @@ The rest is what a link or a run of the page shows when it is missing:
 The patches are made on the upstream commits in `patches/patches.txt`, the ones the forks are built on. On every push
 CI applies them to the commits the recomps here pin (`patches/pins.txt`: Banjo-Kazooie, Majora's Mask, Donkey Kong 64
 with Killklli's runtime and RecompFrontend, Conker's Bad Fur Day, and GoldenEye 007, whose upstream predates
-RecompFrontend, so its web fork pins the commits the forks are built on), and builds every library of a page from
-Banjo-Kazooie's. What to expect from a recomp's own commits:
+RecompFrontend, so its web fork pins the commits the forks are built on), and over Diddy Kong Racing's web fork's own
+patches to its runtime and rt64 (DKR-R-web's `scripts/build_web.sh --patches`), and builds every library of a page
+from Banjo-Kazooie's. What to expect from a recomp's own commits:
 
 - Near those: they apply. Where the code around a change differs too much for `git apply`, `apply.cmake` merges three
   ways against the commit the patch was made on, fetched from the fork, and says so (Donkey Kong 64's RecompFrontend
