@@ -210,7 +210,7 @@ critical fix, a change to a game's repo or shader list) does all of this in the 
   is) as well as the usual one off the desktop, and gives the on-screen number: Windows never composites a window off
   the desktop, which flattered Firefox on Intel UHD. Its Chrome cell is played headless too, whose presents never wait
   for a compositor or display. Chrome's CPU throttling (CDP `Emulation.setCPUThrottlingRate`, 3) stands in for a
-  laptop's slower CPU, but isn't what holds Chrome at 51-55 there (docs/findings.md, A laptop, measured).
+  laptop's slower CPU, but isn't what held Chrome at 51-55 there on v0.46.0 (docs/findings.md, A laptop, measured).
 
 A new game gets a row in its port's work, its Recomp cell naming the upstream recomp and its owner ("[name](url) by
 owner"), from the fork's GitHub parent.

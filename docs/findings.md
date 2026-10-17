@@ -145,6 +145,7 @@ times Chrome's gaps over 100 ms.
 - Chrome sat at 51-55 in six games with the Intel GPU at most 70% busy and the browser and the host far from busy, so a
   slow CPU isn't what holds it, and Chrome's 3x CPU throttling (CLAUDE.md, The games table) doesn't stand in for it: Conker drew
   more that way on the desktop than on the laptop. RT64 paced Conker in Chrome 3 times; the other 54s are unexplained.
+  On v0.58.0 it drew 58-60 there (below).
 - Maximized on the desktop at its 200% (the runs noted "part C"), instead of off it, Firefox's Intel load rose ~30
   points, its GPU process's CPU 1.4-4.6 times, and Conker's presents fell and its boot wait doubled; Chrome stayed
   within 2 presents. So an off-desktop Firefox run on a laptop reads better than a player's visit. Chrome maximized
@@ -152,6 +153,29 @@ times Chrome's gaps over 100 ms.
 - In 10 minutes of Rush 2049 Firefox held 55-60, its callbacks ~20 ms late (30-42 where the Intel GPU reached ~97%),
   the cap moving to 3 at 106 s and 4 at 140 s, while its GPU process's private memory grew from 1.05 to 3.14 GB, near
   linearly, and the adapter's shared memory by 740 MB.
+
+On 2026-10-17, the same laptop played nine pages from Pages, all built on v0.58.0 (Chrome 155, Firefox 158, plugged
+in, best power efficiency, Windows' global timer at 1 ms set by something already running, the host 1-13% busy before
+each run), cold, each game's play plan: plays.jsonl's 79 runs of that date noted "laptop report", failed ones
+included, those noted "onscreen" giving the README's cells. No run that played had a WebGPU error or exception.
+
+- Off the desktop (1920x945) Chrome headed drew 58.2-60.1 in all nine and headless the same within a present, where on
+  v0.46.0 it sat at 51-55. Firefox drew 59.7-59.9 in Banjo, Majora's Mask, Donkey Kong 64 and Wave Race 64 (20-30 on
+  v0.46.0), 58.0 in Pilotwings 64, 55.6 in Rush 2049, 51.4 and 51.5 in Conker, 42.6 in Banjo-Tooie, and 64.0 in
+  GoldenEye, above the 60 Hz display, with 60 animation frames a second.
+- On screen (maximized at 200%, ~3840x1780 device pixels) Chrome drew 53-60 (Conker 53.4, Rush 2049 57.4, Banjo-Tooie
+  59.2, the rest 59.9-60.1) with the Intel GPU 65-95% busy, and Firefox 21-38 with it 97-100% busy (Banjo 85%, paced
+  to its 30): Firefox is GPU-bound there on frames Chrome draws within the GPU's time.
+- Firefox waited 4-22 s a play for shaders, which make nearly all its gaps of seconds; Chrome waited for none at the
+  display's rate.
+- plume's probe of a timed wait of 100 us read 6-14 ms in every Firefox run with Windows' global timer at 1 ms: neither
+  1 ms nor the 15.6 ms tick, and different from run to run.
+- Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
+  88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
+  67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
+  Banjo-Tooie take more than 1/60 s of this GPU a frame in either browser.
+- Over 600 s of Rush 2049 Firefox's GPU process grew from 466 to 3142 MB, still near linearly (about:memory:
+  systemHeap +1143 MB, gpuShared +1261, heap +46), and Chrome's from 508 to 864, most of it in the first minutes.
 
 ## WebGPU in Chrome and Firefox
 
