@@ -17,7 +17,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 
 | Game | Recomp | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|---|
-| San Francisco Rush 2049 | this project's own recomp | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 59; 152* | 51; 113* | 2026-10-16, v0.56.0; laptop 2026-10-15, v0.46.0 |
+| San Francisco Rush 2049 | this project's own recomp | [rush-2049-recomp](https://github.com/amazingalek/rush-2049-recomp) | [play](https://amazingalek.github.io/rush-2049-recomp/) | 59; 136* | 51; 123* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
 | GoldenEye 007 | [GoldenEye64Recomp](https://github.com/cblock85/GoldenEye64Recomp) by cblock85 | [GoldenEye64Recomp-web](https://github.com/amazingalek/GoldenEye64Recomp-web) | [play](https://amazingalek.github.io/GoldenEye64Recomp-web/) | 54; 343* | 47; 331* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
 | The Legend of Zelda: Majora's Mask | [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) by Zelda64Recomp | [Zelda64Recomp-web](https://github.com/amazingalek/Zelda64Recomp-web) | [play](https://amazingalek.github.io/Zelda64Recomp-web/) | 52; 146* | 20†; 130* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
 | Banjo-Kazooie | [Banjo: Recompiled](https://github.com/BanjoRecomp/BanjoRecomp) by BanjoRecomp | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 55; 290* | 21†; 177* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
