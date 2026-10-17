@@ -355,4 +355,6 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   v0.51.0) is 0.1 s.
 - Mario Kart 64's loads (0.43-0.46 s before a race, 0.55 s at its start): the game thread in `audio_reset_session_eu`
   ~470 ms while the audio thread resets its session, the page's thread, the display list thread and the GPU process
-  idle.
+  idle. The game's own, a console's too: its audio reset takes 29 audio frames, one a retrace, and every retrace reached
+  the scheduler (MarioKart64Recomp-web's BUILDING.md, What porting it found). The profile's one long `osRecvMesg` on
+  the scheduler and audio threads is each retrace's wake being shorter than a sample.
