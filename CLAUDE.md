@@ -280,7 +280,9 @@ current in the same work as what changes it:
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
   another shows as the other page's climb and its "Out of Memory". play_page reads the GPU process's private bytes each
   sample, and in Firefox about:memory's split of them at the play's start and end (`gpuProcessMemory`); each read holds
-  Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory).
+  Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory). Which kind of WebGPU
+  work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
+  `--preload tools/webgpu_census.js` reads off the page.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never

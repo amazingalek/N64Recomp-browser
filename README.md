@@ -382,7 +382,9 @@ take the web support without moving its submodules to the forks (Using it in a r
   load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table;
   `--record` appends the run to `plays.jsonl`, every page play kept, a JSON line each, so how each game's page plays
   can be followed day by day. `pass_probe.js`, a preload for it, says what a page's presents spend the GPU on: its
-  passes, their size, their draws by shader and the GPU time of each.
+  passes, their size, their draws by shader and the GPU time of each; `webgpu_census.js`, another, counts its WebGPU calls
+  and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
+  reading Firefox's GPU process memory around each.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
