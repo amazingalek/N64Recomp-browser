@@ -217,4 +217,9 @@ rt64 4cced71           a draw's texture marked used when the state prepares its 
                        after its maximum age went while a queued draw still used it, which read slot 0, another
                        texture (a menu letter of Rush 2049 flickering to a piece of another font). Rush 2049 carried
                        it as runtime-patches/rt64-0007, which its pin moving onto this drops, or it no longer applies
+rt64 8a2c6a7           interpolated frames take turns in 8 color targets (InterpolatedTargetSlots), a frame past them
+                       waiting for the one drawn into its target to be presented: RT64 keeps a target per display frame
+                       of a game frame and never frees one, so a page held as many as its slowest game frame took
+                       display frames. GoldenEye's are 5702x2970 (68 MB) at 3840x2000, and uncapped (360 Hz) in Dam at
+                       ~8 fps it kept 42, 2.8 GB, until Firefox's WebGPU device ran out of memory on an 8 GB GPU
 ```
