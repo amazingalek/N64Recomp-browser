@@ -28,7 +28,19 @@ the same page: 718 → 791 MB, levelling off. The page's WebGPU objects don't pi
 and what JavaScript collected held ~2,000 textures, ~5,000 bind groups (plume 97f4e64's 4,096 among them) and ~1,800
 command buffers alive over 6 minutes, making ~120 textures and ~250 command buffers a second. On a laptop's Intel UHD
 (Firefox 158, 1920x945) it grew a steady 3.5 MB a second, 2.1 GB in 10 minutes, the graphics' shared memory +740 MB:
-there every GPU allocation is system memory, and which part grows there is not read yet.
+there every GPU allocation is system memory. 600 s there on v0.58.0's page went 466 → 3142 MB, 4.47 MB a second and
+not levelling off: Firefox's heap 29 → 75, the system heap 50 → 1193, GPU committed 343 → 1699, shared 427 → 1688
+(Chrome headed 508 → 864 MB, flat after the first minutes).
+
+What the page does a second (`tools/webgpu_census.js`, Firefox 158, 1920x945, its attract race at 60 presents a
+second): 1,800-2,400 writeBuffers of 40-82 MB, 2,200-3,400 copyBufferToBuffer of 83-169 MB, one copyTextureToTexture
+of the 1920x945 scene a present (~420 MB), 30-230 textures made (mostly 4096x1 r8uint, TMEM, and tiles of 32x16 and
+smaller) and as many destroyed, 75-230 compute passes, ~240 render passes of 15,000-30,000 indexed draws, ~250
+command buffers each submitted alone and ~60 empty submits, 30-170 bind groups made, and no writeTexture, mapAsync or
+createBuffer. `tools/gpu_growth.mjs` plays each kind alone in a test page at those rates: on the RTX 2070 (a busy
+host, then a quiet one) none grew the GPU process more than 0.71 MB a second over 60 s, all of them at once 0.45, the
+canvas alone 0.27, Firefox's own heap nearly all of it, and leaving the page gave it back. So on a desktop GPU no kind
+grows it; the laptop, where the page grows 4.47 MB a second, is where a kind would show.
 
 ## Two pages at once
 
