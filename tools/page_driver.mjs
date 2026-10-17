@@ -26,7 +26,8 @@
 // and menus out by the viewport's height, about the centre), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
 // ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
 // n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
-// ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM), ["shot", file] (a screenshot of the page) and
+// ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
+// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
 // JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
 // press while it animates, is passed without timing the presses). A tool can add its own (record_shaders.mjs's
@@ -181,7 +182,10 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
         try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; }
         if (value !== undefined) log(`${op}: ${JSON.stringify(value)}`);
       }
-      else if (op === 'rom') await page.rom(...await place(a[0], a[1]));
+      else if (op === 'rom') {
+        await page.rom(typeof a[0] === 'string' ? async () => { await page.key('down', a); await page.key('up', a); }
+          : async () => page.click(...await place(a[0], a[1])));
+      }
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else throw new Error(`unknown step ${op}`);
     }
@@ -271,10 +275,10 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
     click,
     key: (upDown, [code, key, keyCode]) => send('Input.dispatchKeyEvent',
       { type: upDown === 'down' ? 'keyDown' : 'keyUp', code, key: key ?? code, windowsVirtualKeyCode: keyCode ?? 0 }),
-    rom: async (x, y) => {
+    rom: async (act) => {
       await send('Page.setInterceptFileChooserDialog', { enabled: true });
       fileChooser = null;
-      await click(x, y);
+      await act();
       for (let i = 0; i < 100 && !fileChooser; i++) await sleep(100);
       if (!fileChooser) throw new Error('no file chooser opened');
       await send('DOM.setFileInputFiles', { files: [path.resolve(rom)], backendNodeId: fileChooser.backendNodeId });
@@ -399,7 +403,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     click,
     key: (upDown, [code, key, keyCode]) => evaluate(`window.dispatchEvent(new KeyboardEvent('key${upDown}',
       { bubbles: true, code: ${JSON.stringify(code)}, key: ${JSON.stringify(key ?? code)}, keyCode: ${keyCode ?? 0}, which: ${keyCode ?? 0} })), undefined`),
-    rom: async (x, y) => {
+    rom: async (act) => {
       const data = fs.readFileSync(rom);
       await evaluate(`window.__romPieces = []; undefined`);
       for (let i = 0; i < data.length; i += 1 << 19) {
@@ -417,7 +421,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
           this.dispatchEvent(new Event('change', { bubbles: true }));
         };
       })()`);
-      await click(x, y);
+      await act();
       for (let i = 0; i < 100; i++) {
         await sleep(100);
         if (await evaluate(`window.__romGiven || ([...document.querySelectorAll('button')]
