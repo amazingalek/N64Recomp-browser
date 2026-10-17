@@ -42,6 +42,17 @@ host, then a quiet one) none grew the GPU process more than 0.71 MB a second ove
 canvas alone 0.27, Firefox's own heap nearly all of it, and leaving the page gave it back. So on a desktop GPU no kind
 grows it; the laptop, where the page grows 4.47 MB a second, is where a kind would show.
 
+What did grow a page's video memory was RT64's interpolated frames, before rt64 8a2c6a7: a color target per display
+frame of a game frame, kept for the rest of the visit, so as many as the slowest game frame so far took display frames.
+GoldenEye's page from Pages (v0.58.0), Firefox 158, uncapped at 3840x2000 on an RTX 2070 (a quiet host), its plan into
+Dam: a preload counting the large textures alive saw its 5702x2970 rgba8unorm targets (68 MB, the game's framebuffer at
+Auto's scale) go 31 → 35 → 37 → 42 as Dam's frame rate fell to ~8 (2.0 → 2.8 GB), the GPU process 3.1 → 4.4 GB; in 2 of
+10 runs that day and the run played beside the fix the device was lost to "Out of Memory" at 45-55 s. With the targets
+taken in turn, 8 of them, three runs of a test build held 15 of that size at the end and the GPU process 2.5-2.7 GB,
+none failed, and presented more: Firefox 175-181 a second (133-150 before), Chrome 219 (166-169). Majora's Mask (20
+fps, so uncapped it reuses the targets every game frame), its plan, played in the same hour beside its page from Pages
+(v0.58.0): Firefox 236 (165), the GPU process ending at 2.1 GB (2.7); Chrome 308 (228); no WebGPU errors either way.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals

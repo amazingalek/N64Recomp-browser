@@ -33,7 +33,8 @@ It merges once CI is green and what it changes has been played (Changing it). Wo
 filed and not started, unless it is a critical fix (The pins).
 
 Work is prioritised by what it breaks: high for a crash, med for an issue that affects every game, low for an issue
-that affects one game.
+that affects one game. That is judged again once the cause is known, by whoever finds it, in the same work: one game's
+symptom whose cause is shared code (a fork, this repo) is med, or high if it crashes or loses the device on any game.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
@@ -248,8 +249,8 @@ current in the same work as what changes it:
   nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is the idle discrete GPU.
 - On a desktop GPU a page is played uncapped (`--uncapped`): capped, every page and build reads about 60 there.
   `?uncapped` needs the browser's animation frames uncapped too (Chrome `--disable-frame-rate-limit`, Firefox
-  `layout.frame_rate` 0; `--uncapped` sets both), and costs video memory, an interpolated frame's color target per
-  present a game frame (~530 MB for a 20 fps game at 3840x2000). A run at the display's rate is for what uncapped
+  `layout.frame_rate` 0; `--uncapped` sets both), and its interpolated frames take turns in 8 color targets of the
+  game's framebuffer at the canvas's scale (rt64 8a2c6a7), 0.25-0.55 GB at 3840x2000. A run at the display's rate is for what uncapped
   switches off (RT64's pacing, the presents-in-flight cap, late done callbacks), and so for a laptop's own runs.
 - A plan reaches a level as a player does (the menus where quick, the survey's warp or stage start where not; its
   header says which) and plays it a minute or more. A walk sways out and back by as much each way about a spot it was
