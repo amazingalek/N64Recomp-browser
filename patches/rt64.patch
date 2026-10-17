@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 85a6ad564deb0330701bd15db695198aa6774365
+rt64: https://github.com/amazingalek/rt64-web 9ab28fb6aeb891885e5b664821d2bf80e469df0a
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -720,7 +720,7 @@ index 6ceb97f..dcf0730 100644
              }
              default:
 diff --git a/src/hle/rt64_application.cpp b/src/hle/rt64_application.cpp
-index 785de27..6c840e6 100644
+index 785de27..28a6308 100644
 --- a/src/hle/rt64_application.cpp
 +++ b/src/hle/rt64_application.cpp
 @@ -16,12 +16,18 @@
@@ -824,7 +824,7 @@ index 785de27..6c840e6 100644
          sharedQueueResources->renderTargetManager.setMultisampling(multisampling);
          sharedQueueResources->renderTargetManager.setUsesHDR(usesHDR);
  
-@@ -455,6 +495,13 @@ namespace RT64 {
+@@ -455,6 +495,19 @@ namespace RT64 {
          // Set up the RDP
          state->rdp->setGBI();
  
@@ -833,6 +833,12 @@ index 785de27..6c840e6 100644
 +        if (device->getCapabilities().backgroundPipelineBuilds) {
 +            state->warmUpPipelines();
 +        }
++
++        // Everything setup asks of the device is submitted before this returns and the first screen is presented, which
++        // waits until the browser has done all of it (plume_webgpu.h): the warm-up's compute and render pipelines built
++        // in line in Chrome's GPU process, after the shader modules, held the launcher's presents for as long once its
++        // first frames were shown.
++        workloadQueue->waitForWorkloadId(state->workloadId);
 +#   endif
 +
          return SetupResult::Success;
