@@ -194,6 +194,10 @@ rt64 85a6ad5           on WebGPU the spec constant shaders are the flat pair (th
                        two of 670: Chrome's GPU main thread parsed them before the launcher's first presents, GoldenEye's
                        held 1643-1814 → 427-451 ms, Donkey Kong 64's 1092-1235 → under 100 (docs/findings.md, The
                        launcher), and a page's wasm is 4.4 MB smaller
+plume 2746484,         on WebGPU setup returns once its warm-up is submitted, and the first present waits until the GPU
+rt64 ba24420           process has done everything asked of the device before it: the modules and the pipelines setup
+                       asks for, built in line in Chrome, no longer hold the launcher after its first frames (GoldenEye
+                       403-450 ms → none over 100 in Chrome, 144-196 → none in Firefox; docs/findings.md, The launcher)
 RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
                        copies the whole buffer otherwise (writeBuffer), recompui's 1 MB upload buffer at every present
                        (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB

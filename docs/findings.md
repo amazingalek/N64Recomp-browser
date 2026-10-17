@@ -181,8 +181,8 @@ times Chrome's gaps over 100 ms.
   once a draw resolves its layout): the boot's fixed ones and the RSP's compute shaders at the game's first frame
   (13-64 ms each, DXC on that thread; under 50 ms each in a trace of Banjo's Start); a
   `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
-  shaders' module at setup, which held the launcher's first presents 1.1-1.8 s while there were two (below, The
-  launcher). The ubershader
+  shaders' module at setup, which held the launcher's first presents 1.1-1.8 s while there were two, and is done
+  before the first present now (below, The launcher). The ubershader
   states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
   Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
   977ddca), one first and the rest from its compiled shader (plume 2950009): Chrome compiles a pipeline's shaders on
@@ -350,8 +350,15 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   GoldenEye's shaders: 1.0-1.6 s each → 0.29-0.46). Two interleaved rounds each, cold profiles, uncapped 3840x2000, a
   quiet host: in headless Chrome 155 GoldenEye's gap 1643-1814 → 427-451 ms and its 300th present 4.4-4.6 s → 2.5-3.2
   s after navigation, Donkey Kong 64's 1092-1235 → none over 100 ms; in Firefox 158 GoldenEye's 319-362 → 127-175,
-  Donkey Kong 64's 0-111 → none. What is left of GoldenEye's in Chrome: the two modules, a compute pipeline (56 ms)
-  and four render pipelines a draw wanted before their background build (21-40 ms each), all in line.
+  Donkey Kong 64's 0-111 → none. What was left of GoldenEye's in Chrome: the two modules, a compute pipeline (56 ms)
+  at the setup warm-up's first dispatch and four render pipelines its draws wanted (21-40 ms each), all in line and all
+  asked for by setup. Since plume 2746484 and rt64 ba24420 setup returns once its warm-up is submitted and the first
+  present waits until the GPU process has done all of it (`onSubmittedWorkDone`), so the launcher's first frame comes
+  that much later and nothing follows it: GoldenEye's gap 403-450 → none over 100 ms in Chrome, 144-196 → none in
+  Firefox, its first present 1.32-1.43 → 1.78-1.85 s and its 300th 2.84-2.99 → 2.86-3.00 s after navigation;
+  Donkey Kong 64's 141-184 ms (one round of two) → none in Chrome. Chrome's module parses and pipelines can't be
+  made async (no async `createShaderModule`; a compute pipeline's layout is known at its first dispatch, which is
+  setup's), so holding the first frame is what keeps them off the presents.
 - GoldenEye's Start (1.6 s): the boss thread's first retraces (~0.6 s), then on a profile with no save its first boot
   validating the EEPROM (`fileValidateSaves` → `fileResetSave` → `fileWriteSave`), 48 EEPROM calls, each between
   `joyDisablePoll` and `joyEnablePoll`, which wait a retrace for the controller thread (~0.77 s); a second visit, with the save, waits 1.05 s. The display list
