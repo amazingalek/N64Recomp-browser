@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web d0ff2aeb29f301a5667f0669dddcbb39bcac1c8f
+plume: https://github.com/amazingalek/plume-web 2746484efe20affbff6ce0ffb91c2876a8c89318
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
