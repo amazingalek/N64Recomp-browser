@@ -167,6 +167,17 @@ included, those noted "onscreen" giving the README's cells. No run that played h
 - On screen (maximized at 200%, ~3840x1780 device pixels) Chrome drew 53-60 (Conker 53.4, Rush 2049 57.4, Banjo-Tooie
   59.2, the rest 59.9-60.1) with the Intel GPU 65-95% busy, and Firefox 21-38 with it 97-100% busy (Banjo 85%, paced
   to its 30): Firefox is GPU-bound there on frames Chrome draws within the GPU's time.
+- What Chrome loses on screen isn't RT64's pixels. A page's canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`), so at
+  200% its drawing buffer is the viewport's 1920x889, not its device pixels (headless Chrome at device scale 2 and 1
+  read back the same buffer), and Auto draws the same multiple of the game's lines there as at 1920x945: Conker's
+  2334x1080, 5 times its 216 (`pass_probe.js` on the stand-in at 1920x889, uncapped: 1.51 ms of GPU passes a present,
+  90% of it the scene's 6 passes at that size). What is new on screen is the composition, Chrome scaling the canvas to
+  the window's device pixels and Windows compositing the 3840x2160 desktop, on the same GPU: the Intel GPU was 3-14
+  points busier on screen than headed off the desktop (Rush 2049 84 to 95%, GoldenEye 68 to 81, Majora's Mask 63 to
+  77, Donkey Kong 64 57 to 65). The pages with room to spare stayed at 60. Conker, 87% busy off the desktop, fell to
+  49-58, and Rush 2049's race, already 98-100% busy off the desktop at 53-58, to 39-46 (its median, 57.4, is mostly
+  the stretches at 60). Banjo-Tooie drew no worse on screen (59.2 against 58.8 headed and 58.4 headless); its 20-30
+  are the same part of its plan in every run, uncapped too.
 - Firefox waited 4-22 s a play for shaders, which make nearly all its gaps of seconds; Chrome waited for none at the
   display's rate.
 - plume's probe of a timed wait of 100 us read 6-14 ms in every Firefox run with Windows' global timer at 1 ms: neither
