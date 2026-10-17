@@ -159,6 +159,46 @@ jobs:
             cmake -P patches/apply.cmake "$RUNNER_TEMP/pins/$recomp"   # a second time changes nothing
           done
 
+  # The patches over Diddy Kong Racing's web fork's own patches (DKR-R-web, its main): its build applies DKR-R's patches
+  # to N64ModernRuntime and rt64 first, then patches/apply.cmake but for the files it leaves to DKR-R's, then more of
+  # DKR-R's at configure time, so its checkouts aren't upstream's commits and pins.txt can't name them. Its
+  # scripts/build_web.sh --patches does all three without a ROM, with this checkout as its lib/N64Recomp-browser. Red
+  # on a PR that keeps main's patches means DKR-R-web's main stopped applying them, which is fixed there.
+  dkr-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/cache@v4
+        id: naga
+        with:
+          path: ~/.cargo/bin/naga
+          key: naga-cli-${{ env.NAGA_VERSION }}-${{ runner.os }}
+      - name: naga
+        if: steps.naga.outputs.cache-hit != 'true'
+        run: cargo install naga-cli --version "$NAGA_VERSION" --locked
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.31.0"
+          ninjaVersion: "^1.13.0"
+      - uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+      - name: SPIRV-Tools
+        run: sudo apt-get install -y --no-install-recommends spirv-tools
+      - name: They apply over DKR-R-web's
+        run: |
+          git clone -q --depth 1 https://github.com/amazingalek/DKR-R-web "$RUNNER_TEMP/dkr"
+          git -C "$RUNNER_TEMP/dkr" log -1 --format='DKR-R-web %h %s'
+          rmdir "$RUNNER_TEMP/dkr/lib/N64Recomp-browser"
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/dkr/lib/N64Recomp-browser"
+          PATH="$HOME/.cargo/bin:$PATH" bash "$RUNNER_TEMP/dkr/scripts/build_web.sh" --patches
+
   # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
   # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
@@ -236,7 +276,7 @@ jobs:
   # covered by that one's, a docs-only push's included. A tag pushed with GITHUB_TOKEN starts no workflow: this run,
   # on the same commit, is its CI.
   tag:
-    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, emscripten]
+    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, emscripten]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')

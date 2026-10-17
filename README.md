@@ -28,7 +28,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 30†; 351* | 30†; 241* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 358* | 345* | 2026-10-17, v0.58.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 308* | 205* | 2026-10-17, v0.58.0 |
-| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 357* | 250* | 2026-10-16, v0.56.0 |
+| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 350* | 284* | 2026-10-17, v0.58.0 |
 | Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 357* | 342* | 2026-10-17, v0.58.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, Chrome in a window; * on a stand-in, newer than
@@ -267,8 +267,9 @@ The rest is what a link or a run of the page shows when it is missing:
 The patches are made on the upstream commits in `patches/patches.txt`, the ones the forks are built on. On every push
 CI applies them to the commits the recomps here pin (`patches/pins.txt`: Banjo-Kazooie, Majora's Mask, Donkey Kong 64
 with Killklli's runtime and RecompFrontend, Conker's Bad Fur Day, and GoldenEye 007, whose upstream predates
-RecompFrontend, so its web fork pins the commits the forks are built on), and builds every library of a page from
-Banjo-Kazooie's. What to expect from a recomp's own commits:
+RecompFrontend, so its web fork pins the commits the forks are built on), and over Diddy Kong Racing's web fork's own
+patches to its runtime and rt64 (DKR-R-web's `scripts/build_web.sh --patches`), and builds every library of a page
+from Banjo-Kazooie's. What to expect from a recomp's own commits:
 
 - Near those: they apply. Where the code around a change differs too much for `git apply`, `apply.cmake` merges three
   ways against the commit the patch was made on, fetched from the fork, and says so (Donkey Kong 64's RecompFrontend
