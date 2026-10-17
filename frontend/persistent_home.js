@@ -17,6 +17,12 @@
 // IndexedDB serializes what it stores on the thread that stores it, and that is the page's thread, WebGPU's: a 64 MB ROM
 // took 120 ms there in Chrome, a present held back as long. So a file of 1 MB or more is stored by a worker of its own,
 // given a copy (~20 ms for 64 MB), in the same form, and the next write back waits until the worker has stored it.
+//
+// The program's threads reach these files through calls the page's thread runs between its own tasks, so a write back
+// lists HOME only once IndexedDB has answered what it holds, and reads each file it stores in the same task. IDBFS lists
+// first, and a save finishing while IndexedDB answered (the runtime writes <save>.temp, copies it over the save and
+// deletes it) left a file listed that was gone when it was read: that write back reported ENOENT, while storing all the
+// rest.
 if (typeof document !== 'undefined') {
   Module['preRun'] = [].concat(Module['preRun'] || []);
   Module['preRun'].push(() => {
@@ -25,6 +31,17 @@ if (typeof document !== 'undefined') {
     let source = database;
     const getDB = IDBFS.getDB;
     IDBFS.getDB = (name, callback) => getDB(name === home ? source : name, callback);
+    IDBFS.syncfs = (mount, populate, callback) => IDBFS.getRemoteSet(mount, (error, remote) => {
+      if (error) return callback(error);
+      IDBFS.getLocalSet(mount, (error, local) => {
+        if (error) return callback(error);
+        IDBFS.reconcile(populate ? remote : local, populate ? local : remote, callback);
+      });
+    });
+    // An error as words: IDBFS hands back an FS.ErrnoError (a name and an errno, 44 is ENOENT) or a DOMException.
+    const describe = (error) => error && typeof error === 'object'
+      ? [error.name, error.message, 'errno' in error && 'errno ' + error.errno].filter(Boolean).join(', ')
+      : String(error);
 
     // The folder a path in HOME is kept by: HOME/<name>, or HOME/.<name>/<name>. None for HOME and its dot folders.
     const folderOf = (path) => {
@@ -106,7 +123,8 @@ if (typeof document !== 'undefined') {
               transaction.objectStore(store).put(entry, path);
               transaction.oncomplete = resolve;
               transaction.onerror = transaction.onabort = () => reject(transaction.error);
-            })).then(() => postMessage({ id }), (error) => postMessage({ id, path, error: String(error) }));
+            })).then(() => postMessage({ id }),
+                     (error) => postMessage({ id, path, error: error ? error.name + ', ' + error.message : 'aborted' }));
           };`;
         writer = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
         writer.onmessage = ({ data: { id, path, error } }) => {
@@ -128,7 +146,7 @@ if (typeof document !== 'undefined') {
     const read = (error) => {
       if (error) {
         // Never written back then, so what is stored is not replaced with an empty folder.
-        console.error('Could not read the saved files from IndexedDB, so nothing is saved this time: ' + error);
+        console.error('Could not read the saved files from IndexedDB, so nothing is saved this time: ' + describe(error));
       } else {
         syncing = false;
       }
@@ -156,7 +174,8 @@ if (typeof document !== 'undefined') {
       syncing = true;
       FS.syncfs(false, (error) => {
         if (error) {
-          console.error('Could not save files to IndexedDB: ' + error);
+          // The next write back stores whatever this one didn't: it compares the files with what IndexedDB holds.
+          console.error('Could not save files to IndexedDB: ' + describe(error));
         }
         // The shared database keeps a folder until the worker has stored its large files in the page's own too.
         Promise.all(writing.splice(0)).then((stored) => {
