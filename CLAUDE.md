@@ -32,6 +32,9 @@ A change here is one PR on this repo (`forks.txt`, `patches/`, `frontend/`, `ren
 It merges once CI is green and what it changes has been played (Changing it). Work found while doing other work is
 filed and not started, unless it is a critical fix (The pins).
 
+Work is prioritised by what it breaks: high for a crash, med for an issue that affects every game, low for an issue
+that affects one game.
+
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
 (`forks.txt` here, a game fork's submodule). `rush-2049-recomp` is the one game repo that works by PRs: moving its
