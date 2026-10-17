@@ -210,7 +210,7 @@ critical fix, a change to a game's repo or shader list) does all of this in the 
   is) as well as the usual one off the desktop, and gives the on-screen number: Windows never composites a window off
   the desktop, which flattered Firefox on Intel UHD. Its Chrome cell is played headless too, whose presents never wait
   for a compositor or display. Chrome's CPU throttling (CDP `Emulation.setCPUThrottlingRate`, 3) stands in for a
-  laptop's slower CPU, but isn't what holds Chrome at 51-55 there (docs/findings.md, A laptop, measured).
+  laptop's slower CPU, but isn't what held Chrome at 51-55 there on v0.46.0 (docs/findings.md, A laptop, measured).
 
 A new game gets a row in its port's work, its Recomp cell naming the upstream recomp and its owner ("[name](url) by
 owner"), from the fork's GitHub parent.
@@ -280,7 +280,9 @@ current in the same work as what changes it:
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
   another shows as the other page's climb and its "Out of Memory". play_page reads the GPU process's private bytes each
   sample, and in Firefox about:memory's split of them at the play's start and end (`gpuProcessMemory`); each read holds
-  Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory).
+  Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory). Which kind of WebGPU
+  work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
+  `--preload tools/webgpu_census.js` reads off the page.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never

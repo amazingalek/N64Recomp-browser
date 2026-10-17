@@ -28,7 +28,19 @@ the same page: 718 → 791 MB, levelling off. The page's WebGPU objects don't pi
 and what JavaScript collected held ~2,000 textures, ~5,000 bind groups (plume 97f4e64's 4,096 among them) and ~1,800
 command buffers alive over 6 minutes, making ~120 textures and ~250 command buffers a second. On a laptop's Intel UHD
 (Firefox 158, 1920x945) it grew a steady 3.5 MB a second, 2.1 GB in 10 minutes, the graphics' shared memory +740 MB:
-there every GPU allocation is system memory, and which part grows there is not read yet.
+there every GPU allocation is system memory. 600 s there on v0.58.0's page went 466 → 3142 MB, 4.47 MB a second and
+not levelling off: Firefox's heap 29 → 75, the system heap 50 → 1193, GPU committed 343 → 1699, shared 427 → 1688
+(Chrome headed 508 → 864 MB, flat after the first minutes).
+
+What the page does a second (`tools/webgpu_census.js`, Firefox 158, 1920x945, its attract race at 60 presents a
+second): 1,800-2,400 writeBuffers of 40-82 MB, 2,200-3,400 copyBufferToBuffer of 83-169 MB, one copyTextureToTexture
+of the 1920x945 scene a present (~420 MB), 30-230 textures made (mostly 4096x1 r8uint, TMEM, and tiles of 32x16 and
+smaller) and as many destroyed, 75-230 compute passes, ~240 render passes of 15,000-30,000 indexed draws, ~250
+command buffers each submitted alone and ~60 empty submits, 30-170 bind groups made, and no writeTexture, mapAsync or
+createBuffer. `tools/gpu_growth.mjs` plays each kind alone in a test page at those rates: on the RTX 2070 (a busy
+host, then a quiet one) none grew the GPU process more than 0.71 MB a second over 60 s, all of them at once 0.45, the
+canvas alone 0.27, Firefox's own heap nearly all of it, and leaving the page gave it back. So on a desktop GPU no kind
+grows it; the laptop, where the page grows 4.47 MB a second, is where a kind would show.
 
 ## Two pages at once
 
@@ -145,13 +157,49 @@ times Chrome's gaps over 100 ms.
 - Chrome sat at 51-55 in six games with the Intel GPU at most 70% busy and the browser and the host far from busy, so a
   slow CPU isn't what holds it, and Chrome's 3x CPU throttling (CLAUDE.md, The games table) doesn't stand in for it: Conker drew
   more that way on the desktop than on the laptop. RT64 paced Conker in Chrome 3 times; the other 54s are unexplained.
+  On v0.58.0 it drew 58-60 there (below).
 - Maximized on the desktop at its 200% (the runs noted "part C"), instead of off it, Firefox's Intel load rose ~30
   points, its GPU process's CPU 1.4-4.6 times, and Conker's presents fell and its boot wait doubled; Chrome stayed
-  within 2 presents. So an off-desktop Firefox run on a laptop reads better than a player's visit. Chrome maximized
+  within 2 presents. So an off-desktop Firefox run on a laptop reads better than a player's visit. On screen Firefox
+  redraws the canvas into its window at device pixels each frame (WebGPU in Chrome and Firefox, below). Chrome maximized
   there had a viewport of 1920x889, Firefox 1920x947: a plan's clicks at another `--size` missed Load ROM.
 - In 10 minutes of Rush 2049 Firefox held 55-60, its callbacks ~20 ms late (30-42 where the Intel GPU reached ~97%),
   the cap moving to 3 at 106 s and 4 at 140 s, while its GPU process's private memory grew from 1.05 to 3.14 GB, near
   linearly, and the adapter's shared memory by 740 MB.
+
+On 2026-10-17, the same laptop played nine pages from Pages, all built on v0.58.0 (Chrome 155, Firefox 158, plugged
+in, best power efficiency, Windows' global timer at 1 ms set by something already running, the host 1-13% busy before
+each run), cold, each game's play plan: plays.jsonl's 79 runs of that date noted "laptop report", failed ones
+included, those noted "onscreen" giving the README's cells. No run that played had a WebGPU error or exception.
+
+- Off the desktop (1920x945) Chrome headed drew 58.2-60.1 in all nine and headless the same within a present, where on
+  v0.46.0 it sat at 51-55. Firefox drew 59.7-59.9 in Banjo, Majora's Mask, Donkey Kong 64 and Wave Race 64 (20-30 on
+  v0.46.0), 58.0 in Pilotwings 64, 55.6 in Rush 2049, 51.4 and 51.5 in Conker, 42.6 in Banjo-Tooie, and 64.0 in
+  GoldenEye, above the 60 Hz display, with 60 animation frames a second.
+- On screen (maximized at 200%, ~3840x1780 device pixels) Chrome drew 53-60 (Conker 53.4, Rush 2049 57.4, Banjo-Tooie
+  59.2, the rest 59.9-60.1) with the Intel GPU 65-95% busy, and Firefox 21-38 with it 97-100% busy (Banjo 85%, paced
+  to its 30): Firefox is GPU-bound there on frames Chrome draws within the GPU's time.
+- What Chrome loses on screen isn't RT64's pixels. A page's canvas is CSS-sized (no `SDL_WINDOW_ALLOW_HIGHDPI`), so at
+  200% its drawing buffer is the viewport's 1920x889, not its device pixels (headless Chrome at device scale 2 and 1
+  read back the same buffer), and Auto draws the same multiple of the game's lines there as at 1920x945: Conker's
+  2334x1080, 5 times its 216 (`pass_probe.js` on the stand-in at 1920x889, uncapped: 1.51 ms of GPU passes a present,
+  90% of it the scene's 6 passes at that size). What is new on screen is the composition, Chrome scaling the canvas to
+  the window's device pixels and Windows compositing the 3840x2160 desktop, on the same GPU: the Intel GPU was 3-14
+  points busier on screen than headed off the desktop (Rush 2049 84 to 95%, GoldenEye 68 to 81, Majora's Mask 63 to
+  77, Donkey Kong 64 57 to 65). The pages with room to spare stayed at 60. Conker, 87% busy off the desktop, fell to
+  49-58, and Rush 2049's race, already 98-100% busy off the desktop at 53-58, to 39-46 (its median, 57.4, is mostly
+  the stretches at 60). Banjo-Tooie drew no worse on screen (59.2 against 58.8 headed and 58.4 headless); its 20-30
+  are the same part of its plan in every run, uncapped too.
+- Firefox waited 4-22 s a play for shaders, which make nearly all its gaps of seconds; Chrome waited for none at the
+  display's rate.
+- plume's probe of a timed wait of 100 us read 6-14 ms in every Firefox run with Windows' global timer at 1 ms: neither
+  1 ms nor the 15.6 ms tick, and different from run to run.
+- Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
+  88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
+  67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
+  Banjo-Tooie take more than 1/60 s of this GPU a frame in either browser.
+- Over 600 s of Rush 2049 Firefox's GPU process grew from 466 to 3142 MB, still near linearly (about:memory:
+  systemHeap +1143 MB, gpuShared +1261, heap +46), and Chrome's from 508 to 864, most of it in the first minutes.
 
 ## WebGPU in Chrome and Firefox
 
@@ -162,6 +210,16 @@ times Chrome's gaps over 100 ms.
   costs the same either way. Firefox 157 with a `bgra8unorm` canvas filled an 8 GB card and fell below a frame a
   second, which is why the pages were `rgba8unorm` before; Firefox 158 plays 55-60 frames a second at 3840x2000 in it
   for 15 minutes and more.
+- How Firefox (its source, October 2026) puts that canvas on screen on Windows: wgpu draws into a D3D11 texture
+  shared with WebRender, no copy, but WebRender then draws it every frame into the window's own swap chain at device
+  pixels (a 1920x947 canvas at 200% is 3840x1894 of it), blended over what is behind it: a WebGPU canvas is always
+  treated as having alpha (`alphaMode` isn't applied to how it is shown, bug 1846605). Its own DirectComposition
+  visual, which Windows scales and can put on a hardware overlay, comes only with
+  `gfx.webrender.dcomp-texture-overlay-win` (Windows 11 22H2 and later, read at startup), on by default in 149 and
+  off again on release since 2026-05 (bug 2036365, slow composites; bug 2038378 is to turn it back on). Nothing a page
+  sets turns it on: `alphaMode`, the canvas's size against its CSS size and covering the window change nothing in
+  that path; `image-rendering` other than `auto`, a filter, opacity, a blend mode or a 3D transform on the canvas
+  or above it keep it off even with the pref. `play_page.mjs --firefox-pref` plays a page with one set.
 - Chrome builds a pipeline made with `createRenderPipeline` on its GPU process's main thread, which does nothing
   else meanwhile: no frame, no readback, no screenshot, and the page's main thread blocks once its queue to the GPU
   process fills. A specialized RasterPS (1.15 MB of WGSL) takes 1.4-2.1 s there, 6-11 s cold beside another build,

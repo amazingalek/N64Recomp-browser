@@ -4,7 +4,7 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>]
-//     [--gecko-profile <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -26,6 +26,10 @@
 // 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
 // --preload runs a JavaScript file of your own in every document before the page's scripts, after play_page's own
 // (a probe that wraps a WebGPU call, a stand-in for a slow GPU's callbacks): its console lines come out with the rest.
+// --firefox-pref (Firefox only, repeated for more) sets one of Firefox's prefs in the profile before it starts, its value
+// JSON where it parses (true, 0) and a string otherwise: a compositor path to try on a laptop's screen
+// (gfx.webrender.dcomp-texture-overlay-win, docs/findings.md, A laptop, measured). A run records its prefs and is
+// compared only with runs that set the same ones.
 // --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
@@ -111,6 +115,12 @@ const build = option(args, '--build', null);
 const note = option(args, '--note', null);
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
+const firefoxPrefs = {};
+for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
+  const [name, value] = [pref.slice(0, pref.indexOf('=')), pref.slice(pref.indexOf('=') + 1)];
+  if (!pref.includes('=') || !name) { console.error('--firefox-pref needs <name>=<value>'); process.exit(1); }
+  try { firefoxPrefs[name] = JSON.parse(value); } catch { firefoxPrefs[name] = value; }
+}
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg (publish_pages.sh\'s names)');
   process.exit(1);
@@ -118,10 +128,11 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--gecko-profile <file>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
+if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
@@ -295,8 +306,8 @@ const server = /^https?:\/\//.test(where) ? null : serve(where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, onScreen, uncapped, cpuThrottle, onLine, log });
-log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}`);
+  preload, headed, onScreen, uncapped, cpuThrottle, firefoxPrefs, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 const samples = [];
@@ -460,7 +471,8 @@ if (recordFile) {
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
   const run = {
     time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
-    ...(onScreen ? { onScreen, devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    ...(onScreen ? { onScreen, devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}),
+    ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
@@ -487,7 +499,7 @@ function compare(run, lines) {
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
       like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && !p.uncapped === !run.uncapped && !p.onScreen === !run.onScreen &&
-      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1))
+      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}))
     .slice(-5);
   if (!before.length) {
     console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);
