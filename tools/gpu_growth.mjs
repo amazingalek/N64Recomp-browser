@@ -23,7 +23,7 @@ const args = process.argv.slice(2);
 const dir = path.dirname(fileURLToPath(import.meta.url));
 // The page's kinds, read from its table of them, so the two can't differ.
 const pageKinds = ['present', ...[...fs.readFileSync(path.join(dir, 'gpu_growth.html'), 'utf8').split('const kinds = {')[1].split('};')[0]
-  .matchAll(/^s+(w+): {/gm)].map((m) => m[1]), 'all'];
+  .matchAll(/^\s+(\w+): \{/gm)].map((m) => m[1]), 'all'];
 const kinds = (option(args, '--kinds') ?? pageKinds.join(',')).split(',');
 for (const kind of kinds) if (!pageKinds.includes(kind)) throw new Error(`no kind ${kind}: ${pageKinds.join(', ')}`);
 const seconds = Number(option(args, '--seconds', 120));
