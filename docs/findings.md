@@ -409,6 +409,14 @@ The measurements behind rules CLAUDE.md states without them.
 - Firefox's `\GPU Process Memory(*)\Dedicated Usage` climbs by a canvas a frame, past a terabyte in 15 minutes, while
   the adapter's counter and nvidia-smi hold flat and the page plays on. Conker's page filling video memory in Firefox
   beside another page showed as the other page's climb and its "Out of Memory".
+- A pair of runs before and after a build is not enough to call it slower: the retest on v0.58.0 played Pilotwings 64
+  in Firefox uncapped at 175-192 presents a second against 201-211 for Pages played beside it, one run before and one
+  after, a quiet host, and the page was held back. The next morning 19 runs interleaved over 18 minutes, Pages, a local
+  build of v0.56.0 (the same bytes), v0.58.0 and each of its two changes alone, read 159-193 with no build below
+  another: v0.56.0 171-173, Pages 162-171, v0.58.0 159-185, the worker pool alone 166-193, the held messages alone
+  160-175 (all of them some 15% under the night before), and v0.58.0 was published. The same
+  page moves by 10% between runs minutes apart and by more over hours, so a build is compared with several runs of the
+  old one taken in the same minutes, never one pair.
 - Build times: for Rush 2049 the build went from 590-810 s to 382 s with ccache, and 116 s with the fast link (its
   CLAUDE.md, Step 3). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
   Mask's 150 of 932, with the other two building beside it), and a second fresh dir of the same game 753, 673 and 932.
