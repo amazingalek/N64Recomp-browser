@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 4cced71a7eb7e999d720f914d8a75134c7f1bbf8
+rt64: https://github.com/amazingalek/rt64-web 8a2c6a7efdf7572b3af8f9bd9c5bd278abd8f12f
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1162,7 +1162,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..75dd714 100644
+index 3227ab1..98446c5 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1183,8 +1183,8 @@ index 3227ab1..75dd714 100644
 +#   if defined(__EMSCRIPTEN__)
 +        // A page opened with ?uncapped measures how many presents a second it can make: plume reports the display's rate
 +        // as the query's (360), the frames are interpolated to it, and none are paced (pace()), so that what the GPU
-+        // and the browser can take is what is presented. Each interpolated frame is a color target of the output's size
-+        // kept for a game frame: 17 for a 20 fps game at 360, ~530 MB at 3840x2000.
++        // and the browser can take is what is presented. The interpolated frames take turns in 8 color targets of the
++        // game's framebuffer at the output's scale (WorkloadQueue's InterpolatedTargetSlots), 0.25-0.55 GB at 3840x2000.
 +        uncapped = MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('uncapped') ? 1 : 0; }) != 0;
 +#   endif
 +
@@ -1204,7 +1204,17 @@ index 3227ab1..75dd714 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -391,8 +409,31 @@ namespace RT64 {
+@@ -287,7 +305,8 @@ namespace RT64 {
+ 
+                 if (i < framesToPresent) {
+                     uint32_t targetIndex = usingMSAA ? i : (i - 1);
+-                    colorTarget = ext.sharedResources->interpolatedColorTargets[targetIndex].get();
++                    const auto &interpolatedTargets = ext.sharedResources->interpolatedColorTargets;
++                    colorTarget = interpolatedTargets[targetIndex % interpolatedTargets.size()].get();
+                 }
+                 else {
+                     colorTarget = nullptr;
+@@ -391,8 +410,31 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1236,7 +1246,7 @@ index 3227ab1..75dd714 100644
  
                  if (presentWaitEnabled) {
                      ext.swapChain->wait();
-@@ -416,6 +457,131 @@ namespace RT64 {
+@@ -416,6 +458,131 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1368,7 +1378,7 @@ index 3227ab1..75dd714 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +676,10 @@ namespace RT64 {
+@@ -510,6 +677,10 @@ namespace RT64 {
                      continue;
                  }
  
@@ -1919,7 +1929,7 @@ index 8ea27d5..f97f6c6 100644
  
          void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..1e6b70d 100644
+index 5a331aa..3c5bbef 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -2059,7 +2069,7 @@ index 5a331aa..1e6b70d 100644
                  if (useDifferentCounters) {
                      ext.sharedResources->interpolatedFramesIndex = ext.sharedResources->interpolatedFramesIndex ^ 1;
                      lastPresentId = workload.presentId;
-@@ -1037,10 +1075,12 @@ namespace RT64 {
+@@ -1037,16 +1075,26 @@ namespace RT64 {
                  }
  
                  InterpolatedFrameCounters &curFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -2076,18 +2086,98 @@ index 5a331aa..1e6b70d 100644
  
                  // Create as many render targets as required to store the interpolated targets.
                  auto &interpolatedTargets = ext.sharedResources->interpolatedColorTargets;
-@@ -1133,6 +1173,10 @@ namespace RT64 {
-                         {
-                             std::scoped_lock<std::mutex> cursorLock(cursorMutex);
-                             skipWorkloadNow = ((frame + 1) < displayFrames) && (writeCursor != threadCursor);
-+#                       if RT64_OFFSCREEN_WORKLOADS
-+                            // An offscreen pass alone is the start of the next frame, not the frame: these frames go on.
-+                            skipWorkloadNow = skipWorkloadNow && !(workloads[threadCursor].offscreenOnly && (int((threadCursor + 1) % workloads.size()) == writeCursor));
+                 const bool usingMSAA = (ext.sharedResources->renderTargetManager.multisampling.sampleCount > 1);
+                 const bool usesHDR = ext.sharedResources->renderTargetManager.usesHDR;
+                 uint32_t requiredFrames = (usingMSAA && generateInterpolatedFrames) ? displayFrames : (displayFrames - 1);
++#           if defined(__EMSCRIPTEN__)
++                // At most InterpolatedTargetSlots targets, used in turn: a frame past them waits for the frame drawn into its
++                // target to be presented. RT64 keeps a target for every display frame of a game frame and never frees one,
++                // so a page held as many as the slowest game frame of the visit took display frames: GoldenEye's targets
++                // are 5702x2970 (68 MB) at a 3840x2000 canvas, and ?uncapped (360 Hz) in Dam at ~8 fps kept 42 of them,
++                // 2.8 GB, until Firefox's device ran out of memory. At 60 Hz a game frame takes more only below 7.5 fps.
++                requiredFrames = std::min(requiredFrames, InterpolatedTargetSlots);
++#           endif
+                 if ((requiredFrames > 0) && (interpolatedTargets.size() < requiredFrames)) {
+                     uint32_t previousSize = uint32_t(interpolatedTargets.size());
+                     interpolatedTargets.resize(requiredFrames);
+@@ -1063,6 +1111,15 @@ namespace RT64 {
+                 bool skipWorkloadNow = false;
+                 uint32_t targetIndex = 0;
+                 uint32_t framesRendered = 0;
++                auto newerWorkloadQueued = [&]() {
++                    std::scoped_lock<std::mutex> cursorLock(cursorMutex);
++                    bool newer = (writeCursor != threadCursor);
++#               if RT64_OFFSCREEN_WORKLOADS
++                    // An offscreen pass alone is the start of the next frame, not the frame: these frames go on.
++                    newer = newer && !(workloads[threadCursor].offscreenOnly && (int((threadCursor + 1) % workloads.size()) == writeCursor));
++#               endif
++                    return newer;
++                };
+                 int64_t renderTimeTotalMicro = 0;
+                 for (uint32_t frame = 0; (frame < displayFrames) && !skipWorkloadNow; frame++) {
+                     // Evaluate if this frame should be skipped. Measure the current time and compare it to what frame is estimated should be have been rendered by now.
+@@ -1086,15 +1143,43 @@ namespace RT64 {
+ 
+                         // Override the render target.
+                         if (usingMSAA || (frame > 0)) {
+-                            overrideTarget = interpolatedTargets[targetIndex].get();
+-                            overrideModifier = (targetIndex + 1);
++                            // The targets are used in turn when there are fewer than the frames (InterpolatedTargetSlots).
++                            const uint32_t targetSlots = uint32_t(interpolatedTargets.size());
++                            const uint32_t targetSlot = targetIndex % targetSlots;
++                            overrideTarget = interpolatedTargets[targetSlot].get();
++                            overrideModifier = (targetSlot + 1);
++
++#                       if defined(__EMSCRIPTEN__)
++                            if (targetIndex >= targetSlots) {
++                                // Wait until this workload's own frame drawn into the target has been presented, unless a newer
++                                // workload is waiting: then the rest of this one's frames are skipped, as they are after a frame.
++                                std::unique_lock<std::mutex> interpolatedLock(ext.sharedResources->interpolatedMutex);
++                                while ((curFrameCounters.presented <= (targetIndex - targetSlots)) && !skipWorkloadNow) {
++                                    ext.sharedResources->interpolatedCondition.wait_for(interpolatedLock, std::chrono::milliseconds(5));
++                                    if (curFrameCounters.presented <= (targetIndex - targetSlots)) {
++                                        interpolatedLock.unlock();
++                                        skipWorkloadNow = newerWorkloadQueued();
++                                        interpolatedLock.lock();
++                                    }
++                                }
++
++                                if (skipWorkloadNow) {
++                                    curFrameCounters.skipped = true;
++                                    interpolatedLock.unlock();
++                                    displayTicks += workload.viOriginalRate * (displayFrames - (frame + 1));
++                                    ext.sharedResources->interpolatedCondition.notify_all();
++                                    continue;
++                                }
++                            }
 +#                       endif
-                         }
+ 
+-                            if (useDifferentCounters && (prevFrameCounters.available > 0) && (targetIndex < prevFrameCounters.available)) {
++                            if (useDifferentCounters && (prevFrameCounters.available > targetSlot)) {
+                                 // Wait until the target has finished presenting if the alternate frame counter (used by the present queue) is making use of this target.
++                                const uint32_t prevTargetIndex = targetSlot + ((prevFrameCounters.available - 1 - targetSlot) / targetSlots) * targetSlots;
+                                 std::unique_lock<std::mutex> interpolatedLock(ext.sharedResources->interpolatedMutex);
+                                 ext.sharedResources->interpolatedCondition.wait(interpolatedLock, [&]() {
+-                                    frameReduction = frameReduction || (prevFrameCounters.presented <= targetIndex);
+-                                    return prevFrameCounters.presented > targetIndex;
++                                    frameReduction = frameReduction || (prevFrameCounters.presented <= prevTargetIndex);
++                                    return prevFrameCounters.presented > prevTargetIndex;
+                                 });
+                             }
+ 
+@@ -1130,10 +1215,7 @@ namespace RT64 {
+ 
+                     // For every additional frame, we increase the frames available and notify the present queue.
+                     if (generateInterpolatedFrames && (usingMSAA || (frame > 0))) {
+-                        {
+-                            std::scoped_lock<std::mutex> cursorLock(cursorMutex);
+-                            skipWorkloadNow = ((frame + 1) < displayFrames) && (writeCursor != threadCursor);
+-                        }
++                        skipWorkloadNow = ((frame + 1) < displayFrames) && newerWorkloadQueued();
  
                          {
-@@ -1164,7 +1208,16 @@ namespace RT64 {
+                             std::scoped_lock<std::mutex> managerLock(ext.sharedResources->interpolatedMutex);
+@@ -1164,7 +1246,16 @@ namespace RT64 {
  
                  threadConfigurationValidate();
  
@@ -2106,10 +2196,10 @@ index 5a331aa..1e6b70d 100644
                  }
  
 diff --git a/src/hle/rt64_workload_queue.h b/src/hle/rt64_workload_queue.h
-index bde2f03..9fb1c05 100644
+index bde2f03..6fdaddb 100644
 --- a/src/hle/rt64_workload_queue.h
 +++ b/src/hle/rt64_workload_queue.h
-@@ -23,7 +23,16 @@
+@@ -23,11 +23,26 @@
  #   include "render/rt64_raytracing_shader_cache.h"
  #endif
  
@@ -2127,6 +2217,16 @@ index bde2f03..9fb1c05 100644
  
  namespace RT64 {
      struct PresentQueue;
+ 
++#if defined(__EMSCRIPTEN__)
++    // How many color targets a page's interpolated frames take turns in (WorkloadQueue::renderThreadLoop): 8 hold every
++    // interpolated frame of a 7.5 fps game at 60 Hz, and ?uncapped's 360 Hz presents as many with any number.
++    constexpr uint32_t InterpolatedTargetSlots = 8;
++#endif
++
+     struct WorkloadQueue {
+         struct External {
+             RenderDevice *device = nullptr;
 diff --git a/src/render/rt64_descriptor_sets.h b/src/render/rt64_descriptor_sets.h
 index 69a82ac..1dd31f7 100644
 --- a/src/render/rt64_descriptor_sets.h
