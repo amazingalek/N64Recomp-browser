@@ -17,7 +17,8 @@
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, DKR-R's web/): launcher, ROM, Start Game,
-#    then 20 s of the game running by itself, which has to present frames with no WebGPU error. Each run goes into
+#    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (CLAUDE.md,
+#    Playing a page), which has to present frames with no WebGPU error. Each run goes into
 #    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
@@ -349,7 +350,7 @@ for g in "${published[@]}"; do
     git -C "$clone" archive origin/main $(git -C "$clone" ls-tree --name-only origin/main tools web) | tar xf - -C "$work/$g-tools"
     plan="$work/$g-tools/tools/shader_plan.json"
     [[ -f "$plan" ]] || plan="$work/$g-tools/web/shader_plan.json"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --port $((20000 + RANDOM % 9000)) \
+    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 --port $((20000 + RANDOM % 9000)) \
         --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true
@@ -366,7 +367,7 @@ if [[ -n "$browser" ]]; then
     echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
     for g in "${differ[@]}"; do
         read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n $PAGES_COPY ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
+        echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n ${PAGES_COPY:-} ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
     done
 fi
 $dry_run && { echo "dry run: nothing published"; [[ ${#failed[@]} -eq 0 ]]; exit; }
