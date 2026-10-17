@@ -189,6 +189,11 @@ rt64 0560318           it), its depth bounds drawn twice through the stencil, no
                        58.2 passes a present 4.7, Firefox 158 uncapped 117-121 → 189-206
 plume 795cadf, 2950009 on WebGPU the ubershader's pipelines built behind the launcher; a build matching one in flight
 rt64 977ddca           waits for it
+rt64 85a6ad5           on WebGPU the spec constant shaders are the flat pair (the shading mode is a spec constant), and
+                       RasterPS for the browser keeps the ubershader's loops (SPEC_CONSTANT_LOOPS), 250 KB of WGSL for
+                       two of 670: Chrome's GPU main thread parsed them before the launcher's first presents, GoldenEye's
+                       held 1643-1814 → 427-451 ms, Donkey Kong 64's 1092-1235 → under 100 (docs/findings.md, The
+                       launcher), and a page's wasm is 4.4 MB smaller
 RecompFrontend cfd443b on a page the menus' upload buffers unmapped with the bytes the CPU wrote: plume's WebGPU unmap()
                        copies the whole buffer otherwise (writeBuffer), recompui's 1 MB upload buffer at every present
                        (98% of the launcher's bytes) and its image copy buffer, as large as the largest image yet (94 MB
