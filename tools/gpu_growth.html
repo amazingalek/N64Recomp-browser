@@ -1,0 +1,208 @@
+<!doctype html>
+<!--
+  A test page that does one kind of a recomp page's WebGPU work at the rate the page does it, to find which kind grows a
+  browser's GPU process: gpu_growth.mjs plays it a kind at a time and reads the process's memory around each (its
+  header). ?kind= is one of the kinds below, or "all" for every one at once; ?rate= and ?kb= replace the kind's calls
+  and KB a second. Every kind presents a canvas the size of the window each animation frame, drawn from a scene
+  texture of the same size, and submits nothing else when it has nothing to do ("present" does only that). It logs
+  "gpu_growth:" lines: the rates it reached every 10 s, and any WebGPU error.
+
+  The defaults are Rush 2049's page's (webgpu_census.js, Firefox 158, 1920x945, its attract race at 60 presents a
+  second, 2026-10-17), which makes no writeTexture, mapAsync or createBuffer calls there.
+-->
+<meta charset="utf-8">
+<title>gpu_growth</title>
+<style>html, body { margin: 0; height: 100%; overflow: hidden; background: #000 } canvas { width: 100%; height: 100%; display: block }</style>
+<canvas id="canvas"></canvas>
+<script type="module">
+// Each kind: its calls (and KB, where it moves memory) a second, and what one call is.
+//   textures    a texture made, filled by copyBufferToTexture, drawn from into the scene, and destroyed once 1,500
+//               newer ones are alive (Rush's ~180-1,750), half 4096x1 r8uint (RT64's TMEM) and half 32x16 rgba8unorm
+//   writeBuffer a writeBuffer into one of 8 buffers of 8 MB that the passes' draws read
+//   copies      a copyBufferToBuffer between those buffers, and 1 a present of copyTextureToTexture of the scene
+//   compute     a compute pass of one dispatch, 4 workgroups of 64, over a storage buffer
+//   passes      a render pass into the scene of `draws` indexed draws, each setting 2 bind groups
+//   bindGroups  a bind group made, used by a draw and dropped
+//   submits     a command buffer of its own (the frame's work split among them), and 1 empty submit a present
+//   workDone    an onSubmittedWorkDone call
+const kinds = {
+  textures: { rate: 120 },
+  writeBuffer: { rate: 2300, kb: 80000 },
+  copies: { rate: 3300, kb: 165000 },
+  compute: { rate: 180 },
+  passes: { rate: 240, draws: 100 },
+  bindGroups: { rate: 100 },
+  submits: { rate: 250 },
+  workDone: { rate: 60 },
+};
+const params = new URLSearchParams(location.search);
+const kind = params.get('kind') ?? 'present';
+if (kind !== 'present' && kind !== 'all' && !kinds[kind]) throw new Error(`no kind ${kind}`);
+const on = (name) => kind === 'all' || kind === name;
+if (kinds[kind] && params.has('rate')) kinds[kind].rate = Number(params.get('rate'));
+if (kinds[kind] && params.has('kb')) kinds[kind].kb = Number(params.get('kb'));
+const log = (text) => console.log('gpu_growth: ' + text);
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+device.addEventListener('uncapturederror', (e) => log('error: ' + e.error.message));
+device.lost.then((info) => log('device lost: ' + info.message));
+const queue = device.queue;
+const canvas = document.getElementById('canvas');
+const width = canvas.width = Math.round(innerWidth * devicePixelRatio);
+const height = canvas.height = Math.round(innerHeight * devicePixelRatio);
+const context = canvas.getContext('webgpu');
+const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+context.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
+
+const module = device.createShaderModule({ code: `
+  @group(0) @binding(0) var s: sampler;
+  @group(0) @binding(1) var t: texture_2d<f32>;
+  @group(1) @binding(0) var tmem: texture_2d<u32>;
+  struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
+  @vertex fn fullscreen(@builtin(vertex_index) i: u32) -> Out {
+    let uv = vec2f(f32((i << 1) & 2), f32(i & 2));
+    return Out(vec4f(uv * 2 - 1, 0, 1), uv);
+  }
+  @vertex fn buffered(@location(0) p: vec2f) -> Out { return Out(vec4f(fract(p) * 0.02 - 0.01, 0, 1), fract(p)); }
+  @fragment fn sampled(in: Out) -> @location(0) vec4f { return textureSample(t, s, in.uv) * 0.99 + vec4f(0.004); }
+  @fragment fn loaded(in: Out) -> @location(0) vec4f {
+    return vec4f(f32(textureLoad(tmem, vec2u(u32(in.uv.x * 4095) % 4096, 0), 0).r) / 255) * textureSample(t, s, in.uv);
+  }` });
+
+const sampledLayout = device.createBindGroupLayout({ entries: [
+  { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+  { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} }] });
+const tmemLayout = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } }] });
+const vertexLayout = { arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] };
+const pipeline = (format, vertex, fragment, layouts) => device.createRenderPipeline({
+  layout: device.createPipelineLayout({ bindGroupLayouts: layouts }),
+  vertex: { module, entryPoint: vertex ? 'buffered' : 'fullscreen', buffers: vertex ? [vertexLayout] : [] },
+  fragment: { module, entryPoint: fragment, targets: [{ format }] } });
+const presentPipeline = pipeline(canvasFormat, false, 'sampled', [sampledLayout]);
+const scenePipeline = pipeline('rgba8unorm', false, 'sampled', [sampledLayout]);
+const drawPipeline = pipeline('rgba8unorm', true, 'loaded', [sampledLayout, tmemLayout]);
+const computePipeline = device.createComputePipeline({ layout: 'auto', compute: { entryPoint: 'step', module: device.createShaderModule({ code: `
+  @group(0) @binding(0) var<storage, read_write> words: array<u32>;
+  @compute @workgroup_size(64) fn step(@builtin(global_invocation_id) id: vec3u) { words[id.x] = words[id.x] * 1664525 + 1013904223; }` }) } });
+const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+const texture = (w, h, format = 'rgba8unorm', usage = 0) => device.createTexture({ size: [w, h], format,
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | usage });
+const sampledGroup = (t) => device.createBindGroup({ layout: sampledLayout, entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: t.createView() }] });
+const tmemGroup = (t) => device.createBindGroup({ layout: tmemLayout, entries: [{ binding: 0, resource: t.createView() }] });
+
+const scene = texture(width, height, 'rgba8unorm', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC);
+const sceneCopy = texture(width, height);
+const sceneGroup = sampledGroup(scene);
+const tile = texture(32, 16);
+const tileGroup = sampledGroup(tile);
+const tmem = texture(4096, 1, 'r8uint');
+const fixedTmemGroup = tmemGroup(tmem);
+const bytes = new Uint8Array(1 << 20).map((_, i) => i * 37);
+queue.writeTexture({ texture: tile }, bytes, { bytesPerRow: 128 }, [32, 16]);
+queue.writeTexture({ texture: tmem }, bytes, { bytesPerRow: 4096 }, [4096, 1]);
+const big = 8 << 20;
+const buffers = Array.from({ length: 8 }, () => device.createBuffer({ size: big,
+  usage: GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+const indices = device.createBuffer({ size: 3000 * 4, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
+queue.writeBuffer(indices, 0, new Uint32Array(3000).map((_, i) => (i * 7) % 3000));
+for (const b of buffers) queue.writeBuffer(b, 0, new Float32Array(6000).map(() => Math.random()));
+const storage = device.createBuffer({ size: 256 * 4 * 4, usage: GPUBufferUsage.STORAGE });
+const computeGroup = device.createBindGroup({ layout: computePipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: storage } }] });
+const made = [];
+
+// Calls a kind is due this frame, from its rate and the time since the last frame, so the rate holds at any frame rate.
+const owed = {};
+const done = {};
+let elapsed = 0;
+const due = (name) => {
+  if (!on(name)) return 0;
+  owed[name] = (owed[name] ?? 0) + kinds[name].rate * elapsed;
+  const n = Math.floor(owed[name]);
+  owed[name] -= n;
+  done[name] = (done[name] ?? 0) + n;
+  return n;
+};
+// One call's bytes, a multiple of 4 and at least 4.
+const each = (name) => Math.max(4, Math.floor(kinds[name].kb * 1024 / kinds[name].rate / 4) * 4);
+const at = (size) => Math.floor(Math.random() * (big - size) / 256) * 256;
+
+let last = performance.now();
+let reported = last;
+let frames = 0;
+const frame = () => {
+  const now = performance.now();
+  elapsed = Math.min((now - last) / 1000, 0.25);
+  last = now;
+  frames++;
+  const encoders = [device.createCommandEncoder()];
+  const draws = [];
+  for (let i = due('textures'); i > 0; i--) {
+    const t = i % 2 ? texture(4096, 1, 'r8uint') : texture(32, 16);
+    encoders[0].copyBufferToTexture({ buffer: buffers[i % 8], bytesPerRow: i % 2 ? 4096 : 256 }, { texture: t }, i % 2 ? [4096, 1] : [32, 16]);
+    const group = i % 2 ? tmemGroup(t) : sampledGroup(t);
+    draws.push((pass) => {
+      pass.setPipeline(i % 2 ? drawPipeline : scenePipeline);
+      if (i % 2) { pass.setBindGroup(0, tileGroup); pass.setBindGroup(1, group); pass.setVertexBuffer(0, buffers[0]); pass.setIndexBuffer(indices, 'uint32'); pass.drawIndexed(30); }
+      else { pass.setBindGroup(0, group); pass.draw(3); }
+    });
+    made.push(t);
+    if (made.length > 1500) made.shift().destroy();
+  }
+  for (let i = due('writeBuffer'), size = each('writeBuffer'); i > 0; i--) queue.writeBuffer(buffers[i % 8], at(size), bytes, 0, Math.min(size, bytes.length));
+  for (let i = due('copies'), size = each('copies'); i > 0; i--) encoders[0].copyBufferToBuffer(buffers[i % 8], at(size), buffers[(i + 3) % 8], at(size), size);
+  if (on('copies')) encoders[0].copyTextureToTexture({ texture: scene }, { texture: sceneCopy }, [width, height]);
+  for (let i = due('compute'); i > 0; i--) {
+    const pass = encoders[0].beginComputePass();
+    pass.setPipeline(computePipeline);
+    pass.setBindGroup(0, computeGroup);
+    pass.dispatchWorkgroups(4);
+    pass.end();
+  }
+  for (let i = due('bindGroups'); i > 0; i--) {
+    const group = tmemGroup(tmem);
+    draws.push((pass) => { pass.setPipeline(drawPipeline); pass.setBindGroup(0, tileGroup); pass.setBindGroup(1, group);
+      pass.setVertexBuffer(0, buffers[1]); pass.setIndexBuffer(indices, 'uint32'); pass.drawIndexed(30); });
+  }
+  // The passes kind's own passes, the frame's command buffers split among them; a frame's other draws go in the first.
+  const commandBuffers = due('submits');
+  for (let i = 1; i < commandBuffers; i++) encoders.push(device.createCommandEncoder());
+  const passes = Math.max(draws.length ? 1 : 0, due('passes'));
+  for (let p = 0; p < passes; p++) {
+    const pass = encoders[p % encoders.length].beginRenderPass({ colorAttachments: [{ view: scene.createView(), loadOp: 'load', storeOp: 'store' }] });
+    if (on('passes')) {
+      pass.setPipeline(drawPipeline);
+      pass.setVertexBuffer(0, buffers[p % 8]);
+      pass.setIndexBuffer(indices, 'uint32');
+      for (let d = 0; d < kinds.passes.draws; d++) {
+        pass.setBindGroup(0, tileGroup);
+        pass.setBindGroup(1, fixedTmemGroup);
+        pass.drawIndexed(30, 1, (d * 30) % 2970);
+      }
+    }
+    if (p === 0) for (const draw of draws) draw(pass);
+    pass.end();
+  }
+  // The present: the scene drawn onto the canvas.
+  const pass = encoders.at(-1).beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(),
+    loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }] });
+  pass.setPipeline(presentPipeline);
+  pass.setBindGroup(0, sceneGroup);
+  pass.draw(3);
+  pass.end();
+  for (const e of encoders) queue.submit([e.finish()]);
+  if (on('submits')) queue.submit([]);
+  for (let i = due('workDone'); i > 0; i--) queue.onSubmittedWorkDone();
+  if (now - reported >= 10000) {
+    const seconds = (now - reported) / 1000;
+    const rates = Object.entries(done).map(([name, n]) => `${name} ${Math.round(n / seconds)}`).join(', ');
+    log(`${kind}: ${Math.round(frames / seconds)} presents a second${rates ? ', ' + rates : ''}, ${made.length} textures alive`);
+    for (const name of Object.keys(done)) delete done[name];
+    frames = 0;
+    reported = now;
+  }
+  requestAnimationFrame(frame);
+};
+log(`${kind} at ${width}x${height}: ${JSON.stringify(kinds[kind] ?? (kind === 'all' ? kinds : {}))}`);
+requestAnimationFrame(frame);
+</script>

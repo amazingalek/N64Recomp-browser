@@ -77,8 +77,19 @@
     wrap(GPUDevice.prototype, name, (original) => function () { add(name); return original.apply(this, arguments); });
   }
   wrap(GPUTexture.prototype, 'createView', (original) => function () { add('createView'); return original.apply(this, arguments); });
-  for (const name of ['beginRenderPass', 'beginComputePass', 'copyBufferToBuffer', 'copyBufferToTexture',
-    'copyTextureToBuffer', 'copyTextureToTexture', 'clearBuffer', 'resolveQuerySet']) {
+  // A copy's bytes: copyBufferToBuffer's size (its last argument), a texture copy's extent in the texture's texels.
+  wrap(GPUCommandEncoder.prototype, 'copyBufferToBuffer', (original) => function () {
+    add('copyBufferToBuffer', [...arguments].filter((a) => typeof a === 'number').at(-1) ?? 0);
+    return original.apply(this, arguments);
+  });
+  for (const name of ['copyBufferToTexture', 'copyTextureToBuffer', 'copyTextureToTexture']) {
+    wrap(GPUCommandEncoder.prototype, name, (original) => function (source, destination, size) {
+      const [w, h, d] = extent(size);
+      add(name, w * h * d * texelBytes((source.texture ?? destination.texture).format));
+      return original.apply(this, arguments);
+    });
+  }
+  for (const name of ['beginRenderPass', 'beginComputePass', 'clearBuffer', 'resolveQuerySet']) {
     wrap(GPUCommandEncoder.prototype, name, (original) => function () { add(name); return original.apply(this, arguments); });
   }
   for (const name of ['draw', 'drawIndexed', 'setBindGroup', 'setPipeline']) {
