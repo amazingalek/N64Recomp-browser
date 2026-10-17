@@ -190,10 +190,9 @@ its survey.
 `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
 before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs its `scripts/build_web.sh --patches`
 (DKR-R's patches, `apply.cmake` with its skip list, `patches/web/`, and DKR-R's configure-time stages, no ROM) with the
-PR's checkout, against DKR-R-web's main. A conflict there is settled in DKR-R-web (the skip list, `patches/web/`) or by
-keeping the web's lines off DKR-R's in the fork, as v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web
-8a2ac6b). Where
-both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
+PR's checkout, against DKR-R-web's main. A conflict there is settled in DKR-R-web (the skip list, `patches/web/`), as
+v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web 8a2ac6b), or by keeping the web's lines off DKR-R's in the
+fork. Where both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
 frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
 reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). rt64-web 0a9fcb6 keeps the web's
 lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
