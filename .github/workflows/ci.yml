@@ -2,7 +2,8 @@
 # game, so nothing links into a page and nothing draws: a recomp's own CI and runs do that.
 #
 # A change to nothing but docs (*.md), plays.jsonl, the games' page (site/) and the tools that play, serve and publish
-# pages, which CI never runs, skips every job but changes: they report as skipped, not failed. A tag builds everything.
+# pages, which CI never runs, skips every job but changes: they report as skipped, not failed, except on a push to main
+# when what a page is built from has changed since the newest tag (the tag job). A tag builds everything.
 # A green push to main that changes what a page is built from is tagged as the next release (the tag job). The compiles go through ccache (the
 # emscripten job, frontend/build_speed.cmake), so a PR whose forks, patches/ and sources are main's mostly hits; the
 # cache a PR saves is its own, main's is every PR's.
@@ -14,9 +15,11 @@ on:
     branches: [main]
     tags: ["v*"]
 
+# A PR's new push cancels its run; a push to main queues behind the one running, so each merge gets its own result.
+# GitHub keeps one run waiting per group, so a third merge inside one run still replaces the second's waiting run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -26,7 +29,9 @@ env:
   EMSDK_VERSION: "6.0.12"
 
 jobs:
-  # Whether anything but docs changed: the PR against its base, a push against the commit before it.
+  # Whether anything but docs changed: the PR against its base, a push against the commit before it. A push to main
+  # also builds when forks.txt, patches/, frontend/ or renderer/ differ from the newest tag, which the tag job then
+  # tags: a docs-only merge right after a code merge whose run never finished would otherwise tag that code unbuilt.
   changes:
     runs-on: ubuntu-24.04
     outputs:
@@ -45,10 +50,18 @@ jobs:
             echo code=true >> "$GITHUB_OUTPUT"; exit 0
           fi
           echo "$files"
+          code=false
           if grep -qvE '\.md$|^tools/(page_driver\.mjs|play_page\.mjs|record_shaders\.mjs|publish_pages?\.sh|serve_site\.mjs)$|^plays\.jsonl$|^site/' <<< "$files"
-          then echo code=true >> "$GITHUB_OUTPUT"
-          else echo code=false >> "$GITHUB_OUTPUT"
+          then code=true
+          elif [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            # The same newest tag as the tag job's, and a tag that can't be found or fetched builds everything.
+            if ! last="$(git ls-remote --tags --refs origin | sed -nE 's|.*refs/tags/(v0\.[0-9]+\.0)$|\1|p' | sort -V | tail -1)" ||
+               [[ -z "$last" ]] || ! git fetch --depth 1 origin "refs/tags/$last:refs/tags/$last" ||
+               ! git diff --quiet "$last" HEAD -- forks.txt patches frontend renderer
+            then echo "forks.txt, patches/, frontend/ or renderer/ differ from ${last:-the newest tag}."; code=true
+            fi
           fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
 
   # plume's device thread (tests/plume_device_thread_test.cpp) against a mock backend, natively.
   plume-device-thread:
@@ -273,8 +286,8 @@ jobs:
   # A push to main that changes what a page is built from (forks.txt, patches/, frontend/, renderer/) is tagged
   # v0.<n+1>.0 once its jobs pass: a tag is a release, and the retest builds the newest one, so a change left untagged
   # reaches no page. It compares against the newest tag, not the push before, so a run cancelled by the next merge is
-  # covered by that one's, a docs-only push's included. A tag pushed with GITHUB_TOKEN starts no workflow: this run,
-  # on the same commit, is its CI.
+  # covered by that one's, and the changes job builds a docs-only push's whenever this would tag. A tag pushed with
+  # GITHUB_TOKEN starts no workflow: this run, on the same commit, is its CI.
   tag:
     needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, emscripten]
     if: >-
