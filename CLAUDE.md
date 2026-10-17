@@ -286,8 +286,9 @@ current in the same work as what changes it:
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never
   message each other about turns: the queue says it.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: interleave runs, and write down
-  what else was running beside a number. The page Pages serves, played just before a new build in the same conditions
-  (`--note` it), tells the host from the build.
+  what else was running beside a number. The page Pages serves, played in the same minutes as a new build, several runs
+  of each interleaved (`--note` them), tells the host from the build; one pair before and after doesn't
+  (docs/findings.md, Behind CLAUDE.md's rules).
 - Chrome on Windows times its animation frames by the display's vblank; with no display (a monitor off) it sleeps
   17.9 ms between frames, and every page whose game runs below 60 presents ~55.6 at the display's rate. play_page
   records animation frames a second beside the presents, and leaves presents out of the comparison for a display-rate
