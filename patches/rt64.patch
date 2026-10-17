@@ -1,8 +1,8 @@
-rt64: https://github.com/amazingalek/rt64-web 977ddca892b8589b2e88cd6ef59b92be46bf85b4
+rt64: https://github.com/amazingalek/rt64-web 85a6ad564deb0330701bd15db695198aa6774365
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 79dfc38..b9145b8 100644
+index 79dfc38..583ee8b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,7 +11,13 @@ endif()
@@ -208,7 +208,7 @@ index 79dfc38..b9145b8 100644
  target_link_libraries(rt64 libzstd_static)
  target_link_libraries(rt64 plume)
  
-@@ -504,9 +604,131 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
+@@ -504,9 +604,141 @@ build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlat.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR")
  build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING")
@@ -220,7 +220,17 @@ index 79dfc38..b9145b8 100644
 +    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D DUAL_SOURCE_BLENDING")
 +    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantMSDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D MULTISAMPLING" "-D DUAL_SOURCE_BLENDING")
 +    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D DUAL_SOURCE_BLENDING")
-+    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMSDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D MULTISAMPLING" "-D DUAL_SOURCE_BLENDING")
++    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatMSDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_"-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR"_COLOR" "-D MULTISAMPLING" "-D DUAL_SOURCE_BLENDING")
++    # The RasterPS the browser specializes at run time with override values (ShaderCacheWGSL, rt64_raster_shader.h)
++    # keeps the ubershader's loops (SPEC_CONSTANT_LOOPS): nothing strips it of dead code before the browser parses all of
++    # it, and Chrome parses a module on its GPU main thread, where every present waits behind it. The unrolled ones
++    # above are what the prebuilt shaders are specialized from (spirv-opt), which removes what a shader doesn't use.
++    # Unrolled it is 670 KB of WGSL, which Chrome 155 parsed in 683 ms and built pipelines from in 1.0-1.6 s each; with
++    # the loops 250 KB, 149 ms and 0.29-0.46 s (a test page, six of GoldenEye's shaders, RTX 2070).
++    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatLoops.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D SPEC_CONSTANT_LOOPS")
++    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatLoopsMS.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D SPEC_CONSTANT_LOOPS" "-D MULTISAMPLING")
++    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatLoopsDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D SPEC_CONSTANT_LOOPS" "-D DUAL_SOURCE_BLENDING")
++    build_pixel_shader_spec_constants(rt64 "src/shaders/RasterPS.hlsl" "src/shaders/RasterPSSpecConstantFlatLoopsMSDualSource.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS" "-D VERTEX_FLAT_COLOR" "-D SPEC_CONSTANT_LOOPS" "-D MULTISAMPLING" "-D DUAL_SOURCE_BLENDING")
 +endif()
  build_vertex_shader( rt64 "src/shaders/RasterVS.hlsl" "src/shaders/RasterVSDynamic.hlsl" "-D DYNAMIC_RENDER_PARAMS")
  build_vertex_shader_spec_constants( rt64 "src/shaders/RasterVS.hlsl" "src/shaders/RasterVSSpecConstant.hlsl" "-D SPEC_CONSTANT_RENDER_PARAMS")
@@ -2966,10 +2976,10 @@ index 0000000..9984c41
 +}
 +#endif
 diff --git a/src/render/rt64_raster_shader.cpp b/src/render/rt64_raster_shader.cpp
-index 721a01e..5c40345 100644
+index 721a01e..e7a0578 100644
 --- a/src/render/rt64_raster_shader.cpp
 +++ b/src/render/rt64_raster_shader.cpp
-@@ -7,18 +7,51 @@
+@@ -7,18 +7,46 @@
  #include "xxHash/xxh3.h"
  
  #include "shaders/RenderParams.hlsli.rw.h"
@@ -2988,22 +2998,17 @@ index 721a01e..5c40345 100644
 +#if defined(RT64_WGSL)
 +#   include "shaders/RasterPSDynamic.hlsl.wgsl.h"
 +#   include "shaders/RasterPSDynamicMS.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstant.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantMS.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantFlat.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantFlatMS.hlsl.wgsl.h"
++#   include "shaders/RasterPSSpecConstantFlatLoops.hlsl.wgsl.h"
++#   include "shaders/RasterPSSpecConstantFlatLoopsMS.hlsl.wgsl.h"
 +#   include "shaders/RasterVSDynamic.hlsl.wgsl.h"
-+#   include "shaders/RasterVSSpecConstant.hlsl.wgsl.h"
 +#   include "shaders/RasterVSSpecConstantFlat.hlsl.wgsl.h"
 +#   include "shaders/PostBlendDitherNoiseAddPS.hlsl.wgsl.h"
 +#   include "shaders/PostBlendDitherNoiseSubPS.hlsl.wgsl.h"
 +#   include "shaders/PostBlendDitherNoiseSubNegativePS.hlsl.wgsl.h"
 +#   include "shaders/RasterPSDynamicDualSource.hlsl.wgsl.h"
 +#   include "shaders/RasterPSDynamicMSDualSource.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantDualSource.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantMSDualSource.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantFlatDualSource.hlsl.wgsl.h"
-+#   include "shaders/RasterPSSpecConstantFlatMSDualSource.hlsl.wgsl.h"
++#   include "shaders/RasterPSSpecConstantFlatLoopsDualSource.hlsl.wgsl.h"
++#   include "shaders/RasterPSSpecConstantFlatLoopsMSDualSource.hlsl.wgsl.h"
 +#else
 +#   include "shaders/RasterPSDynamic.hlsl.spirv.h"
 +#   include "shaders/RasterPSDynamicMS.hlsl.spirv.h"
@@ -3033,7 +3038,7 @@ index 721a01e..5c40345 100644
  #ifdef _WIN32
  #   include "shaders/RasterPSLibrary.hlsl.dxil.h"
  #   include "shaders/RasterPSLibraryMS.hlsl.dxil.h"
-@@ -67,25 +100,81 @@ namespace RT64 {
+@@ -67,25 +95,70 @@ namespace RT64 {
  
      // OptimizerCacheSPIRV
  
@@ -3079,36 +3084,25 @@ index 721a01e..5c40345 100644
 +        return shader.get();
 +    }
 +
-+    void ShaderCacheWGSL::get(RenderDevice *device, bool smoothShade, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader) {
++    void ShaderCacheWGSL::get(RenderDevice *device, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader) {
 +#   if defined(RT64_WGSL)
-+        // RasterPS writes the blend factor to a second output only where the device has dual-source blending
++        // Every shading mode draws with the flat ones: the mode is a spec constant too (rpFlagsValue), and a smooth
++        // shader never reads the flat color it is given (RasterPS() picks the smooth one), so the smooth pair would be
++        // the same shader again. Chrome parses each module on its GPU main thread, where every present waits behind it:
++        // the smooth RasterPS was ~0.9 s of the launcher's first frames (GoldenEye, Chrome 155, RTX 2070). RasterPS is the
++        // one with the ubershader's loops (CMakeLists.txt, SPEC_CONSTANT_LOOPS), and writes the blend factor to a second output only where the device has dual-source blending
 +        // (RasterShader::createPipeline).
 +        const bool dualSource = device->getCapabilities().dualSourceBlending;
-+        if (smoothShade) {
-+            vertexShader = get(device, RasterVSSpecConstantBlobWGSL, sizeof(RasterVSSpecConstantBlobWGSL), "VSMain");
-+            if (useMSAA) {
-+                pixelShader = dualSource ?
-+                    get(device, RasterPSSpecConstantMSDualSourceBlobWGSL, sizeof(RasterPSSpecConstantMSDualSourceBlobWGSL), "PSMain") :
-+                    get(device, RasterPSSpecConstantMSBlobWGSL, sizeof(RasterPSSpecConstantMSBlobWGSL), "PSMain");
-+            }
-+            else {
-+                pixelShader = dualSource ?
-+                    get(device, RasterPSSpecConstantDualSourceBlobWGSL, sizeof(RasterPSSpecConstantDualSourceBlobWGSL), "PSMain") :
-+                    get(device, RasterPSSpecConstantBlobWGSL, sizeof(RasterPSSpecConstantBlobWGSL), "PSMain");
-+            }
++        vertexShader = get(device, RasterVSSpecConstantFlatBlobWGSL, sizeof(RasterVSSpecConstantFlatBlobWGSL), "VSMain");
++        if (useMSAA) {
++            pixelShader = dualSource ?
++                get(device, RasterPSSpecConstantFlatLoopsMSDualSourceBlobWGSL, sizeof(RasterPSSpecConstantFlatLoopsMSDualSourceBlobWGSL), "PSMain") :
++                get(device, RasterPSSpecConstantFlatLoopsMSBlobWGSL, sizeof(RasterPSSpecConstantFlatLoopsMSBlobWGSL), "PSMain");
 +        }
 +        else {
-+            vertexShader = get(device, RasterVSSpecConstantFlatBlobWGSL, sizeof(RasterVSSpecConstantFlatBlobWGSL), "VSMain");
-+            if (useMSAA) {
-+                pixelShader = dualSource ?
-+                    get(device, RasterPSSpecConstantFlatMSDualSourceBlobWGSL, sizeof(RasterPSSpecConstantFlatMSDualSourceBlobWGSL), "PSMain") :
-+                    get(device, RasterPSSpecConstantFlatMSBlobWGSL, sizeof(RasterPSSpecConstantFlatMSBlobWGSL), "PSMain");
-+            }
-+            else {
-+                pixelShader = dualSource ?
-+                    get(device, RasterPSSpecConstantFlatDualSourceBlobWGSL, sizeof(RasterPSSpecConstantFlatDualSourceBlobWGSL), "PSMain") :
-+                    get(device, RasterPSSpecConstantFlatBlobWGSL, sizeof(RasterPSSpecConstantFlatBlobWGSL), "PSMain");
-+            }
++            pixelShader = dualSource ?
++                get(device, RasterPSSpecConstantFlatLoopsDualSourceBlobWGSL, sizeof(RasterPSSpecConstantFlatLoopsDualSourceBlobWGSL), "PSMain") :
++                get(device, RasterPSSpecConstantFlatLoopsBlobWGSL, sizeof(RasterPSSpecConstantFlatLoopsBlobWGSL), "PSMain");
 +        }
 +#   else
 +        assert(false && "This build has no WGSL shaders.");
@@ -3123,7 +3117,7 @@ index 721a01e..5c40345 100644
      {
          assert(device != nullptr);
  
-@@ -95,10 +184,25 @@ namespace RT64 {
+@@ -95,10 +168,25 @@ namespace RT64 {
          const bool useMSAA = (multisampling.sampleCount > 1);
          std::unique_ptr<RenderShader> vertexShader;
          std::unique_ptr<RenderShader> pixelShader;
@@ -3137,7 +3131,7 @@ index 721a01e..5c40345 100644
 +        if (shaderFormat == RenderShaderFormat::WGSL) {
 +#       if defined(RT64_WGSL)
 +            // As Metal: the pre-compiled permutation, with the spec constants as the pipeline's override constants.
-+            shaderCacheWGSL->get(device, desc.flags.smoothShade, useMSAA, sharedVertexShader, sharedPixelShader);
++            shaderCacheWGSL->get(device, useMSAA, sharedVertexShader, sharedPixelShader);
 +            specConstants.emplace_back(0, desc.otherMode.L);
 +            specConstants.emplace_back(1, desc.otherMode.H);
 +            specConstants.emplace_back(2, desc.colorCombiner.L);
@@ -3151,7 +3145,7 @@ index 721a01e..5c40345 100644
              // Choose the pre-compiled shader permutations.
              const respv::Shader *VS = nullptr;
              const respv::Shader *PS = nullptr;
-@@ -218,13 +322,54 @@ namespace RT64 {
+@@ -218,13 +306,54 @@ namespace RT64 {
  #       endif
          }
          
@@ -3209,7 +3203,7 @@ index 721a01e..5c40345 100644
          creation.alphaBlend = !copyMode && interop::Blender::usesAlphaBlend(desc.otherMode);
          creation.culling = !copyMode && desc.flags.culling;
          creation.zCmp = !copyMode && desc.otherMode.zCmp() && (desc.otherMode.zMode() != ZMODE_DEC);
-@@ -232,11 +377,14 @@ namespace RT64 {
+@@ -232,11 +361,14 @@ namespace RT64 {
          creation.cvgAdd = (desc.otherMode.cvgDst() == CVG_DST_WRAP) || (desc.otherMode.cvgDst() == CVG_DST_SAVE);
          creation.NoN = desc.flags.NoN;
          creation.usesHDR = desc.flags.usesHDR;
@@ -3229,7 +3223,7 @@ index 721a01e..5c40345 100644
      }
  
      RasterShader::~RasterShader() { }
-@@ -316,7 +464,7 @@ namespace RT64 {
+@@ -316,7 +448,7 @@ namespace RT64 {
          pipelineDesc.depthEnabled = c.zCmp || c.zUpd;
          pipelineDesc.depthFunction = c.zCmp ? RenderComparisonFunction::LESS : RenderComparisonFunction::ALWAYS;
          pipelineDesc.depthWriteEnabled = c.zUpd;
@@ -3238,7 +3232,7 @@ index 721a01e..5c40345 100644
          pipelineDesc.multisampling = c.multisampling;
          pipelineDesc.inputSlots = RasterInputSlots;
          pipelineDesc.inputSlotsCount = uint32_t(std::size(RasterInputSlots));
-@@ -328,13 +476,16 @@ namespace RT64 {
+@@ -328,13 +460,16 @@ namespace RT64 {
          pipelineDesc.pixelShader = c.pixelShader;
          pipelineDesc.specConstants = c.specConstants.data();
          pipelineDesc.specConstantsCount = uint32_t(c.specConstants.size());
@@ -3257,7 +3251,7 @@ index 721a01e..5c40345 100644
              targetBlend.blendOp = RenderBlendOperation::ADD;
          }
  
-@@ -344,6 +495,38 @@ namespace RT64 {
+@@ -344,6 +479,38 @@ namespace RT64 {
              targetBlend.dstBlendAlpha = RenderBlend::ONE;
          }
  
@@ -3296,7 +3290,7 @@ index 721a01e..5c40345 100644
          return c.device->createGraphicsPipeline(pipelineDesc);
      }
      
-@@ -422,12 +605,33 @@ namespace RT64 {
+@@ -422,12 +589,33 @@ namespace RT64 {
              PSBlobSize = uint32_t(useMSAA ? std::size(RasterPSDynamicMSBlobDXIL) : std::size(RasterPSDynamicBlobDXIL));
              break;
  #   endif
@@ -3318,7 +3312,7 @@ index 721a01e..5c40345 100644
 +                PSBlob = dualSource ? RasterPSDynamicDualSourceBlobWGSL : RasterPSDynamicBlobWGSL;
 +                PSBlobSize = uint32_t(dualSource ? sizeof(RasterPSDynamicDualSourceBlobWGSL) : sizeof(RasterPSDynamicBlobWGSL));
 +            }
-             break;
++            break;
 +        }
 +#   else
 +        case RenderShaderFormat::SPIRV: {
@@ -3329,13 +3323,13 @@ index 721a01e..5c40345 100644
 +            PSBlob = PS.data;
 +            VSBlobSize = uint32_t(VS.size);
 +            PSBlobSize = uint32_t(PS.size);
-+            break;
+             break;
 +        }
 +#   endif
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              VSBlob = RasterVSDynamicBlobMSL;
-@@ -445,14 +649,12 @@ namespace RT64 {
+@@ -445,14 +633,12 @@ namespace RT64 {
          pixelShader = device->createShader(PSBlob, PSBlobSize, "PSMain", shaderFormat);
  
          FramebufferRendererDescriptorCommonSet descriptorCommonSet(shaderLibrary->samplerLibrary, device->getCapabilities().raytracing);
@@ -3351,7 +3345,7 @@ index 721a01e..5c40345 100644
          layoutBuilder.addDescriptorSet(descriptorFramebufferSet);
          layoutBuilder.end();
          pipelineLayout = layoutBuilder.create(device);
-@@ -502,11 +704,24 @@ namespace RT64 {
+@@ -502,11 +688,24 @@ namespace RT64 {
              postBlendSubNegativePixelShader = device->createShader(PostBlendDitherNoiseSubNegativePSBlobDXIL, std::size(PostBlendDitherNoiseSubNegativePSBlobDXIL), "PSMain", shaderFormat);
              break;
  #   endif
@@ -3380,7 +3374,7 @@ index 721a01e..5c40345 100644
  #   ifdef __APPLE__
          case RenderShaderFormat::METAL:
              postBlendAddPixelShader = device->createShader(PostBlendDitherNoiseAddPSBlobMSL, std::size(PostBlendDitherNoiseAddPSBlobMSL), "PSMain", shaderFormat);
-@@ -524,7 +739,7 @@ namespace RT64 {
+@@ -524,7 +723,7 @@ namespace RT64 {
          postBlendDesc.renderTargetFormat[0] = RenderTarget::colorBufferFormat(shaderLibrary->usesHDR);
          postBlendDesc.renderTargetCount = 1;
          postBlendDesc.cullMode = RenderCullMode::NONE;
@@ -3390,7 +3384,7 @@ index 721a01e..5c40345 100644
          postBlendDesc.inputSlots = RasterInputSlots;
          postBlendDesc.inputSlotsCount = uint32_t(std::size(RasterInputSlots));
 diff --git a/src/render/rt64_raster_shader.h b/src/render/rt64_raster_shader.h
-index 3b991ff..3200b7d 100644
+index 3b991ff..c17d089 100644
 --- a/src/render/rt64_raster_shader.h
 +++ b/src/render/rt64_raster_shader.h
 @@ -9,6 +9,7 @@
@@ -3410,13 +3404,13 @@ index 3b991ff..3200b7d 100644
 +    };
 +
 +    // The spec constant shaders a WGSL build specializes with override values, each created once: they are the same
-+    // source for every shader, and creating a RasterPS module (over 1 MB of WGSL) costs the browser a parse each time.
++    // source for every shader, and creating a RasterPS module (250 KB of WGSL) costs the browser a parse each time.
 +    struct ShaderCacheWGSL {
 +        std::mutex mutex;
 +        std::unordered_map<const void *, std::unique_ptr<RenderShader>> shaders;
 +
-+        // The vertex and pixel shader for a shading mode, created on first use.
-+        void get(RenderDevice *device, bool smoothShade, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader);
++        // The vertex and pixel shader every shader specializes, created on first use.
++        void get(RenderDevice *device, bool useMSAA, const RenderShader *&vertexShader, const RenderShader *&pixelShader);
 +        const RenderShader *get(RenderDevice *device, const void *blob, uint64_t size, const char *entryPointName);
 +    };
 +
@@ -3464,7 +3458,7 @@ index 3b991ff..3200b7d 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..42bf31e 100644
+index bf7b669..e6920d8 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,52 @@
@@ -3545,7 +3539,7 @@ index bf7b669..42bf31e 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +160,485 @@ namespace RT64 {
+@@ -105,13 +160,483 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
@@ -3576,13 +3570,11 @@ index bf7b669..42bf31e 100644
 +        // Create the spec constant shaders before anything draws. plume's WebGPU backend learns from each new shader which
 +        // stages read which bindings, and when that changes every pipeline gets a new layout: the specialized ones that
 +        // were drawn with would then be built again in place, holding up the browser's GPU process for seconds. Without
-+        // specialized or prebuilt shaders nothing needs them, and each is megabytes of WGSL for the browser to parse.
++        // specialized or prebuilt shaders nothing needs them, and RasterPS is 250 KB of WGSL for the browser to parse.
 +        if ((shaderFormat == RenderShaderFormat::WGSL) && (specializedShaders || prebuiltShaders)) {
 +            const RenderShader *vertexShader = nullptr;
 +            const RenderShader *pixelShader = nullptr;
-+            for (bool smoothShade : { false, true }) {
-+                shaderCacheWGSL.get(device, smoothShade, multisampling.sampleCount > 1, vertexShader, pixelShader);
-+            }
++            shaderCacheWGSL.get(device, multisampling.sampleCount > 1, vertexShader, pixelShader);
 +        }
 +
 +        startPrebuild();
@@ -4032,7 +4024,7 @@ index bf7b669..42bf31e 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +652,22 @@ namespace RT64 {
+@@ -125,6 +650,22 @@ namespace RT64 {
              found = true;
          }
  
@@ -4055,7 +4047,7 @@ index bf7b669..42bf31e 100644
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +708,18 @@ namespace RT64 {
+@@ -165,6 +706,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
@@ -5884,10 +5876,10 @@ index 205dc4c..2aeed21 100644
      dstNorm[vertexOffsetIndex] = worldNorm;
      dstVel[vertexOffsetIndex] = worldPos - prevWorldPos;
 diff --git a/src/shaders/RasterPS.hlsl b/src/shaders/RasterPS.hlsl
-index e7895c3..3edf47d 100644
+index e7895c3..33e87c4 100644
 --- a/src/shaders/RasterPS.hlsl
 +++ b/src/shaders/RasterPS.hlsl
-@@ -45,9 +45,78 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
+@@ -45,9 +45,79 @@ float sampleBackgroundDepth(int2 pixelPos, uint sampleCount) {
  }
  #endif
  
@@ -5931,10 +5923,11 @@ index e7895c3..3edf47d 100644
 +// so each tile's texture slot is a switch anyway (TextureSampler.hlsli), and RasterPS samples both in a loop the shader
 +// keeps, which leaves sampleTexture() in it once: most of a prebuilt pixel shader with mip LOD. Without LOD a specialized
 +// shader knows each tile's slot and clamp modes only if it samples them apart, as two calls (one of Majora's Mask's
-+// with two tiles is 10 KB of WGSL that way, 60 in the loop). The ubershader always loops. Firefox 158 builds a section's
-+// pipelines one at a time while the game waits, and in a test page built GoldenEye's Dam in 5.8-8.3 s against
-+// 14.8-19.1, Pilotwings 64's menus in 5.7-8.2 against 13.9-16.3 and Conker's Windy in 4.1-4.4 against 6.3-8.4 (RTX
-+// 2070, three runs each, interleaved, a busy host).
++// with two tiles is 10 KB of WGSL that way, 60 in the loop). The ubershader always loops, and so does the spec constant
++// shader the browser specializes (SPEC_CONSTANT_LOOPS). Firefox 158 builds a section's pipelines one at a time while
++// the game waits, and in a test page built GoldenEye's Dam in 5.8-8.3 s against 14.8-19.1, Pilotwings 64's menus in
++// 5.7-8.2 against 13.9-16.3 and Conker's Windy in 4.1-4.4 against 6.3-8.4 (RTX 2070, three runs each, interleaved, a
++// busy host).
 +float4 sampleDrawTile(uint t, OtherMode otherMode, RenderFlags flags, int tileIndex0, int tileIndex1, float2 lowResUV, float2 highResUV, float2 ddxUV, float2 ddyUV) {
 +    const bool oneCycleHardwareBug = (otherMode.cycleType() == G_CYC_1CYCLE);
 +    const bool firstTile = (t == 0) || oneCycleHardwareBug;
@@ -5966,7 +5959,7 @@ index e7895c3..3edf47d 100644
      const OtherMode otherMode = { rp.omL, rp.omH };
  #if defined(DYNAMIC_RENDER_PARAMS)
      if ((otherMode.cycleType() != G_CYC_COPY) && renderFlagCulling(rp.flags) && isFrontFace) {
-@@ -89,37 +158,51 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -89,37 +159,51 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
      }
  
      if (depthDecal) {
@@ -6028,7 +6021,7 @@ index e7895c3..3edf47d 100644
      int tileIndex0 = 0;
      int tileIndex1 = 1;
      float lodFraction;
-@@ -132,6 +215,40 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -132,6 +216,40 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
  
      float4 texVal0 = float4(0.0f, 0.0f, 0.0f, 1.0f);
      float4 texVal1 = float4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -6037,7 +6030,7 @@ index e7895c3..3edf47d 100644
 +    const bool usesTexture0 = renderFlagUsesTexture0(rp.flags);
 +    const bool usesTexture1 = renderFlagUsesTexture1(rp.flags);
 +    const bool loopTiles = usesTexture0 && usesTexture1 && (otherMode.textLOD() == G_TL_LOD);
-+#if !defined(DYNAMIC_RENDER_PARAMS)
++#if !defined(DYNAMIC_RENDER_PARAMS) && !defined(SPEC_CONSTANT_LOOPS)
 +    if (!loopTiles) {
 +        if (usesTexture0) {
 +            texVal0 = sampleDrawTile(0, otherMode, rp.flags, tileIndex0, tileIndex1, lowResUV, highResUV, ddxVertexUV, ddyVertexUV);
@@ -6069,7 +6062,7 @@ index e7895c3..3edf47d 100644
      if (renderFlagUsesTexture0(rp.flags)) {
          const uint globalTileIndex = instanceRenderIndices[gConstants.renderIndex].rdpTileIndex + tileIndex0;
          RDPTile rdpTile = RDPTiles[globalTileIndex];
-@@ -141,14 +258,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -141,14 +259,15 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = renderFlagNativeSampler0(rp.flags);
          }
          
@@ -6088,7 +6081,7 @@ index e7895c3..3edf47d 100644
          RDPTile rdpTile = RDPTiles[globalTileIndex];
          if (!renderFlagDynamicTiles(rp.flags)) {
              rdpTile.cms = oneCycleHardwareBug ? renderCMS0(rp.flags) : renderCMS1(rp.flags);
-@@ -156,12 +274,13 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -156,12 +275,13 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
              rdpTile.nativeSampler = oneCycleHardwareBug ? renderFlagNativeSampler0(rp.flags) : renderFlagNativeSampler1(rp.flags);
          }
          
@@ -6105,7 +6098,7 @@ index e7895c3..3edf47d 100644
      // Color combiner.
      float4 shadeColor = vertexColor;
      float4 combinerColor;
-@@ -254,6 +373,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
+@@ -254,6 +374,14 @@ LIBRARY_EXPORT bool RasterPS(const RenderParams rp, float4 vertexPosition, float
          resultColor.a = resultCvg;
      }
      
@@ -6120,7 +6113,7 @@ index e7895c3..3edf47d 100644
      // Add highlight color to the last step.
      uint highlightColorUint = instanceRenderIndices[gConstants.renderIndex].highlightColor;
      if (highlightColorUint > 0) {
-@@ -290,8 +417,15 @@ void PSMain(
+@@ -290,8 +418,15 @@ void PSMain(
  #if defined(DYNAMIC_RENDER_PARAMS)
      , bool isFrontFace : SV_IsFrontFace
  #endif
@@ -6136,7 +6129,7 @@ index e7895c3..3edf47d 100644
  )
  {
  #if !defined(DYNAMIC_RENDER_PARAMS)
-@@ -308,6 +442,11 @@ void PSMain(
+@@ -308,6 +443,11 @@ void PSMain(
      }
  
      pixelColor = resultColor;
@@ -6230,10 +6223,19 @@ index dcc88b2..5e56d4b 100644
      const bool oddColumn = (texelInt.x & 1);
      const bool isRgba32 = and(fmt == G_IM_FMT_RGBA, siz == G_IM_SIZ_32b);
 diff --git a/src/shaders/TextureSampler.hlsli b/src/shaders/TextureSampler.hlsli
-index 1ceb2ce..8078911 100644
+index 1ceb2ce..39b86ec 100644
 --- a/src/shaders/TextureSampler.hlsli
 +++ b/src/shaders/TextureSampler.hlsli
-@@ -24,6 +24,88 @@
+@@ -18,12 +18,96 @@
+ // We prefer using for loops to reduce the size of the final ubershader as much as possible.
+ // When using specialized shaders, we prefer to unroll the loop manually to give re-spirv an
+ // easier time to eliminate dead code, as its graph model can't handle the loop constructs yet.
+-#ifdef DYNAMIC_RENDER_PARAMS
++// A WGSL build's spec constant shaders, which the browser specializes with override values and nothing strips of dead
++// code beforehand, keep the loops too (SPEC_CONSTANT_LOOPS, CMakeLists.txt).
++#if defined(DYNAMIC_RENDER_PARAMS) || defined(SPEC_CONSTANT_LOOPS)
+ #define USE_FOR_LOOPS 1
+ #else
  #define USE_FOR_LOOPS 0
  #endif
  
@@ -6322,7 +6324,7 @@ index 1ceb2ce..8078911 100644
  void computeLOD(OtherMode otherMode, uint rdpTileCount, float2 primLOD, float resLodScale, float2 ddxUV, float2 ddyUV, inout int tileIndex0, inout int tileIndex1, out float lodFraction) {
      const bool usesLOD = (otherMode.textLOD() == G_TL_LOD);
      if (usesLOD) {
-@@ -71,7 +153,8 @@ void computeLOD(OtherMode otherMode, uint rdpTileCount, float2 primLOD, float re
+@@ -71,7 +155,8 @@ void computeLOD(OtherMode otherMode, uint rdpTileCount, float2 primLOD, float re
      }
  }
  
@@ -6332,7 +6334,7 @@ index 1ceb2ce..8078911 100644
      if (rdpTile.cms & G_TX_CLAMP) {
          texelInt.x = clamp(texelInt.x, 0, (round(tcScale.x * rdpTile.lrs) / 4) - (round(tcScale.x * rdpTile.uls) / 4) + round(tcScale.x - 1.0f));
      }
-@@ -97,24 +180,45 @@ float4 clampWrapMirrorSample(const RDPTile rdpTile, const GPUTile gpuTile, float
+@@ -97,24 +182,45 @@ float4 clampWrapMirrorSample(const RDPTile rdpTile, const GPUTile gpuTile, float
      }
      
      // Allows selection of only particular columns or rows as defined by the tile.
@@ -6382,7 +6384,7 @@ index 1ceb2ce..8078911 100644
      // Choose the native sampler that was determined to be compatible.
      switch (nativeSampler) {
          case NATIVE_SAMPLER_WRAP_WRAP:
-@@ -138,6 +242,57 @@ float4 sampleTextureNative(Texture2D texture, uint nativeSampler, int2 texelBase
+@@ -138,6 +244,57 @@ float4 sampleTextureNative(Texture2D texture, uint nativeSampler, int2 texelBase
              return texture.SampleLevel(gNearestClampClampSampler, nativeUVCoord, 0.0f);
      }
  }
@@ -6440,7 +6442,7 @@ index 1ceb2ce..8078911 100644
  
  float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool filterBilerp, bool filterAverage, bool linearFiltering, float2 uvCoord, uint tlut, bool canDecodeTMEM, uint mipLevel, bool usesHDR) {
      float2 tcScale = gpuTile.tcScale;
-@@ -150,6 +305,40 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
+@@ -150,6 +307,40 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
      float4 samples[4];
      const uint nativeSampler = rdpTile.nativeSampler;
      bool gpuTileUsesTMEM = canDecodeTMEM && gpuTileFlagRawTMEM(gpuTile.flags);
@@ -6481,7 +6483,7 @@ index 1ceb2ce..8078911 100644
      if ((nativeSampler == NATIVE_SAMPLER_NONE) || gpuTileUsesTMEM) {
  #if USE_FOR_LOOPS
          int numSamples = select_uint(filtering, 4, 1);
-@@ -168,23 +357,23 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
+@@ -168,23 +359,23 @@ float4 sampleTextureLevel(const RDPTile rdpTile, const GPUTile gpuTile, bool fil
  #endif
      }
      else {
@@ -6511,7 +6513,7 @@ index 1ceb2ce..8078911 100644
      
      float4 sample00 = samples[0];
      if (filtering) {
-@@ -272,8 +461,6 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+@@ -272,8 +463,6 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
  
      // Determine the RDP sample count and mip levels.
      if (flagHasMipmaps) {
@@ -6520,7 +6522,7 @@ index 1ceb2ce..8078911 100644
          if (nativeSampler == NATIVE_SAMPLER_NONE) {
              float2 ddxUVScaled = ddxUV * gpuTile.tcScale;
              float2 ddyUVScaled = ddyUV * gpuTile.tcScale;
-@@ -292,28 +479,7 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+@@ -292,28 +481,7 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
              float2 ddxUVNorm = ddxUV / originalSize;
              float2 ddyUVNorm = ddyUV / originalSize;
              
@@ -6550,7 +6552,7 @@ index 1ceb2ce..8078911 100644
          }
      }
      else {
-@@ -328,6 +494,21 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
+@@ -328,6 +496,21 @@ float4 sampleTexture(OtherMode otherMode, RenderFlags renderFlags, float2 inputU
      for (uint i = 0; i < numRDPSamples; i++) {
          textureSamples[i] = sampleTextureLevel(rdpTile, gpuTile, filterBilerp, filterAverage, linearFiltering, uvCoord, tlut, canDecodeTMEM, RDPMipLevels[i], usesHDR);
      }
