@@ -171,8 +171,8 @@ times Chrome's gaps over 100 ms.
   there is no WebGPU layout to build it for, so it waits for one, and the spec constant shaders are created at
   setup, because a shader reading a binding from a new stage gives every pipeline a new layout. Without those two,
   boot ran at 17-20 display lists a second for ~10 s and about one run in fifteen froze for good. One compilation
-  thread: six at once took ~9 cores and halved the frame rate. The wasm grows from 7.3 to 16.6 MB (the spec
-  constant shaders).
+  thread: six at once took ~9 cores and halved the frame rate. The wasm grew from 7.3 to 16.6 MB (the spec
+  constant shaders), and since rt64 85a6ad5 links 4.4 MB less of them (GoldenEye's 17.2 → 12.8 MB).
 - Chrome parses and validates a shader module (Tint) in `createShaderModule`, on that same main thread, even for a
   pipeline it then builds async, in a time that grows faster than the WGSL (0.16 ms a KB at 24 KB, 0.56 at 180 KB,
   1.07 at 713 KB) and with the variables of a function: that is what held a page's presents 100-160 ms per large
@@ -181,7 +181,8 @@ times Chrome's gaps over 100 ms.
   once a draw resolves its layout): the boot's fixed ones and the RSP's compute shaders at the game's first frame
   (13-64 ms each, DXC on that thread; under 50 ms each in a trace of Banjo's Start); a
   `GPUDevice.prototype.createRenderPipeline` wrapped in a preload (`play_page.mjs --preload`) names each; and the spec constant
-  shaders' modules at setup (713 KB, ~0.7 s each), which hold the launcher's first presents ~1.4 s. The ubershader
+  shaders' module at setup, which held the launcher's first presents 1.1-1.8 s while there were two (below, The
+  launcher). The ubershader
   states (245 KB of WGSL, one per depth and coverage state) were built there too, as the first frames drew them:
   Banjo's page held 2.1 s after Start for 4. A draw of nothing at setup builds them behind the launcher now (rt64
   977ddca), one first and the rest from its compiled shader (plume 2950009): Chrome compiles a pipeline's shaders on
@@ -341,9 +342,16 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   GoldenEye's first present came 1325-1330 ms against 1120-1198 (Donkey Kong 64's 1665-1754 either way).
   `performance.measureUserAgentSpecificMemory` counts the shared heap once a worker (15-25 GB with 55): read the
   process's own counters.
-- The launcher: 1.4-2.0 s about a second after its first frame in every game, Chrome's GPU main thread parsing the
-  spec constant shaders' modules (703 and 730 ms for two of ~671 KB, `DeviceBase::APICreateShaderModule`) and building
-  three compute pipelines in line (55, 43, 78 ms).
+- The launcher: 1.1-1.8 s after its first frame in Chrome (the page's first presents are queued behind it, so the
+  launcher shows that much later), its GPU main thread parsing the spec constant shaders' modules, the flat and the
+  smooth RasterPS, 670 KB of WGSL each (560-950 ms each, `DeviceBase::APICreateShaderModule`), after the ubershader's
+  245 KB (140-190 ms). rt64 85a6ad5 draws every shading mode with the flat pair and keeps the ubershader's loops in its
+  RasterPS, 250 KB (145-150 ms), which also builds its pipelines in about a third of the time (a test page, six of
+  GoldenEye's shaders: 1.0-1.6 s each → 0.29-0.46). Two interleaved rounds each, cold profiles, uncapped 3840x2000, a
+  quiet host: in headless Chrome 155 GoldenEye's gap 1643-1814 → 427-451 ms and its 300th present 4.4-4.6 s → 2.5-3.2
+  s after navigation, Donkey Kong 64's 1092-1235 → none over 100 ms; in Firefox 158 GoldenEye's 319-362 → 127-175,
+  Donkey Kong 64's 0-111 → none. What is left of GoldenEye's in Chrome: the two modules, a compute pipeline (56 ms)
+  and four render pipelines a draw wanted before their background build (21-40 ms each), all in line.
 - GoldenEye's Start (1.6 s): the boss thread's first retraces (~0.6 s), then on a profile with no save its first boot
   validating the EEPROM (`fileValidateSaves` → `fileResetSave` → `fileWriteSave`), 48 EEPROM calls, each between
   `joyDisablePoll` and `joyEnablePoll`, which wait a retrace for the controller thread (~0.77 s); a second visit, with the save, waits 1.05 s. The display list
