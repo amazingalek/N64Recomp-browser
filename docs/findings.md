@@ -148,7 +148,8 @@ times Chrome's gaps over 100 ms.
   On v0.58.0 it drew 58-60 there (below).
 - Maximized on the desktop at its 200% (the runs noted "part C"), instead of off it, Firefox's Intel load rose ~30
   points, its GPU process's CPU 1.4-4.6 times, and Conker's presents fell and its boot wait doubled; Chrome stayed
-  within 2 presents. So an off-desktop Firefox run on a laptop reads better than a player's visit. Chrome maximized
+  within 2 presents. So an off-desktop Firefox run on a laptop reads better than a player's visit. On screen Firefox
+  redraws the canvas into its window at device pixels each frame (WebGPU in Chrome and Firefox, below). Chrome maximized
   there had a viewport of 1920x889, Firefox 1920x947: a plan's clicks at another `--size` missed Load ROM.
 - In 10 minutes of Rush 2049 Firefox held 55-60, its callbacks ~20 ms late (30-42 where the Intel GPU reached ~97%),
   the cap moving to 3 at 106 s and 4 at 140 s, while its GPU process's private memory grew from 1.05 to 3.14 GB, near
@@ -186,6 +187,16 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   costs the same either way. Firefox 157 with a `bgra8unorm` canvas filled an 8 GB card and fell below a frame a
   second, which is why the pages were `rgba8unorm` before; Firefox 158 plays 55-60 frames a second at 3840x2000 in it
   for 15 minutes and more.
+- How Firefox (its source, October 2026) puts that canvas on screen on Windows: wgpu draws into a D3D11 texture
+  shared with WebRender, no copy, but WebRender then draws it every frame into the window's own swap chain at device
+  pixels (a 1920x947 canvas at 200% is 3840x1894 of it), blended over what is behind it: a WebGPU canvas is always
+  treated as having alpha (`alphaMode` isn't applied to how it is shown, bug 1846605). Its own DirectComposition
+  visual, which Windows scales and can put on a hardware overlay, comes only with
+  `gfx.webrender.dcomp-texture-overlay-win` (Windows 11 22H2 and later, read at startup), on by default in 149 and
+  off again on release since 2026-05 (bug 2036365, slow composites; bug 2038378 is to turn it back on). Nothing a page
+  sets turns it on: `alphaMode`, the canvas's size against its CSS size and covering the window change nothing in
+  that path; `image-rendering` other than `auto`, a filter, opacity, a blend mode or a 3D transform on the canvas
+  or above it keep it off even with the pref. `play_page.mjs --firefox-pref` plays a page with one set.
 - Chrome builds a pipeline made with `createRenderPipeline` on its GPU process's main thread, which does nothing
   else meanwhile: no frame, no readback, no screenshot, and the page's main thread blocks once its queue to the GPU
   process fills. A specialized RasterPS (1.15 MB of WGSL) takes 1.4-2.1 s there, 6-11 s cold beside another build,
