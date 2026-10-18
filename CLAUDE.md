@@ -471,8 +471,11 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   3.5% of the compile time. Precompiled headers are off for a page: ccache can't cache a file that includes one.
 - A fixed heap in place of memory growth (no faster), and `-sGROWABLE_ARRAYBUFFERS=2` (emdawnwebgpu passes WebGPU views
   of the heap, which Chrome refuses over a growable buffer).
-- A cheaper GPU frame for Rush 2049's and Majora's Mask's pages, the dearest uncapped, in the web's own parts (pass
-  breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the desktop build draws too:
-  the mip LOD shader's taps (a tile picked per pixel can't use a hardware sampler, upstream's rule in rt64_state.cpp)
-  and Auto's resolution rounded up to a whole multiple of 240 lines. Changing either would draw differently from the
+- A cheaper GPU frame for Rush 2049's, Majora's Mask's and Conker's pages, the dearest uncapped and on a laptop, in the
+  web's own parts (pass breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the
+  desktop build draws too: RT64's pixel shaders (Rush 2049's mip LOD shader's taps, a tile picked per pixel that can't
+  use a hardware sampler, upstream's rule in rt64_state.cpp) and Auto's resolution rounded up to a whole multiple of
+  the game's lines (Conker's 216 five times for a laptop's 889). Changing either would draw differently from the
   desktop's RT64.
+- A DirectComposition overlay for a WebGPU canvas in Chrome on Windows, as Firefox's pref gives (A laptop, measured):
+  Chromium makes one only of video and low-latency canvases, so no flag or page setting gives one.
