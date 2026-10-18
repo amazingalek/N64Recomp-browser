@@ -77,6 +77,30 @@ ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hou
 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against v0.50.0's 330 (headless Chrome
 155, 3840x2000, both served from one port, interleaved).
 
+## Uncapped in Firefox
+
+`layout.frame_rate` 0, which `play_page.mjs --uncapped` gave Firefox until it gave 360, makes Firefox's animation frames
+as fast as it can whether anything was drawn or not: 1,500-11,900 a second on the stand-in (the v0.63.0 retest, Rush
+2049 11,493), 3,700-8,600 on a laptop's Intel UHD (Tiger Lake GT1, 1920x945 off the desktop, Firefox 158, Pages
+v0.58.0) and 17,000-30,000 there with `gfx.webrender.dcomp-texture-overlay-win`. Chrome headless with
+`--disable-frame-rate-limit` makes one when the last was drawn: ~120 a second on the stand-in, 83-102 on the laptop.
+
+- On the laptop WebRender composited for every one of those frames on the GPU the page draws with, and presents
+  uncapped were Firefox's GPU's minus that: Rush 2049 39.4 a second by default against 62.3 with the overlay pref
+  (Chrome headless 44.9), Banjo 66.1 against 79.4. With the pref the loop crowded the page's thread instead: Conker
+  drew 41.4 with the Intel GPU 24-88% busy, against 50.0 at ~90% without it. The round's uncapped Firefox numbers (A
+  laptop, measured) understate its GPU that way.
+- On the stand-in it cost the browser's process a core and the page nothing a run can see. Rush 2049 and Banjo from
+  Pages (v0.63.0, Firefox 158, 3840x2000, cold, a quiet host), interleaved, presents a second (animation frames):
+  Rush 2049 134.0 (11,892) and 120.4 (11,433) at 0 against 149.7, 121.2, 145.2, 128.6 and 134.4 (270-345) at 360,
+  Banjo 279.6 (3,290) and 286.5 (3,795) against 281.8 and 272.4 (~300); the browser's process 4.1-4.4 cores at 0,
+  2.4-3.4 at 360. So the stand-in's earlier Firefox cells stand, though `play_page.mjs` compares a Firefox run with
+  none from before (it records `uncapped` as 360).
+- At 360 the animation frames fall to 190-300 where the page's thread is busy (Rush 2049's race), still above its
+  presents: they hold presents back only on a page that presents near 360, which is the ceiling anyway.
+- A laptop's headroom in Firefox is read either way: uncapped at 360, or at the display's rate with the GPU's load
+  beside the presents (at 60 off the desktop, Firefox and Chrome loaded the Intel GPU about equally in most games).
+
 ## Chrome's pipeline cache
 
 Chrome keeps built pipelines for the next visit, if they fit: the cache (`DawnWebGPUCache` in the profile) is one per
