@@ -212,6 +212,20 @@ included, those noted "onscreen" giving the README's cells. No run that played h
 - Over 600 s of Rush 2049 Firefox's GPU process grew from 466 to 3142 MB, still near linearly (about:memory:
   systemHeap +1143 MB, gpuShared +1261, heap +46), and Chrome's from 508 to 864, most of it in the first minutes.
 
+That evening the same laptop played four pages in Firefox on screen with `gfx.webrender.dcomp-texture-overlay-win` on
+(`play_page.mjs --firefox-pref`) and with the default prefs, one run each, interleaved game by game, cold, nothing else
+running (the runs noted "Firefox composition"; the pref couldn't be read back, since the driver can't script
+about:support). Presents a second and the Intel GPU's median, default / pref: Banjo 30.0 at 86% / 30.1 at 75%, Conker
+29.7 at 99% (paced to 30) / 41.5 at 95% (Windy 39-48, its shader waits halved), GoldenEye 24.7 at 99% / 22.6 at 94%,
+Rush 2049 25.7 at 100% / 27.8 at 100%.
+
+- Where a page left the GPU room the overlay took 25-35 points off it: Banjo's intro 57.6-53.7 at 93-96% against
+  59.9-57.9 at 64-65%, GoldenEye's 59 at 91-99% against 60-64 at 60-67%, Rush 2049's 55 at 93% against 58.9 at 62%.
+  So most of Firefox's on-screen cost is its composition (WebGPU in Chrome and Firefox, below).
+- Rush 2049's race (20-37) and GoldenEye's Dam (about 20) stayed GPU-bound with it, as Chrome's race is off the
+  desktop: what they draw is more than this GPU's 1/60 s, whoever composites it.
+- Banjo stayed at 30 with it: RT64 paced it to 30 with the GPU 70-78% busy until 123 s, and drew 58-60 after.
+
 ## WebGPU in Chrome and Firefox
 
 
@@ -231,6 +245,15 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   sets turns it on: `alphaMode`, the canvas's size against its CSS size and covering the window change nothing in
   that path; `image-rendering` other than `auto`, a filter, opacity, a blend mode or a 3D transform on the canvas
   or above it keep it off even with the pref. `play_page.mjs --firefox-pref` plays a page with one set.
+- Chrome (Chromium's source, October 2026) has no such path for a WebGPU canvas on Windows, by any flag or anything a
+  page sets: its frames are shared images for display reads only (`WebGPUSwapBufferProvider::
+  GetSharedImageUsagesForDisplay` adds scanout on macOS and ChromeOS only), and Chrome's DirectComposition overlays
+  take only video and low-latency canvases (`DCLayerOverlayProcessor`; a `desynchronized` 2D or WebGL canvas, which a
+  WebGPU context has no option for). So its compositor draws the canvas into the window's own swap chain at device
+  pixels each frame, opaque (plume sets `alphaMode` opaque), and Windows composites that.
+- plume's device thread (plume-0002) adds a copy of the whole canvas a present: RT64 draws the present into a texture of
+  plume's, and the device thread acquires the canvas's texture at present and copies it there (`present()` in
+  `plume_device_thread.cpp`); a desktop swap chain is drawn into directly.
 - Chrome builds a pipeline made with `createRenderPipeline` on its GPU process's main thread, which does nothing
   else meanwhile: no frame, no readback, no screenshot, and the page's main thread blocks once its queue to the GPU
   process fills. A specialized RasterPS (1.15 MB of WGSL) takes 1.4-2.1 s there, 6-11 s cold beside another build,
