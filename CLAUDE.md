@@ -357,7 +357,7 @@ bfe07cb).
   section when the game gets there. A shader the list misses draws with the ubershader, in Chrome until it is built
   behind the game and in Firefox for the rest of the visit, and the page remembers it (`localStorage`) and builds it
   with its section next visit. `play_page.mjs` prints each miss and records them (`shaderMisses`), so a long play on
-  a fresh profile counts what a list lacks.
+  a fresh profile counts what a list lacks (docs/findings.md, What the prebuilt lists miss).
 - Recording: `?record-shaders` prebuilds none and prints an `rt64 shader:` line per description, in the order the game
   asks; add the new ones. `tools/record_shaders.mjs` records from a plan. A game with many levels records by code: a
   survey in its patches library or in JavaScript reaches each level as its own code would (`patches/shader_survey.c` or

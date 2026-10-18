@@ -161,6 +161,48 @@ the new, 10.7 MB on disk, and its visits stayed cold until Chrome trimmed it: co
 third open for 5 minutes, in which it fell to 5.3 MB, then 0.7 and 0.4 s. A rebuild with the same WGSL still added 59
 entries and took 2.0 s once. The page shows its indicator only after a second, so a warm visit shows nothing.
 
+## What the prebuilt lists miss
+
+Each list was recorded from a plan that reaches a level's start and plays a few seconds of it (its header says what
+it left out). How many shaders a longer play asks for that a list lacks, counted by `play_page.mjs` (CLAUDE.md,
+Prebuilt shader lists): one play of 6-10 minutes a game from Pages on v0.63.0 (2026-10-18, a busy host), cold, headless
+Chrome 155 uncapped at 1256x645 (RTX 2070), past level starts into what the recordings left out, reached by each game
+fork's survey or warps, memory pokes and inputs: bosses, later rooms, items and weapons in use, minigames, endings.
+Each run is in `plays.jsonl` with its misses (`shaderMisses`), its note naming the places.
+
+    game               misses  where the most were
+    Banjo-Kazooie        33    every world a few; Furnace Fun 4, the ending 5
+    Banjo-Tooie          24    Davy Jones' Locker 17
+    GoldenEye            18    Jungle 6, Control 7, Caverns 3 (6 missions)
+    Majora's Mask        16    items and masks in Termina Field, the shooting
+                               gallery 5, Deku bubbles 4
+    Jet Force Gemini      9    bosses, 1-3 each
+    Conker                7    Poovarotti, the War boss, the Alien
+    Pilotwings 64         7    pilot-class gyrocopter, rocket belt, birdman
+    Diddy Kong Racing     6    Wizpig, Darkmoon Caverns, cutscenes
+
+Unrecorded, from plays that didn't get through: Ocarina of Time 20 (Hyrule Field 8, its dungeons' bosses 1-4 each),
+Donkey Kong 64 18 in the first 225 s of its bosses (Aztec's Dogadon 5, the llama temple 4, the lighthouse 4). Not
+measured late: Rush 2049 and Wave Race 64 (their plans never left the first race: none and 1 there), and Mario Kart 64.
+
+So a long play finds tens of shaders a list lacks, not hundreds: a few a place, the most where a recording never went
+(Davy Jones' Locker, GoldenEye's Jungle and Control past their starts, Hyrule Field). They are the same shaders in
+both browsers, timing aside (Diddy Kong Racing 5 of Chrome's 6 in Firefox, Banjo-Tooie Firefox's 25 all but one of
+Chrome's 24), so what differs is their cost: Chrome builds each behind the game and draws it with the ubershader only
+until then, while Firefox draws it with the ubershader for the rest of the visit, which on integrated graphics costs
+several times what a built shader does for each pixel it covers. The page remembers each and builds it with its
+section the next visit, in either browser.
+
+The section a miss is put in is RT64's, not the place: Chrome builds the list behind the game and moves on from a
+section only when a frame waits for 4 of the next, so it put nearly every miss in the boot; a miss's time against
+its plan says where it was.
+
+Settings: the flags word (rt64-web `src/shared/rt64_render_flags.h`) changes with RT64's Upscale 2D mode, texture LOD
+scaling, MSAA and HDR, and with a rect's own scale, not with the resolution or the canvas: RecompFrontend sets LOD
+scaling on and never changes Upscale 2D, and the web has no MSAA or HDR. Pilotwings 64's play plan missed the same 1
+shader at 1256x645 and 3840x2000, and none at 960x720 (4:3), where nothing else missed either. A recomp's own settings
+can still change a flag: DKR-R's Modern profile's extended culling changed one of its list's in the culling bit.
+
 ## The stand-in, measured
 
 On 2026-10-14, every page built on N64Recomp-browser ed8764a (v0.36.0: rt64 58fc4e4's pacing, the CPU hot paths), Rush
