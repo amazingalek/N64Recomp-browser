@@ -67,7 +67,7 @@
 // the "play" steps: median presents a second and the range, the gaps between presents, the median animation frames a
 // second (in Chrome on Windows ~55.6 when the display gives it no vblank, a monitor that is off: then a page that
 // interpolates presents ~55.6 too, and the run says so), frames short, each prebuilt
-// shader wait (RT64's "built in ... the game waiting" lines), WebGPU errors and exceptions, the GPU and the cores, and
+// shader wait (RT64's "built in ... the game waiting" lines, Firefox's for what the list missed among them, missed: true), WebGPU errors and exceptions, the GPU and the cores, and
 // the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
 // Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
@@ -177,8 +177,8 @@ let exceptions = 0;
 const onLine = (text) => {
   if (/^rt64 shader: /.test(text)) return;
   log(text);
-  const wait = /RT64: (\d+) prebuilt shaders built in ([\d.]+) s, the game waiting/.exec(text);
-  if (wait) shaderWaits.push({ at: Math.round(seconds()), shaders: Number(wait[1]), seconds: Number(wait[2]) });
+  const wait = /RT64: (\d+) (prebuilt shaders|shaders the list missed) built in ([\d.]+) s, the game waiting/.exec(text);
+  if (wait) shaderWaits.push({ at: Math.round(seconds()), shaders: Number(wait[1]), seconds: Number(wait[3]), ...(wait[2] === 'prebuilt shaders' ? {} : { missed: true }) });
   if (/^WebGPU (error|device lost)/.test(text)) errors.push(text);
   if (/^exception: /.test(text)) exceptions++;
 };
