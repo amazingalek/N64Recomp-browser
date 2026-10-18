@@ -2,7 +2,7 @@
 # Rebuilds every game's page from its repo's main, publishes the ones whose files changed, and checks each one it
 # published from Pages: the deploy after a change that reaches the pages, so no page is left behind main.
 #
-#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit>]
+#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit>] [--ref <commit>]
 #
 # For each game in the list below (all of them unless named):
 # 1. Syncs its repo's origin/main to a copy kept on $BUILD_HOST, with rush-2049-recomp's tools/remote_build.sh (its
@@ -30,6 +30,15 @@
 # Once the pins are moved there (a fork's main, Rush 2049's by a pull request on its repo), a run without it builds
 # the same bytes and publishes them. PAGES_COPY=<prefix> builds in copies of its own, <prefix>-<game> (Rush 2049's
 # too), for a test build of a branch beside others' builds in the usual copies.
+# --ref <commit> builds that commit of the one game named in place of its main, as a dry run, in PAGES_COPY's copies
+# (needed: its patches can be other than main's, which a usual copy's next build of main would start from). So a game
+# fork's change that has to land with its pin (its own patch rebased onto a tag, which no longer applies at the old
+# pin) is built and played, with --browser <tag>, before the fork's main moves; once main is that commit, a run without
+# it builds the same bytes and publishes them. The commit is a branch, a tag or a whole SHA the game's clone has or its
+# GitHub repo gives (a pushed wip/<topic> branch); one only in a local clone goes into the clone first,
+# `git -C $PAGES_CACHE/<game> fetch <local clone> <branch>` (Rush 2049's clone is its checkout), its origin left at
+# GitHub: the build host clones from origin's URL, and the sync sends the commit as a bundle on top of origin/main.
+# Every line names the commit built ("commit <sha>", not "main <sha>").
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
@@ -45,12 +54,13 @@
 # ccache), 162 s to built, 6 min 14 s with its publish, the wait for Pages and the boot in headless Chrome.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-dry_run=false browser=""
+dry_run=false browser="" ref=""
 args=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --dry-run) dry_run=true ;;
     --browser) browser="$2" dry_run=true; shift ;;
+    --ref) ref="$2" dry_run=true; shift ;;
     *) args+=("$1") ;;
     esac
     shift
@@ -83,6 +93,17 @@ dkr    amazingalek/DKR-R-web                      DKR-R                build-web
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
 for g in "${selected[@]}"; do grep -q "^$g " <<< "$games" || { echo "no game $g (one of: $(awk 'NF { printf "%s ", $1 }' <<< "$games"))"; exit 1; }; done
+if [[ -n "$ref" ]]; then
+    [[ ${#args[@]} -eq 2 ]] || { echo "--ref builds one game's commit: name the game"; exit 1; }
+    [[ -n "${PAGES_COPY:-}" ]] || { echo "--ref builds in copies of its own: set PAGES_COPY"; exit 1; }
+fi
+# base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, fetched from origin when the clone lacks it.
+base() {
+    [[ -n "$ref" ]] || { git -C "$1" rev-parse origin/main; return; }
+    git -C "$1" rev-parse -q --verify "$ref^{commit}" && return
+    git -C "$1" fetch -q origin "$ref" || { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
+    git -C "$1" rev-parse FETCH_HEAD
+}
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---
 
@@ -287,24 +308,27 @@ for g in "${selected[@]}"; do
     if [[ $g == rush ]]; then
         clone="$rush" copy="${PAGES_COPY:+$PAGES_COPY-rush}" copy="${copy:-publish}"
         git -C "$clone" fetch -q origin main
-        target=origin/main
+        from="$(base "$clone")" || { failed+=("$g"); continue; }
+        target=$from
         if [[ -n "$browser" ]]; then
             # main with lib/N64Recomp-browser at <commit>, made in a scratch index: the checkout's files and branches
             # stay as they are, and remote_build.sh's sync moves the submodule and patches it.
             git -C "$here/.." fetch -q origin "$browser"
             export GIT_INDEX_FILE="$work/rush.index"
-            git -C "$clone" read-tree origin/main
+            git -C "$clone" read-tree "$from"
             git -C "$clone" update-index --cacheinfo "160000,$(git -C "$here/.." rev-parse "FETCH_HEAD^{commit}"),lib/N64Recomp-browser"
             target="$(git -C "$clone" -c user.name=publish_pages -c user.email=publish_pages@localhost \
-                commit-tree "$(git -C "$clone" write-tree)" -p origin/main -m "N64Recomp-browser $browser")"
+                commit-tree "$(git -C "$clone" write-tree)" -p "$from" -m "N64Recomp-browser $browser")"
             unset GIT_INDEX_FILE
         fi
     else
-        clone="$cache/$g" copy="${PAGES_COPY:-pages}-$g" target=origin/main
+        clone="$cache/$g" copy="${PAGES_COPY:-pages}-$g"
         [[ -d "$clone/.git" ]] || git clone -q --filter=blob:none --no-checkout "https://github.com/$repo" "$clone"
         git -C "$clone" fetch -q origin main
+        from="$(base "$clone")" || { failed+=("$g"); continue; }
+        target=$from
     fi
-    sha="$(git -C "$clone" rev-parse --short origin/main)"
+    sha="$(git -C "$clone" rev-parse --short "$from")" label="${ref:+commit $sha}" label="${label:-main $sha}"
     if ! bash "$remote_build" -C "$clone" -n $copy sync $target > "$work/$g.log" 2>&1; then
         echo "   sync failed:"; tail -5 "$work/$g.log"; failed+=("$g"); continue
     fi
@@ -324,12 +348,12 @@ for g in "${selected[@]}"; do
     pages="$(gh api "repos/$repo/git/trees/gh-pages" --jq '.tree[] | .path + " " + .sha' 2> /dev/null || true)"
     served=""
     for f in $(files $name); do served+="$(awk -v p="${f/$name.html/index.html}" '$1 == p { print $2 }' <<< "$pages") "; done
-    echo "   main $sha${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as gh-pages" || echo "differs from gh-pages")"
+    echo "   $label${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as gh-pages" || echo "differs from gh-pages")"
     [[ "$built" != "$served" ]] || continue
     differ+=("$g")
     $dry_run && continue
     bash "$remote_build" -n $copy get "$dir" "$work/$g"
-    bash "$here/publish_page.sh" "$work/$g" "$name" "$repo" "main $sha" | sed 's/^/   /'
+    bash "$here/publish_page.sh" "$work/$g" "$name" "$repo" "$label" | sed 's/^/   /'
     published+=("$g")
 done
 
@@ -363,9 +387,12 @@ done
 
 echo
 [[ ${#failed[@]} -eq 0 ]] || echo "failed: ${failed[*]}"
-if [[ -n "$browser" ]]; then
-    echo "built with N64Recomp-browser $browser, differing from Pages: ${differ[*]:-none}"
-    for g in "${differ[@]}"; do
+if [[ -n "$browser$ref" ]]; then
+    echo "built${ref:+ ${args[1]} at $ref}${browser:+ with N64Recomp-browser $browser}, differing from Pages: ${differ[*]:-none}"
+    # A --ref build is there to play whether or not it differs.
+    shown=("${differ[@]}")
+    [[ -z "$ref" || ${#failed[@]} -gt 0 ]] || shown=("${args[1]}")
+    for g in "${shown[@]}"; do
         read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
         echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n ${PAGES_COPY:-} ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
     done
