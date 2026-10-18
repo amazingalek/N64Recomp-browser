@@ -263,7 +263,8 @@ current in the same work as what changes it:
 - A plan reaches a level as a player does (the menus where quick, the survey's warp or stage start where not; its
   header says which) and plays it a minute or more. A walk sways out and back by as much each way about a spot it was
   played to and looked at: a blind walk in one direction, or back the way it came, carries the character off a ledge,
-  into water or out an exit. A plan that ends on black is the plan's fault until a direct warp there draws black too
+  into water or out an exit. Its waits and holds in the level are on the game's own clock (a `clock` step, page_driver's
+  header): in ms of the browser's time, uneven frames walked Firefox's runs of one plan to other places than Chrome's. A plan that ends on black is the plan's fault until a direct warp there draws black too
   (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
 - Keep `--profile` between runs for a warm one, on its fixed port: IndexedDB belongs to the origin, port included. For
   a cold visit in Chrome, start a new `--user-data-dir` once on the launcher first: a profile's first run stores nothing
