@@ -350,7 +350,12 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   two or three animation frames a game frame however cheap the composite, which fits those trips to the page's thread
   and the sleeps between them, each ending late in Firefox there; the late sleeps to the slots are plume's 6-14 ms timed waits, shorter when the
   overlay takes the composite off the page's thread. Chrome on that screen paced Banjo to 30 too, twice for 10 s in a
-  play otherwise at 60, in a build without the lines.
+  play otherwise at 60, in a build without the lines; on the test build (Chrome 155, 37 drops) the drops before its
+  two paces had the same make-up, wait() 33.5 ms a game frame (median) and asleep 30.6, but only 2.0 past the slots.
+  plume bf417cf (rt64 0c5ba5d) takes wait()'s trips out: the present thread blocks on a futex the done callbacks wake.
+  On a desktop GPU that changes nothing measurable (Banjo in Firefox at `?timer-tick=15.625` 60.0 before and after,
+  its drops there the level loads; GoldenEye uncapped in Firefox 174.0 and 177.6 on a busy host), so whether the
+  laptop's paces go is for a run on its screen.
 - Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
   88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
