@@ -40,7 +40,8 @@
 // from there to the end of the steps, or to a ["clock"] that stops it, a wait's and a hold's ms are of that time, so
 // every browser gives the game the same input for the same game time. A hold presses on the clock's next tick and lets
 // go once the clock has moved its ms on. A wait or hold whose clock stands still (a load the game counts no time in, a
-// wrong address) goes on for at most 5 times its ms and 30 s more, and says so. A counter the game steps by its frame's
+// wrong address) goes on for at most 5 times its ms and 30 s more, and says so; one that goes back (a level that
+// restarts it) counts from there, so a wait over a level's start is that long into the level. A counter the game steps by its frame's
 // length (GoldenEye's g_GlobalTimer, in 60ths) is better than one that counts frames, since a variable timestep moves
 // the player by that length. The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is.
 import fs from 'fs';
@@ -121,12 +122,16 @@ const rdramHelpers = `(() => {
   window.n64r = (a) => { base ??= find(); return HEAPU32[(base + (a - 0x80000000)) >>> 2]; };
   window.n64w = (a, v) => { base ??= find(); HEAPU32[(base + (a - 0x80000000)) >>> 2] = v >>> 0; };
   // Waits for the clock read gives to move ticks on from from (from where it is when from is null), polling on a timer,
-  // for at most ms; gives back where it is and whether it got there.
+  // for at most ms; gives back where it is and whether it got there. A clock that goes back (a level that restarts it)
+  // counts on from where it went back to.
   window.n64clock = (read, from, ticks, ms) => new Promise((resolve) => {
-    const now = new Function('return (' + read + ') >>> 0'), t0 = performance.now(), start = from ?? now();
+    const now = new Function('return ' + read), t0 = performance.now();
+    let last = from ?? now(), moved = 0;
     const poll = () => {
       const at = now();
-      if (((at - start) >>> 0) >= ticks) resolve([at, true]);
+      moved = at < last ? 0 : moved + at - last;
+      last = at;
+      if (moved >= ticks) resolve([at, true]);
       else if (performance.now() - t0 > ms) resolve([at, false]);
       else setTimeout(poll, 1);
     };
