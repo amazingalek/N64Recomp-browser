@@ -208,7 +208,9 @@ included, those noted "onscreen" giving the README's cells. No run that played h
 - Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
   88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
-  Banjo-Tooie take more than 1/60 s of this GPU a frame in either browser.
+  Banjo-Tooie take more than 1/60 s of this GPU a frame in Chrome. Firefox's are too low to set beside Chrome's: its
+  animation frames ran at 3,700-8,600 a second (`layout.frame_rate` 0), and WebRender composited for them on the same
+  GPU (Uncapped in Firefox).
 - Over 600 s of Rush 2049 Firefox's GPU process grew from 466 to 3142 MB, still near linearly (about:memory:
   systemHeap +1143 MB, gpuShared +1261, heap +46), and Chrome's from 508 to 864, most of it in the first minutes.
 
