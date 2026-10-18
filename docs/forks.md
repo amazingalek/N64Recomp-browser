@@ -223,7 +223,7 @@ rt64 8a2c6a7           interpolated frames take turns in 8 color targets (Interp
                        display frames. GoldenEye's are 5702x2970 (68 MB) at 3840x2000, and uncapped (360 Hz) in Dam at
                        ~8 fps it kept 42, 2.8 GB, until Firefox's WebGPU device ran out of memory on an 8 GB GPU
 N64ModernRuntime       where a timed wait ends late (Firefox on Windows), the VI thread ends its wait on the first
-b81df43                animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
+b81df43, 30c60e5       animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
                        15.6 or 31.2 ms apart, RT64 read GoldenEye's frames as a game at 30 ~5 times a second and made
                        two presents of each, and the page presented 63-64 a second on a 60 Hz display. Under the
                        stand-in for the tick (Firefox 158, 60 Hz): VIs 58-60 → 60.0, presents 63.4 → 60.0, sound frames

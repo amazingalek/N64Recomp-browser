@@ -405,7 +405,7 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   ultramodern's VI thread waited for each VI's time with a timed wait, which ended on a tick, so VIs came 15.6 or
   31.2 ms apart, 58-60 a second. RT64 reads a game's rate from the VIs between its last three new frames, read
   GoldenEye's 60 as 30 for 10-13 frames a second, and interpolated each of those into two presents; with the VI
-  thread exempt from the stand-in it drew 60.0. On N64ModernRuntime b81df43, where a probe finds timed waits late,
+  thread exempt from the stand-in it drew 60.0. On N64ModernRuntime b81df43 and 30c60e5, where a probe finds timed waits late,
   the VI thread waits on a futex the page's animation frames wake and ends at the first frame within half a VI of
   its time. Only a count crosses the threads: the page's thread and a pthread read `emscripten_get_now()` apart in
   Firefox, and a version comparing the two clocks sent VIs 1,500-1,800 a second. Under the stand-in it drew VIs and

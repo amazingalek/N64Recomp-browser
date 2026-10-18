@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web b81df43784c7f00ce10c9772699d79cde3133d3e
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 30c60e5c302c4207bf3a5635bbe013ef6e691cc3
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -614,7 +614,7 @@ index 31eb106..50e8244 100644
      int32_t sp;
  } OSThread;
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..2ad2944 100644
+index 2f1cfb5..4609b9a 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
 @@ -179,6 +179,95 @@ extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
@@ -713,18 +713,19 @@ index 2f1cfb5..2ad2944 100644
  void vi_thread_func() {
      ultramodern::set_native_thread_name("VI Thread");
      // This thread should be prioritized over every other thread in the application, as it's what allows
-@@ -204,10 +293,24 @@ void vi_thread_func() {
+@@ -204,10 +293,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
 +#if defined(__EMSCRIPTEN_PTHREADS__)
++        // A VI that ended on a frame leaves the timed wait below nothing to wait for. That wait stays where it was, so
++        // a recomp's own patches to this loop still apply.
 +        const bool vi_on_frame = vi_sleep_until(next);
-+        if (!vi_on_frame) {
-+            ultramodern::sleep_until(next);
++        if (vi_on_frame) {
++            next = std::chrono::high_resolution_clock::now();
 +        }
-+#else
-         ultramodern::sleep_until(next);
 +#endif
+         ultramodern::sleep_until(next);
          auto time_now = ultramodern::time_since_start();
          // Calculate how many VIs have passed
          uint64_t new_total_vis = (time_now * (60 * ultramodern::get_speed_multiplier()) / 1000ms) + 1;
