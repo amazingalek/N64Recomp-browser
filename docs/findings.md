@@ -196,11 +196,37 @@ Each run is in `plays.jsonl` with its misses (`shaderMisses`), its note naming t
     Pilotwings 64         7    pilot-class gyrocopter, rocket belt, birdman
     Diddy Kong Racing     6    Wizpig, Darkmoon Caverns, cutscenes
 
-Unrecorded, from plays that didn't get through: Ocarina of Time 20 (Hyrule Field 8, its dungeons' bosses 1-4 each),
-Donkey Kong 64 18 in the first 225 s of its bosses (Aztec's Dogadon 5, the llama temple 4, the lighthouse 4), Mario
-Kart 64 5 (mirror Bowser's Castle 2, Banshee Boardwalk's finish 3; Rainbow Road driven 150 s, 4-player Versus, cut off
-at the award ceremony; a run whose races stayed at the start line, recorded, missed 4). Not measured late: Rush 2049
-and Wave Race 64 (their plans never left the first race: none and 1 there).
+Ocarina of Time 20 (Hyrule Field 8, its dungeons' bosses 1-4 each), Donkey Kong 64 18 in the first 225 s of its
+bosses (Aztec's Dogadon 5, the llama temple 4, the lighthouse 4) and Mario Kart 64 5 (mirror Bowser's Castle 2, Banshee
+Boardwalk's finish 3) came from plays that didn't get through. Rush 2049 then drove its second track ~6 min (2 missed)
+and Wave Race 64 its first three championship races (10 missed); neither plan gets further (Rush 2049 never leaves its
+first race, Wave Race 64 fails qualification after the third).
+
+Every one of those misses is now in its game's list, in the section of the place it was met (a boss, a later room,
+an item in use in its level's; new sections only for Banjo-Kazooie's later worlds and its ending), and each game
+fork's shader plan reaches those places in that section, so a re-recording keeps them. The same long plans replayed
+on local builds of those lists (2026-10-18, a busy host, cold, uncapped, 1256x645, both browsers), Rush 2049's and Wave
+Race 64's too:
+
+    game               Chrome  Firefox   Firefox's waits under 1 s, all told
+    Banjo-Kazooie         0       0         1.5 s
+    Banjo-Tooie           0       0         1.2 s
+    GoldenEye             0       4         0.8 s
+    Majora's Mask         0       3         1.6 s
+    Jet Force Gemini      0       0         1.7 s
+    Conker                2       0         1.0 s
+    Pilotwings 64         0       0         3.6 s
+    Diddy Kong Racing     0       0         2.9 s
+    Ocarina of Time       0       0         4.0 s
+    Donkey Kong 64        5       6         3.3 s
+    Mario Kart 64         1       0         2.4 s
+    Rush 2049             0       0         0.2 s
+    Wave Race 64          0       0         0.8 s
+
+What the replays still missed is in the lists too (Donkey Kong 64's replay got further into its bosses than the first
+play). No WebGPU errors. Firefox's waits stay what they were: a few seconds a section where the game enters one, as
+before, and the added shaders come as waits of 0.1-0.3 s for 1-3 shaders where the play meets them, 1-4 s all told
+over a 6-10 minute play (Banjo-Tooie 6.3 s of waits before, 6.5 s after; Diddy Kong Racing 5.1 s, 5.4 s).
 
 So a long play finds tens of shaders a list lacks, not hundreds: a few a place, the most where a recording never went
 (Davy Jones' Locker, GoldenEye's Jungle and Control past their starts, Hyrule Field). They are the same shaders in
