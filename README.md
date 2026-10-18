@@ -23,7 +23,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Banjo-Kazooie | [Banjo: Recompiled](https://github.com/BanjoRecomp/BanjoRecomp) by BanjoRecomp | [BanjoRecomp-web](https://github.com/amazingalek/BanjoRecomp-web) | [play](https://amazingalek.github.io/BanjoRecomp-web/) | 60; 340* | 30†; 281* | 2026-10-18, v0.63.0; laptop 2026-10-17, v0.58.0 |
 | Conker's Bad Fur Day | [CBFD-Recompiled](https://github.com/sciaschi/CBFD-Recompiled) by sciaschi | [CBFD-Recompiled-web](https://github.com/amazingalek/CBFD-Recompiled-web) | [play](https://amazingalek.github.io/CBFD-Recompiled-web/) | 53; 345* | 28; 265* | 2026-10-18, v0.63.0; laptop 2026-10-17, v0.58.0 |
 | Donkey Kong 64 | [Donkey Kong 64: Recompiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled) by Rainchus | [Donkey-Kong-64-Recompiled-web](https://github.com/amazingalek/Donkey-Kong-64-Recompiled-web) | [play](https://amazingalek.github.io/Donkey-Kong-64-Recompiled-web/) | 60; 360* | 38; 330* | 2026-10-18, v0.63.0; laptop 2026-10-17, v0.58.0 |
-| Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 54; 314* | 20†; 217* | 2026-10-17, v0.58.0; laptop 2026-10-15, v0.46.0 |
+| Wave Race 64 | [Wave Race 64: Recompiled](https://github.com/danielgomesvieira2000/wave-race-64-recomp) by danielgomesvieira2000 | [wave-race-64-recomp-web](https://github.com/amazingalek/wave-race-64-recomp-web) | [play](https://amazingalek.github.io/wave-race-64-recomp-web/) | 54; 344* | 20†; 283* | 2026-10-18, v0.63.0; laptop 2026-10-15, v0.46.0 |
 | Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 60; 344* | 37; 225* | 2026-10-18, v0.63.0; laptop 2026-10-17, v0.58.0 |
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 59; 358* | 30†; 236* | 2026-10-18, v0.63.0; laptop 2026-10-17, v0.58.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 359* | 340* | 2026-10-18, v0.63.0 |
@@ -100,6 +100,9 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
   `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
   of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
+- A window made without `SDL_WINDOW_ALLOW_HIGHDPI`, so the canvas stays in CSS pixels. With it, a recomp that makes its
+  own window gets a canvas at the device's pixels, which on a laptop at 200% draws four times the pixels and takes every
+  click at the wrong spot: Wave Race 64's Load ROM opened nothing there (wave-race-64-recomp-web 9d3f621).
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
@@ -384,7 +387,7 @@ take the web support without moving its submodules to the forks (Using it in a r
   can be followed day by day. `pass_probe.js`, a preload for it, says what a page's presents spend the GPU on: its
   passes, their size, their draws by shader and the GPU time of each; `webgpu_census.js`, another, counts its WebGPU calls
   and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
-  reading Firefox's GPU process memory around each.
+  reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and

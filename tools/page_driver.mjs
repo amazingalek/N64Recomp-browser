@@ -2,7 +2,7 @@
 // build dir with the headers a threaded page needs, starts the browser with a profile of its own, and runs a plan's
 // steps on the page.
 //
-// Chrome runs headless (muted, WebGPU on, one CSS pixel a pixel) and is driven over the DevTools protocol: its input
+// Chrome runs headless (muted, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
 // events are trusted, and the ROM goes to the file chooser the page opens. Headless Chrome draws to no display, so its
 // presents never go through the desktop's compositor or wait for the display; with headed it runs in a window of its own,
 // moved off the desktop as Firefox's is below, with its throttling of hidden windows off, which presents as a player's
@@ -121,10 +121,13 @@ const rdramHelpers = `(() => {
 // as the browser can make them, not at the display's rate: Chrome with --disable-frame-rate-limit, Firefox with
 // layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how). cpuThrottle
 // (Chrome only) slows the page's thread that many times (CDP Emulation.setCPUThrottlingRate), a stand-in for a
-// laptop's CPU. onScreen (above) leaves size to the window. firefoxPrefs are Firefox prefs of the caller's, set over
+// laptop's CPU. scale is the device pixels a CSS pixel off the desktop, 1 unless given: 2 is a laptop at 200%, where a
+// page whose canvas went to device pixels (SDL_WINDOW_ALLOW_HIGHDPI) drew four times the pixels and took every click
+// at the wrong spot, so Load ROM opened nothing, which no run at 1 shows. onScreen (above) leaves size and scale to the
+// window. firefoxPrefs are Firefox prefs of the caller's, set over
 // the ones below.
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, firefoxPrefs = {}, onLine = () => {}, log = console.log }) => {
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
@@ -137,8 +140,8 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line });
-  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, firefoxPrefs, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line });
+  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
   page.profile = profile;
@@ -204,7 +207,7 @@ const listening = (host, port) => new Promise((resolve) => {
 
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
   // another window over it would hide it too).
   const mode = headed || onScreen
@@ -212,7 +215,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       '--disable-renderer-backgrounding', '--no-default-browser-check']
     : ['--headless=new'];
   if (uncapped) mode.push('--disable-frame-rate-limit');
-  const size = onScreen ? ['--start-maximized'] : ['--force-device-scale-factor=1', `--window-size=${width},${height}`];
+  const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
   const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'],
@@ -253,7 +256,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   await send('Runtime.enable');
   await send('Page.enable');
-  if (!onScreen) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  if (!onScreen) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale, mobile: false });
   if (cpuThrottle > 1) await send('Emulation.setCPUThrottlingRate', { rate: cpuThrottle });
   if (preload) await send('Page.addScriptToEvaluateOnNewDocument', { source: `(${preload})()` });
   const click = async (x, y) => {
@@ -315,12 +318,12 @@ if ($w) { ${place} | Out-Null; 'moved' }`;
     (err, stdout) => resolve(!err && stdout.includes('moved')));
 });
 
-const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, firefoxPrefs, line }) => {
-  // No first-run pages or crash restore, one CSS pixel a pixel (but on screen), sound allowed to start without a click
+const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line }) => {
+  // No first-run pages or crash restore, scale device pixels a CSS pixel (but on screen), sound allowed to start without a click
   // but silent.
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
     'browser.aboutwelcome.enabled': false, 'app.update.auto': false, 'browser.sessionstore.resume_from_crash': false,
-    'dom.webgpu.enabled': true, 'media.volume_scale': '0.0', ...(onScreen ? {} : { 'layout.css.devPixelsPerPx': '1.0' }),
+    'dom.webgpu.enabled': true, 'media.volume_scale': '0.0', ...(onScreen ? {} : { 'layout.css.devPixelsPerPx': scale.toFixed(1) }),
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? 0 : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
@@ -340,7 +343,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   const context = (await send('browsingContext.getTree', {})).result.contexts[0].context;
   if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, onScreen ? 0 : width, height)) line('page_driver: Firefox window not moved');
   if (!onScreen) {
-    const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: 1 });
+    const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: scale });
     if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
   }
   if (preload) await send('script.addPreloadScript', { functionDeclaration: preload });
