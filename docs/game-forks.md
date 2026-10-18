@@ -207,3 +207,18 @@ Timber's Island and Dino Domain, the game asked for 119 descriptions, all in it 
 only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.sh`, `web/shader_survey.js` and
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
+
+## The games' own frame rates
+
+A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
+game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
+Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
+Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
+cartridge's for the other seven: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
+(Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, GoldenEye's and Conker's variable. None of the seven
+has an option to run faster.
+
+A game fork may take a change that runs its game faster when that makes the page play better. Weigh it: logic at 60
+gives lower input lag, motion the game computes rather than RT64 interpolates, and what interpolation misses (some
+particles and 2D), but no more presents, and it doubles the game's CPU work and RT64's per display list (4-12 ms each
+on a page), which a laptop's CPU pays for. For the frame rate on screen, or to measure a page, it buys nothing.

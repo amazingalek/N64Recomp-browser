@@ -161,7 +161,7 @@ rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slo
                        sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
                        the pages of games below the display's rate presented 51-55 a second on a laptop's Intel UHD,
                        where games at its rate, which never sleep there, presented 60 (Chrome's 55.6 on a desktop is
-                       its frames with no display, Playing a page). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       its frames with no display, docs/playing.md). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
                        Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
                        it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
 rt64 254dee3           a framebuffer the CPU changed counted on the CPU, not by a GPU readback (Pilotwings 64's screen
