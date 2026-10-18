@@ -38,7 +38,7 @@
 // --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
-// below that, which changes how Firefox's waits end (CLAUDE.md, WebGPU in Chrome and Firefox).
+// below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -72,9 +72,9 @@
 // Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
 //
-// Every shader the game asks for that the page's prebuilt list doesn't have is a miss (CLAUDE.md, Prebuilt shader
-// lists): RT64 tells the shell of each, once a visit, as Module.rt64ShaderMissed, which play_page wraps. Each comes out
-// as a "shader missed:" line, with its five words as the list writes them (other mode L and H, combiner L and H,
+// Every shader the game asks for that the page's prebuilt list doesn't have is a miss (docs/porting.md,
+// Prebuilt shader lists): RT64 tells the shell of each, once a visit, as Module.rt64ShaderMissed, which play_page wraps.
+// Each comes out as a "shader missed:" line, with its five words as the list writes them (other mode L and H, combiner L and H,
 // flags) and the section RT64 had reached, its index in the list (0 the boot; in Chrome RT64 moves on from a section
 // only when a frame waits for 4 of the next, so a miss there is often put in an earlier one), and the summary counts
 // them by section. A miss draws with the ubershader: in Chrome until it is built behind the game, in Firefox for the
@@ -96,7 +96,7 @@
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
 // or waits for shaders over 2 s and half again longer than the longest of theirs: outside
-// the runs' own noise, but a busy host reads the same, so a flag is a reason to look again (CLAUDE.md, The pins).
+// the runs' own noise, but a busy host reads the same, so a flag is a reason to look again (docs/publishing.md, The retest).
 // Presents aren't compared for a run at the display's rate whose browser drew fewer than 57 animation frames a second:
 // the host had no display to pace them, and every page that interpolates reads the same.
 import fs from 'fs';
@@ -449,8 +449,9 @@ const hostAfter = hostTimes();
 const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
 const animationFrames = median(during.map((s) => s.animationFrames));
-// At the display's rate, a browser drawing fewer than 57 frames a second had no display to pace it (CLAUDE.md, Playing a
-// page): Chrome on Windows then sleeps 17 ms and a timer tick between frames, and plume takes that for the display.
+// At the display's rate, a browser drawing fewer than 57 frames a second had no display to pace it (docs/playing.md,
+// Uncapped, and the browsers' clocks): Chrome on Windows then sleeps 17 ms and a timer tick between frames, and
+// plume takes that for the display.
 const noDisplay = !uncapped && animationFrames !== null && animationFrames < 57;
 const audioAfter = last?.audio ?? null;
 const percentile = (values, q) => {

@@ -17,8 +17,8 @@
 # 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, DKR-R's web/): launcher, ROM, Start Game,
-#    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (CLAUDE.md,
-#    Playing a page), which has to present frames with no WebGPU error. Each run goes into
+#    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (docs/playing.md,
+#    Uncapped, and the browsers' clocks), which has to present frames with no WebGPU error. Each run goes into
 #    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
