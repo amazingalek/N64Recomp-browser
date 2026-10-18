@@ -393,8 +393,10 @@ take the web support without moving its submodules to the forks (Using it in a r
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.
-- `docs/`: notes for whoever changes this repo, beside `CLAUDE.md`: every fork commit (`forks.md`), what porting each
-  game fork found (`game-forks.md`), and what has been measured about the pages in Chrome and Firefox (`findings.md`).
+- `docs/`: notes for whoever changes this repo, beside `CLAUDE.md`: what the web needs from a recomp and RT64
+  (`porting.md`), how a page is played and measured (`playing.md`), the retest and publishing (`publishing.md`), every
+  fork commit (`forks.md`), what porting each game fork found (`game-forks.md`), and what has been measured about the
+  pages in Chrome and Firefox (`findings.md`).
 
 ## Changing it
 
