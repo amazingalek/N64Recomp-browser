@@ -653,6 +653,12 @@ The measurements behind rules CLAUDE.md states without them.
   own (its jigsaw wipe) in Hailfire Peaks, every world warped to after it drew black, though each warp reached its map.
   Its plan now visits ten worlds and doesn't walk (Banjo jumps and attacks where he lands), and its survey's warp waits
   for a change the game began.
+- Holds in ms of the browser's time: a laptop's six Firefox runs of GoldenEye's plan (Pages v0.63.0) ended in other
+  places than its two Chrome runs, by a curb and deep in a tunnel six shots on, where Dam drew ~20 presents a second,
+  so the browsers' Dam numbers weren't of the same views. On a desktop GPU, Chrome and Firefox ended 1,600 units
+  apart in Dam by that plan; on its clock (`g_GlobalTimer`, 60ths), every hold held the 3,624 ticks it asked for in
+  both browsers, and four runs, two each, ended within 750 units of each other facing the same barriers (two Chrome
+  runs alone, 250 apart). Chrome's CPU throttling (4) slowed none of the game: a play under it took as long.
 - A loop of messages to itself in a page's script: Ocarina of Time's survey waited for the file select's hand-over with
   one (`MessageChannel`), ~10,000 tasks a second on the page's thread, none of them long. In Chrome they starved the
   tasks that carry the device thread's WebGPU work to it, and its page held 3-8 s as the file loaded, only while the
