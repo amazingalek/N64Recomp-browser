@@ -295,7 +295,16 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   frames in a row came to 33.3 ms each, 32.5 of it asleep to the slots, without a wait for the next one, and one
   present dropped. Most of the other drops there were held by wait() (14-55 ms a game frame), whose trips to the device
   thread, parked in the last present() until an animation frame, plume's count of time waiting leaves out. On the
-  laptop, the same lines are what tells late sleeps from wait() and early game frames.
+  laptop's screen the same lines put it on wait(), then on late sleeps (a test build of Banjo's main on v0.66.0,
+  Firefox 158 maximized at 200%, cold, `?present-stats`): 30.0 presents a second with default prefs (Intel 86% busy,
+  214 drops, paced at 29.5, 41.5, 63.5 and 105.5 s, each try at the display's rate back within ~2 s) and 30.0 with the
+  overlay pref (75%, 161 drops). Over the drops leading up to each pace, a game frame took 73.4 / 62.7 ms (median,
+  default / overlay) against its 33.3: wait() 32.8 / 38.2, asleep 31.0 / 19.8 of which past the slots 11.5 / 3.3,
+  workload 3.5 / 2.5, draw 1.1 / 1.2, interpolation and present() ~0, mostly one game frame a drop. So wait() costs
+  two or three animation frames a game frame however cheap the composite, which fits trips to a device thread parked
+  in present() until the next animation frame; the late sleeps are plume's 6-14 ms timed waits, shorter when the
+  overlay takes the composite off the page's thread. Chrome on that screen paced Banjo to 30 too, twice for 10 s in a
+  play otherwise at 60, in a build without the lines.
 - Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
   88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
