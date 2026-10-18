@@ -8,7 +8,7 @@ Ruled out lists what not to try again.
 
 ## A page's GPU time
 
-Read with `tools/pass_probe.js` (CLAUDE.md, Playing a page). Uncapped at 3840x2000 in Chrome 155 (RTX 2070, a busy
+Read with `tools/pass_probe.js` (docs/playing.md). Uncapped at 3840x2000 in Chrome 155 (RTX 2070, a busy
 host), RT64 draws a canvas of that size at Auto's ceil(2000/240) = 9 times the N64's lines, 4224x2200 for Rush 2049 and
 4148x2169 for Majora's Mask, and every interpolated present redraws the whole frame there. Rush 2049: ~12 passes a
 present, 7.1 ms of GPU passes, 83% of it the draws of one 70 KB pixel shader, one with mip LOD whose tile is picked per
@@ -40,7 +40,7 @@ nothing builds up. So Dam's GPU frame is RT64's own, as the others are; on the l
 
 ## Memory
 
-Read as CLAUDE.md's Playing a page says. Rush 2049's page from Pages, 10 minutes of its attract demo, Firefox 158 on an
+Read as docs/playing.md says. Rush 2049's page from Pages, 10 minutes of its attract demo, Firefox 158 on an
 RTX 2070 (a busy host): after the first minute the GPU process's private bytes went 1.1 → 1.6 GB at 1920x945 and 1.7 →
 2.1 GB at 3840x2000, a step of ~210 MB some 4 minutes in (GPU memory moving to shared) and then 0.2-0.4 MB a second;
 from minute 1 to 10 Firefox's heap +4 MB, the system heap +207 MB, GPU committed +245 MB (shared +179). Chrome 155 on
@@ -179,7 +179,7 @@ entries and took 2.0 s once. The page shows its indicator only after a second, s
 ## What the prebuilt lists miss
 
 Each list was recorded from a plan that reaches a level's start and plays a few seconds of it (its header says what
-it left out). How many shaders a longer play asks for that a list lacks, counted by `play_page.mjs` (CLAUDE.md,
+it left out). How many shaders a longer play asks for that a list lacks, counted by `play_page.mjs` (docs/porting.md,
 Prebuilt shader lists): one play of 6-10 minutes a game from Pages on v0.63.0 (2026-10-18, a busy host), cold, headless
 Chrome 155 uncapped at 1256x645 (RTX 2070), past level starts into what the recordings left out, reached by each game
 fork's survey or warps, memory pokes and inputs: bosses, later rooms, items and weapons in use, minigames, endings.
@@ -317,7 +317,7 @@ times Chrome's gaps over 100 ms.
 - Firefox's 20-30 is RT64's pacing, its done callbacks 25-45 ms late; with 1 ms timers it drew 59 (WebGPU in Chrome
   and Firefox).
 - Chrome sat at 51-55 in six games with the Intel GPU at most 70% busy and the browser and the host far from busy, so a
-  slow CPU isn't what holds it, and Chrome's 3x CPU throttling (CLAUDE.md, The games table) doesn't stand in for it: Conker drew
+  slow CPU isn't what holds it, and Chrome's 3x CPU throttling (docs/playing.md, A cell of the Games table) doesn't stand in for it: Conker drew
   more that way on the desktop than on the laptop. RT64 paced Conker in Chrome 3 times; the other 54s are unexplained.
   On v0.58.0 it drew 58-60 there (below).
 - Maximized on the desktop at its 200% (the runs noted "part C"), instead of off it, Firefox's Intel load rose ~30
@@ -376,7 +376,12 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   two or three animation frames a game frame however cheap the composite, which fits those trips to the page's thread
   and the sleeps between them, each ending late in Firefox there; the late sleeps to the slots are plume's 6-14 ms timed waits, shorter when the
   overlay takes the composite off the page's thread. Chrome on that screen paced Banjo to 30 too, twice for 10 s in a
-  play otherwise at 60, in a build without the lines.
+  play otherwise at 60, in a build without the lines; on the test build (Chrome 155, 37 drops) the drops before its
+  two paces had the same make-up, wait() 33.5 ms a game frame (median) and asleep 30.6, but only 2.0 past the slots.
+  plume bf417cf (rt64 0c5ba5d) takes wait()'s trips out: the present thread blocks on a futex the done callbacks wake.
+  On a desktop GPU that changes nothing measurable (Banjo in Firefox at `?timer-tick=15.625` 60.0 before and after,
+  its drops there the level loads; GoldenEye uncapped in Firefox 174.0 and 177.6 on a busy host), so whether the
+  laptop's paces go is for a run on its screen.
 - Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
   88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
@@ -596,7 +601,7 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   reported as Intel to the page (a CDP script overriding `GPUAdapter.prototype.info`): they build, and the game draws.
 - RT64's render to RAM (on by default) draws each frame a second time at the N64's resolution and reads it back
   into RDRAM. In Chrome that readback makes the list wait 5-6 ms for the GPU process whatever its size (Rush 2049's
-  CLAUDE.md, Step 2, has the measurements), so a game that never reads its frames on the CPU turns it off
+  `headless/main.cpp` header has the measurements), so a game that never reads its frames on the CPU turns it off
   (RecompFrontend-0004, `set_render_to_ram`), and one that does keeps it on. If it can take a frame one list old (a
   patch of the screen, a row of depth), `set_render_to_ram_late` (rt64 73e9ca0) makes the copy land when the next list
   starts instead, and the list stops waiting: Conker's, GoldenEye's and Donkey Kong 64's pages do. Majora's Mask can't:
@@ -668,7 +673,7 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
 
 ## Behind CLAUDE.md's rules
 
-The measurements behind rules CLAUDE.md states without them.
+The measurements behind rules CLAUDE.md and the other docs state without them.
 
 - `thread_stdio.js`: Emscripten proxies every write to stdout or stderr to the page's thread, WebGPU's, and waits, so
   each line held its thread for up to a frame. Banjo-Tooie's upstream logs ~100 lines a second: its title screen's sound
@@ -679,6 +684,12 @@ The measurements behind rules CLAUDE.md states without them.
   own (its jigsaw wipe) in Hailfire Peaks, every world warped to after it drew black, though each warp reached its map.
   Its plan now visits ten worlds and doesn't walk (Banjo jumps and attacks where he lands), and its survey's warp waits
   for a change the game began.
+- Holds in ms of the browser's time: a laptop's six Firefox runs of GoldenEye's plan (Pages v0.63.0) ended in other
+  places than its two Chrome runs, by a curb and deep in a tunnel six shots on, where Dam drew ~20 presents a second,
+  so the browsers' Dam numbers weren't of the same views. On a desktop GPU, Chrome and Firefox ended 1,600 units
+  apart in Dam by that plan; on its clock (`g_GlobalTimer`, 60ths), every hold held the 3,624 ticks it asked for in
+  both browsers, and four runs, two each, ended within 750 units of each other facing the same barriers (two Chrome
+  runs alone, 250 apart). Chrome's CPU throttling (4) slowed none of the game: a play under it took as long.
 - A loop of messages to itself in a page's script: Ocarina of Time's survey waited for the file select's hand-over with
   one (`MessageChannel`), ~10,000 tasks a second on the page's thread, none of them long. In Chrome they starved the
   tasks that carry the device thread's WebGPU work to it, and its page held 3-8 s as the file loaded, only while the
@@ -717,7 +728,7 @@ The measurements behind rules CLAUDE.md states without them.
   page moves by 10% between runs minutes apart and by more over hours, so a build is compared with several runs of the
   old one taken in the same minutes, never one pair.
 - Build times: for Rush 2049 the build went from 590-810 s to 382 s with ccache, and 116 s with the fast link (its
-  CLAUDE.md, Step 3). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
+  `CMakeLists.txt`). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
   Mask's 150 of 932, with the other two building beside it), and a second fresh dir of the same game 753, 673 and 932.
   Their builds went from ~2050-2100 s to 480-650 s, of which the link was 250-330 s; configure took 230-590 s either
   way. On a 16-core Linux host `tests/build`'s libraries build in 47 s, and in 5 s from a second fresh dir.

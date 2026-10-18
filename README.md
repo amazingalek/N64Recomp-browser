@@ -353,7 +353,8 @@ rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` 
 N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
 of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
-`RenderSwapChain::isWaitReady()` (always true but on WebGPU), which change nothing there. Each commit's message says what it does and why.
+`RenderSwapChain::isWaitReady()` (always true but on WebGPU) and `waitOnCaller()` (always false but on WebGPU), which
+change nothing there. Each commit's message says what it does and why.
 
 `patches/` holds each fork as one patch, everything its `main` adds to the upstream commit it is on, so a recomp can
 take the web support without moving its submodules to the forks (Using it in a recomp).
@@ -393,8 +394,10 @@ take the web support without moving its submodules to the forks (Using it in a r
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.
-- `docs/`: notes for whoever changes this repo, beside `CLAUDE.md`: every fork commit (`forks.md`), what porting each
-  game fork found (`game-forks.md`), and what has been measured about the pages in Chrome and Firefox (`findings.md`).
+- `docs/`: notes for whoever changes this repo, beside `CLAUDE.md`: what the web needs from a recomp and RT64
+  (`porting.md`), how a page is played and measured (`playing.md`), the retest and publishing (`publishing.md`), every
+  fork commit (`forks.md`), what porting each game fork found (`game-forks.md`), and what has been measured about the
+  pages in Chrome and Firefox (`findings.md`).
 
 ## Changing it
 

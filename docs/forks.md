@@ -161,7 +161,7 @@ rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slo
                        sleep's late wake-ups and wait()'s trip to the page's thread were added to every period, so
                        the pages of games below the display's rate presented 51-55 a second on a laptop's Intel UHD,
                        where games at its rate, which never sleep there, presented 60 (Chrome's 55.6 on a desktop is
-                       its frames with no display, Playing a page). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
+                       its frames with no display, docs/playing.md). Banjo with the page's thread kept ~65% busy (headless Chrome 155): 57.6-57.7 → 60.0; plain,
                        Firefox 158 58.0-59.3 → 60.0, headed Chrome 59.4 → 59.8 (RTX 2070, a busy host). c89ced0 set
                        it in the sleep, off the line Conker's and DKR-R's own rt64 patches add beside
 rt64 254dee3           a framebuffer the CPU changed counted on the CPU, not by a GPU readback (Pilotwings 64's screen
@@ -231,6 +231,10 @@ rt64 58aff42           a submission, or on its own timer, ~50 ms), an empty subm
                        every 2-4 ms while any present is in flight: each present's callback came back at the next
                        frame's submission, about a frame late, which present-stats' done delay and the adaptive
                        presents-in-flight cap read as GPU time (a laptop's Intel UHD: 18.5 → 5.1 ms at 60 a second)
+plume bf417cf,         behind the device thread a present's wait() blocks on the present thread, on a futex the done
+rt64 0c5ba5d           callbacks wake (RenderSwapChain::waitOnCaller()), counting presents queued for the device thread
+                       as in flight; it was a loop of trips to the page's thread with a 1 ms sleep between two, 33-38
+                       ms a game frame in Firefox on a laptop's screen, which paced Banjo-Kazooie to 30
 N64ModernRuntime       where a timed wait ends late (Firefox on Windows), the VI thread ends its wait on the first
 b81df43, 30c60e5       animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
                        15.6 or 31.2 ms apart, RT64 read GoldenEye's frames as a game at 30 ~5 times a second and made

@@ -30,8 +30,23 @@
 // key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
 // JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
-// press while it animates, is passed without timing the presses). A tool can add its own (record_shaders.mjs's
-// "keep").
+// press while it animates, is passed without timing the presses), and ["clock", read, perSecond] (below). A tool can add
+// its own (record_shaders.mjs's "keep").
+//
+// The game reads its keys once a game frame, so a hold of so many ms covers as many frames as the game managed in them,
+// and where frames come unevenly (Firefox's shader waits, RT64's pacing, a laptop) the same plan walks and turns the
+// player by other amounts than in Chrome, and the browsers end up in other places. A clock step names a counter the game
+// keeps in RDRAM, a JavaScript expression (n64r of its address) that counts perSecond a second of the game's own time:
+// from there to the end of the steps, or to a ["clock"] that stops it, a wait's and a hold's ms are of that time, so
+// every browser gives the game the same input for the same game time. A hold presses on the clock's next tick and lets
+// go once the clock has moved its ms on. A wait or hold whose clock stands still (a load the game counts no time in, a
+// wrong address) goes on for at most 5 times its ms and 30 s more, and says so; one that goes back (a level that
+// restarts it) counts from there, so a wait over a level's start is that long into the level. A counter the game steps by its frame's
+// length (GoldenEye's g_GlobalTimer, in 60ths) is better than one that counts frames, since a variable timestep moves
+// the player by that length. The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is. A run
+// says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
+// after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
+// busy.
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
@@ -109,6 +124,22 @@ const rdramHelpers = `(() => {
   };
   window.n64r = (a) => { base ??= find(); return HEAPU32[(base + (a - 0x80000000)) >>> 2]; };
   window.n64w = (a, v) => { base ??= find(); HEAPU32[(base + (a - 0x80000000)) >>> 2] = v >>> 0; };
+  // Waits for the clock read gives to move ticks on from from (from where it is when from is null), polling on a timer,
+  // for at most ms; gives back where it is and whether it got there. A clock that goes back (a level that restarts it)
+  // counts on from where it went back to.
+  window.n64clock = (read, from, ticks, ms) => new Promise((resolve) => {
+    const now = new Function('return ' + read), t0 = performance.now();
+    let last = from ?? now(), moved = 0;
+    const poll = () => {
+      const at = now();
+      moved = at < last ? 0 : moved + at - last;
+      last = at;
+      if (moved >= ticks) resolve([at, true]);
+      else if (performance.now() - t0 > ms) resolve([at, false]);
+      else setTimeout(poll, 1);
+    };
+    poll();
+  });
 })()`;
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
@@ -158,9 +189,23 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
     return [Math.round(w / 2 + (x - 628) * scale), Math.round(h / 2 + (y - 322.5) * scale)];
   };
   page.run = async (steps, extra = {}) => {
+    let clock = null, asked = 0, held = 0;
+    const ticks = (ms) => Math.max(1, Math.round(ms * clock[1] / 1000));
+    // ms of the game's time on from from (null: from now), or of wall time with no clock.
+    const onClock = async (ms, from = null) => {
+      if (!clock) return sleep(ms);
+      const [read] = clock;
+      const [at, got] = await page.evaluate(`n64clock(${JSON.stringify(read)}, ${from}, ${ticks(ms)}, ${ms * 5 + 30000})`);
+      if (!got) log(`the clock stood still: ${read} stayed ${at} through ${ms} ms of the game's time`);
+      return at;
+    };
     for (const [op, ...a] of steps) {
       if (extra[op]) await extra[op](...a);
-      else if (op === 'wait') await sleep(a[0]);
+      else if (op === 'clock') {
+        clock = a.length ? a : null;
+        if (clock) await page.evaluate(rdramHelpers);
+      }
+      else if (op === 'wait') await onClock(a[0]);
       else if (op === 'until') {
         const re = new RegExp(a[0]);
         await new Promise((resolve) => {
@@ -171,7 +216,14 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       }
       else if (op === 'click') await page.click(...await place(a[0], a[1]));
       else if (op === 'key') { await page.key('down', a); await page.key('up', a); }
-      else if (op === 'hold') { await page.key('down', a); await sleep(a[3]); await page.key('up', a); }
+      else if (op === 'hold') {
+        const from = clock ? await onClock(1000 / clock[1]) : null;
+        await page.key('down', a); await onClock(a[3], from); await page.key('up', a);
+        if (clock) {
+          const after = await page.evaluate(clock[0]);
+          asked += ticks(a[3]); held += after >= from ? after - from : after;
+        }
+      }
       else if (op === 'down' || op === 'up') await page.key(op, a);
       else if (op === 'pressUntil') {
         const [code, key, keyCode, holdMs, everyMs, test, timeoutMs] = a;
@@ -197,6 +249,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else throw new Error(`unknown step ${op}`);
     }
+    if (asked) log(`holds on the clock: ${asked} ticks asked, ${held} held`);
   };
   return page;
 };

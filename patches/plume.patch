@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web abb500648d30d0d3aa8ed84c9c0b81183649e734
+plume: https://github.com/amazingalek/plume-web bf417cf1882be8a06d53728e69723de17ade9140
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -859,10 +859,10 @@ index 0000000..03b3ea0
 +}
 diff --git a/plume_device_thread.cpp b/plume_device_thread.cpp
 new file mode 100644
-index 0000000..2526da8
+index 0000000..08d098c
 --- /dev/null
 +++ b/plume_device_thread.cpp
-@@ -0,0 +1,1565 @@
+@@ -0,0 +1,1580 @@
 +//
 +// plume
 +//
@@ -1856,6 +1856,10 @@ index 0000000..2526da8
 +        mutable std::atomic<uint32_t> innerRefreshRate = 0;
 +        mutable std::atomic<bool> refreshing = false;
 +
++        // The presents queued for the device thread that haven't reached the backend's present() yet, which waitOnCaller()
++        // counts as in flight.
++        std::atomic<uint32_t> presentsQueued = 0;
++
 +        // On the device thread.
 +        DTSwapChain(DeviceThread *thread, RenderDevice *innerDevice, RenderCommandQueue *innerQueue, std::unique_ptr<RenderSwapChain> inner, const RenderSwapChainDesc &desc)
 +            : thread(thread), innerDevice(innerDevice), innerQueue(innerQueue), inner(inner.release()), desc(desc)
@@ -1925,11 +1929,13 @@ index 0000000..2526da8
 +        bool present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) override {
 +            assert(textureIndex < textures.size());
 +            std::vector<RenderCommandSemaphore *> waits = unwrap(waitSemaphores, waitSemaphoreCount);
++            presentsQueued++;
 +            thread->runAsync([this, textureIndex, waits]() mutable {
 +                publish();
 +                RenderTexture *source = innerTextures[textureIndex].get();
 +                uint32_t innerIndex = 0;
 +                if ((source == nullptr) || !inner->acquireTexture(acquireSemaphore.get(), &innerIndex)) {
++                    presentsQueued--;
 +                    return;
 +                }
 +
@@ -1945,15 +1951,24 @@ index 0000000..2526da8
 +                const RenderCommandList *commandList = copyList.get();
 +                innerQueue->executeCommandLists(&commandList, 1, waits.data(), uint32_t(waits.size()), &signal, 1);
 +                inner->present(innerIndex, &signal, 1);
++                presentsQueued--;
 +                checkPendingReadbacks();
 +            });
 +
 +            return true;
 +        }
 +
-+        // The backend learns that a present's work is done in a callback on the device thread (WebGPU's), so this thread
-+        // polls isWaitReady() between calls rather than holding the device thread, as map() does isMapReady().
++        // The backend learns that a present's work is done in a callback on the device thread (WebGPU's), so where it can
++        // this thread waits for that itself (waitOnCaller()), with no trip to the device thread. Each trip queued behind
++        // whatever that thread was doing, a page's thread in Firefox's rendering, and the 1 ms sleep between two ended 6-14
++        // ms late in Firefox on a laptop: wait() took 33-38 ms a game frame there, and RT64 paced Banjo-Kazooie's 60 to 30.
++        // Otherwise (the first present, which asks the device thread) it polls isWaitReady() between calls rather than
++        // holding the device thread, as map() does isMapReady().
 +        void wait() override {
++            if (inner->waitOnCaller(presentsQueued)) {
++                return;
++            }
++
 +            const std::thread::id caller = std::this_thread::get_id();
 +            for (;;) {
 +                const bool ready = runSync(thread, [&]() {
@@ -2430,10 +2445,10 @@ index 0000000..2526da8
 +};
 diff --git a/plume_device_thread.h b/plume_device_thread.h
 new file mode 100644
-index 0000000..10b5a17
+index 0000000..8d4a8ab
 --- /dev/null
 +++ b/plume_device_thread.h
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,80 @@
 +//
 +// plume
 +//
@@ -2470,8 +2485,9 @@ index 0000000..10b5a17
 +// - A swap chain hands out textures of its own, and present() copies the one drawn into the backend's swap chain
 +//   texture: acquire, copy and present run as one task on the device thread. A browser shows the canvas between two
 +//   tasks of its event loop whenever it updates the rendering, so a canvas texture acquired in one task can be gone
-+//   by the next. That costs a copy of the window each present. wait() polls the backend's isWaitReady() from the
-+//   calling thread, as map() does isMapReady(). needsResize() and getRefreshRate() don't wait for the device thread:
++//   by the next. That costs a copy of the window each present. wait() waits on the calling thread where the backend
++//   can tell it there (waitOnCaller()), and otherwise polls the backend's isWaitReady() from it, as map() does
++//   isMapReady(). needsResize() and getRefreshRate() don't wait for the device thread:
 +//   they answer what the backend said at the last present, resize() or refresh, and queue a refresh.
 +// - On the device thread itself, everything runs in place, after whatever is queued.
 +// - Raytracing and acceleration structures aren't forwarded: WebGPU has neither.
@@ -2514,18 +2530,19 @@ index 0000000..10b5a17
 +#endif
 +};
 diff --git a/plume_render_interface.h b/plume_render_interface.h
-index 2048557..50d53e1 100644
+index 2048557..0622476 100644
 --- a/plume_render_interface.h
 +++ b/plume_render_interface.h
-@@ -7,6 +7,7 @@
+@@ -7,6 +7,8 @@
  
  #pragma once
  
++#include <atomic>
 +#include <chrono>
  #include <climits>
  
  #include "plume_render_interface_types.h"
-@@ -26,6 +27,10 @@ namespace plume {
+@@ -26,6 +28,10 @@ namespace plume {
          virtual void setName(const std::string &name) = 0;
          virtual uint64_t getDeviceAddress() const = 0;
  
@@ -2536,7 +2553,7 @@ index 2048557..50d53e1 100644
          // Concrete implementation shortcuts.
          inline RenderBufferReference at(uint64_t offset) const {
              return RenderBufferReference(this, offset);
-@@ -59,6 +64,10 @@ namespace plume {
+@@ -59,6 +65,10 @@ namespace plume {
          virtual ~RenderPipeline() { }
          virtual void setName(const std::string &name) = 0;
          virtual RenderPipelineProgram getProgram(const std::string &name) const = 0;
@@ -2547,7 +2564,7 @@ index 2048557..50d53e1 100644
      };
  
      struct RenderPipelineLayout {
-@@ -89,6 +98,20 @@ namespace plume {
+@@ -89,6 +99,26 @@ namespace plume {
          virtual ~RenderSwapChain() { }
          virtual bool present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) = 0;
          virtual void wait() = 0;
@@ -2565,10 +2582,16 @@ index 2048557..50d53e1 100644
 +        virtual bool sleepUntil(std::chrono::steady_clock::time_point time) { return false; }
 +#endif
 +
++        // wait() on a thread other than the device's, counting as in flight the presents its caller has queued for the
++        // device's thread that haven't reached present() yet (`queued`). False at once where only the device's thread can
++        // tell (every backend but WebGPU), and the caller waits through it. Not behind __EMSCRIPTEN__ so that
++        // plume_device_thread.cpp's native test reaches it.
++        virtual bool waitOnCaller(const std::atomic<uint32_t> &queued) { return false; }
++
          virtual bool resize() = 0;
          virtual bool needsResize() const = 0;
          virtual void setVsyncEnabled(bool vsyncEnabled) = 0;
-@@ -249,6 +272,11 @@ namespace plume {
+@@ -249,6 +279,11 @@ namespace plume {
          virtual RenderSampleCounts getSampleCountsSupported(RenderFormat format) const = 0;
          virtual bool beginCapture() = 0;
          virtual bool endCapture() = 0;
@@ -2702,10 +2725,10 @@ index 0000000..0b0ff01
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..397c221
+index 0000000..d6cdd2a
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3359 @@
+@@ -0,0 +1,3399 @@
 +//
 +// plume
 +//
@@ -4322,13 +4345,13 @@ index 0000000..397c221
 +                presentsInFlightFixed = true;
 +            }
 +
-+            printf("plume: uncapped, the display reported as %u Hz, at most %u presents in flight\n", uncappedRate, maxPresentsInFlight);
++            printf("plume: uncapped, the display reported as %u Hz, at most %u presents in flight\n", uncappedRate, maxPresentsInFlight.load());
 +        }
 +
 +        presentStats = (plume_webgpu_query_number("present-stats") >= 0);
 +        presentState->timeWorkDone = presentStats;
 +        if (presentStats || (presentsInFlightQuery >= 0)) {
-+            printf("plume: at most %u presents in flight\n", maxPresentsInFlight);
++            printf("plume: at most %u presents in flight\n", maxPresentsInFlight.load());
 +        }
 +    }
 +
@@ -4358,6 +4381,7 @@ index 0000000..397c221
 +    static void presentWorkDone(WGPUQueueWorkDoneStatus status, WGPUStringView message, void *userdata1, void *userdata2) {
 +        WebGPUPresentWork *work = static_cast<WebGPUPresentWork *>(userdata1);
 +        work->state->inFlight--;
++        emscripten_futex_wake(&work->state->inFlight, INT_MAX);
 +        if (work->state->timeWorkDone) {
 +            work->state->workDoneMs.emplace_back(emscripten_get_now() - work->presentTime);
 +        }
@@ -4402,6 +4426,9 @@ index 0000000..397c221
 +            kickTimer = emscripten_set_timeout(kickWorkDone, 1.0, this);
 +        }
 +
++        const double waitedMs = presentState->waitedMs.exchange(0.0);
++        statsWaitMs += waitedMs;
++        capWaitMs += waitedMs;
 +        if (presentStats) {
 +            statsPresents++;
 +            reportPresentStats();
@@ -4452,6 +4479,41 @@ index 0000000..397c221
 +
 +            emscripten_futex_wait(&frameTimer->frameSerial, serial, endMs - now);
 +        }
++    }
++
++    // On a thread other than the page's, once the first present is caught up (isWaitReady() asks the device's thread for
++    // that): presents leave flight in their done callbacks, which wake this, so it needs nothing of the device's thread.
++    // A present the caller has queued for that thread is counted in `queued` until present() counts it in inFlight, so
++    // it is never in neither. The wait ends after 100 ms all the same, for what changes without a wake (a queued present
++    // that never reaches present()).
++    bool WebGPUSwapChain::waitOnCaller(const std::atomic<uint32_t> &queued) {
++        if (emscripten_is_main_browser_thread() || !presentState->caughtUp) {
++            return false;
++        }
++
++        double startMs = 0.0;
++        for (;;) {
++            const uint32_t queuedNow = queued;
++            const uint32_t inFlight = presentState->inFlight;
++            if ((queuedNow + inFlight) < maxPresentsInFlight) {
++                break;
++            }
++
++            if (startMs == 0.0) {
++                startMs = emscripten_get_now();
++            }
++
++            emscripten_futex_wait(&presentState->inFlight, inFlight, 100.0);
++        }
++
++        if (startMs > 0.0) {
++            const double waitedMs = emscripten_get_now() - startMs;
++            double counted = presentState->waitedMs;
++            while (!presentState->waitedMs.compare_exchange_weak(counted, counted + waitedMs)) {
++            }
++        }
++
++        return true;
 +    }
 +
 +    void WebGPUSwapChain::wait() {
@@ -4538,7 +4600,7 @@ index 0000000..397c221
 +            capTrying = false;
 +            if ((rate >= (capTryRate * 1.08)) || (rate >= (displayRate * 0.95))) {
 +                capRetryMs = 10000.0;
-+                printf("plume: %u presents in flight (%.1f a second, from %.1f)\n", maxPresentsInFlight, rate, capTryRate);
++                printf("plume: %u presents in flight (%.1f a second, from %.1f)\n", maxPresentsInFlight.load(), rate, capTryRate);
 +            }
 +            else {
 +                if (presentStats) {
@@ -4561,6 +4623,7 @@ index 0000000..397c221
 +            capTryRate = rate;
 +            capTrying = true;
 +            maxPresentsInFlight++;
++            emscripten_futex_wake(&presentState->inFlight, INT_MAX);
 +        }
 +
 +        capWindowStart = now;
@@ -4594,7 +4657,7 @@ index 0000000..397c221
 +
 +        printf("plume: %.1f presents a second, each done on the GPU %.0f ms after it (median; %.0f at p90, %.0f at most), "
 +            "%.0f ms a second waiting for fewer than %u in flight, %.1f animation frames a second (display read as %u Hz)\n",
-+            statsPresents / seconds, quantile(0.5), quantile(0.9), quantile(1.0), statsWaitMs / seconds, maxPresentsInFlight,
++            statsPresents / seconds, quantile(0.5), quantile(0.9), quantile(1.0), statsWaitMs / seconds, maxPresentsInFlight.load(),
 +            (frameTimer->frameCount - statsFrameCount) / seconds, frameTimer->refreshRate);
 +
 +        statsStartTime = now;
@@ -6067,10 +6130,10 @@ index 0000000..397c221
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..90dbb56
+index 0000000..cdbe538
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,703 @@
+@@ -0,0 +1,707 @@
 +//
 +// plume
 +//
@@ -6138,8 +6201,9 @@ index 0000000..90dbb56
 +//   takes 60 frames a second whatever the GPU finishes, so its queue grew seconds deep and the page showed a frame or
 +//   two a second. So a swap chain counts the presents whose work the GPU hasn't finished (onSubmittedWorkDone), and
 +//   with presentWait, wait() holds the next present until fewer than the swap chain's maxFrameLatency (at least 2)
-+//   are, and isWaitReady() says whether it would. Behind plume_device_thread.h the calling thread polls isWaitReady(),
-+//   as it does isMapReady(); without threads, wait() waits when the build can. Not 1: Firefox calls back late, and with
++//   are, and isWaitReady() says whether it would. Behind plume_device_thread.h the calling thread waits for that itself
++//   (waitOnCaller(), a futex the done callbacks wake), polling isWaitReady() only for the first present; without
++//   threads, wait() waits when the build can. Not 1: Firefox calls back late, and with
 +//   one frame in flight a GPU that could finish ~54 frames a second gave 38, against 46 with two and 47 with three
 +//   (whose queue sat 50 ms behind against 33). Nor always 2: where the callback comes back later than two frames, two
 +//   in flight hold presents below the display's rate with the GPU idle, and RT64 reads the presents it skips as the GPU
@@ -6164,8 +6228,8 @@ index 0000000..90dbb56
 +//   compute pipeline built at its first dispatch and render pipelines built at their first draw.
 +// - The browser doesn't say what the display's refresh rate is, so a swap chain times the animation frames with a
 +//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming. The loop wakes
-+//   a thread in sleepUntil() at each frame, the one call another thread may make, where a timed sleep on a page's
-+//   thread ends late (plume_web_waits.h).
++//   a thread in sleepUntil() at each frame, where a timed sleep on a page's thread ends late (plume_web_waits.h).
++//   sleepUntil() and waitOnCaller() are the calls another thread may make.
 +// - Every call must come from the thread that owns the device's JavaScript object: WebGPU objects can't be shared
 +//   between workers.
 +// - Shaders are WGSL text (RenderShaderFormat::WGSL). Specialization constants are WGSL overrides named by their id,
@@ -6450,11 +6514,13 @@ index 0000000..90dbb56
 +        std::atomic<double> frameMs = 1000.0 / 60.0;
 +    };
 +
-+    // The presents whose work the GPU hasn't finished, and for present-stats how long each one's took to be reported
-+    // done. Shared with their callbacks, which can outlive the swap chain.
++    // The presents whose work the GPU hasn't finished (a futex, woken as each is done), and for present-stats how long
++    // each one's took to be reported done. Shared with their callbacks, which can outlive the swap chain. inFlight,
++    // caughtUp and waitedMs (the time waitOnCaller() held presents, not yet counted) are read on other threads too.
 +    struct WebGPUPresentState {
-+        uint32_t inFlight = 0;
-+        bool caughtUp = false;
++        std::atomic<uint32_t> inFlight = 0;
++        std::atomic<bool> caughtUp = false;
++        std::atomic<double> waitedMs = 0.0;
 +        bool timeWorkDone = false;
 +        std::vector<double> workDoneMs;
 +    };
@@ -6475,7 +6541,7 @@ index 0000000..90dbb56
 +        uint32_t uncappedRate = 0;
 +
 +        std::shared_ptr<WebGPUPresentState> presentState = std::make_shared<WebGPUPresentState>();
-+        uint32_t maxPresentsInFlight = 2;
++        std::atomic<uint32_t> maxPresentsInFlight = 2;
 +        double waitStartTime = 0.0;
 +        bool caughtUpAsked = false;
 +        int kickTimer = 0;
@@ -6505,6 +6571,7 @@ index 0000000..90dbb56
 +        void wait() override;
 +        bool isWaitReady() override;
 +        bool sleepUntil(std::chrono::steady_clock::time_point time) override;
++        bool waitOnCaller(const std::atomic<uint32_t> &queued) override;
 +        bool resize() override;
 +        bool needsResize() const override;
 +        void setVsyncEnabled(bool vsyncEnabled) override;
