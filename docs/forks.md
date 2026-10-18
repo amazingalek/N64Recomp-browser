@@ -222,6 +222,15 @@ rt64 8a2c6a7           interpolated frames take turns in 8 color targets (Interp
                        of a game frame and never frees one, so a page held as many as its slowest game frame took
                        display frames. GoldenEye's are 5702x2970 (68 MB) at 3840x2000, and uncapped (360 Hz) in Dam at
                        ~8 fps it kept 42, 2.8 GB, until Firefox's WebGPU device ran out of memory on an 8 GB GPU
+rt64 f262d56, 2a249b3  ?present-stats prints a line at each present the present thread drops (the next already queued
+                       behind it, what pace() counts): how long it waited, and each game frame's time since the thread
+                       last waited, split into waiting for the workload, for the interpolated frame, the draw, the
+                       sleeps to the slots (and how far past them they woke), wait() and the present() calls
+plume abb5006,         in Firefox, which calls onSubmittedWorkDone back only when it next looks for finished work (after
+rt64 58aff42           a submission, or on its own timer, ~50 ms), an empty submission 1 ms after a present and then
+                       every 2-4 ms while any present is in flight: each present's callback came back at the next
+                       frame's submission, about a frame late, which present-stats' done delay and the adaptive
+                       presents-in-flight cap read as GPU time (a laptop's Intel UHD: 18.5 → 5.1 ms at 60 a second)
 N64ModernRuntime       where a timed wait ends late (Firefox on Windows), the VI thread ends its wait on the first
 b81df43, 30c60e5       animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
                        15.6 or 31.2 ms apart, RT64 read GoldenEye's frames as a game at 30 ~5 times a second and made
