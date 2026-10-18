@@ -45,8 +45,8 @@ A fork's rt64 older than 7910126 needs a fresh build dir when it moves: an incre
 Each game fork's page is `https://amazingalek.github.io/<fork>/`, linked from the top of its README, built from main
 with its shader list by its BUILDING.md on Linux, in rush-2049-recomp's Docker image (its `tools/docker/Dockerfile`,
 which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks goes into that Dockerfile), with
-`EM_CACHE` set to a mounted folder, since emsdk's environment resets it (a new one needs `$EM_CACHE/sysroot/lib/pkgconfig`
-made first, or `embuilder` fails writing `sdl2.pc`).
+`EM_CACHE` set to a mounted folder, since emsdk's environment resets it (a new one needs
+`$EM_CACHE/sysroot/lib/pkgconfig` made first, or `embuilder` fails writing `sdl2.pc`).
 
 `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "main <sha>"` publishes one (switching Pages on the first
 time); `tools/publish_pages.sh` does it for every game, or the ones it is given. Each page's commit names the main it

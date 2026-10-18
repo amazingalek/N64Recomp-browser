@@ -93,9 +93,9 @@ options; `docs/findings.md` has what was measured this way.
   problem but can't clear one, and a laptop result stays until a newer laptop run replaces it (docs/findings.md, The
   stand-in, measured, and A laptop, measured).
 - A cell is a number: the median presents a second after the waits ("58", "240*"), `†` beside the game's own rate
-  ("20†": a page showing it, where RT64 paced presents to the game's frames, a GPU falling behind, or doesn't
-  interpolate), a laptop's and the stand-in's both when the stand-in's is newer ("20†; 240*"), words only where there is no
-  number ("never boots", "not yet"); never "smooth", never against an earlier result ("the crash is gone"). A cell
+  ("20†": a page showing it, where RT64 paced presents to the game's frames (a GPU falling behind) or doesn't
+  interpolate), a laptop's and the stand-in's both when the stand-in's is newer ("20†; 240*"), words only where there
+  is no number ("never boots", "not yet"); never "smooth", never against an earlier result ("the crash is gone"). A cell
   whose laptop result a fix was made for gives the stand-in's number until played there again. A cell below 60
   without a `†` has work filed to make it 60. A Played cell is the date and the tag the page was built on
   ("2026-10-16, v0.39.0"); one that names no tag is played in the next retest. Under the table are two lines and no

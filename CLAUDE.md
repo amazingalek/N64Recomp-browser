@@ -2,7 +2,7 @@
 
 Web support for N64 static recompilations: the game, its menus and RT64 built with Emscripten into one page that draws
 through WebGPU (README). Almost all of it is written by AI agents, so this file is what the next one needs: how work
-lands, the rules, and where everything else is written.
+lands, the rules, and where everything else is written, and only what the README, the docs and the code can't say.
 
 ## Where things are written down
 
@@ -10,7 +10,7 @@ Each describes main as it is, a PR that makes one wrong fixes it in the same PR,
 a doc points at the other.
 
 - `README.md`, for humans: what this is, the Games table, how a recomp uses it, what each fork adds, what this repo
-  adds besides the forks, the layout.
+  adds besides the forks, the layout. It changes when a recomp's porter or a player would notice.
 - Comments beside the code, for how and why: each file's header (`frontend/CMakeLists.txt`, `patches/apply.cmake`,
   `frontend/*.js`, `site/site.js`, every script in `tools/`) and each fork commit's message. Read the header of the
   file you change first, and update it in the same commit.
@@ -23,7 +23,7 @@ a doc points at the other.
   - `docs/playing.md`: playing and measuring a page, writing a Games table cell, the games page (`site/`).
   - `docs/publishing.md`: the retest, a critical fix, building and publishing pages.
   - `docs/forks.md`: every fork commit by its label. `docs/game-forks.md`: each game fork's port, its game's own frame
-    rate, how the games compare.
+    rate, how the games compare. Read a game fork's part there and its own docs before changing it.
   - `docs/findings.md`: what has been measured, the numbers behind this file's rules included.
 
 This repo, the forks and the game forks are public. Write for a stranger, in the present tense: nothing about a
@@ -49,7 +49,7 @@ the game forks take no PRs: a change is a commit pushed to the fork's `main` as 
 Branches don't outlive their work: every one of these repos deletes a PR's branch when it merges ("Automatically
 delete head branches", on in each, a new fork included), and a branch pushed to a fork to hold work not on `main` yet
 (`web-wip`, `wip/<topic>`) is deleted by the work that lands or drops it. A fork keeps `main`, `gh-pages` and those
-branches only.
+branches only: upstream's others are deleted when it is made.
 
 ## Rules
 
@@ -145,8 +145,9 @@ docs/publishing.md.
 ## The games table
 
 The README's Games table has each game's repo and page, how it plays in Chrome and Firefox on a laptop's integrated
-graphics (Intel UHD) or a stand-in for one, and when it was last played. Whoever plays a page that changed (a retest, a
-critical fix, a change to a game's repo or shader list) does all of this in the same work, as docs/playing.md says:
+graphics (Intel UHD) or a stand-in for one, and when it was last played (no desktop column: a desktop GPU plays them
+all). Whoever plays a page that changed (a retest, a critical fix, a change to a game's repo or shader list) does all
+of this in the same work, as docs/playing.md says:
 
 - Plays it in Chrome and Firefox, always both (Firefox is where pages fall behind), its build before it is published
   and from Pages after: launcher, Load ROM, the shader wait, menus (look at them, a `shot` step), a level or race,

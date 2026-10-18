@@ -100,8 +100,8 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   for negative numbers.
 - Every page's canvas is CSS-sized: a window made with `SDL_WINDOW_ALLOW_HIGHDPI` goes to device pixels on the web,
   draws four times the pixels at 200% and takes every click at the wrong spot, so Load ROM opens nothing (Wave Race
-  64's did, wave-race-64-recomp-web 9d3f621), which only a run at `--scale 2` or a laptop's screen shows. A new port
-  clears the flag with Emscripten.
+  64's did, wave-race-64-recomp-web 9d3f621), which only a laptop's screen or a run at `--scale 2`
+  (`tools/page_driver.mjs`) shows. A new port clears the flag with Emscripten.
 - Gamepads (no `SDL_INIT_HAPTIC` on Emscripten: README) were checked with a stand-in `navigator.getGamepads()` (a
   standard-mapping pad set from CDP, `vibrationActuator.playEffect` logged): launcher, menus, a race, rumble. No real
   pad has been tried. Exit is hidden on a page (RecompFrontend-0005): it left a black canvas, and the next input
@@ -124,4 +124,4 @@ emit and load wasm modules instead. A recomp's built-in mods work (README): reco
 mod replaces or hooks redirected at each function's entry, since wasm code can't be rewritten. Clang folds a function's
 address used as an array index into the load's offset, where the linker fills in the function's index in the module,
 not its table index, which hung the page at boot until `recomp.h` hid the address behind an empty `asm`: a function
-pointer is safe in wasm as a value, not as arithmetic.
+pointer is safe in wasm as a value, not as arithmetic. No other N64 recomp running in a browser was found to learn from.

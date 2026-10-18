@@ -642,7 +642,7 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
 
 ## Behind CLAUDE.md's rules
 
-The measurements behind rules CLAUDE.md states without them.
+The measurements behind rules CLAUDE.md and the other docs state without them.
 
 - `thread_stdio.js`: Emscripten proxies every write to stdout or stderr to the page's thread, WebGPU's, and waits, so
   each line held its thread for up to a frame. Banjo-Tooie's upstream logs ~100 lines a second: its title screen's sound
