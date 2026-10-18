@@ -205,6 +205,16 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   display's rate.
 - plume's probe of a timed wait of 100 us read 6-14 ms in every Firefox run with Windows' global timer at 1 ms: neither
   1 ms nor the 15.6 ms tick, and different from run to run.
+- Firefox on screen held Banjo at 29.9-30.1 in six runs, RT64 pacing it while plume's done callbacks came back in 9-15
+  ms (median), the GPU was 66-80% busy and plume waited 0 ms a second at 2 in flight (with
+  `gfx.webrender.dcomp-texture-overlay-win` and a kick of empty submits): each try at the display's rate fell back
+  within ~2 s. What pace() counts is the present thread coming to a game frame's present with the next one already
+  queued, and on a desktop GPU (Firefox 158 at the display's rate, 1920x945, `?timer-tick=15.625`, an idle host)
+  rt64 f262d56's lines say that thread has no time to spare at a 30 fps game's two presents a frame: once 341 game
+  frames in a row came to 33.3 ms each, 32.5 of it asleep to the slots, without a wait for the next one, and one
+  present dropped. Most of the other drops there were held by wait() (14-55 ms a game frame), whose trips to the device
+  thread, parked in the last present() until an animation frame, plume's count of time waiting leaves out. On the
+  laptop, the same lines are what tells late sleeps from wait() and early game frames.
 - Uncapped at 1920x945, the Intel GPU 94-99% busy in each run, Chrome headless / Firefox presented: Donkey Kong 64
   88.9/63.8, Pilotwings 64 84.5/56.2, Wave Race 64 83.8/74.8, GoldenEye 81.2/69.1, Majora's Mask 68.0/51.9, Banjo
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and

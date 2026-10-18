@@ -269,7 +269,8 @@ current in the same work as what changes it:
   require-corp` (threads need SharedArrayBuffer); on Pages `coi_serviceworker.js` sets them after one reload. Look at a
   page with CDP `Page.captureScreenshot` of that page.
 - What a page says about itself: `Module.recompAudioStats()` (frames played, frames short); `?present-stats` (plume
-  90ef8e5: presents a second, how late each onSubmittedWorkDone comes back); `?presents-in-flight=<1-8>` (otherwise 2,
+  90ef8e5: presents a second, how late each onSubmittedWorkDone comes back; rt64 f262d56: at each present RT64 drops,
+  where the present thread's time went); `?presents-in-flight=<1-8>` (otherwise 2,
   raised to 4 at most while it holds presents back); `?uncapped` (plume 904b26c, rt64 e408ed4); `?record-shaders`; and
   the console reports each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap
   `AudioWorkletNode` in a preload, take `processorOptions.ring` and sample its two counters every few ms.
