@@ -29,7 +29,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 359* | 340* | 2026-10-18, v0.63.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 342* | 257* | 2026-10-18, v0.63.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 358* | 293* | 2026-10-18, v0.63.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 357* | 342* | 2026-10-17, v0.58.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 333* | 319* | 2026-10-18, v0.63.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most); † the game's own rate. Goal: 60.
@@ -100,6 +100,9 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
   `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
   of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
+- A window made without `SDL_WINDOW_ALLOW_HIGHDPI`, so the canvas stays in CSS pixels. With it, a recomp that makes its
+  own window gets a canvas at the device's pixels, which on a laptop at 200% draws four times the pixels and takes every
+  click at the wrong spot: Wave Race 64's Load ROM opened nothing there (wave-race-64-recomp-web 9d3f621).
 - Sound through `n64recomp_browser::audio` (`frontend/audio_output.h`: `open`, `queue`, `queued_frames`) in place of
   `SDL_QueueAudio` and `SDL_GetQueuedAudioSize`. SDL2's port plays from the page's thread, which WebGPU's work keeps
   busy, and its sound breaks up there (Rush 2049's music was choppy on a laptop in Chrome).
