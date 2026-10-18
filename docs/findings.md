@@ -132,6 +132,21 @@ v0.58.0) and 17,000-30,000 there with `gfx.webrender.dcomp-texture-overlay-win`.
   (Chrome headless 44.9), Banjo 66.1 against 79.4. With the pref the loop crowded the page's thread instead: Conker
   drew 41.4 with the Intel GPU 24-88% busy, against 50.0 at ~90% without it. The round's uncapped Firefox numbers (A
   laptop, measured) understate its GPU that way.
+- Replayed at 360 on the same laptop (2026-10-18, Pages v0.63.0, 1920x945 off the desktop, cold, `?present-stats`,
+  the host 16-32% busy before each run; plays.jsonl's runs noted "frame_rate 360 replay"), Firefox's animation frames
+  ran at 63-154 a second, and its presents uncapped, default / with the overlay pref / Chrome headless, were: Rush 2049
+  48.9 and 59.2 / 55.4 and 61.8 / 52.2, Banjo 69.5 and 64.4 / 67.9 and 78.9 / 90.4, Conker 55.4 / 65.0 / 65.0,
+  Banjo-Tooie 39.0 / 45.8 / 50.0, the Intel GPU 82-97% busy in Firefox and 88-100% in Chrome, no WebGPU errors.
+  - With the pref, 360 reads what the pref read at 0 (Rush 2049 62.3, Banjo 79.4); by default it reads less, so the
+    pref still adds presents where WebRender composites each animation frame on the page's GPU: 3-10 a run in Rush
+    2049, Conker and Banjo-Tooie, -2 and +15 in Banjo's two pairs.
+  - Firefox with the pref draws what Chrome headless does in Rush 2049 and Conker and 4 fewer in Banjo-Tooie. Banjo is
+    12-23 short: Chrome holds the Intel GPU at 99-100% there, Firefox at 89-94% with about as many animation frames
+    (68-72) as presents.
+  - Chrome headless drew 4-22 more than on v0.58.0 (Rush 2049 44.9, Banjo 67.9, Conker 61.1, Banjo-Tooie 41.1), so
+    the build is part of Firefox's rise from the round's numbers too; set Firefox beside Chrome on one build.
+  - Two runs alike differ by up to 11 a second in Firefox (Rush 2049 48.9 and 59.2, Banjo with the pref 67.9 and 78.9)
+    and its p10s are its shader waits, so a single Firefox run says little: compare runs interleaved, several each.
 - On the stand-in it cost the browser's process a core and the page nothing a run can see. Rush 2049 and Banjo from
   Pages (v0.63.0, Firefox 158, 3840x2000, cold, a quiet host), interleaved, presents a second (animation frames):
   Rush 2049 134.0 (11,892) and 120.4 (11,433) at 0 against 149.7, 121.2, 145.2, 128.6 and 134.4 (270-345) at 360,
@@ -286,7 +301,7 @@ included, those noted "onscreen" giving the README's cells. No run that played h
   67.9/60.0, Conker 61.1/48.2, Rush 2049 44.9/27.0, Banjo-Tooie 41.1/31.6. So at a laptop window's size Rush 2049 and
   Banjo-Tooie take more than 1/60 s of this GPU a frame in Chrome. Firefox's are too low to set beside Chrome's: its
   animation frames ran at 3,700-8,600 a second (`layout.frame_rate` 0), and WebRender composited for them on the same
-  GPU (Uncapped in Firefox).
+  GPU (Uncapped in Firefox, which has four of them replayed at 360).
 - Over 600 s of Rush 2049 Firefox's GPU process grew from 466 to 3142 MB, still near linearly (about:memory:
   systemHeap +1143 MB, gpuShared +1261, heap +46), and Chrome's from 508 to 864, most of it in the first minutes.
 
