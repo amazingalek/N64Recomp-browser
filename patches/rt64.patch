@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 8a2c6a7efdf7572b3af8f9bd9c5bd278abd8f12f
+rt64: https://github.com/amazingalek/rt64-web a56a1e6de56313e3aa519f02d3acbc2f10161297
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1162,7 +1162,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..98446c5 100644
+index 3227ab1..333f0c1 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1176,7 +1176,18 @@ index 3227ab1..98446c5 100644
  #include "rt64_workload_queue.h"
  
  namespace RT64 {
-@@ -88,6 +92,14 @@ namespace RT64 {
+@@ -48,6 +52,10 @@ namespace RT64 {
+         // Modify the cursor and notify anything waiting on the queue.
+         {
+             const std::scoped_lock lock(cursorMutex);
++            if (presentStats) {
++                presentQueued[writeCursor] = Timer::current();
++            }
++
+             writeCursor = nextWriteCursor;
+         }
+ 
+@@ -88,6 +96,15 @@ namespace RT64 {
  
          viRenderer = std::make_unique<VIRenderer>();
  
@@ -1186,12 +1197,13 @@ index 3227ab1..98446c5 100644
 +        // and the browser can take is what is presented. The interpolated frames take turns in 8 color targets of the
 +        // game's framebuffer at the output's scale (WorkloadQueue's InterpolatedTargetSlots), 0.25-0.55 GB at 3840x2000.
 +        uncapped = MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('uncapped') ? 1 : 0; }) != 0;
++        presentStats = MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('present-stats') ? 1 : 0; }) != 0;
 +#   endif
 +
          presentThreadRunning = true;
          presentThread = new std::thread(&PresentQueue::threadLoop, this);
      }
-@@ -114,6 +126,12 @@ namespace RT64 {
+@@ -114,6 +131,12 @@ namespace RT64 {
              targetRate = ext.sharedResources->targetRate;
          }
  
@@ -1204,7 +1216,15 @@ index 3227ab1..98446c5 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -287,7 +305,8 @@ namespace RT64 {
+@@ -271,6 +294,7 @@ namespace RT64 {
+             if ((framesToPresent > 1) && (usingMSAA || (i > 0))) {
+                 // Stall until the interpolated color target is available.
+                 const uint32_t targetIndex = usingMSAA ? i : (i - 1);
++                PhaseTimer phaseTimer(this, PhaseInterpolated);
+                 std::unique_lock<std::mutex> interpolatedLock(ext.sharedResources->interpolatedMutex);
+                 ext.sharedResources->interpolatedCondition.wait(interpolatedLock, [&]() {
+                     return (frameCounters.available > targetIndex) || ((frameCounters.available == targetIndex) && frameCounters.skipped);
+@@ -287,7 +311,8 @@ namespace RT64 {
  
                  if (i < framesToPresent) {
                      uint32_t targetIndex = usingMSAA ? i : (i - 1);
@@ -1214,7 +1234,25 @@ index 3227ab1..98446c5 100644
                  }
                  else {
                      colorTarget = nullptr;
-@@ -391,8 +410,31 @@ namespace RT64 {
+@@ -299,7 +324,9 @@ namespace RT64 {
+ 
+             uint32_t swapChainIndex = 0;
+             const bool presentFrame = (i < framesToPresent) && swapChainValid;
++            std::optional<PhaseTimer> drawTimer;
+             if (presentFrame) {
++                drawTimer.emplace(this, PhaseDraw);
+                 swapChainValid = ext.swapChain->acquireTexture(acquiredSemaphore.get(), &swapChainIndex);
+             }
+ 
+@@ -369,6 +396,7 @@ namespace RT64 {
+                 }
+             }
+ 
++            drawTimer.reset();
+             if (lockedWorkloadMutex) {
+                 ext.sharedResources->workloadMutex.unlock();
+                 lockedWorkloadMutex = false;
+@@ -391,15 +419,47 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1231,22 +1269,38 @@ index 3227ab1..98446c5 100644
 +                    }
 +
 +                    presentSlot += presentPeriod;
-+                    if (!ext.swapChain->sleepUntil(std::chrono::steady_clock::now() + (presentSlot - Timer::current()))) {
-+                        Timer::preciseSleepUntil(presentSlot);
++                    {
++                        PhaseTimer phaseTimer(this, PhaseSleep);
++                        if (!ext.swapChain->sleepUntil(std::chrono::steady_clock::now() + (presentSlot - Timer::current()))) {
++                            Timer::preciseSleepUntil(presentSlot);
++                        }
++                    }
++
++                    if (presentStats) {
++                        busyLateMicro += std::max(Timer::deltaMicroseconds(presentSlot, Timer::current()), int64_t(0));
 +                    }
 +#               else
                      Timer::preciseSleepUntil(presentTimestamp + std::chrono::nanoseconds(1'000'000'000 / targetRate));
 +#               endif
-                 }
++                }
 +#           if defined(__EMSCRIPTEN__)
 +                else {
 +                    presentSlot = Timestamp();
-+                }
+                 }
 +#           endif
  
                  if (presentWaitEnabled) {
++                    PhaseTimer phaseTimer(this, PhaseWait);
                      ext.swapChain->wait();
-@@ -416,6 +458,131 @@ namespace RT64 {
+                 }
+ 
+                 RenderCommandSemaphore *waitSemaphore = drawSemaphores[swapChainIndex].get();
+                 presentTimestamp = Timer::current();
++                PhaseTimer phaseTimer(this, PhasePresent);
+                 swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
+                 presentProfiler.logAndRestart();
+             }
+@@ -416,6 +476,186 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1269,6 +1323,8 @@ index 3227ab1..98446c5 100644
 +    // Banjo-Kazooie in Chrome went to 30 a second 0.4 s after its 1.5 s wait, for 10 s. A game at about the display's
 +    // rate (a launcher's 60 on a 59-61 Hz display) has nothing to be paced to, and its drops while a page loads aren't
 +    // counted either. Nor is a page opened with ?uncapped paced, which drops presents by design.
++    // A page opened with ?present-stats prints where the present thread's time went before each present it drops
++    // (reportDroppedPresent()).
 +    void PresentQueue::pace(bool presentDropped) {
 +        const uint32_t targetRate = ext.sharedResources->targetRate;
 +        const uint32_t originalRate = ext.sharedResources->viOriginalRate;
@@ -1375,10 +1431,105 @@ index 3227ab1..98446c5 100644
 +        setPacedRate((pacingMultiple > 0) ? (pacedMultipleAtMost(pacingMultiple) * originalRate) : 0);
 +    }
 +
++    PresentQueue::PhaseTimer::PhaseTimer(PresentQueue *queue, PresentPhase phase) : queue(queue), phase(phase) {
++        if (queue->presentStats) {
++            start = Timer::current();
++        }
++    }
++
++    PresentQueue::PhaseTimer::~PhaseTimer() {
++        if (queue->presentStats) {
++            queue->busyPhaseMicro[phase] += Timer::deltaMicroseconds(start, Timer::current());
++        }
++    }
++
++    void PresentQueue::resetBusyFrames() {
++        busyPhaseMicro.fill(0);
++        busyLateMicro = 0;
++        busyFrames = 0;
++        busyStart = Timer::current();
++    }
++
++    // With present-stats, a line for each present dropped because the next was already queued behind it (what pace()
++    // counts): how long it waited, and where the present thread's time went in the game frames since it last waited for
++    // a present or dropped one, as each frame's share: waiting for its workload, for the next interpolated frame, drawing
++    // and submitting each present, sleeping until each one's slot (and how far past the slots it woke), wait() (for
++    // fewer presents in flight, and the trips to the device thread it makes to ask), the present() calls, and the rest.
++    // The thread fell a game frame behind in those frames, so what grew in them is what dropped the present.
++    void PresentQueue::reportDroppedPresent(int droppedCursor, int nextCursor) {
++        const Timestamp now = Timer::current();
++        const double waitedMs = Timer::deltaMicroseconds(presentQueued[droppedCursor], now) / 1000.0;
++        const double nextMs = Timer::deltaMicroseconds(presentQueued[droppedCursor], presentQueued[nextCursor]) / 1000.0;
++        if (busyFrames == 0) {
++            printf("RT64: present dropped (it waited %.1f ms, the next came %.1f ms after it)\n", waitedMs, nextMs);
++        }
++        else {
++            const double frameMs = Timer::deltaMicroseconds(busyStart, now) / 1000.0 / busyFrames;
++            auto phaseMs = [&](PresentPhase phase) {
++                return busyPhaseMicro[phase] / 1000.0 / busyFrames;
++            };
++
++            double restMs = frameMs;
++            for (uint32_t p = 0; p < PhaseCount; p++) {
++                restMs -= phaseMs(PresentPhase(p));
++            }
++
++            printf("RT64: present dropped (it waited %.1f ms, the next came %.1f ms after it); the %u game frames before it "
++                "since the present thread last waited took %.1f ms each: workload %.1f, interpolated %.1f, draw %.1f, "
++                "sleep %.1f (%.1f past the slots), wait() %.1f, present() %.1f, the rest %.1f\n",
++                waitedMs, nextMs, busyFrames, frameMs, phaseMs(PhaseWorkload), phaseMs(PhaseInterpolated), phaseMs(PhaseDraw),
++                phaseMs(PhaseSleep), busyLateMicro / 1000.0 / busyFrames, phaseMs(PhaseWait), phaseMs(PhasePresent), restMs);
++        }
++
++        resetBusyFrames();
++    }
++
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -510,6 +677,10 @@ namespace RT64 {
+@@ -450,8 +690,10 @@ namespace RT64 {
+         const bool displayTiming = ext.device->getCapabilities().displayTiming;
+         bool swapChainValid = !ext.swapChain->needsResize();
+         while (presentThreadRunning) {
++            bool waited = false;
+             {
+                 std::unique_lock<std::mutex> cursorLock(cursorMutex);
++                waited = (writeCursor == threadCursor);
+                 cursorCondition.wait(cursorLock, [&]() {
+                     return (writeCursor != threadCursor) || !presentThreadRunning;
+                 });
+@@ -463,6 +705,20 @@ namespace RT64 {
+                 }
+             }
+ 
++            // present-stats: a game frame ended at each present the thread came to without waiting for it.
++            if (presentStats && (processCursor >= 0)) {
++                if (waited) {
++                    resetBusyFrames();
++                }
++                else {
++                    busyFrames++;
++                }
++
++                if (skipPresent) {
++                    reportDroppedPresent(processCursor, threadCursor);
++                }
++            }
++
+             if (processCursor >= 0) {
+                 std::unique_lock<std::mutex> threadLock(threadMutex);
+                 const bool needsResize = ext.swapChain->needsResize() || !swapChainValid;
+@@ -504,12 +760,19 @@ namespace RT64 {
+                 skipPresent = skipPresent || ext.swapChain->isEmpty();
+ 
+                 Present &present = presents[processCursor];
+-                ext.workloadQueue->waitForWorkloadId(present.workloadId);
++                {
++                    PhaseTimer phaseTimer(this, PhaseWorkload);
++                    ext.workloadQueue->waitForWorkloadId(present.workloadId);
++                }
+ 
+                 if (!presentThreadRunning) {
                      continue;
                  }
  
@@ -1390,19 +1541,21 @@ index 3227ab1..98446c5 100644
                      skipInterpolation();
                      notifyPresentId(present);
 diff --git a/src/hle/rt64_present_queue.h b/src/hle/rt64_present_queue.h
-index e08b02c..ffe572c 100644
+index e08b02c..7c7d266 100644
 --- a/src/hle/rt64_present_queue.h
 +++ b/src/hle/rt64_present_queue.h
-@@ -4,6 +4,8 @@
+@@ -4,6 +4,10 @@
  
  #pragma once
  
++#include <array>
 +#include <deque>
++#include <optional>
 +
  #include "common/rt64_profiling_timer.h"
  #include "gui/rt64_inspector.h"
  #include "render/rt64_vi_renderer.h"
-@@ -57,6 +59,16 @@ namespace RT64 {
+@@ -57,6 +61,36 @@ namespace RT64 {
          Timestamp presentTimestamp;
          VIHistory viHistory;
          bool presentWaitEnabled = false;
@@ -1416,14 +1569,36 @@ index e08b02c..ffe572c 100644
 +        Timestamp pacingPrebuildWaited;
 +        bool uncapped = false;
 +        Timestamp presentSlot;
++
++        // present-stats (?present-stats): when each present was queued, and where the present thread's time went in the
++        // game frames since it last waited for one or dropped one, which it prints at each one it drops (threadLoop()).
++        enum PresentPhase { PhaseWorkload, PhaseInterpolated, PhaseDraw, PhaseSleep, PhaseWait, PhasePresent, PhaseCount };
++        bool presentStats = false;
++        std::array<Timestamp, PRESENT_QUEUE_SIZE> presentQueued;
++        std::array<int64_t, PhaseCount> busyPhaseMicro = {};
++        int64_t busyLateMicro = 0;
++        uint32_t busyFrames = 0;
++        Timestamp busyStart;
++
++        // Adds the time until the end of its scope to a phase, while present-stats is on.
++        struct PhaseTimer {
++            PresentQueue *queue;
++            PresentPhase phase;
++            Timestamp start;
++
++            PhaseTimer(PresentQueue *queue, PresentPhase phase);
++            ~PhaseTimer();
++        };
  
          PresentQueue();
          ~PresentQueue();
-@@ -69,6 +81,7 @@ namespace RT64 {
+@@ -69,6 +103,9 @@ namespace RT64 {
          void setup(const External &ext);
          void threadPresent(const Present &present, bool &swapChainValid);
          void skipInterpolation();
 +        void pace(bool presentDropped);
++        void resetBusyFrames();
++        void reportDroppedPresent(int droppedCursor, int nextCursor);
          void notifyPresentId(const Present &present);
          void threadAdvanceBarrier();
          void threadLoop();

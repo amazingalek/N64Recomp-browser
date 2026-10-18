@@ -222,4 +222,8 @@ rt64 8a2c6a7           interpolated frames take turns in 8 color targets (Interp
                        of a game frame and never frees one, so a page held as many as its slowest game frame took
                        display frames. GoldenEye's are 5702x2970 (68 MB) at 3840x2000, and uncapped (360 Hz) in Dam at
                        ~8 fps it kept 42, 2.8 GB, until Firefox's WebGPU device ran out of memory on an 8 GB GPU
+rt64 a56a1e6           ?present-stats prints a line at each present the present thread drops (the next already queued
+                       behind it, what pace() counts): how long it waited, and each game frame's time since the thread
+                       last waited, split into waiting for the workload, for the interpolated frame, the draw, the
+                       sleeps to the slots (and how far past them they woke), wait() and the present() calls
 ```
