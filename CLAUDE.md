@@ -241,8 +241,9 @@ current in the same work as what changes it:
 ## Playing a page
 
 - `tools/play_page.mjs` (its header) plays a page by a plan in either browser and prints presents a second, sound
-  frames short, the shader waits, WebGPU errors and the GPU's and browser's load. A game's plan is its
-  `tools/play_plan.json`; a game fork's shader plan plays with `--section`. `tools/page_driver.mjs` drives the browsers
+  frames short, the shader waits, the shaders the list missed, WebGPU errors and the GPU's and browser's load. A
+  game's plan is its `tools/play_plan.json`; a game fork's shader plan plays with `--section`. `tools/page_driver.mjs`
+  drives the browsers
   for it and for your own scripts: Chrome headless (`--headless=new --enable-unsafe-webgpu`) or `--headed` in a window
   off the desktop, Firefox always in a window off the desktop over WebDriver BiDi (Firefox headless has no WebGPU
   adapter). Such a window has no focus, so keys and clicks come from script, the ROM is sent in pieces, and the
@@ -353,8 +354,10 @@ bfe07cb).
 - Chrome builds the whole list behind the launcher and the game from a draw of nothing at setup (rt64 977ddca), and a
   frame that wants 4 or more unbuilt shaders of a section holds the game for those under "Preparing graphics" (rt64
   950188f). Firefox builds nothing behind the game: it waits for the boot section before the first frame and for a
-  section when the game gets there. A shader the list misses is built behind the game, and the page remembers it
-  (`localStorage`) and builds it with the rest next visit.
+  section when the game gets there. A shader the list misses draws with the ubershader, in Chrome until it is built
+  behind the game and in Firefox for the rest of the visit, and the page remembers it (`localStorage`) and builds it
+  with its section next visit. `play_page.mjs` prints each miss and records them (`shaderMisses`), so a long play on
+  a fresh profile counts what a list lacks (docs/findings.md, What the prebuilt lists miss).
 - Recording: `?record-shaders` prebuilds none and prints an `rt64 shader:` line per description, in the order the game
   asks; add the new ones. `tools/record_shaders.mjs` records from a plan. A game with many levels records by code: a
   survey in its patches library or in JavaScript reaches each level as its own code would (`patches/shader_survey.c` or
