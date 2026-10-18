@@ -255,7 +255,8 @@ current in the same work as what changes it:
   nvidia-smi's GPU 0 beside it: on a laptop with two GPUs that one is the idle discrete GPU.
 - On a desktop GPU a page is played uncapped (`--uncapped`): capped, every page and build reads about 60 there.
   `?uncapped` needs the browser's animation frames uncapped too (Chrome `--disable-frame-rate-limit`, Firefox
-  `layout.frame_rate` 0; `--uncapped` sets both), and its interpolated frames take turns in 8 color targets of the
+  `layout.frame_rate` 360, never 0, which spins them at thousands a second: docs/findings.md, Uncapped in Firefox;
+  `--uncapped` sets both), and its interpolated frames take turns in 8 color targets of the
   game's framebuffer at the canvas's scale (rt64 8a2c6a7), 0.25-0.55 GB at 3840x2000. A run at the display's rate is for what uncapped
   switches off (RT64's pacing, the presents-in-flight cap, late done callbacks), and so for a laptop's own runs.
 - A plan reaches a level as a player does (the menus where quick, the survey's warp or stage start where not; its
