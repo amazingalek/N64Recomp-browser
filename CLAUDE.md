@@ -242,7 +242,10 @@ current in the same work as what changes it:
   for it and for your own scripts: Chrome headless (`--headless=new --enable-unsafe-webgpu`) or `--headed` in a window
   off the desktop, Firefox always in a window off the desktop over WebDriver BiDi (Firefox headless has no WebGPU
   adapter). Such a window has no focus, so keys and clicks come from script, the ROM is sent in pieces, and the
-  viewport is one CSS pixel a pixel (the canvas is CSS-sized: no `SDL_WINDOW_ALLOW_HIGHDPI`). `--on-screen` maximizes
+  viewport is one CSS pixel a pixel, or `--scale 2`'s two, a laptop at 200%. Every page's canvas is CSS-sized: a
+  window made with `SDL_WINDOW_ALLOW_HIGHDPI` goes to device pixels on the web, draws four times the pixels at 200% and
+  takes every click at the wrong spot, so Load ROM opens nothing (Wave Race 64's did, wave-race-64-recomp-web 9d3f621),
+  which only a run at `--scale 2` or a laptop's screen shows; a new port clears the flag with Emscripten. `--on-screen` maximizes
   either browser on the desktop at its scale instead, with none of those overrides. A plan's clicks are in 1256x645,
   moved to the viewport the page has (`innerWidth`, `innerHeight`), never to `--size`.
 - On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with (by LUID), with
