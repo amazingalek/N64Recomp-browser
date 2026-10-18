@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web a56a1e6de56313e3aa519f02d3acbc2f10161297
+rt64: https://github.com/amazingalek/rt64-web f262d56b098afebe950836254083febb3b02bae1
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1162,7 +1162,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..333f0c1 100644
+index 3227ab1..1373e25 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1252,7 +1252,7 @@ index 3227ab1..333f0c1 100644
              if (lockedWorkloadMutex) {
                  ext.sharedResources->workloadMutex.unlock();
                  lockedWorkloadMutex = false;
-@@ -391,15 +419,47 @@ namespace RT64 {
+@@ -391,15 +419,49 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1269,6 +1269,7 @@ index 3227ab1..333f0c1 100644
 +                    }
 +
 +                    presentSlot += presentPeriod;
++                    const bool slotAhead = presentStats && (presentSlot > Timer::current());
 +                    {
 +                        PhaseTimer phaseTimer(this, PhaseSleep);
 +                        if (!ext.swapChain->sleepUntil(std::chrono::steady_clock::now() + (presentSlot - Timer::current()))) {
@@ -1276,7 +1277,8 @@ index 3227ab1..333f0c1 100644
 +                        }
 +                    }
 +
-+                    if (presentStats) {
++                    // Only a sleep that had a slot to wait for woke past it: one already past (after a stall) didn't sleep.
++                    if (slotAhead) {
 +                        busyLateMicro += std::max(Timer::deltaMicroseconds(presentSlot, Timer::current()), int64_t(0));
 +                    }
 +#               else
@@ -1300,7 +1302,7 @@ index 3227ab1..333f0c1 100644
                  swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
                  presentProfiler.logAndRestart();
              }
-@@ -416,6 +476,186 @@ namespace RT64 {
+@@ -416,6 +478,186 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1487,7 +1489,7 @@ index 3227ab1..333f0c1 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -450,8 +690,10 @@ namespace RT64 {
+@@ -450,8 +692,10 @@ namespace RT64 {
          const bool displayTiming = ext.device->getCapabilities().displayTiming;
          bool swapChainValid = !ext.swapChain->needsResize();
          while (presentThreadRunning) {
@@ -1498,19 +1500,21 @@ index 3227ab1..333f0c1 100644
                  cursorCondition.wait(cursorLock, [&]() {
                      return (writeCursor != threadCursor) || !presentThreadRunning;
                  });
-@@ -463,6 +705,20 @@ namespace RT64 {
+@@ -463,6 +707,22 @@ namespace RT64 {
                  }
              }
  
-+            // present-stats: a game frame ended at each present the thread came to without waiting for it.
++            // present-stats: a game frame ended at each present the thread came to without waiting for it, unless the one
++            // before was dropped (a second of a burst, reported without the frames).
 +            if (presentStats && (processCursor >= 0)) {
 +                if (waited) {
 +                    resetBusyFrames();
 +                }
-+                else {
++                else if (!lastPresentDropped) {
 +                    busyFrames++;
 +                }
 +
++                lastPresentDropped = skipPresent;
 +                if (skipPresent) {
 +                    reportDroppedPresent(processCursor, threadCursor);
 +                }
@@ -1519,7 +1523,7 @@ index 3227ab1..333f0c1 100644
              if (processCursor >= 0) {
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  const bool needsResize = ext.swapChain->needsResize() || !swapChainValid;
-@@ -504,12 +760,19 @@ namespace RT64 {
+@@ -504,12 +764,19 @@ namespace RT64 {
                  skipPresent = skipPresent || ext.swapChain->isEmpty();
  
                  Present &present = presents[processCursor];
@@ -1541,7 +1545,7 @@ index 3227ab1..333f0c1 100644
                      skipInterpolation();
                      notifyPresentId(present);
 diff --git a/src/hle/rt64_present_queue.h b/src/hle/rt64_present_queue.h
-index e08b02c..7c7d266 100644
+index e08b02c..d41b750 100644
 --- a/src/hle/rt64_present_queue.h
 +++ b/src/hle/rt64_present_queue.h
 @@ -4,6 +4,10 @@
@@ -1555,7 +1559,7 @@ index e08b02c..7c7d266 100644
  #include "common/rt64_profiling_timer.h"
  #include "gui/rt64_inspector.h"
  #include "render/rt64_vi_renderer.h"
-@@ -57,6 +61,36 @@ namespace RT64 {
+@@ -57,6 +61,37 @@ namespace RT64 {
          Timestamp presentTimestamp;
          VIHistory viHistory;
          bool presentWaitEnabled = false;
@@ -1578,6 +1582,7 @@ index e08b02c..7c7d266 100644
 +        std::array<int64_t, PhaseCount> busyPhaseMicro = {};
 +        int64_t busyLateMicro = 0;
 +        uint32_t busyFrames = 0;
++        bool lastPresentDropped = false;
 +        Timestamp busyStart;
 +
 +        // Adds the time until the end of its scope to a phase, while present-stats is on.
@@ -1592,7 +1597,7 @@ index e08b02c..7c7d266 100644
  
          PresentQueue();
          ~PresentQueue();
-@@ -69,6 +103,9 @@ namespace RT64 {
+@@ -69,6 +104,9 @@ namespace RT64 {
          void setup(const External &ext);
          void threadPresent(const Present &present, bool &swapChainValid);
          void skipInterpolation();
