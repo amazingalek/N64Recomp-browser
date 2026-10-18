@@ -92,8 +92,8 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   gets the shared one on a build dir's first configure only (CMP0077's old behaviour), so its page sets it in the cache
   (`FORCE`), as Jet Force Gemini's does; only a fresh build dir shows it.
 - The web builds compile with `-msimd128` (hlslpp's wasm backend, the auto-vectorizer) and `-DXXH_HAS_INCLUDE(x)=0`
-  (xxHash's NEON path through Emscripten's `arm_neon.h` doesn't compile in C++, so XXH3 stays scalar): small (Rush
-  2049's CLAUDE.md, Step 3) but free, since every browser with WebGPU has wasm SIMD.
+  (xxHash's NEON path through Emscripten's `arm_neon.h` doesn't compile in C++, so XXH3 stays scalar): small (~5% off a
+  Rush 2049 race display list: its `CMakeLists.txt`) but free, since every browser with WebGPU has wasm SIMD.
 - hlslpp's wasm SIMD backend had movehl, dot4, load3 of int3 and per-lane shifts wrong, so transpose, inverse and some
   mul shapes too, which RT64 builds its view and projection matrices with (Banjo drew a polygon over the whole screen).
   hlslpp-web fixes them and CI checks the backend against plain C++. `HLSLPP_SCALAR` is no way out: its `frac` is wrong
