@@ -33,8 +33,11 @@ It merges once CI is green and what it changes has been played (Changing it). Wo
 filed and not started, unless it is a critical fix (The pins).
 
 Work is prioritised by what it breaks: high for a crash, med for an issue that affects every game, low for an issue
-that affects one game. That is judged again once the cause is known, by whoever finds it, in the same work: one game's
-symptom whose cause is shared code (a fork, this repo) is med, or high if it crashes or loses the device on any game.
+that affects one game. Work that comes without a priority gets one from whoever first can tell what it breaks (often
+its title already says), before anything else they do on it. A priority found wrong is changed at once by whoever finds
+it, in the same work, not at its end: the cause known, a second game showing it, a crash turning up, or a cause
+that turns out to be one game's own. One game's symptom whose cause is shared code (a fork, this repo) is med, or high if it
+crashes or loses the device on any game.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
@@ -472,8 +475,11 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   3.5% of the compile time. Precompiled headers are off for a page: ccache can't cache a file that includes one.
 - A fixed heap in place of memory growth (no faster), and `-sGROWABLE_ARRAYBUFFERS=2` (emdawnwebgpu passes WebGPU views
   of the heap, which Chrome refuses over a growable buffer).
-- A cheaper GPU frame for Rush 2049's and Majora's Mask's pages, the dearest uncapped, in the web's own parts (pass
-  breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the desktop build draws too:
-  the mip LOD shader's taps (a tile picked per pixel can't use a hardware sampler, upstream's rule in rt64_state.cpp)
-  and Auto's resolution rounded up to a whole multiple of 240 lines. Changing either would draw differently from the
+- A cheaper GPU frame for Rush 2049's, Majora's Mask's and Conker's pages, the dearest uncapped and on a laptop, in the
+  web's own parts (pass breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the
+  desktop build draws too: RT64's pixel shaders (Rush 2049's mip LOD shader's taps, a tile picked per pixel that can't
+  use a hardware sampler, upstream's rule in rt64_state.cpp) and Auto's resolution rounded up to a whole multiple of
+  the game's lines (Conker's 216 five times for a laptop's 889). Changing either would draw differently from the
   desktop's RT64.
+- A DirectComposition overlay for a WebGPU canvas in Chrome on Windows, as Firefox's pref gives (A laptop, measured):
+  Chromium makes one only of video and low-latency canvases, so no flag or page setting gives one.

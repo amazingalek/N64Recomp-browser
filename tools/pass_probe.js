@@ -151,6 +151,9 @@
     if (record) record.work += x * y * z;
     return original.apply(this, arguments);
   });
+  // The probe's own readback copies are made with the unwrapped calls, so they aren't counted as the page's.
+  const resolveQuerySet = GPUCommandEncoder.prototype.resolveQuerySet;
+  const copyBufferToBuffer = GPUCommandEncoder.prototype.copyBufferToBuffer;
   const copyKind = { copyTextureToTexture: 'copy texture to texture', copyTextureToBuffer: 'copy texture to buffer',
     copyBufferToTexture: 'copy buffer to texture', copyBufferToBuffer: 'copy buffer to buffer' };
   for (const name of Object.keys(copyKind)) {
@@ -163,8 +166,6 @@
       return original.apply(this, arguments);
     });
   }
-  const resolveQuerySet = GPUCommandEncoder.prototype.resolveQuerySet;
-  const copyBufferToBuffer = GPUCommandEncoder.prototype.copyBufferToBuffer;
   wrap(GPUCommandEncoder.prototype, 'finish', (original) => function () {
     const state = encoderState.get(this);
     if (state && state.records.length) {
