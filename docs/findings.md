@@ -182,8 +182,10 @@ Each run is in `plays.jsonl` with its misses (`shaderMisses`), its note naming t
     Diddy Kong Racing     6    Wizpig, Darkmoon Caverns, cutscenes
 
 Unrecorded, from plays that didn't get through: Ocarina of Time 20 (Hyrule Field 8, its dungeons' bosses 1-4 each),
-Donkey Kong 64 18 in the first 225 s of its bosses (Aztec's Dogadon 5, the llama temple 4, the lighthouse 4). Not
-measured late: Rush 2049 and Wave Race 64 (their plans never left the first race: none and 1 there), and Mario Kart 64.
+Donkey Kong 64 18 in the first 225 s of its bosses (Aztec's Dogadon 5, the llama temple 4, the lighthouse 4), Mario
+Kart 64 5 (mirror Bowser's Castle 2, Banshee Boardwalk's finish 3; Rainbow Road driven 150 s, 4-player Versus, cut off
+at the award ceremony; a run whose races stayed at the start line, recorded, missed 4). Not measured late: Rush 2049
+and Wave Race 64 (their plans never left the first race: none and 1 there).
 
 So a long play finds tens of shaders a list lacks, not hundreds: a few a place, the most where a recording never went
 (Davy Jones' Locker, GoldenEye's Jungle and Control past their starts, Hyrule Field). They are the same shaders in
