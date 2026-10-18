@@ -29,6 +29,15 @@ With `?probe-skip` the scene passes' median came to ~1.12 ms without the 13 KB d
 RT64's own pixel shaders spread over its draws, as Majora's Mask's is, at Auto's rounded-up size; the 13 KB shader's
 many draws are small and cheap.
 
+GoldenEye's Dam at a laptop window's 1920x945 (v0.63.0's page from Pages, its plan, headless Chrome 155 uncapped on an
+RTX 2070, the host 39% busy, which held it at the 360 cap): Auto draws 4 times its 330 lines, 2682x1320. 0.66-0.77 ms of
+GPU passes a present, ~7.4 passes: one scene pass at 2682x1320 (100-275 draws, 0.58-0.69 ms), its depth pass (0.01),
+~2.7 compute passes (0.02), one 1920x945 draw into the canvas (0.04), render to RAM's 440x330 passes every other
+present (0.01), and ~39 buffer copies and a copy of the canvas, untimed. The draws are spread over many fragment
+shaders (25, 10, 70, 60, 21, 24 and 73 KB the most), their mix changing with the view and repeating with the plan's
+16 s walk, and the time a present stayed within that range from 50 s to 128 s: no part of the walk costs more and
+nothing builds up. So Dam's GPU frame is RT64's own, as the others are; on the laptop below Chrome draws it at 60.
+
 ## Memory
 
 Read as CLAUDE.md's Playing a page says. Rush 2049's page from Pages, 10 minutes of its attract demo, Firefox 158 on an
@@ -306,8 +315,19 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
 - Where a page left the GPU room the overlay took 25-35 points off it: Banjo's intro 57.6-53.7 at 93-96% against
   59.9-57.9 at 64-65%, GoldenEye's 59 at 91-99% against 60-64 at 60-67%, Rush 2049's 55 at 93% against 58.9 at 62%.
   So most of Firefox's on-screen cost is its composition (WebGPU in Chrome and Firefox, below).
-- Rush 2049's race (20-37) and GoldenEye's Dam (about 20) stayed GPU-bound with it, as Chrome's race is off the
-  desktop: what they draw is more than this GPU's 1/60 s, whoever composites it.
+- Rush 2049's race (20-37) stayed GPU-bound with it, as Chrome's race is off the desktop: what it draws is more than
+  this GPU's 1/60 s, whoever composites it. GoldenEye's Dam (about 20) stayed GPU-bound too, but not on what it draws:
+  Chrome drew Dam at 60 on this laptop with the Intel GPU 68% busy off the desktop and 81% on screen, and 81 uncapped
+  (~12 ms of the GPU a present), and Dam's frame costs the same all through the plan (A page's GPU time).
+- GoldenEye in Firefox off the desktop, that evening's six runs (with and without a preload that kicks plume's
+  callbacks): four fell to 20.6-23.8 presents a second in Dam, the other two held 63.9-64.0. At ~20 presents the Intel
+  GPU was 84-93% busy, ~45 ms of it a present where Chrome takes ~12, and the GPU process took 0.23-0.27 cores against
+  0.52-0.58, so the GPU was busy with something other than the frames. The four ended with 3149-3200 MB of the
+  adapter's shared memory in use, the two with 2311-2461. v0.58.0 kept a color target for every display frame of the
+  slowest game frame so far (Memory, above; rt64 8a2c6a7 caps them at 8 from v0.63.0), and Dam's are 2682x1320, 14 MB:
+  the 800 MB more is about 56 of them, one game frame of ~0.9 s. Whether the collapse was those targets (the Intel GPU's
+  memory is the host's, and its counters can't say what the GPU's time went on) or is still there on v0.63.0 needs
+  the laptop again.
 - Banjo stayed at 30 with it: RT64 paced it to 30 with the GPU 70-78% busy until 123 s, and drew 58-60 after.
 
 ## WebGPU in Chrome and Firefox
@@ -451,6 +471,18 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   (the graphics thread's 1 ms, the thread cleaner's 10) stays timed. Under the stand-in a page's sound is short all
   through (Conker 77,000-81,000 frames in 60 s, main and the fix alike), which the laptop's Firefox runs don't show
   (0-232), so read presents from it, not sound.
+- GoldenEye from Pages (v0.58.0) presented 63-64.5 a second in Firefox on a laptop at 60 Hz with 60 animation frames,
+  and under the stand-in (`?timer-tick=15.625`, desktop Firefox 158 at the display's rate, a busy host) 63.4.
+  ultramodern's VI thread waited for each VI's time with a timed wait, which ended on a tick, so VIs came 15.6 or
+  31.2 ms apart, 58-60 a second. RT64 reads a game's rate from the VIs between its last three new frames, read
+  GoldenEye's 60 as 30 for 10-13 frames a second, and interpolated each of those into two presents; with the VI
+  thread exempt from the stand-in it drew 60.0. On N64ModernRuntime b81df43 and 30c60e5, where a probe finds timed waits late,
+  the VI thread waits on a futex the page's animation frames wake and ends at the first frame within half a VI of
+  its time. Only a count crosses the threads: the page's thread and a pthread read `emscripten_get_now()` apart in
+  Firefox, and a version comparing the two clocks sent VIs 1,500-1,800 a second. Under the stand-in it drew VIs and
+  presents 60.0 a second, a gap p50 of 16.6 ms against 15.7, frames read as 30 0.4-3.2 a second, the browser at
+  1.28 cores against 1.71, and sound frames short 0 against 47,296 in a play: the audio messages go out with each
+  VI, so GoldenEye's short sound under the stand-in was its VIs'.
 - A launcher's first frame in Firefox 158 (Banjo's and Conker's from Pages, 3840x2000 uncapped, RTX 2070, a preload
   timing each WebGPU call): the page submits its first four presents within ~20 ms and gets their onSubmittedWorkDone
   back 79-290 ms later, all at once, and from then on no two presents are more than 80 ms apart. Nothing reaches the
