@@ -116,7 +116,7 @@ patch), the microcode labels it ignores, render to RAM off and why, the shader l
 
 `amazingalek/BanjoTooieRecompiled-web` is Banjo-Tooie: Recompiled. The game writes thprof creating its threads
 (N64ModernRuntime 2e6aa0a). Upstream ships the Suplexmentary Comic NC font in `assets/`, and the page loads it. Its list
-is 255 shaders and 160 pipelines in 11 sections. The word at 0x800459C8 counts 30 a second in every world, not frames
+is 284 descriptions in 11 sections. The word at 0x800459C8 counts 30 a second in every world, not frames
 drawn. The desktop build draws every world but Terrydactyland and Hailfire Peaks at 30. Upstream prints diagnostics of
 its own (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are. Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how its
@@ -128,7 +128,7 @@ ELF is built with are in the Docker image. It is Fast3D, which RT64 draws on Web
 both framebuffers' RDRAM stays stale and equal, so `uvCopyFrameBuf`'s copy changes no byte and RT64's check of a
 framebuffer's RDRAM before each list (`checkRAM`) sees nothing; the title's fade alternates black frames either way, so
 that is not the page's. A game whose CPU copies into a framebuffer RT64 has never drawn, or reads one, still needs it.
-Its list is 414 descriptions, 298 pipelines in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
+Its list is 422 descriptions in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
 before the first frame, split 7-9 s. Its docs/BUILDING.md (The web page) and the headers of `src/frontend.cpp`,
 `patches/clocks.c`, `patches/sched.c`, `tools/shader_survey.js` and `tools/merge_shader_sections.py` have the rest: the
 decompilation build and the patches, sound, render to RAM off and why, the clock waits, the shader list's sections and
@@ -149,7 +149,7 @@ of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
 N64Recomp-browser's `frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's. Upstream shapes its
 window to the launcher and to the game's aspect; the page leaves the window alone. The game reads the keyboard once a
-frame at its 20 a second, so a script holds a key 150-300 ms. Its list, `src/rt64_shaders.txt`, is 544 descriptions in
+frame at its 20 a second, so a script holds a key 150-300 ms. Its list, `src/rt64_shaders.txt`, is 564 descriptions in
 24 sections, the boot 69. Its survey clears a new file's opening cutscene at the file select's hand-over, since clearing
 it mid-cutscene hung the game on a black screen, and warps as a child or an adult by the play state's `linkAgeOnLoad`,
 since the save's `linkAge` alone is overwritten. Its `tools/play_plan.json` plays Link's house, Kokiri Forest, the pause
@@ -164,7 +164,7 @@ and its survey, the warps.
 Gamepad API and keeps the dummy frame out of RDRAM as RecompFrontend 75fe596 does. The game binds draw buffers the
 workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. The
 base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
-never waits there. Its list, `src/rt64_shaders.txt`, is 201 descriptions and 192 pipelines in 16 sections, the boot 36
+never waits there. Its list, `src/rt64_shaders.txt`, is 210 descriptions in 16 sections, the boot 36
 and a planet 20-86 descriptions each. The early release took the sound short over its play plan (the first room of every
 planet in 160 s, headless Chrome 155) from 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display
 (`patches/web/dkr.patch` sets the base's `rr_default`, Original, to Display with Emscripten, and moves a page's settings
