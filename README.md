@@ -384,7 +384,7 @@ take the web support without moving its submodules to the forks (Using it in a r
   can be followed day by day. `pass_probe.js`, a preload for it, says what a page's presents spend the GPU on: its
   passes, their size, their draws by shader and the GPU time of each; `webgpu_census.js`, another, counts its WebGPU calls
   and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
-  reading Firefox's GPU process memory around each.
+  reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
