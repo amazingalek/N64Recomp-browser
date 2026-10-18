@@ -33,8 +33,11 @@ It merges once CI is green and what it changes has been played (Changing it). Wo
 filed and not started, unless it is a critical fix (The pins).
 
 Work is prioritised by what it breaks: high for a crash, med for an issue that affects every game, low for an issue
-that affects one game. That is judged again once the cause is known, by whoever finds it, in the same work: one game's
-symptom whose cause is shared code (a fork, this repo) is med, or high if it crashes or loses the device on any game.
+that affects one game. Work that comes without a priority gets one from whoever first can tell what it breaks (often
+its title already says), before anything else they do on it. A priority found wrong is changed at once by whoever finds
+it, in the same work, not at its end: the cause known, a second game showing it, a crash turning up, or a cause
+that turns out to be one game's own. One game's symptom whose cause is shared code (a fork, this repo) is med, or high if it
+crashes or loses the device on any game.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
