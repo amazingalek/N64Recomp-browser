@@ -71,8 +71,8 @@ options; `docs/findings.md` has what was measured this way.
   kept. To see a page's sound as the game writes it, wrap `AudioWorkletNode` in a preload, take
   `processorOptions.ring` and sample its two counters every few ms.
 - What its GPU time goes on: `--preload tools/pass_probe.js` (its header) prints each kind of pass, their draws and GPU
-  time (Chrome's timestamp queries; Firefox counts only) and the draws by fragment shader; `--query probe-skip=<KB>`
-  leaves one shader's draws out to price them (docs/findings.md, A page's GPU time).
+  time (timestamp queries, where the browser offers them; counts only elsewhere) and the draws by fragment shader;
+  `--query probe-skip=<KB>` leaves one shader's draws out to price them (docs/findings.md, A page's GPU time).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
