@@ -42,6 +42,28 @@ host, then a quiet one) none grew the GPU process more than 0.71 MB a second ove
 canvas alone 0.27, Firefox's own heap nearly all of it, and leaving the page gave it back. So on a desktop GPU no kind
 grows it; the laptop, where the page grows 4.47 MB a second, is where a kind would show.
 
+On the laptop (Firefox 158, Intel UHD, 1920x945, v0.58.0's page) no kind grew it either, nor all at once (0.65 MB a
+second); with Rush's ~20 texture sizes (1x2 to 128x64, 2,000 alive) and its writes spread over 200 buffers it grew
+2.01, nearly all GPU committed, and the system heap not at all, against the page's 4.3 (60 to 300 s: GPU committed
++529 MB, the system heap +461; +587 MB of write-combined commit in 15 segments, on an integrated GPU likely the same
+memory as GPU committed; of Firefox's own reports only WebRender's texture hosts grew, +14). What does grow it there
+comes with the attract race's scene changes, which the test page has none of. Every ~35 s the page draws 2,000-6,800
+non-indexed draws a second for a few seconds, and every second time its live textures fall from ~2,000 to ~180 and fill
+again in 10-20 s; the GPU process stepped 80-230 MB at five of six of them, 723 of the 1,008 MB it grew from 60 to
+320 s. Banjo-Kazooie's plan, which changed no scene in its 300 s, held 180-600 textures and grew 0.18 MB a second; a test
+page that fills 2,200 textures in 4 s and destroys all but 200 every 20 s grew 0.34. Neither page creates a pipeline,
+shader module, sampler or layout after its first minute.
+
+Whose code made what grows: `tools/memory_scan.ps1` (its header) reads the GPU process's pages committed since a
+snapshot and counts what in them points into each loaded module. Rush 2049's page from Pages in Firefox 158 on the RTX
+2070, uncapped at 1920x945, 60 to 540 s of its attract (a quiet host; about:memory start to end: the system heap 23 →
+232 MB, Firefox's heap 53 → 150, GPU committed 483 → 1176): +131 MB of Windows' heap, whose pointers go into d3d12.dll
+(69,849), NVIDIA's D3D12 driver nvwgf2umx.dll (37,796) and dxcompiler.dll (17,275) and 92 into Firefox's xul.dll, with
+12 DXBC shader containers; +120 MB write-combined in four 32 MB blocks, all of them by 240 s; 3 MB in mozjemalloc's
+1 MB chunks. So the system heap that grows is made by the D3D12 runtime, the driver and DXC, not by Firefox's own
+code. A pointer names who made a block, not who keeps it: whether wgpu holds the D3D12 objects behind it, and what
+the Intel driver's share is on the laptop, is still open.
+
 What did grow a page's video memory was RT64's interpolated frames, before rt64 8a2c6a7: a color target per display
 frame of a game frame, kept for the rest of the visit, so as many as the slowest game frame so far took display frames.
 GoldenEye's page from Pages (v0.58.0), Firefox 158, uncapped at 3840x2000 on an RTX 2070 (a quiet host), its plan into

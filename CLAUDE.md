@@ -283,7 +283,8 @@ current in the same work as what changes it:
   sample, and in Firefox about:memory's split of them at the play's start and end (`gpuProcessMemory`); each read holds
   Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory). Which kind of WebGPU
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
-  `--preload tools/webgpu_census.js` reads off the page.
+  `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
+  Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never
