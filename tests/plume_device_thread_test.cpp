@@ -2,7 +2,8 @@
 // call: every call reaches the backend on the device thread, in the order it was made; command lists recorded on
 // several threads at once replay their commands with the backend's objects and with copies of what their arguments
 // pointed at; push constants of size 0 take the size of their range; a swap chain's present() copies the texture drawn
-// into the backend's swap chain texture, and its needsResize() and getRefreshRate() don't wait for the device thread;
+// into the backend's swap chain texture, its needsResize() and getRefreshRate() don't wait for the device thread, and
+// its wait() asks the backend on the calling thread with the presents not yet run on the device thread;
 // map() of a buffer whose data isn't there yet waits for it on the calling side (WebGPU readback), and asking whether
 // it's there doesn't wait for the device thread; and every backend object is destroyed on the device thread.
 
@@ -250,6 +251,8 @@ MockSwapChain *lastSwapChain = nullptr;
 struct MockSwapChain : RenderSwapChain, Named {
     std::vector<std::unique_ptr<MockTexture>> textures;
     uint32_t width = 0, height = 0, next = 0, canvasWidth = 640, refreshRate = 60;
+    std::atomic<int> callerWaits{ 0 };
+    std::atomic<uint32_t> lastQueued{ 0 };
     MockSwapChain() : Named("swapChain") {
         lastSwapChain = this;
         textures.emplace_back(std::make_unique<MockTexture>("canvas0"));
@@ -257,6 +260,7 @@ struct MockSwapChain : RenderSwapChain, Named {
     }
     bool present(uint32_t index, RenderCommandSemaphore **waits, uint32_t count) override { call("present " + std::to_string(index) + " waits " + std::to_string(count)); return true; }
     void wait() override { }
+    bool waitOnCaller(const std::atomic<uint32_t> &queued) override { callerWaits++; lastQueued = queued.load(); return true; }
     bool resize() override { call("resize"); width = canvasWidth; height = 480; return true; }
     bool needsResize() const override { call("needsResize"); return width != canvasWidth; }
     void setVsyncEnabled(bool) override { }
@@ -630,6 +634,22 @@ int main() {
     const bool refreshed = swapChain->needsResize() && (swapChain->getRefreshRate() == 144);
     check(answeredWithoutWaiting && lastAnswerKept && refreshed, "needsResize() and getRefreshRate() answer without waiting for the device thread, and a refresh later the backend's answer");
     check(swapChain->resize() && !swapChain->needsResize() && (swapChain->getWidth() == 800), "needsResize() answers false right after resize()");
+
+    // wait() asks the backend on the calling thread, with the presents the device thread hasn't run yet, and doesn't
+    // wait for the device thread.
+    std::promise<void> presentGate;
+    std::shared_future<void> presentGateOpen = presentGate.get_future().share();
+    deviceThread->runAsync([presentGateOpen]() { presentGateOpen.wait(); });
+    swapChain->present(0, nullptr, 0);
+    swapChain->present(1, nullptr, 0);
+    std::future<uint32_t> queuedAnswer = std::async(std::launch::async, [&]() { swapChain->wait(); return swapChainInner->lastQueued.load(); });
+    const bool waitedWithoutDevice = (queuedAnswer.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    presentGate.set_value();
+    const uint32_t queuedWhileHeld = queuedAnswer.get();
+    deviceThread->runSync([]() {});
+    swapChain->wait();
+    check(waitedWithoutDevice && (queuedWhileHeld == 2) && (swapChainInner->lastQueued == 0) && (swapChainInner->callerWaits == 2),
+        "wait() waits on the calling thread, counting the presents the device thread hasn't run as in flight");
 
     // A buffer whose data arrives late: map() asks isMapReady() from the calling side until it's true, then maps.
     nextBufferNotReady = 3;
