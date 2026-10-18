@@ -43,7 +43,10 @@
 // wrong address) goes on for at most 5 times its ms and 30 s more, and says so; one that goes back (a level that
 // restarts it) counts from there, so a wait over a level's start is that long into the level. A counter the game steps by its frame's
 // length (GoldenEye's g_GlobalTimer, in 60ths) is better than one that counts frames, since a variable timestep moves
-// the player by that length. The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is.
+// the player by that length. The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is. A run
+// says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
+// after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
+// busy.
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
@@ -186,12 +189,13 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
     return [Math.round(w / 2 + (x - 628) * scale), Math.round(h / 2 + (y - 322.5) * scale)];
   };
   page.run = async (steps, extra = {}) => {
-    let clock = null;
+    let clock = null, asked = 0, held = 0;
+    const ticks = (ms) => Math.max(1, Math.round(ms * clock[1] / 1000));
     // ms of the game's time on from from (null: from now), or of wall time with no clock.
     const onClock = async (ms, from = null) => {
       if (!clock) return sleep(ms);
-      const [read, perSecond] = clock;
-      const [at, got] = await page.evaluate(`n64clock(${JSON.stringify(read)}, ${from}, ${Math.max(1, Math.round(ms * perSecond / 1000))}, ${ms * 5 + 30000})`);
+      const [read] = clock;
+      const [at, got] = await page.evaluate(`n64clock(${JSON.stringify(read)}, ${from}, ${ticks(ms)}, ${ms * 5 + 30000})`);
       if (!got) log(`the clock stood still: ${read} stayed ${at} through ${ms} ms of the game's time`);
       return at;
     };
@@ -215,6 +219,10 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'hold') {
         const from = clock ? await onClock(1000 / clock[1]) : null;
         await page.key('down', a); await onClock(a[3], from); await page.key('up', a);
+        if (clock) {
+          const after = await page.evaluate(clock[0]);
+          asked += ticks(a[3]); held += after >= from ? after - from : after;
+        }
       }
       else if (op === 'down' || op === 'up') await page.key(op, a);
       else if (op === 'pressUntil') {
@@ -241,6 +249,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else throw new Error(`unknown step ${op}`);
     }
+    if (asked) log(`holds on the clock: ${asked} ticks asked, ${held} held`);
   };
   return page;
 };
