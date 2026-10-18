@@ -33,8 +33,11 @@ It merges once CI is green and what it changes has been played (Changing it). Wo
 filed and not started, unless it is a critical fix (The pins).
 
 Work is prioritised by what it breaks: high for a crash, med for an issue that affects every game, low for an issue
-that affects one game. That is judged again once the cause is known, by whoever finds it, in the same work: one game's
-symptom whose cause is shared code (a fork, this repo) is med, or high if it crashes or loses the device on any game.
+that affects one game. Work that comes without a priority gets one from whoever first can tell what it breaks (often
+its title already says), before anything else they do on it. A priority found wrong is changed at once by whoever finds
+it, in the same work, not at its end: the cause known, a second game showing it, a crash turning up, or a cause
+that turns out to be one game's own. One game's symptom whose cause is shared code (a fork, this repo) is med, or high if it
+crashes or loses the device on any game.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
@@ -242,7 +245,10 @@ current in the same work as what changes it:
   for it and for your own scripts: Chrome headless (`--headless=new --enable-unsafe-webgpu`) or `--headed` in a window
   off the desktop, Firefox always in a window off the desktop over WebDriver BiDi (Firefox headless has no WebGPU
   adapter). Such a window has no focus, so keys and clicks come from script, the ROM is sent in pieces, and the
-  viewport is one CSS pixel a pixel (the canvas is CSS-sized: no `SDL_WINDOW_ALLOW_HIGHDPI`). `--on-screen` maximizes
+  viewport is one CSS pixel a pixel, or `--scale 2`'s two, a laptop at 200%. Every page's canvas is CSS-sized: a
+  window made with `SDL_WINDOW_ALLOW_HIGHDPI` goes to device pixels on the web, draws four times the pixels at 200% and
+  takes every click at the wrong spot, so Load ROM opens nothing (Wave Race 64's did, wave-race-64-recomp-web 9d3f621),
+  which only a run at `--scale 2` or a laptop's screen shows; a new port clears the flag with Emscripten. `--on-screen` maximizes
   either browser on the desktop at its scale instead, with none of those overrides. A plan's clicks are in 1256x645,
   moved to the viewport the page has (`innerWidth`, `innerHeight`), never to `--size`.
 - On Windows play_page reads the GPU from Windows' counters for the adapter the page draws with (by LUID), with
@@ -270,7 +276,8 @@ current in the same work as what changes it:
   require-corp` (threads need SharedArrayBuffer); on Pages `coi_serviceworker.js` sets them after one reload. Look at a
   page with CDP `Page.captureScreenshot` of that page.
 - What a page says about itself: `Module.recompAudioStats()` (frames played, frames short); `?present-stats` (plume
-  90ef8e5: presents a second, how late each onSubmittedWorkDone comes back); `?presents-in-flight=<1-8>` (otherwise 2,
+  90ef8e5: presents a second, how late each onSubmittedWorkDone comes back; rt64 f262d56: at each present RT64 drops,
+  where the present thread's time went); `?presents-in-flight=<1-8>` (otherwise 2,
   raised to 4 at most while it holds presents back); `?uncapped` (plume 904b26c, rt64 e408ed4); `?record-shaders`; and
   the console reports each CPU write render to RAM's late copy kept. To see a page's sound as the game writes it, wrap
   `AudioWorkletNode` in a preload, take `processorOptions.ring` and sample its two counters every few ms.
@@ -284,7 +291,8 @@ current in the same work as what changes it:
   sample, and in Firefox about:memory's split of them at the play's start and end (`gpuProcessMemory`); each read holds
   Firefox's page 120-200 ms, so a play's gaps start after the first (docs/findings.md, Memory). Which kind of WebGPU
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
-  `--preload tools/webgpu_census.js` reads off the page.
+  `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
+  Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never
@@ -472,8 +480,11 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   3.5% of the compile time. Precompiled headers are off for a page: ccache can't cache a file that includes one.
 - A fixed heap in place of memory growth (no faster), and `-sGROWABLE_ARRAYBUFFERS=2` (emdawnwebgpu passes WebGPU views
   of the heap, which Chrome refuses over a growable buffer).
-- A cheaper GPU frame for Rush 2049's and Majora's Mask's pages, the dearest uncapped, in the web's own parts (pass
-  breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the desktop build draws too:
-  the mip LOD shader's taps (a tile picked per pixel can't use a hardware sampler, upstream's rule in rt64_state.cpp)
-  and Auto's resolution rounded up to a whole multiple of 240 lines. Changing either would draw differently from the
+- A cheaper GPU frame for Rush 2049's, Majora's Mask's and Conker's pages, the dearest uncapped and on a laptop, in the
+  web's own parts (pass breaks, render to RAM's passes, the copies, rt64 008f380's loops). What costs is what the
+  desktop build draws too: RT64's pixel shaders (Rush 2049's mip LOD shader's taps, a tile picked per pixel that can't
+  use a hardware sampler, upstream's rule in rt64_state.cpp) and Auto's resolution rounded up to a whole multiple of
+  the game's lines (Conker's 216 five times for a laptop's 889). Changing either would draw differently from the
   desktop's RT64.
+- A DirectComposition overlay for a WebGPU canvas in Chrome on Windows, as Firefox's pref gives (A laptop, measured):
+  Chromium makes one only of video and low-latency canvases, so no flag or page setting gives one.
