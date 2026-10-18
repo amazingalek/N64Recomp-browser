@@ -411,9 +411,25 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   0.52-0.58, so the GPU was busy with something other than the frames. The four ended with 3149-3200 MB of the
   adapter's shared memory in use, the two with 2311-2461. v0.58.0 kept a color target for every display frame of the
   slowest game frame so far (Memory, above; rt64 8a2c6a7 caps them at 8 from v0.63.0), and Dam's are 2682x1320, 14 MB:
-  the 800 MB more is about 56 of them, one game frame of ~0.9 s. Whether the collapse was those targets (the Intel GPU's
-  memory is the host's, and its counters can't say what the GPU's time went on) or is still there on v0.63.0 needs
-  the laptop again.
+  the 800 MB more is about 56 of them, one game frame of ~0.9 s. On v0.63.0 the collapse stayed and the memory didn't
+  (next bullet), so it wasn't those targets.
+- GoldenEye on v0.63.0 in Firefox, the next day (Pages, its plan, `?present-stats`, cold, interleaved with Chrome
+  headless; plays.jsonl's 20 lines of 2026-10-18 noted "laptop report" for GoldenEye): 9 of 13 runs off the desktop at
+  1920x945 and both on screen fell to 18-29 presents a second in Dam, starting 65-115 s in, most a few seconds after its
+  one-shader wait, with the Intel GPU 91-100% busy; Chrome held 60.1-60.3 at 69-73%. The collapsing runs ended with
+  2.0-2.2 GB of the adapter's shared memory in use (Chrome 1.6), not v0.58.0's 3.1-3.2. The GPU drew more power in the
+  collapse, not less (6.3-6.8 W at 91-96% busy against 4.1-5.8 W at 71-75% at 60, by RAPL), and no thermal zone or
+  limit throttled. `tools/memory_scan.ps1` found 27-37 MB of new driver heap and 7-54 MB of Firefox's own between 15 and
+  55 s of play, too little to be it.
+- `tools/pass_probe.js` in those runs (Firefox 158 gives it timestamps on this adapter): the scene pass, 2682x1320
+  rgba8unorm with depth32float-stencil8, took 5.1-7.1 ms of GPU a present before the collapse and 33-56 ms in it, and
+  Chrome's 5.3-6.8 all through Dam. Each pass took 25-35 ms instead of 5-6, with the same draws by fragment shader
+  (100-350 a pass), at 1.3-1.9 passes a present instead of 1.0-1.3; every other pass stayed under 0.6 ms. Leaving out
+  the 10, 25 or 70 KB fragment shaders' draws (`?probe-skip`) didn't stop it, each collapsing at ~85 s at least once,
+  and no texture of 1M texels or more was made after Dam started (in two runs that didn't collapse). At 1280x630 the
+  GPU was 58% busy and it never came. So the same draws into the same targets cost Firefox's GPU 5-7 times more once it
+  has been near full for a while, and Chrome's never. What changes on the GPU then (a target's compression or
+  fast-clear state, the queue behind a copy only Firefox's path makes) needs a GPU capture.
 - Banjo stayed at 30 with it: RT64 paced it to 30 with the GPU 70-78% busy until 123 s, and drew 58-60 after.
 
 ## WebGPU in Chrome and Firefox

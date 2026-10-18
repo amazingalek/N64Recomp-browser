@@ -1,7 +1,8 @@
 // What a page's presents spend the GPU on: a preload for play_page.mjs (--preload tools/pass_probe.js) that wraps the
 // page's WebGPU calls and, every 5 s, prints a "passes:" line per kind of pass with how many a present has, their
 // draws or workgroups, and the GPU time each takes a present, from timestamp queries where the browser gives them
-// (Chrome: 'timestamp-query', quantized to 100 us, which averages out over many passes; Firefox: counts only).
+// ('timestamp-query', where the adapter offers it: Chrome, quantized to 100 us, which averages out over many passes;
+// Firefox 158 on a laptop's Intel UHD; counts only elsewhere).
 //
 // A pass's kind is its attachments' size and formats (a compute pass: "compute"), and a present is a getCurrentTexture
 // call on a WebGPU canvas, so a kind's numbers are per present whatever the game's own frame rate. Copies are counted
