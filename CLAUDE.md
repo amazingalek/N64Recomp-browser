@@ -16,7 +16,7 @@ a doc points at the other.
   file you change first, and update it in the same commit.
 - `plays.jsonl`, the one record of every run of a page: never the README, never a game's repo.
 - A game's own repo, for a finding that explains that game's code (a game fork's README or BUILDING.md, Rush 2049's
-  CLAUDE.md: The web target, Steps 1-3).
+  docs/web.md).
 - `docs/`, read when the task needs it:
   - `docs/porting.md`: what the web needs: WebGPU and the shaders, prebuilt shader lists, Emscripten, mods. Read it
     before a port or a change to a fork.

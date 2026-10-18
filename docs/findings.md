@@ -570,7 +570,7 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   reported as Intel to the page (a CDP script overriding `GPUAdapter.prototype.info`): they build, and the game draws.
 - RT64's render to RAM (on by default) draws each frame a second time at the N64's resolution and reads it back
   into RDRAM. In Chrome that readback makes the list wait 5-6 ms for the GPU process whatever its size (Rush 2049's
-  CLAUDE.md, Step 2, has the measurements), so a game that never reads its frames on the CPU turns it off
+  `headless/main.cpp` header has the measurements), so a game that never reads its frames on the CPU turns it off
   (RecompFrontend-0004, `set_render_to_ram`), and one that does keeps it on. If it can take a frame one list old (a
   patch of the screen, a row of depth), `set_render_to_ram_late` (rt64 73e9ca0) makes the copy land when the next list
   starts instead, and the list stops waiting: Conker's, GoldenEye's and Donkey Kong 64's pages do. Majora's Mask can't:
@@ -697,7 +697,7 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
   page moves by 10% between runs minutes apart and by more over hours, so a build is compared with several runs of the
   old one taken in the same minutes, never one pair.
 - Build times: for Rush 2049 the build went from 590-810 s to 382 s with ccache, and 116 s with the fast link (its
-  CLAUDE.md, Step 3). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
+  `CMakeLists.txt`). A first build of Banjo's page hit 71 of 754 compiles and Donkey Kong 64's 4 of 674 (Majora's
   Mask's 150 of 932, with the other two building beside it), and a second fresh dir of the same game 753, 673 and 932.
   Their builds went from ~2050-2100 s to 480-650 s, of which the link was 250-330 s; configure took 230-590 s either
   way. On a 16-core Linux host `tests/build`'s libraries build in 47 s, and in 5 s from a second fresh dir.
