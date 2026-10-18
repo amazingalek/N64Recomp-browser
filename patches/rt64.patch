@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web f262d56b098afebe950836254083febb3b02bae1
+rt64: https://github.com/amazingalek/rt64-web 2a249b387707d38b0de6237c036689e7ceb1ac3c
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1162,7 +1162,7 @@ index 00a72f6..cfa769a 100644
          uint64_t hashFromCall(const GameCall &call, uint32_t matrixIdHash) const;
          bool isDebuggerCameraEnabled(const WorkloadQueue &workloadQueue);
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..1373e25 100644
+index 3227ab1..0369db4 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1176,18 +1176,20 @@ index 3227ab1..1373e25 100644
  #include "rt64_workload_queue.h"
  
  namespace RT64 {
-@@ -48,6 +52,10 @@ namespace RT64 {
-         // Modify the cursor and notify anything waiting on the queue.
-         {
-             const std::scoped_lock lock(cursorMutex);
-+            if (presentStats) {
-+                presentQueued[writeCursor] = Timer::current();
-+            }
-+
-             writeCursor = nextWriteCursor;
-         }
+@@ -36,6 +40,12 @@ namespace RT64 {
+     }
  
-@@ -88,6 +96,15 @@ namespace RT64 {
+     void PresentQueue::advanceToNextPresent() {
++        // For present-stats, when the present was queued: before the stall below, which waits only while the present
++        // thread is the whole queue behind.
++        if (presentStats) {
++            presentQueued[writeCursor] = Timer::current();
++        }
++
+         int nextWriteCursor = (writeCursor + 1) % presents.size();
+ 
+         // Stall the thread until the barrier is lifted if we're trying to write on a present being used by the GPU.
+@@ -88,6 +98,15 @@ namespace RT64 {
  
          viRenderer = std::make_unique<VIRenderer>();
  
@@ -1203,7 +1205,7 @@ index 3227ab1..1373e25 100644
          presentThreadRunning = true;
          presentThread = new std::thread(&PresentQueue::threadLoop, this);
      }
-@@ -114,6 +131,12 @@ namespace RT64 {
+@@ -114,6 +133,12 @@ namespace RT64 {
              targetRate = ext.sharedResources->targetRate;
          }
  
@@ -1216,7 +1218,7 @@ index 3227ab1..1373e25 100644
          RenderTarget *colorTarget = nullptr;
          int32_t framesToPresent = 1;
          bool lockedWorkloadMutex = false;
-@@ -271,6 +294,7 @@ namespace RT64 {
+@@ -271,6 +296,7 @@ namespace RT64 {
              if ((framesToPresent > 1) && (usingMSAA || (i > 0))) {
                  // Stall until the interpolated color target is available.
                  const uint32_t targetIndex = usingMSAA ? i : (i - 1);
@@ -1224,7 +1226,7 @@ index 3227ab1..1373e25 100644
                  std::unique_lock<std::mutex> interpolatedLock(ext.sharedResources->interpolatedMutex);
                  ext.sharedResources->interpolatedCondition.wait(interpolatedLock, [&]() {
                      return (frameCounters.available > targetIndex) || ((frameCounters.available == targetIndex) && frameCounters.skipped);
-@@ -287,7 +311,8 @@ namespace RT64 {
+@@ -287,7 +313,8 @@ namespace RT64 {
  
                  if (i < framesToPresent) {
                      uint32_t targetIndex = usingMSAA ? i : (i - 1);
@@ -1234,7 +1236,7 @@ index 3227ab1..1373e25 100644
                  }
                  else {
                      colorTarget = nullptr;
-@@ -299,7 +324,9 @@ namespace RT64 {
+@@ -299,7 +326,9 @@ namespace RT64 {
  
              uint32_t swapChainIndex = 0;
              const bool presentFrame = (i < framesToPresent) && swapChainValid;
@@ -1244,7 +1246,7 @@ index 3227ab1..1373e25 100644
                  swapChainValid = ext.swapChain->acquireTexture(acquiredSemaphore.get(), &swapChainIndex);
              }
  
-@@ -369,6 +396,7 @@ namespace RT64 {
+@@ -369,6 +398,7 @@ namespace RT64 {
                  }
              }
  
@@ -1252,7 +1254,7 @@ index 3227ab1..1373e25 100644
              if (lockedWorkloadMutex) {
                  ext.sharedResources->workloadMutex.unlock();
                  lockedWorkloadMutex = false;
-@@ -391,15 +419,49 @@ namespace RT64 {
+@@ -391,15 +421,49 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1302,7 +1304,7 @@ index 3227ab1..1373e25 100644
                  swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
                  presentProfiler.logAndRestart();
              }
-@@ -416,6 +478,186 @@ namespace RT64 {
+@@ -416,6 +480,186 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1489,7 +1491,7 @@ index 3227ab1..1373e25 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -450,8 +692,10 @@ namespace RT64 {
+@@ -450,8 +694,10 @@ namespace RT64 {
          const bool displayTiming = ext.device->getCapabilities().displayTiming;
          bool swapChainValid = !ext.swapChain->needsResize();
          while (presentThreadRunning) {
@@ -1500,7 +1502,7 @@ index 3227ab1..1373e25 100644
                  cursorCondition.wait(cursorLock, [&]() {
                      return (writeCursor != threadCursor) || !presentThreadRunning;
                  });
-@@ -463,6 +707,22 @@ namespace RT64 {
+@@ -463,6 +709,22 @@ namespace RT64 {
                  }
              }
  
@@ -1523,7 +1525,7 @@ index 3227ab1..1373e25 100644
              if (processCursor >= 0) {
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  const bool needsResize = ext.swapChain->needsResize() || !swapChainValid;
-@@ -504,12 +764,19 @@ namespace RT64 {
+@@ -504,12 +766,19 @@ namespace RT64 {
                  skipPresent = skipPresent || ext.swapChain->isEmpty();
  
                  Present &present = presents[processCursor];
