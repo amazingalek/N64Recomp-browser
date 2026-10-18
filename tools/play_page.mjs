@@ -72,13 +72,23 @@
 // Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
 //
+// Every shader the game asks for that the page's prebuilt list doesn't have is a miss (CLAUDE.md, Prebuilt shader
+// lists): RT64 tells the shell of each, once a visit, as Module.rt64ShaderMissed, which play_page wraps. Each comes out
+// as a "shader missed:" line, with its five words as the list writes them (other mode L and H, combiner L and H,
+// flags) and the section RT64 had reached, its index in the list (0 the boot; in Chrome RT64 moves on from a section
+// only when a frame waits for 4 of the next, so a miss there is often put in an earlier one), and the summary counts
+// them by section. A miss draws with the ubershader: in Chrome until it is built behind the game, in Firefox for the
+// rest of the visit. On a fresh profile that is everything the list misses on the way; a kept one has built what the
+// visits before it missed (the shell remembers them), so it shows only what is new.
+//
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
 // mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg), --build what the page was built from (a tag of this repo, or Pages),
 // and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms; the animation frames a second),
-// each sample's presents, sound short and GPU load, the page, the query and the host's processor load over the play.
+// each sample's presents, sound short and GPU load, every shader miss ({at, section, shader}, at in seconds since the
+// start, to the sample's 5), the page, the query and the host's processor load over the play.
 //
 // A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
 // freshness of profile, uncapped the same way or not and on screen or not, none with a note, failed or without a frame (one with
@@ -160,6 +170,8 @@ const median = (values) => {
 
 // What the console says.
 const shaderWaits = [];
+const shaderMisses = [];
+const hex = (x) => (x >>> 0).toString(16).padStart(8, '0');
 const errors = [];
 let exceptions = 0;
 const onLine = (text) => {
@@ -178,6 +190,20 @@ const ownPreload = `() => {
   window.__animationFrames = 0;
   const frame = () => { window.__animationFrames++; requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
+  // The shell's Module, as it is set: its rt64ShaderMissed(list, [section, five words]) is wrapped to keep each miss.
+  window.__shaderMisses = [];
+  let module;
+  Object.defineProperty(window, 'Module', { configurable: true, get: () => module, set: (m) => {
+    module = m;
+    const missed = m && m.rt64ShaderMissed;
+    if (missed && !missed.__counted) {
+      m.rt64ShaderMissed = function (list, entry) {
+        window.__shaderMisses.push(entry);
+        return missed.apply(this, arguments);
+      };
+      m.rt64ShaderMissed.__counted = true;
+    }
+  } });
   let lastPresent = 0;
   const getContext = HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext = function (kind) {
@@ -335,6 +361,12 @@ const sample = async () => {
     animationFrames = await page.evaluate('window.__animationFrames ?? null');
     gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()'));
     audio = await page.evaluate(audioStats);
+    const misses = JSON.parse(await page.evaluate('(() => { const m = window.__shaderMisses ?? []; window.__shaderMisses = []; return JSON.stringify(m); })()'));
+    for (const [section, ...words] of misses) {
+      const miss = { at: Math.round(seconds()), section, shader: words.map(hex).join(' ') };
+      shaderMisses.push(miss);
+      log(`shader missed: ${miss.shader} (section ${section})`);
+    }
   } catch {}
   const now = { at: seconds(), presents, animationFrames, audio, cpu: procCpu() };
   const gpu = gpuNow();
@@ -446,7 +478,7 @@ const summary = {
     longestMs: Math.max(...gaps), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
     over250Ms: gaps.filter((g) => g > 250).length } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
-  shaderWaits, webgpuErrors: errors, exceptions,
+  shaderWaits, shaderMisses: shaderMisses.length, webgpuErrors: errors, exceptions,
   gpu: gpuMedians('gpu'), nvidia: gpuMedians('nvidia'),
   cores: during.some((s) => s.gpuProcess !== null) ?
     { gpuProcess: median(during.map((s) => s.gpuProcess)), browser: median(during.map((s) => s.browser)) } : null,
@@ -465,6 +497,10 @@ if (summary.animationFrames !== null) console.log(`  animation frames/s ${summar
   (noDisplay ? ': the browser had no display to pace it, so a page that interpolates presents as many' : ''));
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
 console.log(`  shader waits ${shaderWaits.length ? shaderWaits.map((w) => `${w.seconds} s for ${w.shaders} at ${w.at} s`).join(', ') : 'none'}`);
+const bySection = {};
+for (const m of shaderMisses) bySection[m.section] = (bySection[m.section] ?? 0) + 1;
+console.log(`  shader misses ${shaderMisses.length}${shaderMisses.length ? ', by section: ' +
+  Object.entries(bySection).map(([section, n]) => `${n} in ${section}`).join(', ') : ''}`);
 console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
 if (summary.gpu?.adapter) console.log(`  GPU ${summary.gpu.busy}% busy (3D), ${summary.gpu.mib} MiB, ${summary.gpu.sharedMib} MiB shared (medians, the page's adapter ${summary.gpu.adapter})`);
 else if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
@@ -484,7 +520,7 @@ if (recordFile) {
     ...(onScreen ? { onScreen } : {}), ...(summary.devicePixelRatio ? { devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped: uncappedAs } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}),
     ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
-    frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits,
+    frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits, shaderMisses,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
     interval, series: { presents: during.map((s) => s.presents === null ? null : Math.round(s.presents * 10) / 10),
       short: during.map((s) => s.short), gpuBusy: during.map((s) => s.gpu?.busy ?? null),
