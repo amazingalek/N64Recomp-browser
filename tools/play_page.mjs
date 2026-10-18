@@ -475,7 +475,7 @@ const summary = {
     max: Math.max(...presents) } : null,
   animationFrames: animationFrames === null ? null : Math.round(animationFrames * 10) / 10,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
-    longestMs: Math.max(...gaps), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
+    longestMs: gaps.reduce((m, g) => Math.max(m, g)), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
     over250Ms: gaps.filter((g) => g > 250).length } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
   shaderWaits, shaderMisses: shaderMisses.length, webgpuErrors: errors, exceptions,
