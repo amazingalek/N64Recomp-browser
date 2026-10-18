@@ -154,7 +154,8 @@ since the last one at once:
   files differ from what Pages serves: those are played, from the builds it leaves; one with the same bytes took
   nothing and is left alone. Once the pins of those that played well move, a run without `--browser` builds each main
   again (the same bytes), publishes what differs, boots each from Pages in headless Chrome and lists them, and their
-  rows are updated.
+  rows are updated. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
+  builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves (the script's header).
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages that crashes, never boots, loses its WebGPU
 device or can't be played moves the pins of the games it fixes (Rush 2049's by a PR), builds, plays in Chrome and
