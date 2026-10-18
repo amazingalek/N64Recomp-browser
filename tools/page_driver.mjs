@@ -118,11 +118,16 @@ const rdramHelpers = `(() => {
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
 // Chrome made of a 1280x800 window when the first plans were written. uncapped gives the page animation frames as fast
-// as the browser can make them, not at the display's rate: Chrome with --disable-frame-rate-limit, Firefox with
-// layout.frame_rate 0 (a page opened with ?uncapped presents at that rate, plume's swap chain says how). cpuThrottle
+// as the browser makes them, not at the display's rate (a page opened with ?uncapped presents at that rate, plume's swap
+// chain says how): Chrome with --disable-frame-rate-limit, which makes one when the last was drawn, and Firefox with
+// layout.frame_rate firefoxUncappedRate, the 360 Hz plume reports. Firefox's 0 makes them as fast as it can whether
+// anything was drawn or not, 1,500-11,500 a second on a desktop GPU, and composites or runs script for each, which
+// took the GPU and the page's thread from the page (docs/findings.md, Uncapped in Firefox). cpuThrottle
 // (Chrome only) slows the page's thread that many times (CDP Emulation.setCPUThrottlingRate), a stand-in for a
 // laptop's CPU. onScreen (above) leaves size to the window. firefoxPrefs are Firefox prefs of the caller's, set over
 // the ones below.
+export const firefoxUncappedRate = 360;
+
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
   headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, firefoxPrefs = {}, onLine = () => {}, log = console.log }) => {
   fs.mkdirSync(profile, { recursive: true });
@@ -321,7 +326,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
     'browser.aboutwelcome.enabled': false, 'app.update.auto': false, 'browser.sessionstore.resume_from_crash': false,
     'dom.webgpu.enabled': true, 'media.volume_scale': '0.0', ...(onScreen ? {} : { 'layout.css.devPixelsPerPx': '1.0' }),
-    'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? 0 : -1, ...firefoxPrefs };
+    'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
