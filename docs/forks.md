@@ -226,4 +226,9 @@ rt64 f262d56, 2a249b3  ?present-stats prints a line at each present the present 
                        behind it, what pace() counts): how long it waited, and each game frame's time since the thread
                        last waited, split into waiting for the workload, for the interpolated frame, the draw, the
                        sleeps to the slots (and how far past them they woke), wait() and the present() calls
+plume abb5006,         in Firefox, which calls onSubmittedWorkDone back only when it next looks for finished work (after
+rt64 58aff42           a submission, or on its own timer, ~50 ms), an empty submission 1 ms after a present and then
+                       every 2-4 ms while any present is in flight: each present's callback came back at the next
+                       frame's submission, about a frame late, which present-stats' done delay and the adaptive
+                       presents-in-flight cap read as GPU time (a laptop's Intel UHD: 18.5 → 5.1 ms at 60 a second)
 ```

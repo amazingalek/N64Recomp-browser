@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 2746484efe20affbff6ce0ffb91c2876a8c89318
+plume: https://github.com/amazingalek/plume-web abb500648d30d0d3aa8ed84c9c0b81183649e734
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2702,10 +2702,10 @@ index 0000000..0b0ff01
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..9a38507
+index 0000000..397c221
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3327 @@
+@@ -0,0 +1,3359 @@
 +//
 +// plume
 +//
@@ -2724,6 +2724,7 @@ index 0000000..9a38507
 +#include <cstring>
 +
 +#include <emscripten/emscripten.h>
++#include <emscripten/eventloop.h>
 +#include <emscripten/html5.h>
 +#include <emscripten/threading.h>
 +
@@ -2739,6 +2740,12 @@ index 0000000..9a38507
 +    }
 +    console.log('plume: pipelines are built in line with the device here (Firefox)');
 +    return 0;
++});
++
++// Whether the browser calls onSubmittedWorkDone and mapAsync back only when it next looks for finished work, after a
++// submission or on a timer (WebGPUDevice::pollQueue()). Chrome calls back when the work is done.
++EM_JS(int, plume_webgpu_work_done_after_submit, (), {
++    return navigator.userAgent.includes('Firefox') ? 1 : 0;
 +});
 +
 +// Whether the browser's preferred canvas format is bgra8unorm (rgba8unorm otherwise): the one it presents a canvas in
@@ -4326,6 +4333,10 @@ index 0000000..9a38507
 +    }
 +
 +    WebGPUSwapChain::~WebGPUSwapChain() {
++        if (kickTimer != 0) {
++            emscripten_clear_timeout(kickTimer);
++        }
++
 +        frameTimer->stopped = true;
 +        textures.clear();
 +        if (surface != nullptr) {
@@ -4360,6 +4371,23 @@ index 0000000..9a38507
 +        delete state;
 +    }
 +
++    // Where the browser calls back only when it next looks for finished work (Firefox), a present's onSubmittedWorkDone
++    // came back at the next frame's submission, about a frame late, and nothing polled while presents stayed under the
++    // cap. That read as GPU time in present-stats' done delay and in adaptPresentsInFlight(), which raised the cap for
++    // it. So while any present is in flight, an empty submission 1 ms after it and then on a timer makes the browser look
++    // again (pollQueue(), at most once a millisecond): a test page's callback on a laptop's Intel UHD came back in 49.9
++    // ms alone, 2 ms with one empty submission 1 ms after its pass, and a frame's in 5 ms at 60 frames a second, against
++    // 18.5; Rush 2049's page's done delay fell from 16 to 4 ms. Firefox nests the timer down to 4 ms, so it costs ~150
++    // empty submissions a second, and none once presents are done.
++    static void kickWorkDone(void *userData) {
++        WebGPUSwapChain *swapChain = static_cast<WebGPUSwapChain *>(userData);
++        swapChain->kickTimer = 0;
++        if (swapChain->presentState->inFlight > 0) {
++            swapChain->commandQueue->device->pollQueue();
++            swapChain->kickTimer = emscripten_set_timeout(kickWorkDone, 2.0, swapChain);
++        }
++    }
++
 +    // The browser shows the canvas when this thread returns to its event loop, so when the build can wait, this does
 +    // that until the next animation frame (or just once without vsync).
 +    bool WebGPUSwapChain::present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) {
@@ -4370,6 +4398,9 @@ index 0000000..9a38507
 +        callbackInfo.callback = presentWorkDone;
 +        callbackInfo.userdata1 = new WebGPUPresentWork{ presentState, emscripten_get_now() };
 +        wgpuQueueOnSubmittedWorkDone(commandQueue->device->queue, callbackInfo);
++        if (commandQueue->device->workDoneAfterSubmit && (kickTimer == 0)) {
++            kickTimer = emscripten_set_timeout(kickWorkDone, 1.0, this);
++        }
 +
 +        if (presentStats) {
 +            statsPresents++;
@@ -5672,6 +5703,7 @@ index 0000000..9a38507
 +        capabilities.backgroundPipelineBuilds = (plume_webgpu_background_pipeline_builds() != 0);
 +        capabilities.preferredSwapChainFormat = (plume_webgpu_bgra_swap_chain() != 0) ? RenderFormat::B8G8R8A8_UNORM : RenderFormat::R8G8B8A8_UNORM;
 +        description.name = "WebGPU";
++        workDoneAfterSubmit = (plume_webgpu_work_done_after_submit() != 0);
 +    }
 +
 +    WebGPUDevice::~WebGPUDevice() {
@@ -5769,8 +5801,8 @@ index 0000000..9a38507
 +    // Firefox's GPU process looks for finished GPU work, and calls mapAsync and onSubmittedWorkDone back, only after a
 +    // submission or on a timer every 100 ms (POLL_TIME_MS in its WebGPUParent.cpp). A page that waits for one of those
 +    // callbacks before it submits more, as a readback does, so waits for the timer whenever the GPU hadn't finished by
-+    // the submission's own look, which on a slow GPU is every time. While something waits, an empty submission at most
-+    // once a millisecond makes it look again.
++    // the submission's own look, which on a slow GPU is every time. While something waits, or a present is in flight
++    // (kickWorkDone()), an empty submission at most once a millisecond makes it look again.
 +    void WebGPUDevice::pollQueue() {
 +        const double now = emscripten_get_now();
 +        if ((now - lastPollTime) >= 1.0) {
@@ -6035,10 +6067,10 @@ index 0000000..9a38507
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..af882d4
+index 0000000..90dbb56
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,700 @@
+@@ -0,0 +1,703 @@
 +//
 +// plume
 +//
@@ -6079,8 +6111,8 @@ index 0000000..af882d4
 +//   Without threads, map() waits for it itself when the build can (ASYNCIFY or JSPI: emscripten_sleep() hands the
 +//   thread back to its event loop). Either way execute, wait, map reads what the GPU wrote, as on the other backends.
 +//   A build that can't wait gets whatever arrived before the call, possibly a submission old. Firefox looks for
-+//   finished work only after a submission or every 100 ms, so while a map (or a present, below) waits, an empty
-+//   submission at most once a millisecond makes it look again (WebGPUDevice::pollQueue()).
++//   finished work only after a submission or every 100 ms, so while a map waits, or a present is in flight (below), an
++//   empty submission at most once a millisecond makes it look again (WebGPUDevice::pollQueue()).
 +// - Formatted buffer views (texel buffers) don't exist. A formatted view binds its buffer as a read-only storage
 +//   buffer of raw bytes, the binding padded to a multiple of 4, so the shader reads array<u32> and unpacks R8 or R16
 +//   elements itself: element i of an n-byte format is at byte i * n, little-endian. A writable formatted view of
@@ -6113,7 +6145,8 @@ index 0000000..af882d4
 +//   in flight hold presents below the display's rate with the GPU idle, and RT64 reads the presents it skips as the GPU
 +//   falling behind and paces them to the game's frames. With each callback held 20-40 ms (an RTX 2070's Firefox gives
 +//   11-16 ms; a laptop's Intel graphics is suspected of more), Firefox 158 drew Banjo-Kazooie at 20 a second with 2 in
-+//   flight, 58 with 3 and 59 with 4. The callbacks alone can't tell a late callback from a slow GPU, but only the first
++//   flight, 58 with 3 and 59 with 4 (before present() kicked Firefox to look for finished work while a present is in
++//   flight, which brings a laptop's callback back in ~5 ms rather than at the next frame). The callbacks alone can't tell a late callback from a slow GPU, but only the first
 +//   gains from one more in flight, so while wait() holds presents a swap chain tries one more, up to 4, and keeps it if
 +//   presents rise (adaptPresentsInFlight()), but only from presents steady before the try: after a stall any recovery is
 +//   a rise. The page's query can fix the number (presents-in-flight=<1-8>), and
@@ -6445,6 +6478,7 @@ index 0000000..af882d4
 +        uint32_t maxPresentsInFlight = 2;
 +        double waitStartTime = 0.0;
 +        bool caughtUpAsked = false;
++        int kickTimer = 0;
 +
 +        // The number in flight tried one higher while wait() holds presents, and kept only if presents rise with it.
 +        bool presentsInFlightFixed = false;
@@ -6689,6 +6723,7 @@ index 0000000..af882d4
 +        std::unordered_map<std::string, WGPURenderPipeline> clearPipelines;
 +        std::map<std::pair<std::string, WGPUPipelineLayout>, WebGPUSharedShaderBuilds> sharedShaderBuilds;
 +        double lastPollTime = 0.0;
++        bool workDoneAfterSubmit = false;
 +
 +        WebGPUDevice(WebGPUInterface *renderInterface);
 +        ~WebGPUDevice() override;
