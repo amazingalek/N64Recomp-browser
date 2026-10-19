@@ -205,3 +205,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   recomp's loads are too short to give a pause after most misses, and they come after the list's last section.
 - A present's wait() trips to the page's thread, or Firefox's late timed waits, as what paces a page to 30 on a
   laptop's screen: without the trips Banjo paced the same; how much of the GPU Windows' compositor takes decides it.
+- The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
+  ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.

@@ -788,7 +788,7 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
 
 Jet Force Gemini's page presented 58.4-58.6 a second in Chrome on a laptop's Intel UHD (v0.63.0, headed, headless and
 on screen) against 60 animation frames, with the GPU 56-64% busy, where Mario Kart 64 and Ocarina of Time drew 60. A
-desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second whatever the screen),
+desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second at its screen's 60 Hz; headless runs the screen's rate, 240 on a 240 Hz one),
 1920x945, JFG's page from Pages on v0.69.0, its play plan, `?present-stats`, a busy host. In two runs RT64 dropped
 2-6 presents over the plan's ~190 s of play (~440 more in the launcher, before the game), so the presents missing there
 are display frames with none, not drops, and not GPU load.
@@ -808,6 +808,31 @@ How many VIs a frame takes is known only at its swap, after RT64 has drawn its i
 fill those display frames without waiting another game frame. A rate guessed from the frame before (rather than the
 fastest of three) would hold one display frame where the game slows from 30 to 20, not up to three, but would cut a
 frame short where it speeds back up, for a skipped moment instead of a held one.
+
+How each guess does is counting, not a build: from a play's order of 2- and 3-VI frames, `tools/frame_lengths.mjs`
+counts what each would hold and cut (`tools/frame_lengths.js`, a preload, logs them; docs/playing.md). For a run of L
+frames of 3 VIs among frames of 2, with what RT64 knows ending a frame before the one it times, the fastest of three
+(RT64's) holds min(L, 3) display frames and cuts one frame where L is 3 or more. The last frame's holds 1 and cuts 1
+every run: worse alone (L 1), even at L 2, two judders fewer a run of 3 or more. The most common of the last three or
+five is late at both ends of a run, holding going in and cutting coming out (Ruled out, measured). RT64 counts a
+frame's VIs at the screen's swap to it (`pushFactor`) but picks the rate as the next frame's display list ends, so what
+it knows may end two frames back; at that lag the last frame's holds min(L, 2) and cuts up to 2.
+
+An RTX 5080 desktop doesn't show the case (its screen at 240 Hz; the pages from Pages, Jet Force Gemini's main 7f730ba
+and Banjo-Tooie's e8df837; 1920x945, their play plans; plays.jsonl). Headless Chrome 155 there runs the screen's 240
+animation frames, and Jet Force Gemini seldom takes 3 VIs: in Chrome 260 of 5578 frames (a quiet host), in Firefox
+held at 60 (`layout.frame_rate`, the host 82% busy at the start) 160 of 5439, nearly all in eight and five runs of
+30-31 frames where the game runs at 20 for a second, two alone. Over each ~3.5 min of play, at a lag of 1 and 2, the
+fastest of three would hold 26-34 and 8-11 display frames and cut 9-18 and 5-9 frames, the last frame's hold 10-18 and
+4-7 and cut 11-20 and 7-11: about 0.1 display frames a second, where the laptop misses 1.6. Too few to tell the lag
+from the animation frames with no present, most of them the launcher's and the loads'. Banjo-Tooie's plan's clock
+(`0x80127638`, its time in seconds) isn't a count of VIs: times 60 it moves by 1 and 3 where 2 is expected (81 moves of
+1, 87 lone 3s), and its other 3-VI frames came in three runs at 20 (118, 137 and 514 frames), where all three match
+and nothing is held. Its own VI count is still to find.
+
+So what decides the last frame's guess is the order of the frames where 10-27% take 3 VIs (a laptop, or a 60 Hz desktop
+that shows it, as above): a play there with the preload, read by the simulator. Runs mostly of 3 frames or more make a
+test build worth trying, to look at the motion; runs mostly of one put the guess in Ruled out beside the most common.
 
 ## Behind CLAUDE.md's rules
 
@@ -882,6 +907,13 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
 ## Ruled out, measured
 
 What CLAUDE.md's Ruled out rests on.
+
+- The most common of a game's last three or five frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length,
+  in place of the fastest of three: late at both ends of a run of 3-VI frames, at no run's length does it judder less.
+  At a lag of 1 the most common of three holds min(L, 2) display frames and cuts 2 frames after a run of 2 or more,
+  against the fastest of three's min(L, 3) and 1 (A game's uneven frames). On an RTX 5080 desktop's two plays of Jet
+  Force Gemini (Chrome, Firefox) it would hold 17 and 5 and cut 19 and 11, the most common of five hold 25 and 7 and cut
+  29 and 17, where the fastest of three holds 26 and 8 and cuts 9 and 5 (`tools/frame_lengths.mjs`).
 
 - Presents waiting for the animation frame in every browser: on a laptop's Intel UHD, Chrome 155 headed drew as many
   (Banjo 59.9 against 60.0, Conker 53.9 against 54.0), but the GPU went 71 → 86% busy for Banjo and 63 → 75% for
