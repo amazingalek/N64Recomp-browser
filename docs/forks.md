@@ -238,9 +238,10 @@ rt64 0c5ba5d           callbacks wake (RenderSwapChain::waitOnCaller()), countin
                        as in flight; it was a loop of trips to the page's thread with a 1 ms sleep between two, 33-38
                        ms a game frame in Firefox on a laptop's screen, which paced Banjo-Kazooie to 30
 N64ModernRuntime       where a timed wait ends late (Firefox on Windows), the VI thread ends its wait on the first
-b81df43, 30c60e5       animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
-                       15.6 or 31.2 ms apart, RT64 read GoldenEye's frames as a game at 30 ~5 times a second and made
+b81df43, 30c60e5,      animation frame less than half a VI before the VI's time, not on the tick after it: VIs came
+6456ba6                15.6 or 31.2 ms apart, RT64 read GoldenEye's frames as a game at 30 ~5 times a second and made
                        two presents of each, and the page presented 63-64 a second on a 60 Hz display. Under the
                        stand-in for the tick (Firefox 158, 60 Hz): VIs 58-60 → 60.0, presents 63.4 → 60.0, sound frames
-                       short 47,296 → 0, the browser 1.71 → 1.28 cores
+                       short 47,296 → 0, the browser 1.71 → 1.28 cores. Its code sits apart from vi_thread_func,
+                       off the lines a recomp's own patch to the VI thread changes (Conker's, DKR-R's, Rush 2049's)
 ```
