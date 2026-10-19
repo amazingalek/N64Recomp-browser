@@ -175,6 +175,17 @@ const shaderMisses = [];
 const hex = (x) => (x >>> 0).toString(16).padStart(8, '0');
 const errors = [];
 let exceptions = 0, firstException = null, exceptionAt = null;
+// A page that refuses the ROM throws nothing and stays at its launcher, presenting at the display's rate, so its plan
+// would go on to the end: one Firefox run of a refused ROM held a GPU turn for 1,940 s and summed up as a clean run of
+// 60 presents a second. Each game's page says it on the console, three ways: recompui's launcher (and the launchers
+// built like it) prints "[ERROR] " and the reason (it alerts the same reason too, which a worker's alert also puts on
+// the console, without the prefix), Ocarina of Time's "[launch] rom refused: " and Diddy Kong Racing's "[boot][page] "
+// and the reason. The first of them stops the run, which fails with the line. A ROM DKR's page can't keep in the
+// browser ("[boot][page] The ROM could not be kept ...") still plays, so it isn't one.
+const romRefused = new RegExp(String.raw`\[launch\] rom refused: ` +
+  String.raw`|\[ERROR\] (Failed to open ROM file|This is not a valid ROM file|This (ROM )?is(n't)? .*(version|not the correct game)` +
+  String.raw`|This game isn't supported yet|An unknown error has occurred|The file (couldn't be opened|isn't an N64 ROM)|The ROM couldn't be loaded)` +
+  String.raw`|\[boot\]\[page\] (This page plays |The ROM could not be opened|The selected |This .* is not supported)`);
 const onLine = (text) => {
   if (/^rt64 shader: /.test(text)) return;
   log(text);
@@ -187,6 +198,7 @@ const onLine = (text) => {
     firstException ??= text.split('\n')[0].slice(0, 300);
     exceptionAt ??= seconds();
   }
+  if (romRefused.test(text)) page.stop(`the page refused the ROM: ${text.split('\n')[0].slice(0, 300)}`);
 };
 
 // Presents: every getCurrentTexture call on a WebGPU canvas, and the gap in ms since the one before (taken each sample).
