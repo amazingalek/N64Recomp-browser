@@ -255,16 +255,16 @@ rides it to its end, taking photos and throwing the items. Its docs/WEB.md and t
 `lib/patches/<submodule>.patch` change (3,800 lines on rt64's 41 files: car reflection and ambient occlusion shaders,
 the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched by the N64Recomp-browser tag its
 `lib/N64Recomp-browser` pins. Its `tools/build_web.sh` applies Rush 2's patches first, then `apply.cmake` project by
-project, but for the files where both change the same lines (`web/patches/files.txt`: 6 of rt64's, the runtime's
+project, but for the files where both change the same lines (`web/patches/files.txt`: 5 of rt64's, the runtime's
 `events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand; its
 `tools/check_web_patches.sh` stops the build when N64Recomp-browser's change to one of them has moved, as Snap64's
-does. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Three of
+does. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
 the merge's choices: Rush 2's generated mipmaps and texels of a region of a larger image are read through the web's draw
-texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`); `RasterPS.hlsl`'s coverage output (`SV_Coverage`) is
-left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel; and the
-texture decoder writes a generated-mipmap texture's first level through a view of that level alone, as it does the
-others, since WebGPU binds one level as a storage texture (without it every race drew black, 10,208 WebGPU errors in
-one play; plume-web binding a storage texture's whole view is filed). The page leaves out online play, for
+texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`), and `RasterPS.hlsl`'s coverage output (`SV_Coverage`)
+is left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel. Its
+texture cache binds a generated-mipmap texture with no view as the decoder's storage target for the first level, which
+plume 827a073 binds as that level, as D3D12 does (before it every race drew black, 10,208 WebGPU errors in one play).
+The page leaves out online play, for
 `src/online/online_web.cpp`, an offline machine to the game, the texture upscaler, which starts a program, and N64:
 Recompiled code mods. Its list is 82 shaders: the boot (the launcher, the title and the menus, 37) and 9 sections (the
 title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web/shader_plan.json`, which drives the
