@@ -334,6 +334,10 @@ jobs:
             echo "frontend_signature_mismatch linked"; exit 1
           fi
           grep "function signature mismatch: native" mismatch.log
+      # frontend/ccache_launcher.cmake: what includes a file a custom command writes into the source tree is rebuilt in
+      # the build that writes it (tests/depfile).
+      - name: Incremental build
+        run: bash tests/depfile/run.sh build-depfile
 
   # A push to main that changes what a page is built from (forks.txt, patches/, frontend/, renderer/) is tagged
   # v0.<n+1>.0 once its jobs pass: a tag is a release, and the retest builds the newest one, so a change left untagged
