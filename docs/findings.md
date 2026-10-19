@@ -232,13 +232,43 @@ So a long play finds tens of shaders a list lacks, not hundreds: a few a place, 
 (Davy Jones' Locker, GoldenEye's Jungle and Control past their starts, Hyrule Field). They are the same shaders in
 both browsers, timing aside (Diddy Kong Racing 5 of Chrome's 6 in Firefox, Banjo-Tooie Firefox's 25 all but one of
 Chrome's 24), so what differs is their cost: Chrome builds each behind the game and draws it with the ubershader only
-until then, while Firefox draws it with the ubershader for the rest of the visit, which on integrated graphics costs
-several times what a built shader does for each pixel it covers. The page remembers each and builds it with its
-section the next visit, in either browser.
+until then, while Firefox, which builds nothing behind the game, holds the game while it builds one (below). The page
+remembers each and builds it with its section the next visit, in either browser.
 
 The section a miss is put in is RT64's, not the place: Chrome builds the list behind the game and moves on from a
 section only when a frame waits for 4 of the next, so it put nearly every miss in the boot; a miss's time against
 its plan says where it was.
+
+Firefox builds a miss before the next frame, the game waiting, as it does a stray of the list (rt64 b52d78f). Drawn
+with the ubershader instead, as before, a miss stayed so for the rest of the visit, which on a laptop's Intel UHD costs
+most of the frame rate where it covers much of the screen: GoldenEye from Pages (v0.63.0, Firefox 158 off the desktop
+at 1920x945) drew Dam at 62-63 presents a second until it met 6 shaders its list lacks, then 18-23 for the rest of the
+level, its 2682x1320 scene pass 22.7-33.0 ms against 5.5-5.8, where the runs that didn't meet them drew Dam at 64 for
+minutes. A miss is built from the ubershader's WGSL with its spec constants as overrides, as a learned one is: 22
+learned shaders added 4.9-5.5 s to Banjo-Kazooie's boot wait in Firefox 158 (7.8-8.3 s against 2.7-3.0, three runs
+each from Pages, interleaved, RTX 2070, a host 12-20% busy), 0.22-0.25 s a shader.
+
+Long plays of Banjo-Tooie and GoldenEye built with their lists from before the long plays' misses were added, on main
+and with each miss built at once, two or three runs each, interleaved (2026-10-19, a busy host, Firefox 158 uncapped at
+3840x2000, RTX 2070, cold): Banjo-Tooie's shader plan's sections one after another (14 minutes), and GoldenEye's
+Jungle, Control, Caverns, Cradle, Aztec and Egypt played further in (7 minutes).
+
+    game          build     misses  their waits      presents a s  gaps over 50 ms  over 250
+    Banjo-Tooie   main        28    -                 168-172         226-266        18-20
+                  at once     28    10, 6.3-6.5 s     169-171         106-114        27-29
+    GoldenEye     main        5-11  -                 103-110         460-651         1-2
+                  at once     7-10  6-8, 1.2-2.2 s    105-115         326-488         3-14
+
+The longest wait was Davy Jones' Locker's 16 misses at once, 3.4-3.5 s under the page's "Preparing graphics"; the
+others are 0.1-0.8 s for 1-3 shaders. On the RTX 2070 the ubershader hardly shows in presents a second, but
+Banjo-Tooie's gaps over 50 ms halve once its misses are built.
+
+Putting the builds off was measured too, and doesn't reach them. Built where the game sends no frame for 100 ms (a
+screen change, a load), the same plays built 5-6 of Banjo-Tooie's 27-29, the first 6-7 minutes in, and none of
+GoldenEye's 5-7, in two runs each, and 2-4 of those builds came as the game's next frame did, holding it ~0.2 s: a
+recomp's loads are short, so the game seldom stops sending frames. Nor is there a section's wait to build them in: the
+misses come once every section of the list has been reached (Banjo-Tooie's at 640-880 s, its last section's wait at
+~600 s; GoldenEye's after its last level's start).
 
 Settings: the flags word (rt64-web `src/shared/rt64_render_flags.h`) changes with RT64's Upscale 2D mode, texture LOD
 scaling, MSAA and HDR, and with a rect's own scale, not with the resolution or the canvas: RecompFrontend sets LOD
@@ -499,8 +529,8 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
 - Firefox (157, Windows) builds a `createRenderPipelineAsync` pipeline on its GPU process in line with the device's
   other work: a specialized RasterPS took 2-8 s there (12 at worst), with the page queuing 60 frames a second and
   Firefox painting a handful in between, so menus and races sat below a frame a second for minutes, until every
-  shader they use had been built. So in Firefox RT64 builds none during play, and what isn't prebuilt draws with the
-  ubershader (plume 9c69058, rt64 fcc6fe4, a user agent check). Firefox 158 does all of a page's WebGPU on one thread
+  shader they use had been built. So in Firefox RT64 builds none behind the game (plume 9c69058, rt64 fcc6fe4, a user
+  agent check), and what isn't prebuilt is built with the game waiting (rt64 b52d78f, What the prebuilt lists miss). Firefox 158 does all of a page's WebGPU on one thread
   of its GPU process (`CanvasRenderer`), so its prebuilt waits are each pipeline's build one after another: sampled
   through Rush 2049's boot wait (D3D12, RTX 2070), DXC ~36% of that thread, NVIDIA's shader compiler ~26%, heap and
   copies ~20%, the D3D12 driver ~8%, naga and wgpu ~7%. A pipeline takes ~100 ms there and the largest, pixel shaders
@@ -706,6 +736,14 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
   apart in Dam by that plan; on its clock (`g_GlobalTimer`, 60ths), every hold held the 3,624 ticks it asked for in
   both browsers, and four runs, two each, ended within 750 units of each other facing the same barriers (two Chrome
   runs alone, 250 apart). Chrome's CPU throttling (4) slowed none of the game: a play under it took as long.
+- Six more plans on their games' clocks (Pages, a desktop GPU, shared turns): a Chrome and a Firefox run of each held
+  within 3% of the ticks asked, and ended Banjo-Tooie 2 units apart, Jet Force Gemini 15 (a second Firefox run 6 from
+  the first), DK64 60, Majora's Mask 50 and Conker 450. Majora's Mask's 9 s after its warp were still the browser's
+  time: Firefox's Link stood at the gate through the first ten steps; on the clock from the warp, both browsers walked
+  him by the same steps to within 2 units. Banjo's Spiral Mountain was the same to the unit in each run; Mumbo's
+  Mountain, after a 4 s wait, walked three ways in three runs, two of them Chrome's, and its walk by the Ticker termites
+  on the mountain's path still varies run to run in either browser (three runs, 670 units). A run's position read
+  after every step (a copy of the plan, not committed) shows the step two runs part at.
 - A loop of messages to itself in a page's script: Ocarina of Time's survey waited for the file select's hand-over with
   one (`MessageChannel`), ~10,000 tasks a second on the page's thread, none of them long. In Chrome they starved the
   tasks that carry the device thread's WebGPU work to it, and its page held 3-8 s as the file loaded, only while the
@@ -792,3 +830,6 @@ What CLAUDE.md's Ruled out rests on.
 - A DirectComposition overlay for Chrome's WebGPU canvas on Windows: Chromium has no path for one (WebGPU in Chrome and
   Firefox).
 - A fixed heap: Conker's 3 GB measured no faster than memory growth.
+- Firefox's misses built where the game pauses, or with the next section's wait (What the prebuilt lists miss): in
+  long plays a 100 ms pause after a miss came for 5-6 of Banjo-Tooie's 27-29 and none of GoldenEye's 5-7, and the
+  misses come after the list's last section.

@@ -93,6 +93,8 @@ rt64 918deb3           a reload of the replacement directories waits for the tex
 rt64 c6cf6c4           a per-draw texture's slot in a GPUTile field of its own (drawSlot), so a shader without LOD reads
                        one
 rt64 6734747, 0fda089  presents paced only while one in ten or more is dropped over 2 s, 4 at least; the console says so
+rt64 b52d78f           a shader the prebuilt list missed built before the next frame, the game waiting, where nothing is
+                       built behind the game (Firefox), not drawn with the ubershader for the rest of the visit
 plume 16e608a          the display's rate from the period that explains the most animation frames (Firefox's extra
 rt64 07d608e           callbacks)
 plume 97f4e64          bind groups kept by their layout and what they bind (a serial per handle), the 4096 last used:

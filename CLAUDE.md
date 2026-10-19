@@ -200,3 +200,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   from the desktop's RT64.
 - A DirectComposition overlay for a WebGPU canvas in Chrome on Windows: Chromium makes one only of video and
   low-latency canvases, so no flag or page setting gives one.
+- Building Firefox's shader misses where the game sends no frames or with a later section's wait, not at once: a
+  recomp's loads are too short to give a pause after most misses, and they come after the list's last section.
