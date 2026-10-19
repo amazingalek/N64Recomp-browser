@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 30c60e5c302c4207bf3a5635bbe013ef6e691cc3
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 6456ba6aadce150cbf893da52cd0256910bc126f
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -614,13 +614,14 @@ index 31eb106..50e8244 100644
      int32_t sp;
  } OSThread;
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..4609b9a 100644
+index 2f1cfb5..f237092 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -179,6 +179,95 @@ extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
+@@ -175,6 +175,98 @@ uint64_t total_vis = 0;
  
- void set_dummy_vi(bool odd);
  
+ extern std::atomic_bool exited;
++
 +#if defined(__EMSCRIPTEN_PTHREADS__)
 +#include <algorithm>
 +#include <climits>
@@ -639,6 +640,8 @@ index 2f1cfb5..4609b9a 100644
 +// frame less than half a VI before its time: on a 60 Hz display every VI is a frame apart. A timed wait to the VI's time
 +// stays as the fallback, for a page whose frames have stopped (hidden). Elsewhere (Chrome, a finer timer) the VI thread
 +// sleeps as before.
++// It sits up here, apart from vi_thread_func, because a recomp's own patch to the VI thread adds its state just above
++// that function (CBFD-Recompiled's remaining_retraces), and a block there kept such a patch from applying.
 +namespace {
 +    // Whether a timed wait off the page's thread ends late: three waits of 100 us, late if the shortest took more than
 +    // 4 ms (plume's timedWaitsEndLate() measures the same).
@@ -710,10 +713,10 @@ index 2f1cfb5..4609b9a 100644
 +}
 +#endif
 +
- void vi_thread_func() {
-     ultramodern::set_native_thread_name("VI Thread");
-     // This thread should be prioritized over every other thread in the application, as it's what allows
-@@ -204,10 +293,25 @@ void vi_thread_func() {
+ extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
+ 
+ void set_dummy_vi(bool odd);
+@@ -204,10 +296,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
