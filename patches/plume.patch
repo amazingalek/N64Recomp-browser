@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web da273ff67c3b7b28b077014ff0b0b74f99d7d171
+plume: https://github.com/amazingalek/plume-web 827a073ea08b6ada2b56b345ab2d3bcfdd70f23d
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2725,10 +2725,10 @@ index 0000000..0b0ff01
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..d6cdd2a
+index 0000000..9c86158
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3399 @@
+@@ -0,0 +1,3429 @@
 +//
 +// plume
 +//
@@ -3376,6 +3376,11 @@ index 0000000..d6cdd2a
 +    }
 +
 +    void WebGPUTexture::releaseHandle() {
++        if (storageView != nullptr) {
++            wgpuTextureViewRelease(storageView);
++            storageView = nullptr;
++        }
++
 +        if (defaultView != nullptr) {
 +            wgpuTextureViewRelease(defaultView);
 +            defaultView = nullptr;
@@ -3403,6 +3408,24 @@ index 0000000..d6cdd2a
 +        }
 +
 +        return defaultView;
++    }
++
++    // The view a storage slot binds for a texture set without one. WebGPU binds one mip level to a storage texture, so
++    // this is the first, as D3D12's null UAV desc is: the default view of a texture with mipmaps would fail the bind
++    // group, its pass and the whole submit.
++    WGPUTextureView WebGPUTexture::getStorageView() {
++        if (desc.mipLevels <= 1) {
++            return getDefaultView();
++        }
++
++        if ((storageView == nullptr) && (texture != nullptr)) {
++            WGPUTextureViewDescriptor viewDesc = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
++            viewDesc.dimension = viewDimension(desc, nullptr);
++            viewDesc.mipLevelCount = 1;
++            storageView = wgpuTextureCreateView(texture, &viewDesc);
++        }
++
++        return storageView;
 +    }
 +
 +    std::unique_ptr<RenderTextureView> WebGPUTexture::createTextureView(const RenderTextureViewDesc &desc) const {
@@ -3748,7 +3771,13 @@ index 0000000..d6cdd2a
 +                    appendKey(key, 't', uint32_t(binding.binding), int32_t(layoutEntry.texture.sampleType), int32_t(dimension), int32_t(multisampled));
 +                }
 +
-+                groupEntry.textureView = (binding.textureView != nullptr) ? binding.textureView->view : const_cast<WebGPUTexture *>(binding.texture)->getDefaultView();
++                WebGPUTexture *texture = const_cast<WebGPUTexture *>(binding.texture);
++                if (binding.textureView != nullptr) {
++                    groupEntry.textureView = binding.textureView->view;
++                }
++                else {
++                    groupEntry.textureView = (binding.type == RenderDescriptorRangeType::READ_WRITE_TEXTURE) ? texture->getStorageView() : texture->getDefaultView();
++                }
 +                break;
 +            }
 +            case RenderDescriptorRangeType::SAMPLER: {
@@ -3778,7 +3807,8 @@ index 0000000..d6cdd2a
 +
 +            appendKey(key, 'v', uint64_t(layoutEntry.visibility));
 +
-+            // What the entry binds, for the device's bind group cache: a texture without a view binds its default one.
++            // What the entry binds, for the device's bind group cache: a texture without a view binds its default one, or
++            // on a storage slot its storage view (the layout's key tells the two apart).
 +            uint64_t serial = 0;
 +            if (groupEntry.buffer != nullptr) serial = binding.buffer->handleSerial;
 +            else if (groupEntry.sampler != nullptr) serial = binding.sampler->handleSerial;
@@ -6130,10 +6160,10 @@ index 0000000..d6cdd2a
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..cdbe538
+index 0000000..5e504ec
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,707 @@
+@@ -0,0 +1,709 @@
 +//
 +// plume
 +//
@@ -6322,6 +6352,7 @@ index 0000000..cdbe538
 +    struct WebGPUTexture : RenderTexture {
 +        WGPUTexture texture = nullptr;
 +        WGPUTextureView defaultView = nullptr;
++        WGPUTextureView storageView = nullptr;
 +        uint64_t handleSerial = 0;
 +        WebGPUDevice *device = nullptr;
 +        RenderTextureDesc desc;
@@ -6333,6 +6364,7 @@ index 0000000..cdbe538
 +        std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &desc) const override;
 +        void setName(const std::string &name) override;
 +        WGPUTextureView getDefaultView();
++        WGPUTextureView getStorageView();
 +        void releaseHandle();
 +    };
 +
