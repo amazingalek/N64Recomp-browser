@@ -33,6 +33,13 @@ options; `docs/findings.md` has what was measured this way.
 - The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
   run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
   takes.
+- A level the survey starts may crash when it ends: the screens after it read what the menus before it would have set
+  up. So a plan that starts one keeps the player alive for as long as it plays (GoldenEye's `setInvincible()`): a
+  GoldenEye play of Dam long enough for its guards to kill Bond stopped on the Mission Failed screen in Chrome and
+  Firefox (`strcmp` from `fileGetIndex`, given the name of a briefing mission select never chose:
+  `load_briefing_text_for_stage` under `init_menu0C_missionfailed`). A thread of the game that throws ends the run
+  as a failed one once nothing has presented for 15 s, and a page that refuses the ROM ends it at once, with the line
+  it said that in (`play_page.mjs`).
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key reached RmlUi): Enter starts the game on
   the second press, or click Start Game. Every RecompFrontend game does it, desktop too.
