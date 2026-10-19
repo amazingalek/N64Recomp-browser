@@ -212,6 +212,35 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/dkr/lib/N64Recomp-browser"
           PATH="$HOME/.cargo/bin:$PATH" bash "$RUNNER_TEMP/dkr/scripts/build_web.sh" --patches
 
+  # The patches over Conker's web fork's own (CBFD-Recompiled-web, its main): its build.sh applies its recomp/*.patch to
+  # N64Recomp, N64ModernRuntime, rt64 and RecompFrontend first, then its tools/web_patch.sh puts patches/apply.cmake's
+  # on top but for the files it leaves to its own tools/web_*.patch, so its checkouts aren't upstream's commits either.
+  # This does both without a ROM, with this checkout as its tools/N64Recomp-browser. Red on a PR that keeps main's
+  # patches means CBFD-Recompiled-web's main stopped applying them, which is fixed there.
+  cbfd-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: They apply over CBFD-Recompiled-web's
+        run: |
+          cbfd="$RUNNER_TEMP/cbfd"
+          git clone -q --depth 1 https://github.com/amazingalek/CBFD-Recompiled-web "$cbfd"
+          git -C "$cbfd" log -1 --format='CBFD-Recompiled-web %h %s'
+          git -C "$cbfd" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 4             tools/N64Recomp tools/N64ModernRuntime tools/rt64 tools/RecompFrontend
+          git -C "$cbfd/tools/rt64" -c protocol.version=2 submodule update -q --init --depth 1 src/contrib/plume src/contrib/hlslpp
+          git -C "$cbfd/tools/N64ModernRuntime" -c protocol.version=2 submodule update -q --init --depth 1 N64Recomp
+          for tool in N64Recomp N64ModernRuntime rt64 RecompFrontend; do
+            git -C "$cbfd/tools/$tool" apply "$cbfd/recomp/$(echo "$tool" | tr A-Z a-z).patch"
+          done
+          rmdir "$cbfd/tools/N64Recomp-browser"
+          ln -s "$GITHUB_WORKSPACE" "$cbfd/tools/N64Recomp-browser"
+          sh "$cbfd/tools/web_patch.sh"
+
   # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
   # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
@@ -289,7 +318,7 @@ jobs:
   # covered by that one's, and the changes job builds a docs-only push's whenever this would tag. A tag pushed with
   # GITHUB_TOKEN starts no workflow: this run, on the same commit, is its CI.
   tag:
-    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, emscripten]
+    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, emscripten]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')

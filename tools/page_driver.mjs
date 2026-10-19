@@ -48,6 +48,10 @@
 // says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
 // after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
 // busy.
+//
+// page.stop(reason) ends a run where it is: the step it is in is left (a clock wait included, which on a game that has
+// stopped waits out its whole 5 times and 30 s), no step after it starts, and run() throws reason, as a step that failed
+// does. A run started after it throws at once.
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
@@ -145,7 +149,7 @@ const rdramHelpers = `(() => {
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra),
-//   close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
+//   stop(reason) (above), close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -189,7 +193,13 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
     const scale = h / 645;
     return [Math.round(w / 2 + (x - 628) * scale), Math.round(h / 2 + (y - 322.5) * scale)];
   };
-  page.run = async (steps, extra = {}) => {
+  let stopped = null;
+  let stop;
+  const stopping = new Promise((resolve, reject) => { stop = reject; });
+  stopping.catch(() => {});
+  page.stop = (reason) => { stopped ??= new Error(reason); stop(stopped); };
+  page.run = (steps, extra) => Promise.race([runSteps(steps, extra), stopping]);
+  const runSteps = async (steps, extra = {}) => {
     let clock = null, asked = 0, held = 0;
     const ticks = (ms) => Math.max(1, Math.round(ms * clock[1] / 1000));
     // ms of the game's time on from from (null: from now), or of wall time with no clock.
@@ -201,6 +211,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       return at;
     };
     for (const [op, ...a] of steps) {
+      if (stopped) throw stopped;
       if (extra[op]) await extra[op](...a);
       else if (op === 'clock') {
         clock = a.length ? a : null;

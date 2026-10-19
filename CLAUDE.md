@@ -81,9 +81,9 @@ branches only: upstream's others are deleted when it is made.
   runtime's own interfaces, as every recomp does.
 - CI (`.github/workflows/ci.yml`) builds every library of a page with Emscripten from the forks, checks every WGSL
   shader, the plume device thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply
-  to every recomp commit in `patches/pins.txt` and over DKR-R-web's own patches. It builds no page (that needs a game),
-  so anything that changes what a page runs is built and played before it lands. A change to only `*.md`,
-  `plays.jsonl`, `site/` and the tools that play, serve and publish pages runs only the `changes` job.
+  to every recomp commit in `patches/pins.txt` and over DKR-R-web's and CBFD-Recompiled-web's own patches. It builds
+  no page (that needs a game), so anything that changes what a page runs is built and played before it lands. A change
+  to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve and publish pages runs only the `changes` job.
 
 ## The forks
 
@@ -202,3 +202,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   low-latency canvases, so no flag or page setting gives one.
 - Building Firefox's shader misses where the game sends no frames or with a later section's wait, not at once: a
   recomp's loads are too short to give a pause after most misses, and they come after the list's last section.
+- A present's wait() trips to the page's thread, or Firefox's late timed waits, as what paces a page to 30 on a
+  laptop's screen: without the trips Banjo paced the same; how much of the GPU Windows' compositor takes decides it.
