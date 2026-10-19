@@ -89,6 +89,7 @@ mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-we
 oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web
 dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
+snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -293,6 +294,10 @@ build_jfg() {
 build_dkr() {
     # Patches its dependencies from clean whenever N64Recomp-browser or its patches moved (build/web-patched).
     bash scripts/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+build_snap() {
+    # Patches its submodules from clean whenever N64Recomp-browser or patches/web moved (build-web-prep/web-patched).
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
 
 # --- Here ---
