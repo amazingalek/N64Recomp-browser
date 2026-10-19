@@ -172,13 +172,17 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   const waiters = new Set();
   // One of the game's threads throwing (a wasm trap: Chrome's exception on a worker, Emscripten's "worker sent an
   // error!" in both browsers) has stopped the game for good: its clock stands still and every wait and hold on it would
-  // sit out its 5 times and 30 s. So run() ends there, its step cut short, and throws the line.
-  let stop;
+  // sit out its 5 times and 30 s. So run() ends 2 s after the first such line, its step cut short, and throws it: the
+  // 2 s let the rest come in, Chrome's report of the worker's exception with its stack after Emscripten's line.
+  let stop, stopping = false;
   const stopped = new Promise((resolve, reject) => { stop = reject; });
   stopped.catch(() => {});
   const line = (text) => {
     onLine(text);
-    if (/^exception on a worker: |worker sent an error!/.test(text)) stop(new Error(`the game stopped: ${text.split('\n')[0]}`));
+    if (!stopping && /^exception on a worker: |worker sent an error!/.test(text)) {
+      stopping = true;
+      setTimeout(() => stop(new Error(`the game stopped: ${text.split('\n')[0]}`)), 2000);
+    }
     for (const waiter of waiters) waiter(text);
   };
   let page;
