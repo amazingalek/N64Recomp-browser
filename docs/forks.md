@@ -244,4 +244,8 @@ b81df43, 30c60e5,      animation frame less than half a VI before the VI's time,
                        stand-in for the tick (Firefox 158, 60 Hz): VIs 58-60 → 60.0, presents 63.4 → 60.0, sound frames
                        short 47,296 → 0, the browser 1.71 → 1.28 cores. Its code sits apart from vi_thread_func,
                        off the lines a recomp's own patch to the VI thread changes (Conker's, DKR-R's, Rush 2049's)
+plume da273ff,         the device made with the adapter's maxTextureDimension2D (16384 on most), not WebGPU's 8192,
+rt64 e5ee82d           and on Emscripten RT64's clamp on a render target, tile copy and reinterpreted tile
+                       (RenderTarget::MaxDimension, D3D12's 16384) the device's limit: a target past 8192 failed
+                       validation with every pass drawn on it (Mario Kart 64 at 7000x1201: an 8394x1440 target)
 ```

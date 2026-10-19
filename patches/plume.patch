@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web bf417cf1882be8a06d53728e69723de17ade9140
+plume: https://github.com/amazingalek/plume-web da273ff67c3b7b28b077014ff0b0b74f99d7d171
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -6843,17 +6843,18 @@ index 0000000..cdbe538
 +};
 diff --git a/plume_webgpu_device.js b/plume_webgpu_device.js
 new file mode 100644
-index 0000000..115497c
+index 0000000..760a273
 --- /dev/null
 +++ b/plume_webgpu_device.js
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,80 @@
 +// Link with --pre-js for plume's WebGPU backend. Requesting a WebGPU device is asynchronous, so this does it before
 +// main() runs and hands the device over as Module.preinitializedWebGPUDevice, which emscripten_webgpu_get_device()
 +// returns. Optional features plume can use are asked for when the adapter has them, and the adapter's own maximum for
 +// the limits a renderer with big descriptor sets and buffers runs into first (WebGPU's defaults are far below what
-+// desktop GPUs offer). Validation errors and a lost device are logged to the console. The adapter's info (vendor,
-+// architecture) is kept as Module.plumeWebGPUAdapterInfo. At the end, setBindGroup is made to work in Firefox with a
-+// heap past 2 GB.
++// desktop GPUs offer), and for the largest texture, which a renderer scaling its targets to the screen runs into (8192
++// by default, where D3D12 and most adapters allow 16384). Validation errors and a lost device are logged to the
++// console. The adapter's info (vendor, architecture) is kept as Module.plumeWebGPUAdapterInfo. At the end,
++// setBindGroup is made to work in Firefox with a heap past 2 GB.
 +Module['preRun'] = [].concat(Module['preRun'] || []);
 +Module['preRun'].push(() => {
 +  addRunDependency('plume-webgpu-device');
@@ -6871,7 +6872,8 @@ index 0000000..115497c
 +      'depth32float-stencil8'];
 +    const requiredFeatures = optionalFeatures.filter((feature) => adapter.features.has(feature));
 +    const raisedLimits = ['maxSampledTexturesPerShaderStage', 'maxSamplersPerShaderStage', 'maxStorageBuffersPerShaderStage',
-+      'maxStorageTexturesPerShaderStage', 'maxBindingsPerBindGroup', 'maxStorageBufferBindingSize', 'maxBufferSize'];
++      'maxStorageTexturesPerShaderStage', 'maxBindingsPerBindGroup', 'maxStorageBufferBindingSize', 'maxBufferSize',
++      'maxTextureDimension2D'];
 +    const requiredLimits = {};
 +    for (const limit of raisedLimits) {
 +      if (adapter.limits[limit] !== undefined) {
