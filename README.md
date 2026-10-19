@@ -31,6 +31,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60; 320* | 37; 282* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 353* | 267* | 2026-10-19, v0.67.0 |
 | Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 58; 336* | 44; 311* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
+| Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-19, v0.70.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
@@ -290,7 +291,9 @@ from Banjo-Kazooie's. What to expect from a recomp's own commits:
   recomp's own patch is known to touch (Conker's Bad Fur Day adds includes to rt64 beside theirs). Where both make the
   same change their own way, the recomp leaves that file out, as a path in the project after its name:
   `cmake -P .../apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp` (Conker's own patch already finds a jump table
-  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye).
+  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye). A file left out goes without a
+  later change of the forks to it, so a recomp that leaves out many checks that their change is still the one it
+  merged (Pokémon Snap's `tools/check_web_patches.sh`, docs/game-forks.md).
 - Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
   changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
   not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop. A recomp's own fork of a

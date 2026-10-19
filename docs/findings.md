@@ -157,6 +157,12 @@ again before it is read as the page's, with `tools/wait_probe.js` to say whether
 `timedWaitsEndLate()` and the VI thread's measure them once as a page starts, so a host whose waits turn late after that
 shows only in the probe.
 
+It came back from 12:19 UTC that day. Pokémon Snap's page (Snap64Recomp-web on v0.70.0) presented 358 a second at
+11:54, held by the uncapped 360. From 12:19 to 12:45 it read 68 (71.6 animation frames), then 172 and, from Pages, 174
+(120 animation frames, the GPU 15% busy, the browser on half the cores it had). Its 11:54 build read 176 in the same
+minutes, and Mario Kart 64's page, 358* in its row, read 171. Firefox read Snap at 203-206 throughout. Snap's Chrome
+cell is its 11:54 run, and Star Fox 64's 173*, from Pages at 12:28-12:31, was played in that state.
+
 ## Uncapped in Firefox
 
 `layout.frame_rate` 0, which `play_page.mjs --uncapped` gave Firefox until it gave 360, makes Firefox's animation frames
