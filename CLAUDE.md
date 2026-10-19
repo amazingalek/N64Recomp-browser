@@ -202,3 +202,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   low-latency canvases, so no flag or page setting gives one.
 - Building Firefox's shader misses where the game sends no frames or with a later section's wait, not at once: a
   recomp's loads are too short to give a pause after most misses, and they come after the list's last section.
+- A present's wait() trips to the page's thread, or Firefox's late timed waits, as what paces a page to 30 on a
+  laptop's screen: without the trips Banjo paced the same; how much of the GPU Windows' compositor takes decides it.
