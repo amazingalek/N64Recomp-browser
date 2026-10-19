@@ -248,4 +248,9 @@ plume da273ff,         the device made with the adapter's maxTextureDimension2D 
 rt64 e5ee82d           and on Emscripten RT64's clamp on a render target, tile copy and reinterpreted tile
                        (RenderTarget::MaxDimension, D3D12's 16384) the device's limit: a target past 8192 failed
                        validation with every pass drawn on it (Mario Kart 64 at 7000x1201: an 8394x1440 target)
+plume 827a073,         a texture set on a read-write texture slot with no view binds a view of its first mip level
+rt64 e83ea6e           and every array slice, as D3D12's null UAV desc does, not its default view of every level:
+                       WebGPU binds one level as a storage texture, so a texture with mipmaps bound that way failed
+                       the bind group, its pass and the submit (Rush 2's texture cache decoding into its generated
+                       mipmaps: every upload failed and races drew black)
 ```
