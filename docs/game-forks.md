@@ -90,7 +90,10 @@ but nothing has been offered to it). Its tools stay upstream's submodules in `to
 has them, and `tools/publish_pages.sh` runs the fork's `tools/web_patch.sh` too; the three files that leaves out are out
 of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. rt64-web
 03b9dcc and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a
-game's patch adds none, or the next retest's Conker build stops on it. In headless Chrome: launcher, Add ROM, the intro,
+game's patch adds none, or the next retest's Conker build stops on it. N64ModernRuntime 6456ba6 keeps the VI thread's
+frame wait off the lines Conker's runtime patch moves its retrace count to, and CI's `cbfd-patches` job applies the
+patches over all of Conker's own (`recomp/*.patch`, then `tools/web_patch.sh`, from the fork's main), so a collision is
+red on the PR that makes it. In headless Chrome: launcher, Add ROM, the intro,
 the bar, Conker walking outside it, sound. Without a GPU, the window build runs under Xvfb with Mesa's software Vulkan
 (`--seconds 90`, `--rom` an absolute path since it moves to its own folder): the intro to the bar at 60 VIs a second.
 Its shader survey is JavaScript since the fork has no patches library, and its list, `host/rt64_shaders.txt`, is 499
