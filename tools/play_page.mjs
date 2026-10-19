@@ -174,7 +174,7 @@ const shaderWaits = [];
 const shaderMisses = [];
 const hex = (x) => (x >>> 0).toString(16).padStart(8, '0');
 const errors = [];
-let exceptions = 0, firstException = null, exceptionAt = null;
+let exceptions = 0, firstException = null, exceptionAt = null, aborted = null;
 // A page that refuses the ROM throws nothing and stays at its launcher, presenting at the display's rate, so its plan
 // would go on to the end: one Firefox run of a refused ROM held a GPU turn for 1,940 s and summed up as a clean run of
 // 60 presents a second. Each game's page says it on the console, three ways: recompui's launcher (and the launchers
@@ -192,10 +192,14 @@ const onLine = (text) => {
   const wait = /RT64: (\d+) (prebuilt shaders|shaders the list missed) built in ([\d.]+) s, the game waiting/.exec(text);
   if (wait) shaderWaits.push({ at: Math.round(seconds()), shaders: Number(wait[1]), seconds: Number(wait[3]), ...(wait[2] === 'prebuilt shaders' ? {} : { missed: true }) });
   if (/^WebGPU (error|device lost)/.test(text)) errors.push(text);
+  // Emscripten's abort() prints "Aborted(<reason>)" and then traps in the wasm's ___trap, which a worker reports only as
+  // "unreachable executed" at that function's offset (docs/playing.md, What a page says about itself), so the line
+  // that says why goes in front of the exception's.
+  if (/^Aborted\(/.test(text)) aborted ??= text.split('\n')[0].slice(0, 300);
   // The page's own exceptions and, in Chrome, its workers' (page_driver.mjs; Firefox reports both as "exception: ").
   if (/^exception( on a worker)?: /.test(text)) {
     exceptions++;
-    firstException ??= text.split('\n')[0].slice(0, 300);
+    firstException ??= (aborted ? `${aborted}, then ` : '') + text.split('\n')[0].slice(0, 300);
     exceptionAt ??= seconds();
   }
   if (romRefused.test(text)) page.stop(`the page refused the ROM: ${text.split('\n')[0].slice(0, 300)}`);

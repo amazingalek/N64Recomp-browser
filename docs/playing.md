@@ -92,6 +92,12 @@ options; `docs/findings.md` has what was measured this way.
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
   `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
   Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
+- A thread of the game that traps names only an offset in the wasm on a page linked without `--profiling-funcs`
+  (`Game.wasm:8767891: RuntimeError: unreachable executed`); `node tools/wasm_offset.mjs <wasm or URL> <offset>`
+  names the function that holds it. `unreachable executed` in the export the page's `.js` calls `___trap` is
+  Emscripten's `abort()`, not a bad pointer: it prints `Aborted(<reason>)` just before, play_page puts that line in
+  front of the exception in the failure it records, and an empty reason is C's `abort()` (a failed `new`, libc++
+  throwing with exceptions off, the runtime's own), which the stderr lines before it say.
 
 ## A cell of the Games table
 
