@@ -226,10 +226,10 @@ interpolate at the fastest (rt64 179adb8) and the port's last measured rate is w
 every other the port's depth. HAL's object manager runs each object on a thread that stops itself, which the libultra
 thread stop ignored a start of (N64ModernRuntime-web 6515ea8). Render to RAM keeps the exact copy: the game scores a
 photo from the frame it has just drawn and finds the viewfinder's focus dot in it, and a play shows no kept writes.
-Its list is 196 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
-code: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js` rides it to its end, taking photos
-and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`, `tools/check_web_patches.sh`,
-`web/page.cmake` and `web/rt64_shaders.txt` have the rest.
+Its list is 198 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
+code but for two a Firefox play missed: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js`
+rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
+`tools/check_web_patches.sh`, `web/page.cmake` and `web/rt64_shaders.txt` have the rest.
 
 ## The games' own frame rates
 
