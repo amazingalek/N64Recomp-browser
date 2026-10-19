@@ -771,17 +771,20 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
 Jet Force Gemini's page presented 58.4-58.6 a second in Chrome on a laptop's Intel UHD (v0.63.0, headed, headless and
 on screen) against 60 animation frames, with the GPU 56-64% busy, where Mario Kart 64 and Ocarina of Time drew 60. A
 desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second whatever the screen),
-1920x945, JFG's page from Pages on v0.69.0, its play plan, a busy host, presented 58.8 a second over the plan's 187 s of
-play, and RT64 dropped 6 presents there (`?present-stats`; 445 more in the launcher, before the game). So these are
-display frames with no present, not drops, and no GPU load.
+1920x945, JFG's page from Pages on v0.69.0, its play plan, `?present-stats`, a busy host. In two runs RT64 dropped
+2-6 presents over the plan's ~190 s of play (~440 more in the launcher, before the game), so the presents missing there
+are display frames with none, not drops, and not GPU load.
 
 A preload counted, at each animation frame, the canvas textures acquired since the last and how far the game's own
-clock (`0x800FD748`, in VIs) had moved. The game ran at 30 dropping to 20: 3557 frames of 2 VIs, 1339 of 3, 20 of 4-6.
-In each 5 s of play whose frames all took 2 VIs, 300 animation frames got 300 presents. In those that mixed 2 and 3,
-5-16 animation frames went without one. Over the play, 274 animation frames had no present, and 188 of them are what
+clock (`0x800FD748`, in VIs) had moved. The game runs at 30 dropping to 20, and how often it drops varies from run to
+run. In the first run 1339 of its 4916 frames took 3 VIs and 20 took 4-6, and play presented 58.8 a second; in the
+second (plays.jsonl, its note names the preload) 525 of 5486 took 3 and 15 took 4-6, and play presented 59.2. In each
+5 s whose frames all took 2 VIs, 300 animation frames got 300 presents, the second run's 17 such windows missing 19 in
+all, at its loads. Those that mixed 2 and 3 missed 5-16 presents each, 161 in the second run's 22. That is what
 RT64_UNEVEN_FRAME_RATES (rt64 179adb8) leaves. It interpolates frames whose last three took uneven VIs (the slowest at
 most twice the fastest) at the fastest one's rate, so a 3-VI frame after 2-VI ones gets 2 presents and holds the last
-through the third display frame. Banjo-Tooie's 58.4-59.2 in Chrome on the laptop may be the same.
+through the third display frame. Counting those display frames from the clock alone (it moves at the game's frame, not
+at its swap) gives 54-69% of the missing presents. Banjo-Tooie's 58.4-59.2 in Chrome on the laptop may be the same.
 
 How many VIs a frame takes is known only at its swap, after RT64 has drawn its interpolated frames, so a page can't
 fill those display frames without waiting another game frame. A rate guessed from the frame before (rather than the
