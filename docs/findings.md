@@ -488,8 +488,9 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
 On 2026-10-18 and 19 the same laptop played Banjo's test build (its main on v0.66.0 with plume bf417cf) and Mario Kart
 64 from Pages on v0.63.0 on screen (Firefox 158 maximized at 200%), cold, `?present-stats`, with each process's share
 of the Intel GPU's 3D engine (dwm.exe, the browser) sampled every 5 s: plays.jsonl's 24 lines from 20:37 UTC on the 18th
-to 00:17 on the 19th, after the 15 above. Runs of that night not in plays.jsonl, the same
-pages from Pages on v0.63.0, read the same split in four games (presents a second, then the Intel GPU / Firefox / DWM
+to 00:17 on the 19th, after the 15 above. That night's first laptop runs of Mario Kart 64, Ocarina of Time and Jet
+Force Gemini, from Pages on v0.63.0 (plays.jsonl's 17 lines from 22:58 to 23:48 UTC on the 18th, with Diddy Kong
+Racing's two failed boots: its page plays the US 1.0 ROM and the laptop has Rev A), read the same split as Banjo (presents a second, then the Intel GPU / Firefox / DWM
 in percent): Banjo 30.0 at 85-87 / 55-56 / 30-31, Mario Kart 64 42.6 at 99 / 61 / 38, Ocarina of Time 37.1 at 91 / 53 /
 38, Jet Force Gemini 44.2 at 95 / 58 / 36. Chrome 155 on the same screen drew 58.4-60.0 with the GPU 62-73% busy and
 DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these pages at 58-60 with 56-62% of the GPU.
