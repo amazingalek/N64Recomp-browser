@@ -181,8 +181,11 @@ and its survey, the warps.
 `amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled. Its upstream's base recomp has its own frontend
 (an RmlUi launcher and menus, no RecompFrontend); on the page (`patches/web/dkr.patch`) it plays rumble through the
 Gamepad API and keeps the dummy frame out of RDRAM as RecompFrontend 75fe596 does. The game binds draw buffers the
-workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. The
-base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
+workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. Its
+`patches/web/rt64.patch` is the base's own renderer (F3DDKR, its bloom and SSAO, the shader cache's pause), so it can't
+move into rt64-web, and it goes on top of the web's: CI's `jfg-patches` job runs its `tools/build_web.sh --patches`
+(the whole patch step, no ROM) with the PR's checkout, so a change here to the lines it touches is red in its own PR
+and is settled there, by rebasing the fork's patch or keeping the web's lines off its. The base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
 never waits there. Its list, `src/rt64_shaders.txt`, is 210 descriptions in 16 sections, the boot 36
 and a planet 20-86 descriptions each. The early release took the sound short over its play plan (the first room of every
 planet in 160 s, headless Chrome 155) from 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display
