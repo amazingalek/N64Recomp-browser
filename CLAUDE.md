@@ -61,8 +61,11 @@ branches only: upstream's others are deleted when it is made.
   or more. One game's polish (one browser's sound in one game, 100 ms gaps at one screen change) is filed and waits
   until asked for.
 - A game fork is its recomp plus web support and nothing else: no new features (mouse aim, controls, enhancements) and
-  no fix the page doesn't need. A request for one is answered that way, not filed. The one exception is a change that
-  runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame rates).
+  no fix the page doesn't need. A request for one is answered that way, not filed. The exceptions are a change that
+  runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame rates), and
+  GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for weapons,
+  keys for reload and crouch), since a page is played with keyboard and mouse: all of it in GoldenEye64Recomp-web's own
+  code and none in the forks, on its `mouse` branch until it has been played by hand.
 - Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and resolution
   Auto, in every game fork and new port, whatever its recomp's desktop build defaults to (README, The recomp's own
   code). A page held to its game's own rate reads that rate uncapped whatever a change costs or saves (DKR-R 29.8-30.0,
