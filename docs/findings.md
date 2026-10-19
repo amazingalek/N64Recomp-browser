@@ -136,6 +136,27 @@ ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hou
 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against v0.50.0's 330 (headless Chrome
 155, 3840x2000, both served from one port, interleaved).
 
+## A host that holds Chrome's presents
+
+For half an hour of 2026-10-19 (11:25-11:50 UTC) an RTX 5080 desktop held headless Chrome 155's pages uncapped at
+3840x2000 to far less than its GPU could draw, and the page's own runs read it as the page's. Star Fox 64's (its
+fork's web-wip faeef4a on v0.69.0, its play plan, a fresh profile) presented 78 and 70.7 a second, its launcher at 77-81
+from the first sample, as many animation frames (71.4, 71.7), frame gaps a steady 15.5 ms (the system timer's tick),
+the GPU 13% busy; Conker's from Pages, minutes later, 198 with 125 animation frames, where it read 322-340 there that
+morning, and its start measured a timed wait of 100 us off the page's thread at 8.7 ms, so plume and the VI thread took
+the animation frames instead (as in Firefox: Uncapped in Firefox). Half an hour later the same Star Fox build presented
+346.6 a second, 348.2 and 350.8 with `tools/wait_probe.js` (12:02-12:15 UTC, a whole GPU turn each, the host 11-26%
+busy), held by the uncapped 360, with 120 animation frames, frame gaps of 2.8 ms and every one of the probe's waits
+1-1.2 ms; one of them with the host idle past its display's 10 minutes, so a display that Windows switched off isn't
+what held them, though nothing says whether it had. Firefox 158 read what it read in that half hour, 198.4 against
+200.6 (about 350 in the menus, 197 in Corneria; its waits late, as always there, 11.8 ms), so only Chrome's was the host.
+
+What the host was doing then isn't known: Chrome's version was the same, and no other session held the GPU. So a Chrome
+run uncapped well below a game's other runs on that host, its presents no more than its animation frames, is played
+again before it is read as the page's, with `tools/wait_probe.js` to say whether its timed waits ended late. plume's
+`timedWaitsEndLate()` and the VI thread's measure them once as a page starts, so a host whose waits turn late after that
+shows only in the probe.
+
 ## Uncapped in Firefox
 
 `layout.frame_rate` 0, which `play_page.mjs --uncapped` gave Firefox until it gave 360, makes Firefox's animation frames

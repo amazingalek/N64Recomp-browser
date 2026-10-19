@@ -89,6 +89,9 @@ options; `docs/findings.md` has what was measured this way.
   each guess at a frame's length would hold and cut (docs/findings.md, A game's uneven frames). Read it at 60
   animation frames: headless Chrome runs the screen's rate, 240 on a 240 Hz one (Firefox: `--firefox-pref
   layout.frame_rate=60`).
+- Whether timed waits off its thread end on time all through a play: `--preload tools/wait_probe.js` logs, each
+  second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
+  the page starts (docs/findings.md, A host that holds Chrome's presents).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
