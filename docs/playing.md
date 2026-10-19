@@ -35,7 +35,7 @@ options; `docs/findings.md` has what was measured this way.
   GoldenEye play of Dam long enough for its guards to kill Bond stopped on the Mission Failed screen in Chrome and
   Firefox (`strcmp` from `fileGetIndex`, given the name of a briefing mission select never chose:
   `load_briefing_text_for_stage` under `init_menu0C_missionfailed`). A thread of the game that throws ends the run
-  there, as a failed one (`page_driver.mjs`).
+  as a failed one once nothing has presented for 15 s (`play_page.mjs`).
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key reached RmlUi): Enter starts the game on
   the second press, or click Start Game. Every RecompFrontend game does it, desktop too.

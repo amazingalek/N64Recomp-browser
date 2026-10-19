@@ -48,6 +48,10 @@
 // says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
 // after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
 // busy.
+//
+// page.stop(reason) ends a run where it is: the step it is in is left (a clock wait included, which on a game that has
+// stopped waits out its whole 5 times and 30 s), no step after it starts, and run() throws reason, as a step that failed
+// does. A run started after it throws at once.
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
@@ -144,9 +148,8 @@ const rdramHelpers = `(() => {
 })()`;
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
-//   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra) (throws
-//   once a thread of the game throws, below),
-//   close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
+//   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra),
+//   stop(reason) (above), close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -170,21 +173,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   profile = path.resolve(profile);
   const [width, height] = size;
   const waiters = new Set();
-  // One of the game's threads throwing (a wasm trap: Chrome's exception on a worker, Emscripten's "worker sent an
-  // error!" in both browsers) has stopped the game for good: its clock stands still and every wait and hold on it would
-  // sit out its 5 times and 30 s. So run() ends 2 s after the first such line, its step cut short, and throws it: the
-  // 2 s let the rest come in, Chrome's report of the worker's exception with its stack after Emscripten's line.
-  let stop, stopping = false;
-  const stopped = new Promise((resolve, reject) => { stop = reject; });
-  stopped.catch(() => {});
-  const line = (text) => {
-    onLine(text);
-    if (!stopping && /^exception on a worker: |worker sent an error!/.test(text)) {
-      stopping = true;
-      setTimeout(() => stop(new Error(`the game stopped: ${text.split('\n')[0]}`)), 2000);
-    }
-    for (const waiter of waiters) waiter(text);
-  };
+  const line = (text) => { onLine(text); for (const waiter of waiters) waiter(text); };
   let page;
   if (cpuThrottle && browser !== 'chrome') throw new Error('cpuThrottle is Chrome\'s only');
   // A debugging port another browser holds is refused, not shared: the browser started here would take the other
@@ -204,7 +193,13 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
     const scale = h / 645;
     return [Math.round(w / 2 + (x - 628) * scale), Math.round(h / 2 + (y - 322.5) * scale)];
   };
-  page.run = async (steps, extra = {}) => {
+  let stopped = null;
+  let stop;
+  const stopping = new Promise((resolve, reject) => { stop = reject; });
+  stopping.catch(() => {});
+  page.stop = (reason) => { stopped ??= new Error(reason); stop(stopped); };
+  page.run = (steps, extra) => Promise.race([runSteps(steps, extra), stopping]);
+  const runSteps = async (steps, extra = {}) => {
     let clock = null, asked = 0, held = 0;
     const ticks = (ms) => Math.max(1, Math.round(ms * clock[1] / 1000));
     // ms of the game's time on from from (null: from now), or of wall time with no clock.
@@ -215,7 +210,8 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       if (!got) log(`the clock stood still: ${read} stayed ${at} through ${ms} ms of the game's time`);
       return at;
     };
-    const step = async (op, a) => {
+    for (const [op, ...a] of steps) {
+      if (stopped) throw stopped;
       if (extra[op]) await extra[op](...a);
       else if (op === 'clock') {
         clock = a.length ? a : null;
@@ -264,11 +260,6 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       }
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else throw new Error(`unknown step ${op}`);
-    };
-    for (const [op, ...a] of steps) {
-      const done = step(op, a);
-      done.catch(() => {});  // a step cut short may still fail once the page has closed
-      await Promise.race([done, stopped]);
     }
     if (asked) log(`holds on the clock: ${asked} ticks asked, ${held} held`);
   };
