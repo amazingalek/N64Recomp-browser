@@ -77,7 +77,8 @@ branches only: upstream's others are deleted when it is made.
   no AI-made contribution and no AI talking to its maintainers). Each fork's README opens with a banner, and its GitHub
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
-- Code from a repo without a license is never copied: facts learned from one only.
+- A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
+  the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it
   is built where the ROM is, never in CI, and its `.data` holds only what it preloads (`tools/publish_page.sh`).
 - Nothing here names a game, includes from a game's repo or needs its ROM: the web side gets what it needs through the
