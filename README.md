@@ -29,7 +29,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 358* | 342* | 2026-10-19, v0.67.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 320* | 282* | 2026-10-19, v0.67.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 353* | 267* | 2026-10-19, v0.67.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 333* | 319* | 2026-10-18, v0.63.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 336* | 311* | 2026-10-19, v0.67.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
