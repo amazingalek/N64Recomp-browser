@@ -766,6 +766,28 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
   the scheduler (MarioKart64Recomp-web's BUILDING.md, What porting it found). The profile's one long `osRecvMesg` on
   the scheduler and audio threads is each retrace's wake being shorter than a sample.
 
+## A game's uneven frames
+
+Jet Force Gemini's page presented 58.4-58.6 a second in Chrome on a laptop's Intel UHD (v0.63.0, headed, headless and
+on screen) against 60 animation frames, with the GPU 56-64% busy, where Mario Kart 64 and Ocarina of Time drew 60. A
+desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second whatever the screen),
+1920x945, JFG's page from Pages on v0.69.0, its play plan, a busy host, presented 58.8 a second over the plan's 187 s of
+play, and RT64 dropped 6 presents there (`?present-stats`; 445 more in the launcher, before the game). So these are
+display frames with no present, not drops, and no GPU load.
+
+A preload counted, at each animation frame, the canvas textures acquired since the last and how far the game's own
+clock (`0x800FD748`, in VIs) had moved. The game ran at 30 dropping to 20: 3557 frames of 2 VIs, 1339 of 3, 20 of 4-6.
+In each 5 s of play whose frames all took 2 VIs, 300 animation frames got 300 presents. In those that mixed 2 and 3,
+5-16 animation frames went without one. Over the play, 274 animation frames had no present, and 188 of them are what
+RT64_UNEVEN_FRAME_RATES (rt64 179adb8) leaves. It interpolates frames whose last three took uneven VIs (the slowest at
+most twice the fastest) at the fastest one's rate, so a 3-VI frame after 2-VI ones gets 2 presents and holds the last
+through the third display frame. Banjo-Tooie's 58.4-59.2 in Chrome on the laptop may be the same.
+
+How many VIs a frame takes is known only at its swap, after RT64 has drawn its interpolated frames, so a page can't
+fill those display frames without waiting another game frame. A rate guessed from the frame before (rather than the
+fastest of three) would hold one display frame where the game slows from 30 to 20, not up to three, but would cut a
+frame short where it speeds back up, for a skipped moment instead of a held one.
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
