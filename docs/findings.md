@@ -95,6 +95,23 @@ none failed, and presented more: Firefox 175-181 a second (133-150 before), Chro
 fps, so uncapped it reuses the targets every game frame), its plan, played in the same hour beside its page from Pages
 (v0.58.0): Firefox 236 (165), the GPU process ending at 2.1 GB (2.7); Chrome 308 (228); no WebGPU errors either way.
 
+A worker that traps in `free()` has found the heap already corrupt (`tools/wasm_offset.mjs` names it: dlmalloc
+unlinking a chunk whose links were overwritten). Mario Kart 64's page from Pages (v0.67.0) did that once in 5 runs on a
+laptop (Intel UHD, Firefox 158 on screen, a 1920x947 canvas), at the title screen, 0.3 s after RT64 asked for a texture
+of 16384 a side, past the device's 8192. Neither caused the other:
+- RDRAM doesn't run into the heap past the console's 8 MB: N64ModernRuntime-0003 allocates the whole `mem_size`, 512
+  MB, only without the guard region above it. What leaves it is an address a desktop build's guard pages would stop:
+  KSEG1 (0xA0000000 up, RDRAM + 512 MB, right after it) or KUSEG, which wasm32's 32-bit pointers wrap to anywhere in
+  the heap.
+- A texture past the device's limit leaves nothing wrong on the CPU's side: plume logs WebGPU's errors, and the
+  failed texture is still a handle. The same page in headless Chrome at 7000x1201 failed an 8394-wide target every
+  frame for 25 s, ~2,700 errors, and played on at 60.
+- Nothing sizes 16384 there from Mario Kart 64's 320x240 framebuffer. Auto at 1920x947 is 4 x 6.08, a target 1946
+  wide, a 16-bit tile reinterpreted as 4-bit 7,784; a VI cut to RT64's 60-line floor gives 16 x 16, a target 5,120
+  wide, and only a full-width tile reinterpreted from 16 to 4 bits there (20,480) passes 16384. So it took a bad value:
+  a VI that short or a few pixels wide, or a framebuffer over 2,690 wide, a game's display list read while it was being
+  rewritten, or the same corruption reaching RT64's own state.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
