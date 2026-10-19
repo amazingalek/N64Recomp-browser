@@ -40,10 +40,11 @@ builds it: a game's `rt64_shaders.txt` (its header says what was played and what
 - Chrome builds the whole list behind the launcher and the game from a draw of nothing at setup (rt64 977ddca), and a
   frame that wants 4 or more unbuilt shaders of a section holds the game for those under "Preparing graphics" (rt64
   950188f). Firefox builds nothing behind the game: it waits for the boot section before the first frame and for a
-  section when the game gets there. A shader the list misses draws with the ubershader, in Chrome until it is built
-  behind the game and in Firefox for the rest of the visit, and the page remembers it (`localStorage`) and builds it
-  with its section next visit. `play_page.mjs` prints each miss and records them (`shaderMisses`), so a long play on
-  a fresh profile counts what a list lacks (docs/findings.md, What the prebuilt lists miss).
+  section when the game gets there. A shader the list misses draws with the ubershader in Chrome until it is built
+  behind the game, while Firefox builds it before the next frame, the game waiting (0.2-0.3 s a shader, rt64
+  b52d78f), and the page remembers it (`localStorage`) and builds it with its section next visit. `play_page.mjs`
+  prints each miss and records them (`shaderMisses`), so a long play on a fresh profile counts what a list lacks
+  (docs/findings.md, What the prebuilt lists miss).
 - Recording: `?record-shaders` prebuilds none and prints an `rt64 shader:` line per description, in the order the game
   asks; add the new ones. `tools/record_shaders.mjs` records from a plan. A game with many levels records by code: a
   survey in its patches library or in JavaScript reaches each level as its own code would (`patches/shader_survey.c` or

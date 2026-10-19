@@ -181,7 +181,8 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   first frame, and its title alone is 33 and 7-9 s, the menus' 47 built after Start; Chrome builds that second
   section on the boot's threads too, so it doesn't wait for it. A
   description can be in several sections. One the list missed, or a few at a time, is built
-  behind the game, which draws with the ubershader meanwhile (Firefox waits for those too). The page remembers each
+  behind the game, which draws with the ubershader meanwhile; Firefox builds it before the next frame instead, the game
+  waiting, a fraction of a second a shader. The page remembers each
   one the list missed, with the section the game was in (the frontend's shell keeps them in `localStorage`), and on
   later visits builds it with that section as if the list had it, so what a recording didn't reach costs a player
   one visit, not every one. Set

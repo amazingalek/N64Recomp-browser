@@ -67,7 +67,8 @@
 // the "play" steps: median presents a second and the range, the gaps between presents, the median animation frames a
 // second (in Chrome on Windows ~55.6 when the display gives it no vblank, a monitor that is off: then a page that
 // interpolates presents ~55.6 too, and the run says so), frames short, each prebuilt
-// shader wait (RT64's "built in ... the game waiting" lines, Firefox's for what the list missed among them, missed: true), WebGPU errors and exceptions, the GPU and the cores, and
+// shader wait (RT64's "built in ... the game waiting" lines, Firefox's for the shaders the list missed among them, with
+// missed: true), WebGPU errors and exceptions, the GPU and the cores, and
 // the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
 // Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
