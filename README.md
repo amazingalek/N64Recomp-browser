@@ -27,9 +27,11 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Pilotwings 64 | [Pilotwings 64: Recompiled](https://github.com/danielgomesvieira2000/pilotwings-64-recomp) by danielgomesvieira2000 | [pilotwings-64-recomp-web](https://github.com/amazingalek/pilotwings-64-recomp-web) | [play](https://amazingalek.github.io/pilotwings-64-recomp-web/) | 60; 254* | 37; 179* | 2026-10-19, v0.67.0; laptop 2026-10-17, v0.58.0 |
 | Banjo-Tooie | [Banjo-Tooie: Recompiled](https://github.com/Vidanox/BanjoTooieRecompiled) by Vidanox | [BanjoTooieRecompiled-web](https://github.com/amazingalek/BanjoTooieRecompiled-web) | [play](https://amazingalek.github.io/BanjoTooieRecompiled-web/) | 59; 356* | 30†; 258* | 2026-10-19, v0.67.0; laptop 2026-10-17, v0.58.0 |
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/amazingalek/MarioKart64Recomp-web) | [play](https://amazingalek.github.io/MarioKart64Recomp-web/) | 60; 358* | 43; 342* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
+| Star Fox 64 | [Starfox64Recomp](https://github.com/sonicdcer/Starfox64Recomp) by sonicdcer | [Starfox64Recomp-web](https://github.com/amazingalek/Starfox64Recomp-web) | [play](https://amazingalek.github.io/Starfox64Recomp-web/) | 173* | 201* | 2026-10-19, v0.69.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60; 320* | 37; 282* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 353* | 267* | 2026-10-19, v0.67.0 |
 | Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 58; 336* | 44; 311* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
+| Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-19, v0.70.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
@@ -289,7 +291,9 @@ from Banjo-Kazooie's. What to expect from a recomp's own commits:
   recomp's own patch is known to touch (Conker's Bad Fur Day adds includes to rt64 beside theirs). Where both make the
   same change their own way, the recomp leaves that file out, as a path in the project after its name:
   `cmake -P .../apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp` (Conker's own patch already finds a jump table
-  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye).
+  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye). A file left out goes without a
+  later change of the forks to it, so a recomp that leaves out many checks that their change is still the one it
+  merged (Pokémon Snap's `tools/check_web_patches.sh`, docs/game-forks.md).
 - Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
   changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
   not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop. A recomp's own fork of a
@@ -393,7 +397,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
   reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `frame_lengths.js`, a preload too, logs how long the game's frames are against the page's presents, and
-  `frame_lengths.mjs` counts from that what each guess at a frame's length would hold and cut.
+  `frame_lengths.mjs` counts from that what each guess at a frame's length would hold and cut. `wait_probe.js` logs
+  whether a timed wait off the page's thread ends on time, each second of a play.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one. `wasm_offset.mjs`
   names the function of a page's wasm at the offset a trap gives.

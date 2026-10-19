@@ -147,6 +147,22 @@ Luigi Raceway on the game's own AI. Its README and BUILDING.md, and the headers 
 Pak, the boot's first display list and its fix, render to RAM kept exact for the jumbotron, the shader list and how it
 was recorded.
 
+`amazingalek/Starfox64Recomp-web` is Starfox 64: Recompiled (US 1.1, Rev A), moved onto RecompFrontend as Mario Kart
+64's is: its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are
+built on (a row each in `patches/pins.txt`). Its settings (film grain, the radio box, inverted Y, the volumes) are on
+RecompFrontend's General and Sound tabs; upstream's debug menu and quicksaves stay out. The cartridge is
+MIO0-compressed: N64Recomp reads the ROM `tools/decompress_rom.sh` decompresses with the sf64 decompilation's tools
+(`lib/sf64decomp`), and the program takes the plain dump and decompresses it in memory, as upstream's does. Render to
+RAM is off: the CPU never reads a frame it drew (the motion blur is the RDP drawing over the last frame). Its CMake
+makes `register_patches.cpp` depend on the patches' section table, which N64Recomp writes mid-build: without that an
+incremental build after a patch moved stopped at boot ("Failed to find function at"; Mario Kart 64's CMake lacks the
+same edge). Its list, 818 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
+zones, the training, Venom's two routes and Andross, game over, Versus and the ending), is recorded by code:
+`patches/shader_survey.c` hands a level, a phase or a game state from the script to the game's own change of state
+(`gNextGameState`), with the player's shields kept full; a straight switch to the ending crashed until the survey set
+it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corneria (Start skips the Lylat map's
+prologue, A picks the planet) and a minute of it. Its README, BUILDING.md and the headers of those files have the rest.
+
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
@@ -211,15 +227,35 @@ only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.s
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
 
+`amazingalek/Snap64Recomp-web` is Snap64 Recomp, Pokémon Snap (US), on its port's own forks of rt64, plume and
+N64ModernRuntime (their `snap64` branches), the one game fork whose rt64 isn't upstream's: ~8,000 lines of the port's
+in RT64 (each object's identity for interpolation, its frame pacing and presentation, Photo Detail's framebuffer
+readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` patches them, but for the files where
+both change the same lines (`patches/web/files.txt`, 16 of rt64's and 6 of the runtime's), whose web change is its
+`patches/web/<project>.patch`, merged by hand. Its `tools/check_web_patches.sh`, run first by its `tools/build_web.sh`,
+stops the build when N64Recomp-browser's change to one of those files has moved since that patch was merged, so a
+change here to one of them reaches its page once it is merged there too (run it on the change's branch, or the
+retest's build stops on it). On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
+the build had left out with nothing said. Two of that merge's choices: in `rt64_vi.cpp` frames of uneven VIs
+interpolate at the fastest (rt64 179adb8) and the port's last measured rate is what's left, in place of 0; in
+`RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
+every other the port's depth. HAL's object manager runs each object on a thread that stops itself, which the libultra
+thread stop ignored a start of (N64ModernRuntime-web 6515ea8). Render to RAM keeps the exact copy: the game scores a
+photo from the frame it has just drawn and finds the viewfinder's focus dot in it, and a play shows no kept writes.
+Its list is 199 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
+code but for three Firefox plays missed: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js`
+rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
+`tools/check_web_patches.sh`, `web/page.cmake` and `web/rt64_shaders.txt` have the rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
 game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
-cartridge's for the other seven: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
-(Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, GoldenEye's and Conker's variable. None of the seven
-has an option to run faster.
+cartridge's for the other eight: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
+(Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, Star Fox 64 30 (20 where a scene sets 3 VIs a
+frame), GoldenEye's and Conker's variable. None of the eight has an option to run faster.
 
 A game fork may take a change that runs its game faster when that makes the page play better. Weigh it: logic at 60
 gives lower input lag, motion the game computes rather than RT64 interpolates, and what interpolation misses (some
