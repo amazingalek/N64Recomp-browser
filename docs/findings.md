@@ -457,9 +457,19 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
   (100-350 a pass), at 1.3-1.9 passes a present instead of 1.0-1.3; every other pass stayed under 0.6 ms. Leaving out
   the 10, 25 or 70 KB fragment shaders' draws (`?probe-skip`) didn't stop it, each collapsing at ~85 s at least once,
   and no texture of 1M texels or more was made after Dam started (in two runs that didn't collapse). At 1280x630 the
-  GPU was 58% busy and it never came. So the same draws into the same targets cost Firefox's GPU 5-7 times more once it
-  has been near full for a while, and Chrome's never. What changes on the GPU then (a target's compression or
-  fast-clear state, the queue behind a copy only Firefox's path makes) needs a GPU capture.
+  GPU was 58% busy and it never came. So the same draws into the same targets cost Firefox's GPU 5-7 times more, and
+  Chrome's never: they were drawn with the ubershader (next bullet), and `?probe-skip` couldn't show it, since an
+  ubershader draw carries the size of a shader already in the table.
+- What it was, the next two nights (Pages on v0.63.0, GoldenEye's list at main 5967d94, `pass_probe.js`, Firefox off
+  the desktop at 1920x945; plays.jsonl's 15 lines of 2026-10-18/19 noted "laptop report"): shaders GoldenEye's list
+  lacked, which Firefox drew with the ubershader for the rest of the visit (What the prebuilt lists miss, above). On the
+  plan with holds on the game's clock (5967d94) Dam held 64 until 214-360 s in all three runs, the scene pass at
+  5.0-6.9 ms, as Chrome's 5.2-6.3 on that plan. On the plan before it, holds on the wall clock, 4 of 5 runs fell to
+  16-23 in Dam, the build of the night before (main 0f30f97) as well as that day's, each just after Dam missed some of
+  a family of `c8102078 …6f` shaders, about 80 s in: the scene pass went 6.0, 12.1, 22.6 ms a pass over 10 s at the
+  same 110-270 draws. The one run that met none of them held 64. GoldenEye64Recomp-web 4681896 adds the 21 shaders
+  these runs missed to Dam's section. Nothing in the other pages behaved like it: Rush 2049's race at 86-99% busy for
+  300 s kept its main pass at 9-20 µs a draw, and Conker's and Majora's Mask's plans (69-75% busy) stayed flat.
 - Banjo stayed at 30 with it: RT64 paced it to 30 with the GPU 70-78% busy until 123 s, and drew 58-60 after.
 
 ## WebGPU in Chrome and Firefox
