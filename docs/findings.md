@@ -124,6 +124,19 @@ signature mismatch" beside it: a function pointer overwritten too. So the corrup
 display list from (RDRAM, or its segment addresses) before it reached the heap, which points at stray writes over
 both, not at RT64 or the VI sizing anything wrong. Who writes them is open.
 
+A desktop doesn't make them, even with the laptop's slow RT64 thread put in by hand. A checked test build of the page
+(v0.72.0's forks plus checks) traps at the first address out of RDRAM's 512 MB in every recompiled load and store, the
+PI DMAs and ultramodern's TO_PTR, logs the stack of every NULL TO_PTR makes into a pointer, and, at the first color
+image over 1024 wide, prints the 16 commands each side of it, the frame's list and the segment table, reads those
+words again 5 ms later and traps. Its RT64 thread waits 0-30 ms between sp_complete and reading the list, so the game
+is told its task is done long before RT64 has read it. On an RTX 5080 (the host 10-21% busy, no other GPU work),
+Mario Kart 64's plan played it 21 times through the menu into a race: 11 in Firefox 158 on screen, 10 in headless
+Chrome at 3840x2000 with the CPU throttled 3 times. None of them trapped or logged anything (WebGPU errors 0), so in
+those plays neither the game, the runtime nor the DMAs reached past RDRAM, the runtime made no pointer of NULL, and no
+list RT64 read held a wide color image. Each check reads its address once: a TO_PTR that evaluated its argument three
+times popped ultramodern's running queue as often and crashed at boot, which reads like a race between game threads
+and isn't one. The laptop trapped once in 21 plays, so 21 clean ones here rule out a likely cause, not every cause.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
