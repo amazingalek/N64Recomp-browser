@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 0c5ba5d66e3ab1fda573556b216bbd1b05976736
+rt64: https://github.com/amazingalek/rt64-web b52d78fc528f80a48410f7e3d1bc0ac64f38db9f
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -3796,7 +3796,7 @@ index 3b991ff..c17d089 100644
          static std::unique_ptr<RenderPipeline> createPipeline(const PipelineCreation &c);
          static RenderMultisampling generateMultisamplingPattern(uint32_t sampleCount, bool sampleLocationsSupported);
 diff --git a/src/render/rt64_raster_shader_cache.cpp b/src/render/rt64_raster_shader_cache.cpp
-index bf7b669..e6920d8 100644
+index bf7b669..378cf0c 100644
 --- a/src/render/rt64_raster_shader_cache.cpp
 +++ b/src/render/rt64_raster_shader_cache.cpp
 @@ -6,6 +6,52 @@
@@ -3877,13 +3877,13 @@ index bf7b669..e6920d8 100644
      }
  
      void RasterShaderCache::setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling) {
-@@ -105,13 +160,483 @@ namespace RT64 {
+@@ -105,13 +160,486 @@ namespace RT64 {
          shaderUber = std::make_unique<RasterShaderUber>(device, shaderFormat, multisampling, shaderLibrary, ubershaderThreadCount);
          usesHDR = shaderLibrary->usesHDR;
  
 +        // Where building a pipeline holds up the device (WebGPU in Firefox), a specialized shader stalls the frames
 +        // for longer than the ubershader it replaces costs them, and a race asks for a new one every few seconds.
-+        // What isn't prebuilt draws with the ubershader there.
++        // What isn't prebuilt is built with the game waiting there (buildMissed()), never behind it.
 +        specializedShaders = device->getCapabilities().backgroundPipelineBuilds;
 +
 +        // The prebuilt shaders are built wherever a game has a list, whatever the browser and the adapter: they are
@@ -4338,6 +4338,9 @@ index bf7b669..e6920d8 100644
 +                prebuildChanged.notify_all();
 +            }
 +        }
++
++        lock.unlock();
++        held = buildMissed() || held;
 +#   endif
 +        return held;
 +    }
@@ -4353,8 +4356,8 @@ index bf7b669..e6920d8 100644
      }
  
      void RasterShaderCache::submit(const ShaderDescription &desc) {
-+        // A browser that builds no shaders during play (Firefox) still learns the ones the list missed, and builds them
-+        // with their section on the next visit.
++        // A browser that builds no shaders behind the game (Firefox) still learns the ones the list missed, builds them
++        // before the next frame (buildMissed()), and with their section on the next visit.
 +        if (!specializedShaders && !recordShaders && (prebuildCount == 0)) {
 +            return;
 +        }
@@ -4362,7 +4365,7 @@ index bf7b669..e6920d8 100644
          {
              std::unique_lock<std::mutex> queueLock(submissionMutex);
  
-@@ -125,6 +650,22 @@ namespace RT64 {
+@@ -125,6 +653,28 @@ namespace RT64 {
              found = true;
          }
  
@@ -4379,13 +4382,62 @@ index bf7b669..e6920d8 100644
 +#   endif
 +
 +        if (!specializedShaders) {
++#       if defined(RT64_PREBUILT_SHADERS)
++            if (prebuildCount > 0) {
++                const std::unique_lock<std::mutex> missedLock(missedMutex);
++                missedQueue.emplace_back(desc);
++            }
++#       endif
 +            return;
 +        }
 +
          // Push a new shader compilation to the queue.
          {
              const std::unique_lock<std::mutex> queueLock(descQueueMutex);
-@@ -165,6 +706,18 @@ namespace RT64 {
+@@ -134,6 +684,42 @@ namespace RT64 {
+         descQueueChanged.notify_all();
+     }
+     
++    // Where nothing is built during play (Firefox, setup()), a shader the list missed is built before the next frame,
++    // the game waiting, as a stray of the list is (startPrebuild()). Drawn with the ubershader instead, it stayed so
++    // for the rest of the visit: waiting for a moment when the game sends no frames found none in most of a long play,
++    // and the misses come where the list's sections have all been reached, with no section's wait after them. Each
++    // is built from the ubershader's WGSL with its spec constants as overrides, as a learned one is. Called by
++    // waitForPrebuild(), on the workload thread; returns whether the game waited.
++    bool RasterShaderCache::buildMissed() {
++        std::deque<ShaderDescription> missed;
++        {
++            const std::unique_lock<std::mutex> missedLock(missedMutex);
++            missed.swap(missedQueue);
++        }
++
++        if (missed.empty()) {
++            return false;
++        }
++
++        ElapsedTimer timer;
++        const uint32_t count = uint32_t(missed.size());
++        reportPrebuild(0, count, 0, 0, count);
++        for (uint32_t i = 0; i < count; i++) {
++            const ShaderDescription &desc = missed[i];
++            const std::shared_ptr<RasterShader> shader = std::make_shared<RasterShader>(device, desc, shaderUber->pipelineLayout.get(), shaderFormat,
++                multisampling, shaderCompiler.get(), &optimizerCacheSPIRV, &shaderCacheWGSL);
++            {
++                const std::unique_lock<std::mutex> shadersLock(GPUShadersMutex);
++                GPUShaders[desc.hash()] = shader;
++            }
++
++            reportPrebuild(i + 1, count, i + 1, i + 1, count);
++        }
++
++        printf("RT64: %u shaders the list missed built in %.1f s, the game waiting\n", count, timer.elapsedSeconds());
++        return true;
++    }
++
+     void RasterShaderCache::waitForAll() {
+         {
+             std::unique_lock<std::mutex> queueLock(descQueueMutex);
+@@ -165,6 +751,18 @@ namespace RT64 {
          const std::unique_lock<std::mutex> lock(GPUShadersMutex);
          auto shaderIt = GPUShaders.find(shaderHash);
          if (shaderIt == GPUShaders.end()) {
@@ -4405,7 +4457,7 @@ index bf7b669..e6920d8 100644
          }
  
 diff --git a/src/render/rt64_raster_shader_cache.h b/src/render/rt64_raster_shader_cache.h
-index 5c40c18..bdf6569 100644
+index 5c40c18..50cb454 100644
 --- a/src/render/rt64_raster_shader_cache.h
 +++ b/src/render/rt64_raster_shader_cache.h
 @@ -4,15 +4,24 @@
@@ -4449,7 +4501,7 @@ index 5c40c18..bdf6569 100644
          std::mutex GPUShadersMutex;
          std::list<std::unique_ptr<CompilationThread>> compilationThreads;
          uint32_t threadCount;
-@@ -45,12 +55,57 @@ namespace RT64 {
+@@ -45,12 +55,62 @@ namespace RT64 {
          std::unique_ptr<ShaderCompiler> shaderCompiler;
          RenderMultisampling multisampling;
          bool usesHDR = false;
@@ -4492,6 +4544,10 @@ index 5c40c18..bdf6569 100644
 +        std::vector<std::vector<uint64_t>> prebuildAliases;
 +        std::atomic<uint32_t> prebuildSection = 0;
 +
++        // What the list missed where nothing is built during play (Firefox), built before the next frame (buildMissed()).
++        std::deque<ShaderDescription> missedQueue;
++        std::mutex missedMutex;
++
          RasterShaderCache(uint32_t threadCount, uint32_t ubershaderThreadCount);
          ~RasterShaderCache();
          void setup(RenderDevice *device, RenderShaderFormat shaderFormat, const ShaderLibrary *shaderLibrary, const RenderMultisampling &multisampling);
@@ -4505,6 +4561,7 @@ index 5c40c18..bdf6569 100644
 +        bool waitForPrebuild();
 +        void learnPrebuild();
 +        void reportMissed(const ShaderDescription &desc);
++        bool buildMissed();
          void destroyAll();
          RasterShader *getGPUShader(const ShaderDescription &desc);
          RasterShaderUber *getGPUShaderUber() const;
