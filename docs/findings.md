@@ -822,10 +822,11 @@ An RTX 5080 desktop doesn't show the case (its screen at 240 Hz; the pages from 
 and Banjo-Tooie's e8df837; 1920x945, their play plans; plays.jsonl). Headless Chrome 155 there runs the screen's 240
 animation frames, and Jet Force Gemini seldom takes 3 VIs: in two Chrome runs 260 of 5578 frames and 438 of 5462 (a
 quiet host), in Firefox held at 60 (`layout.frame_rate`, the host 82% busy at the start) 160 of 5439, nearly all in
-runs of 13-74 frames where the game runs at 20 for a second or so, four alone. Over each ~3.5 min of play, at a lag of
-1 and 2, the fastest of three would hold 8-35 display frames and cut 5-22 frames, the last frame's hold 4-19 and cut
-7-22, never fewer frames cut and at most 2 more: about 0.1 display frames a second, where the laptop misses 1.6. Too few to tell the lag
-from the animation frames with no present, most of them the launcher's and the loads'. Banjo-Tooie's plan's clock
+runs of 13-74 frames where the game runs at 20 for a second or so, the rest in nine runs of 1-6. Over each ~3.5 min
+of play, at a lag of 1 and 2, the fastest of three would hold 8-35 display frames and cut 5-22 frames, the last
+frame's hold 4-19 and cut 7-22, never fewer frames cut and at most 2 more: about 0.1 display frames a second, where
+the laptop misses 1.6. Too few to tell the lag from the animation frames with no present, most of them the launcher's
+and the loads'. Banjo-Tooie's plan's clock
 (`0x80127638`, its time in seconds) isn't a count of VIs: times 60 it moves by 1 and 3 where 2 is expected (81 moves of
 1, 87 lone 3s), and its other 3-VI frames came in three runs at 20 (118, 137 and 514 frames), where all three match
 and nothing is held. Its own VI count is still to find.
