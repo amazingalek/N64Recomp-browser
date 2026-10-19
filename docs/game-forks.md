@@ -211,6 +211,26 @@ only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.s
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
 
+`amazingalek/Snap64Recomp-web` is Snap64 Recomp, Pokémon Snap (US), on its port's own forks of rt64, plume and
+N64ModernRuntime (their `snap64` branches), the one game fork whose rt64 isn't upstream's: ~8,000 lines of the port's
+in RT64 (each object's identity for interpolation, its frame pacing and presentation, Photo Detail's framebuffer
+readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` patches them, but for the files where
+both change the same lines (`patches/web/files.txt`, 16 of rt64's and 6 of the runtime's), whose web change is its
+`patches/web/<project>.patch`, merged by hand. Its `tools/check_web_patches.sh`, run first by its `tools/build_web.sh`,
+stops the build when N64Recomp-browser's change to one of those files has moved since that patch was merged, so a
+change here to one of them reaches its page once it is merged there too (run it on the change's branch, or the
+retest's build stops on it). On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
+the build had left out with nothing said. Two of that merge's choices: in `rt64_vi.cpp` frames of uneven VIs
+interpolate at the fastest (rt64 179adb8) and the port's last measured rate is what's left, in place of 0; in
+`RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
+every other the port's depth. HAL's object manager runs each object on a thread that stops itself, which the libultra
+thread stop ignored a start of (N64ModernRuntime-web 6515ea8). Render to RAM keeps the exact copy: the game scores a
+photo from the frame it has just drawn and finds the viewfinder's focus dot in it, and a play shows no kept writes.
+Its list is 196 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
+code: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js` rides it to its end, taking photos
+and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`, `tools/check_web_patches.sh`,
+`web/page.cmake` and `web/rt64_shaders.txt` have the rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the

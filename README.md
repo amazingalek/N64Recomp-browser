@@ -289,7 +289,9 @@ from Banjo-Kazooie's. What to expect from a recomp's own commits:
   recomp's own patch is known to touch (Conker's Bad Fur Day adds includes to rt64 beside theirs). Where both make the
   same change their own way, the recomp leaves that file out, as a path in the project after its name:
   `cmake -P .../apply.cmake N64Recomp tools/N64Recomp src/analysis.cpp` (Conker's own patch already finds a jump table
-  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye).
+  in another section, which N64Recomp's `src/analysis.cpp` change does for GoldenEye). A file left out goes without a
+  later change of the forks to it, so a recomp that leaves out many checks that their change is still the one it
+  merged (Pokémon Snap's `tools/check_web_patches.sh`, docs/game-forks.md).
 - Applying isn't building. A patch that applies can meet an API that has moved, and then the recomp's own code
   changes: Banjo-Kazooie's runtime is older than the one the forks are on, and its `recomp::start` takes arguments,
   not a `recomp::Configuration`, so its `main.cpp` calls it its own way, as on the desktop. A recomp's own fork of a
