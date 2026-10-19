@@ -30,6 +30,9 @@ options; `docs/findings.md` has what was measured this way.
   header): in ms of the browser's time, uneven frames walked Firefox's runs of one plan to other places than Chrome's
   (docs/findings.md, Behind CLAUDE.md's rules). A plan that ends on black is the plan's fault until a direct warp there
   draws black too (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
+- The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
+  run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
+  takes.
 - A level the survey starts may crash when it ends: the screens after it read what the menus before it would have set
   up. So a plan that starts one keeps the player alive for as long as it plays (GoldenEye's `setInvincible()`): a
   GoldenEye play of Dam long enough for its guards to kill Bond stopped on the Mission Failed screen in Chrome and
