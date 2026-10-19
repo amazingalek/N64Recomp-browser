@@ -147,6 +147,22 @@ Luigi Raceway on the game's own AI. Its README and BUILDING.md, and the headers 
 Pak, the boot's first display list and its fix, render to RAM kept exact for the jumbotron, the shader list and how it
 was recorded.
 
+`amazingalek/Starfox64Recomp-web` is Starfox 64: Recompiled (US 1.1, Rev A), moved onto RecompFrontend as Mario Kart
+64's is: its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are
+built on (a row each in `patches/pins.txt`). Its settings (film grain, the radio box, inverted Y, the volumes) are on
+RecompFrontend's General and Sound tabs; upstream's debug menu and quicksaves stay out. The cartridge is
+MIO0-compressed: N64Recomp reads the ROM `tools/decompress_rom.sh` decompresses with the sf64 decompilation's tools
+(`lib/sf64decomp`), and the program takes the plain dump and decompresses it in memory, as upstream's does. Render to
+RAM is off: the CPU never reads a frame it drew (the motion blur is the RDP drawing over the last frame). Its CMake
+makes `register_patches.cpp` depend on the patches' section table, which N64Recomp writes mid-build: without that an
+incremental build after a patch moved stopped at boot ("Failed to find function at"; Mario Kart 64's CMake lacks the
+same edge). Its list, 818 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
+zones, the training, Venom's two routes and Andross, game over, Versus and the ending), is recorded by code:
+`patches/shader_survey.c` hands a level, a phase or a game state from the script to the game's own change of state
+(`gNextGameState`), with the player's shields kept full; a straight switch to the ending crashed until the survey set
+it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corneria (Start skips the Lylat map's
+prologue, A picks the planet) and a minute of it. Its README, BUILDING.md and the headers of those files have the rest.
+
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
@@ -237,9 +253,9 @@ A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rule
 game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
-cartridge's for the other seven: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
-(Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, GoldenEye's and Conker's variable. None of the seven
-has an option to run faster.
+cartridge's for the other eight: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
+(Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, Star Fox 64 30 (20 where a scene sets 3 VIs a
+frame), GoldenEye's and Conker's variable. None of the eight has an option to run faster.
 
 A game fork may take a change that runs its game faster when that makes the page play better. Weigh it: logic at 60
 gives lower input lag, motion the game computes rather than RT64 interpolates, and what interpolation misses (some

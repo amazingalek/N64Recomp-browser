@@ -83,6 +83,15 @@ options; `docs/findings.md` has what was measured this way.
 - What its GPU time goes on: `--preload tools/pass_probe.js` (its header) prints each kind of pass, their draws and GPU
   time (timestamp queries, where the browser offers them; counts only elsewhere) and the draws by fragment shader;
   `--query probe-skip=<KB>` leaves one shader's draws out to price them (docs/findings.md, A page's GPU time).
+- How long the game's frames are against its presents: `--preload tools/frame_lengths.js --query
+  '?present-stats&frame-clock=<hex>'`, the address of a clock the game adds each frame's VIs to (Jet Force Gemini's
+  800FD748), logs both at each animation frame, and `node tools/frame_lengths.mjs <the play's output>` counts what
+  each guess at a frame's length would hold and cut (docs/findings.md, A game's uneven frames). Read it at 60
+  animation frames: headless Chrome runs the screen's rate, 240 on a 240 Hz one (Firefox: `--firefox-pref
+  layout.frame_rate=60`).
+- Whether timed waits off its thread end on time all through a play: `--preload tools/wait_probe.js` logs, each
+  second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
+  the page starts (docs/findings.md, A host that holds Chrome's presents).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside

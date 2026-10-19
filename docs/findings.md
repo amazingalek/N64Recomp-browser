@@ -136,6 +136,33 @@ ms), and main with rt64 c89ced0 read 58.6-60 while the display was there (an hou
 cost anything uncapped: Conker's page on v0.51.0 presented 339-341 a second against v0.50.0's 330 (headless Chrome
 155, 3840x2000, both served from one port, interleaved).
 
+## A host that holds Chrome's presents
+
+For half an hour of 2026-10-19 (11:25-11:50 UTC) an RTX 5080 desktop held headless Chrome 155's pages uncapped at
+3840x2000 to far less than its GPU could draw, and the page's own runs read it as the page's. Star Fox 64's (its
+fork's web-wip faeef4a on v0.69.0, its play plan, a fresh profile) presented 78 and 70.7 a second, its launcher at 77-81
+from the first sample, as many animation frames (71.4, 71.7), frame gaps a steady 15.5 ms (the system timer's tick),
+the GPU 13% busy; Conker's from Pages, minutes later, 198 with 125 animation frames, where it read 322-340 there that
+morning, and its start measured a timed wait of 100 us off the page's thread at 8.7 ms, so plume and the VI thread took
+the animation frames instead (as in Firefox: Uncapped in Firefox). Half an hour later the same Star Fox build presented
+346.6 a second, 348.2 and 350.8 with `tools/wait_probe.js` (12:02-12:15 UTC, a whole GPU turn each, the host 11-26%
+busy), held by the uncapped 360, with 120 animation frames, frame gaps of 2.8 ms and every one of the probe's waits
+1-1.2 ms; one of them with the host idle past its display's 10 minutes, so a display that Windows switched off isn't
+what held them, though nothing says whether it had. Firefox 158 read what it read in that half hour, 198.4 against
+200.6 (about 350 in the menus, 197 in Corneria; its waits late, as always there, 11.8 ms), so only Chrome's was the host.
+
+What the host was doing then isn't known: Chrome's version was the same, and no other session held the GPU. So a Chrome
+run uncapped well below a game's other runs on that host, its presents no more than its animation frames, is played
+again before it is read as the page's, with `tools/wait_probe.js` to say whether its timed waits ended late. plume's
+`timedWaitsEndLate()` and the VI thread's measure them once as a page starts, so a host whose waits turn late after that
+shows only in the probe.
+
+It came back from 12:19 UTC that day. Pokémon Snap's page (Snap64Recomp-web on v0.70.0) presented 358 a second at
+11:54, held by the uncapped 360. From 12:19 to 12:45 it read 68 (71.6 animation frames), then 172 and, from Pages, 174
+(120 animation frames, the GPU 15% busy, the browser on half the cores it had). Its 11:54 build read 176 in the same
+minutes, and Mario Kart 64's page, 358* in its row, read 171. Firefox read Snap at 203-206 throughout. Snap's Chrome
+cell is its 11:54 run, and Star Fox 64's 173*, from Pages at 12:28-12:31, was played in that state.
+
 ## Uncapped in Firefox
 
 `layout.frame_rate` 0, which `play_page.mjs --uncapped` gave Firefox until it gave 360, makes Firefox's animation frames
@@ -788,7 +815,7 @@ profile). The V8 profiler slows what it samples: a new worker took 130-240 ms tr
 
 Jet Force Gemini's page presented 58.4-58.6 a second in Chrome on a laptop's Intel UHD (v0.63.0, headed, headless and
 on screen) against 60 animation frames, with the GPU 56-64% busy, where Mario Kart 64 and Ocarina of Time drew 60. A
-desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second whatever the screen),
+desktop does the same at the display's rate: headless Chrome 155 (60 animation frames a second at its screen's 60 Hz; headless runs the screen's rate, 240 on a 240 Hz one),
 1920x945, JFG's page from Pages on v0.69.0, its play plan, `?present-stats`, a busy host. In two runs RT64 dropped
 2-6 presents over the plan's ~190 s of play (~440 more in the launcher, before the game), so the presents missing there
 are display frames with none, not drops, and not GPU load.
@@ -808,6 +835,32 @@ How many VIs a frame takes is known only at its swap, after RT64 has drawn its i
 fill those display frames without waiting another game frame. A rate guessed from the frame before (rather than the
 fastest of three) would hold one display frame where the game slows from 30 to 20, not up to three, but would cut a
 frame short where it speeds back up, for a skipped moment instead of a held one.
+
+How each guess does is counting, not a build: from a play's order of 2- and 3-VI frames, `tools/frame_lengths.mjs`
+counts what each would hold and cut (`tools/frame_lengths.js`, a preload, logs them; docs/playing.md). For a run of L
+frames of 3 VIs among frames of 2, with what RT64 knows ending a frame before the one it times, the fastest of three
+(RT64's) holds min(L, 3) display frames and cuts one frame where L is 3 or more. The last frame's holds 1 and cuts 1
+every run: worse alone (L 1), even at L 2, two judders fewer a run of 3 or more. The most common of the last three or
+five is late at both ends of a run, holding going in and cutting coming out (Ruled out, measured). RT64 counts a
+frame's VIs at the screen's swap to it (`pushFactor`) but picks the rate as the next frame's display list ends, so what
+it knows may end two frames back; at that lag the last frame's holds min(L, 2) and cuts up to 2.
+
+An RTX 5080 desktop doesn't show the case (its screen at 240 Hz; the pages from Pages, Jet Force Gemini's main 7f730ba
+and Banjo-Tooie's e8df837; 1920x945, their play plans; plays.jsonl). Headless Chrome 155 there runs the screen's 240
+animation frames, and Jet Force Gemini seldom takes 3 VIs: in two Chrome runs 260 of 5578 frames and 438 of 5462 (a
+quiet host), in Firefox held at 60 (`layout.frame_rate`, the host 82% busy at the start) 160 of 5439, nearly all in
+runs of 13-74 frames where the game runs at 20 for a second or so, the rest in nine runs of 1-6. Over each ~3.5 min
+of play, at a lag of 1 and 2, the fastest of three would hold 8-35 display frames and cut 5-22 frames, the last
+frame's hold 4-19 and cut 7-22, never fewer frames cut and at most 2 more: about 0.1 display frames a second, where
+the laptop misses 1.6. Too few to tell the lag from the animation frames with no present, most of them the launcher's
+and the loads'. Banjo-Tooie's plan's clock
+(`0x80127638`, its time in seconds) isn't a count of VIs: times 60 it moves by 1 and 3 where 2 is expected (81 moves of
+1, 87 lone 3s), and its other 3-VI frames came in three runs at 20 (118, 137 and 514 frames), where all three match
+and nothing is held. Its own VI count is still to find.
+
+So what decides the last frame's guess is the order of the frames where 10-27% take 3 VIs (a laptop, or a 60 Hz desktop
+that shows it, as above): a play there with the preload, read by the simulator. Runs mostly of 3 frames or more make a
+test build worth trying, to look at the motion; runs mostly of one put the guess in Ruled out beside the most common.
 
 ## Behind CLAUDE.md's rules
 
@@ -882,6 +935,13 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
 ## Ruled out, measured
 
 What CLAUDE.md's Ruled out rests on.
+
+- The most common of a game's last three or five frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length,
+  in place of the fastest of three: late at both ends of a run of 3-VI frames, at no run's length does it judder less.
+  At a lag of 1 the most common of three holds min(L, 2) display frames and cuts 2 frames after a run of 2 or more,
+  against the fastest of three's min(L, 3) and 1 (A game's uneven frames). On an RTX 5080 desktop's two plays of Jet
+  Force Gemini (Chrome, Firefox) it would hold 17 and 5 and cut 19 and 11, the most common of five hold 25 and 7 and cut
+  29 and 17, where the fastest of three holds 26 and 8 and cuts 9 and 5 (`tools/frame_lengths.mjs`).
 
 - Presents waiting for the animation frame in every browser: on a laptop's Intel UHD, Chrome 155 headed drew as many
   (Banjo 59.9 against 60.0, Conker 53.9 against 54.0), but the GPU went 71 → 86% busy for Banjo and 63 → 75% for

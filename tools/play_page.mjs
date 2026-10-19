@@ -84,7 +84,7 @@
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
-// mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg, snap), --build what the page was built from (a tag of this repo, or Pages),
+// mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap), --build what the page was built from (a tag of this repo, or Pages),
 // and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms; the animation frames a second),
@@ -139,7 +139,7 @@ for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
   try { firefoxPrefs[name] = JSON.parse(value); } catch { firefoxPrefs[name] = value; }
 }
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
-  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg, snap (publish_pages.sh\'s names)');
+  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap (publish_pages.sh\'s names)');
   process.exit(1);
 }
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
