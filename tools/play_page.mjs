@@ -82,6 +82,9 @@
 // rest of the visit. On a fresh profile that is everything the list misses on the way; a kept one has built what the
 // visits before it missed (the shell remembers them), so it shows only what is new.
 //
+// A thread of the game that throws ends the play 2 s later as a failure, the exception (in Chrome with its stack) logged
+// (page_driver.mjs's run()).
+//
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
 // mm, banjo, cbfd, dk64, wr, pw, bt, mk64, oot, dkr, jfg), --build what the page was built from (a tag of this repo, or Pages),
