@@ -477,8 +477,8 @@ Rush 2049 25.7 at 100% / 27.8 at 100%.
 
 On 2026-10-18 and 19 the same laptop played Banjo's test build (its main on v0.66.0 with plume bf417cf) and Mario Kart
 64 from Pages on v0.63.0 on screen (Firefox 158 maximized at 200%), cold, `?present-stats`, with each process's share
-of the Intel GPU's 3D engine (dwm.exe, the browser) sampled every 5 s: plays.jsonl's 24 lines of those dates noted
-"laptop report" on the test build or with `gfx.webrender.compositor`. Runs of that night not in plays.jsonl, the same
+of the Intel GPU's 3D engine (dwm.exe, the browser) sampled every 5 s: plays.jsonl's 24 lines from 20:37 UTC on the 18th
+to 00:17 on the 19th, after the 15 above. Runs of that night not in plays.jsonl, the same
 pages from Pages on v0.63.0, read the same split in four games (presents a second, then the Intel GPU / Firefox / DWM
 in percent): Banjo 30.0 at 85-87 / 55-56 / 30-31, Mario Kart 64 42.6 at 99 / 61 / 38, Ocarina of Time 37.1 at 91 / 53 /
 38, Jet Force Gemini 44.2 at 95 / 58 / 36. Chrome 155 on the same screen drew 58.4-60.0 with the GPU 62-73% busy and
@@ -496,8 +496,7 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   through WebDriver BiDi (`browser.setClientWindowState`; its toolbars kept 85 px). `canvas.requestFullscreen()` was
   denied every time under remote control, with the fullscreen prefs set, user activation and the window brought to
   the front (`document.hasFocus()` stayed false), so element fullscreen is untested.
-  `gfx.webrender.dcomp-texture-overlay-win` holds 60 only when its overlay engages, in 2 runs of 5; otherwise DWM took
-  45-54%.
+  `gfx.webrender.dcomp-texture-overlay-win` holds 60 only when its overlay engages (above).
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
 
