@@ -112,6 +112,18 @@ of 16384 a side, past the device's 8192. Neither caused the other:
   a VI that short or a few pixels wide, or a framebuffer over 2,690 wide, a game's display list read while it was being
   rewritten, or the same corruption reaching RT64's own state.
 
+It was a framebuffer, from a display list that was already garbage. A test build of the page that logs every change of
+VI size, window and Auto's scale, every framebuffer over 1024 a side and every target or tile past 8192 played 21 times
+on the same laptop (Firefox 158 on screen, MK64's plan) and trapped once, at the same menu. In the 20 clean plays it
+logged only the VI at boot: 320x240, 1920x947, 6.082 x 4.000. In the trapping one the VI stayed 320x240 throughout, and
+0.1 s after the plan reached the menu RT64 was handed color images 3072 wide and 108-112 high at 0x00D41BFF and
+0x00D117FF (not 8-byte aligned, past the console's 8 MB) and at 0x002F9F80, over 100 of them (the log's cap) in 0.8 s.
+Their targets, 3072 x 6.08 clamped to RenderTarget::MaxDimension, are the 16384 x 440 the device refused; no tile copy
+or reinterpreted tile passed 8192. The worker trapped 0.8 s after the first, in `free()` again, with an "indirect call
+signature mismatch" beside it: a function pointer overwritten too. So the corruption reached what RT64 reads the
+display list from (RDRAM, or its segment addresses) before it reached the heap, which points at stray writes over
+both, not at RT64 or the VI sizing anything wrong. Who writes them is open.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
