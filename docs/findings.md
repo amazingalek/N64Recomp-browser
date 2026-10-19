@@ -736,6 +736,14 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
   apart in Dam by that plan; on its clock (`g_GlobalTimer`, 60ths), every hold held the 3,624 ticks it asked for in
   both browsers, and four runs, two each, ended within 750 units of each other facing the same barriers (two Chrome
   runs alone, 250 apart). Chrome's CPU throttling (4) slowed none of the game: a play under it took as long.
+- Six more plans on their games' clocks (Pages, a desktop GPU, shared turns): a Chrome and a Firefox run of each held
+  within 3% of the ticks asked, and ended Banjo-Tooie 2 units apart, Jet Force Gemini 15 (a second Firefox run 6 from
+  the first), DK64 60, Majora's Mask 50 and Conker 450. Majora's Mask's 9 s after its warp were still the browser's
+  time: Firefox's Link stood at the gate through the first ten steps; on the clock from the warp, both browsers walked
+  him by the same steps to within 2 units. Banjo's Spiral Mountain was the same to the unit in each run; Mumbo's
+  Mountain, after a 4 s wait, walked three ways in three runs, two of them Chrome's, and its walk by the Ticker termites
+  on the mountain's path still varies run to run in either browser (three runs, 670 units). A run's position read
+  after every step (a copy of the plan, not committed) shows the step two runs part at.
 - A loop of messages to itself in a page's script: Ocarina of Time's survey waited for the file select's hand-over with
   one (`MessageChannel`), ~10,000 tasks a second on the page's thread, none of them long. In Chrome they starved the
   tasks that carry the device thread's WebGPU work to it, and its page held 3-8 s as the file loaded, only while the

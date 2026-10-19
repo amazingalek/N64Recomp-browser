@@ -43,7 +43,8 @@
 // wrong address) goes on for at most 5 times its ms and 30 s more, and says so; one that goes back (a level that
 // restarts it) counts from there, so a wait over a level's start is that long into the level. A counter the game steps by its frame's
 // length (GoldenEye's g_GlobalTimer, in 60ths) is better than one that counts frames, since a variable timestep moves
-// the player by that length. The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is. A run
+// the player by that length; a game that keeps no sum of its frames' lengths has one added up by its fork's script
+// (DK64's gameTime()). The game's own data symbols (a recomp's data_dump.toml, a decomp's) say where it is. A run
 // says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
 // after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
 // busy.
