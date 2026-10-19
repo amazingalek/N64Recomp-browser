@@ -26,6 +26,8 @@
 // and menus out by the viewport's height, about the centre), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
 // ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
 // n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
+// ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
+// ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
 // key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
@@ -237,11 +239,12 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
           await sleep(everyMs);
         }
       }
-      else if (op === 'eval' || op === 'evalFile') {
-        const js = (op === 'eval') ? a[0] : fs.readFileSync(path.resolve(planDir, a[0]), 'utf8');
-        let value;
-        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; }
+      else if (op === 'eval' || op === 'evalFile' || op === 'need') {
+        const js = (op === 'evalFile') ? fs.readFileSync(path.resolve(planDir, a[0]), 'utf8') : a[0];
+        let value, failed = false;
+        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; failed = true; }
         if (value !== undefined) log(`${op}: ${JSON.stringify(value)}`);
+        if (op === 'need' && (failed || value === false || value === null)) throw new Error(`${a[0]} gave ${JSON.stringify(value)}`);
       }
       else if (op === 'rom') {
         await page.rom(typeof a[0] === 'string' ? async () => { await page.key('down', a); await page.key('up', a); }

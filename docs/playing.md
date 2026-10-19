@@ -30,6 +30,9 @@ options; `docs/findings.md` has what was measured this way.
   header): in ms of the browser's time, uneven frames walked Firefox's runs of one plan to other places than Chrome's
   (docs/findings.md, Behind CLAUDE.md's rules). A plan that ends on black is the plan's fault until a direct warp there
   draws black too (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
+- The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
+  run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
+  takes.
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key reached RmlUi): Enter starts the game on
   the second press, or click Start Game. Every RecompFrontend game does it, desktop too.
