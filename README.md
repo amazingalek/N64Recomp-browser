@@ -393,7 +393,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
   reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
-  of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one.
+  of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one. `wasm_offset.mjs`
+  names the function of a page's wasm at the offset a trap gives.
 - `tests/`: the plume device thread test, hlslpp's wasm SIMD backend against plain C++, the WGSL checker, and
   `build/`, every library of a page built with Emscripten from the forks. CI (`.github/workflows/ci.yml`) runs all
   four.

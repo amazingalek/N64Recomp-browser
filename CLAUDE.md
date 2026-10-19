@@ -83,7 +83,8 @@ branches only: upstream's others are deleted when it is made.
   shader, the plume device thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply
   to every recomp commit in `patches/pins.txt` and over DKR-R-web's and CBFD-Recompiled-web's own patches. It builds
   no page (that needs a game), so anything that changes what a page runs is built and played before it lands. A change
-  to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve and publish pages runs only the `changes` job.
+  to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve, read and publish pages runs only the `changes`
+  job.
 
 ## The forks
 
