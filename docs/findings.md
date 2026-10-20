@@ -137,6 +137,22 @@ list RT64 read held a wide color image. Each check reads its address once: a TO_
 times popped ultramodern's running queue as often and crashed at boot, which reads like a race between game threads
 and isn't one. The laptop trapped once in 21 plays, so 21 clean ones here rule out a likely cause, not every cause.
 
+A page that runs out of heap does so all at once, not by leaking. Banjo-Kazooie's page aborted with `Aborted(OOM)`
+in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX 5080, the page
+from Pages, v0.67.0, and a v0.71.0 build both), at 70, 72 and 123 s; Chrome (throttled 6 times) played on, and no other
+game's page aborted. A page's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
+resize import aborts, and the trap names only abort(). `tools/heap_probe.js` read the heap's break at 843.9 MB from
+2 s in to the end of 15 plays of the same page in Firefox the next morning, one of them 5 minutes long: the page takes
+what it uses at boot (RDRAM's 512 MB among it) and nothing after. In each aborting run the sound and the presents
+stopped together 0-4 s before the abort (the 123 s one: 160,000 frames short and presents 151 → 53 in the 5 s before
+it), with nothing on the console. That reads like a thread caught in a loop that allocates as it goes, a list
+interpreter walking a garbage display list say (Mario Kart 64's above), not a slow climb. None of the 15 plays aborted:
+8 on a quiet host, 3 with 12 busy loops on the host's 16 cores, 3 with a second page (headless Chrome) beside it. In
+the hour of the aborts, the plays of Mario Kart 64's checked test build (its RT64 thread made laptop-slow, Firefox on
+screen) ran beside the retest's on the same machine, two of the three aborting runs started during one (two clean runs
+too), and the retest's clean Firefox runs read 631-3,097 sound frames short where the next morning's read 0-465. What
+set it off isn't reproduced yet; heap_probe.js logs the size and stack of the request that runs a heap out (`heapoom`).
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
