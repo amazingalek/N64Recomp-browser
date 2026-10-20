@@ -152,8 +152,8 @@ from the second play on), but it cost the sound: 3.4% of the frames short (71,00
 main's page played 0-307 short in the same minutes. The audio thread's sample loads waited behind the graphics too.
 Holding only the thread that sends the lists trapped 2 of 2 (the loader sends none), and the threads don't separate by
 task either (the video thread sends both kinds; the audio thread only loads). What separates them is where a load
-lands: N64ModernRuntime 23325d5 (`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten, with rt64 7adbb05 and
-RecompFrontend 115e099) has RT64 mark the RDRAM it reads each list's commands from, and only a load onto commands one
+lands: N64ModernRuntime bf96a62 (`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten, with rt64 02f0a7c and
+RecompFrontend ab544ca) has RT64 mark the RDRAM it reads each list's commands from, and only a load onto commands one
 of the last 8 lists ran waits, at most 2 s; a sound's samples go at once. On a desktop GPU RT64 reads a list in a few
 ms, so a load rarely waits at all.
 
