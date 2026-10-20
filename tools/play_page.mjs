@@ -3,7 +3,7 @@
 //
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
-//     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
+//     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]...
 //     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]
 //     [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
@@ -35,6 +35,7 @@
 // and is compared only with runs at the same one.
 // --preload runs a JavaScript file of your own in every document before the page's scripts, after play_page's own
 // (a probe that wraps a WebGPU call, a stand-in for a slow GPU's callbacks): its console lines come out with the rest.
+// Repeated, each file runs in turn, in a block of its own (tools/heap_probe.js and tools/heartbeat.js on one soak).
 // --firefox-pref (Firefox only, repeated for more) sets one of Firefox's prefs in the profile before it starts, its value
 // JSON where it parses (true, 0) and a string otherwise: a compositor path to try on a laptop's screen
 // (gfx.webrender.dcomp-texture-overlay-win, docs/findings.md, A laptop, measured). A run records its prefs and is
@@ -145,7 +146,8 @@ const note = option(args, '--note', null);
 const set = option(args, '--set', null);
 const role = option(args, '--role', null);
 const hostReadingOption = option(args, '--host-reading', null);
-const preloadFile = option(args, '--preload', null);
+const preloadFiles = [];
+for (let file; (file = option(args, '--preload', null)) !== null;) preloadFiles.push(file);
 const geckoProfileFile = option(args, '--gecko-profile', null);
 const firefoxPrefs = {};
 for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
@@ -174,7 +176,7 @@ if (hostReadingOption !== null) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]... [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -273,9 +275,9 @@ const ownPreload = `() => {
     return context;
   };
 }`;
-const preload = preloadFile ? `() => {
+const preload = preloadFiles.length ? `() => {
 (${ownPreload})();
-${fs.readFileSync(preloadFile, 'utf8')}
+${preloadFiles.map((file) => `{\n${fs.readFileSync(file, 'utf8')}\n}`).join('\n')}
 }` : ownPreload;
 
 // Each whole line a helper process prints: a pipe's chunk can end mid-line.
