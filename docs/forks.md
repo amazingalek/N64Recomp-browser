@@ -273,4 +273,11 @@ ab544ca                it, as a console's RSP has long before a load lands; a lo
                        on a laptop's integrated GPU RT64's thread, a frame or more behind, read that list after the
                        load, took texture words for commands (color images 1792-3072 wide) and the page trapped in
                        free(). Every load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
+plume 1c7b759,         a hidden page (a tab behind another, minimized: document.hidden) presents nothing, and RT64's
+rt64 b6d6a95           pacing counts no presents while it is hidden or for a second after: a swap chain says so
+                       (isHidden()), and plume holds no present to its cap then. In a hidden tab Chrome calls
+                       onSubmittedWorkDone back late, at times by seconds, and the present thread's wait() held the
+                       game: Mario Kart 64's and Star Fox 64's sound broke up while hidden, and their dropped presents
+                       read as the GPU falling behind (Mario Kart 64 on a 240 Hz display: 114 presents a second, then
+                       60 for 80 s after the tab came back). docs/findings.md, A page in a hidden tab
 ```
