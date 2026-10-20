@@ -273,4 +273,7 @@ ab544ca                it, as a console's RSP has long before a load lands; a lo
                        on a laptop's integrated GPU RT64's thread, a frame or more behind, read that list after the
                        load, took texture words for commands (color images 1792-3072 wide) and the page trapped in
                        free(). Every load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
+plume 77e521e,         timedWaitsEndLate() (plume_web_waits.h) answers false in a build without threads, so plume's
+rt64 be95c2c           examples and plume_webgpu_checks build without -pthread again: sleepUntil() called it there
+                       and the build stopped at an undeclared identifier. Pages build with -pthread, unchanged
 ```

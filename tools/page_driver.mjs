@@ -29,7 +29,10 @@
 // ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
 // ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
-// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page) and
+// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page),
+// ["resize", w, h] (the viewport to that many CSS pixels, as a player's window resized: not on screen, where the
+// window is the desktop's), ["hide", ms] (another tab in front of the page's for ms of wall time, then the page's again,
+// as a player switching tabs: the page's document is hidden, and the browser throttles it as it does a player's) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
 // JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
 // press while it animates, is passed without timing the presses), and ["clock", read, perSecond] (below). A tool can add
@@ -59,7 +62,7 @@ import fs from 'fs';
 import http from 'http';
 import net from 'net';
 import path from 'path';
-import { spawn, execFile } from 'child_process';
+import { spawn, execFile, execFileSync } from 'child_process';
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -239,7 +242,8 @@ const rdramHelpers = `(() => {
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js, ms) (the value, awaited and passed as JSON; throws on an exception, and with unanswered
 //   set when the page gives no answer in ms, evaluateMs unless given, or the browser is gone), run(steps, extra),
-//   stop(reason) (above), close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
+//   stop(reason) (above), resize(w, h) and hide(ms) (the steps), close(), pid, profile, in Firefox
+//   gpuProcessMemory() and geckoProfile, and in Chrome chromeTrace (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -254,11 +258,39 @@ const rdramHelpers = `(() => {
 // page whose canvas went to device pixels (SDL_WINDOW_ALLOW_HIGHDPI) drew four times the pixels and took every click
 // at the wrong spot, so Load ROM opened nothing, which no run at 1 shows. onScreen (above) leaves size and scale to the
 // window. firefoxPrefs are Firefox prefs of the caller's, set over
-// the ones below.
+// the ones below. affinity holds the browser, every process of it, to the first that many logical processors (0: all),
+// a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
+// WebGPU adapter in place of the GPU, a slow GPU: Chrome started with --use-webgpu-adapter=swiftshader (SwiftShader,
+// Vulkan on the CPU; Chrome 155 has no other: its warp, d3d11 and opengles values give the GPU or no adapter) and every
+// requestAdapter() asked for forceFallbackAdapter, which is what gives Firefox one (D3D12's WARP, from wgpu's dx12
+// backend; Firefox names no adapter to a page, and has none with forceFallbackAdapter on its vulkan backend).
 export const firefoxUncappedRate = 360;
 
+const fallbackAdapterPreload = `() => {
+  if (!self.GPU) return;
+  const requestAdapter = GPU.prototype.requestAdapter;
+  GPU.prototype.requestAdapter = function (options) { return requestAdapter.call(this, { ...options, forceFallbackAdapter: true }); };
+}`;
+
+// spawn(), held to the first affinity logical processors (0: all) on Windows, where a process starts with its parent's
+// affinity: this process is held to them while spawn() creates the browser (CreateProcess, before spawn() returns) and
+// let go after, so the browser and every process it starts later (Chrome's GPU process and renderers, Firefox's
+// launcher's browser and its GPU and content processes) take them, which no flag of either browser does, and the
+// helpers started after it (the counters' PowerShell, nvidia-smi) don't. On an SMT processor two logical processors are
+// one core (0 and 1 on this repo's desktops), so 4 is two cores of four threads, as a laptop's i3 has. Elsewhere taskset.
+const spawnHeld = (affinity, command, args, options) => {
+  if (!affinity) return spawn(command, args, options);
+  if (process.platform !== 'win32') return spawn('taskset', ['-c', `0-${affinity - 1}`, command, ...args], options);
+  const hold = (mask) => execFileSync('powershell', ['-NoProfile', '-Command',
+    `$p = Get-Process -Id ${process.pid}; $o = $p.ProcessorAffinity; $p.ProcessorAffinity = ${mask}; [int64]$o`], { encoding: 'utf8' }).trim();
+  const all = hold((2n ** BigInt(affinity) - 1n).toString());
+  try { return spawn(command, args, options); } finally { hold(all); }
+};
+
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, onLine = () => {}, log = console.log }) => {
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, affinity = 0, fallbackAdapter = false,
+  onLine = () => {}, log = console.log }) => {
+  if (fallbackAdapter) preload = preload ? `() => { (${fallbackAdapterPreload})(); (${preload})(); }` : fallbackAdapterPreload;
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
@@ -273,8 +305,8 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line });
-  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line });
+  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
   page.profile = profile;
@@ -352,6 +384,11 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
           : async () => page.click(...await place(a[0], a[1])));
       }
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
+      else if (op === 'resize') {
+        if (onScreen) throw new Error('resize is off the desktop only: on screen the window is the desktop\'s');
+        await page.resize(a[0], a[1]);
+      }
+      else if (op === 'hide') await page.hide(a[0]);
       else throw new Error(`unknown step ${op}`);
     }
     if (asked) log(`holds on the clock: ${asked} ticks asked, ${held} held`);
@@ -378,7 +415,7 @@ const listening = (host, port) => new Promise((resolve) => {
 
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
   // another window over it would hide it too).
   const mode = headed || onScreen
@@ -386,8 +423,9 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       '--disable-renderer-backgrounding', '--no-default-browser-check']
     : ['--headless=new'];
   if (uncapped) mode.push('--disable-frame-rate-limit');
+  if (fallbackAdapter) mode.push('--use-webgpu-adapter=swiftshader');
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
-  const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
@@ -398,7 +436,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
     try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); } catch { await sleep(200); }
   }
   if (!targets) throw new Error('Chrome never answered on its debugging port');
-  let fileChooser = null;
+  let fileChooser = null, tracingComplete = null;
   // The game's threads are workers, and an exception on one reaches the page only as an ErrorEvent without its stack,
   // so each worker is attached to as it starts and its exceptions are reported from there, stack and all (a wasm
   // frame names its function if the page was linked with --profiling-funcs). Its console lines come through the page
@@ -406,8 +444,9 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   // a host without the headers), held until resumed, and Runtime.enable doesn't answer a held service worker: resumed
   // only once that answered, it never activated, and the page from such a host was never cross-origin isolated. So
   // the two go out together; each target takes them in order, so a worker still has Runtime on before it runs.
+  const target = targets.find((t) => t.type === 'page');
   let send;
-  send = await connect(targets.find((t) => t.type === 'page').webSocketDebuggerUrl, (m) => {
+  send = await connect(target.webSocketDebuggerUrl, (m) => {
     if (m.method === 'Target.attachedToTarget') {
       const session = m.params.sessionId;
       send('Runtime.enable', {}, session).catch(() => {});
@@ -415,6 +454,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       return;
     }
     if (m.method === 'Page.fileChooserOpened') fileChooser = m.params;
+    if (m.method === 'Tracing.tracingComplete') tracingComplete = m.params;
     if (m.method === 'Runtime.consoleAPICalled' && !m.sessionId) {
       line(m.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
     }
@@ -458,6 +498,36 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       await send('Page.setInterceptFileChooserDialog', { enabled: false });
     },
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'),
+    resize: (w, h) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile: false }),
+    hide: async (ms) => {
+      const { targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result;
+      await send('Target.activateTarget', { targetId });
+      await sleep(ms);
+      await send('Target.activateTarget', { targetId: target.id });
+      await send('Target.closeTarget', { targetId });
+    },
+    // A Chrome trace, what DevTools' Performance panel records: start() traces every process and samples the
+    // JavaScript and wasm stacks of every thread of the page's (V8's sampler, the workers the game's threads are
+    // included), and stop(file) writes the trace as JSON for the Performance panel or ui.perfetto.dev.
+    chromeTrace: {
+      start: () => send('Tracing.start', { transferMode: 'ReturnAsStream', traceConfig: { recordMode: 'recordAsMuchAsPossible',
+        includedCategories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame',
+          'toplevel', 'v8.execute', 'blink.console', 'disabled-by-default-v8.cpu_profiler', 'gpu', 'webgpu'] } }),
+      stop: async (file) => {
+        tracingComplete = null;
+        await send('Tracing.end');
+        for (let i = 0; i < 1200 && !tracingComplete; i++) await sleep(100);
+        if (!tracingComplete?.stream) throw new Error('the trace never completed');
+        const out = fs.openSync(file, 'w');
+        for (;;) {
+          const r = (await send('IO.read', { handle: tracingComplete.stream, size: 1 << 22 })).result;
+          fs.writeSync(out, r.base64Encoded ? Buffer.from(r.data, 'base64') : r.data);
+          if (r.eof) break;
+        }
+        fs.closeSync(out);
+        await send('IO.close', { handle: tracingComplete.stream });
+      },
+    },
     // Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
     close: async () => {
       const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 10000); }) : null;
@@ -488,7 +558,7 @@ if ($w) { ${place} | Out-Null; 'moved' }`;
     (err, stdout) => resolve(!err && stdout.includes('moved')));
 });
 
-const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line }) => {
+const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line }) => {
   // No first-run pages or crash restore, scale device pixels a CSS pixel (but on screen), sound allowed to start without a click
   // but silent.
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
@@ -497,7 +567,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
     { stdio: 'ignore' });
   let send = null;
@@ -604,6 +674,13 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       throw new Error('the page never asked for a file');
     },
     screenshot: async () => Buffer.from((await send('browsingContext.captureScreenshot', { context })).result.data, 'base64'),
+    resize: (w, h) => send('browsingContext.setViewport', { context, viewport: { width: w, height: h }, devicePixelRatio: scale }),
+    hide: async (ms) => {
+      const tab = (await send('browsingContext.create', { type: 'tab' })).result.context;
+      await sleep(ms);
+      await send('browsingContext.activate', { context });
+      await send('browsingContext.close', { context: tab });
+    },
     close: async () => {
       const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 30000); }) : null;
       send('browser.close').catch(() => {});
