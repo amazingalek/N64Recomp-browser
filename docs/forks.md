@@ -259,4 +259,9 @@ RecompFrontend         first boot and every input whenever the Controls tab clos
 3993399                (GoldenEye's mouse branch's Mouse Sensitivity of 50 over RecompFrontend's 0) never reached a
                        player who had played the page before. An option the file leaves out takes its default before
                        an option's own parser sees it (the Graphics tab's downsampling would throw)
+RecompFrontend 2114cc6 on a page mouse motion reaches nothing while relative mode is on and the browser holds no pointer
+                       lock, and a lock the browser ended itself (Esc, which never reaches the page, or the page losing
+                       focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
+                       cursor's position on the canvas as motion, so GoldenEye's mouse look turned at once by however
+                       far that was from the last locked one, and the menu opened only at a second Esc
 ```
