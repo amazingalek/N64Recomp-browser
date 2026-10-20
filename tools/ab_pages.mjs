@@ -17,7 +17,9 @@
 // saying it was one of these (the --note given added), so play_page compares it with nothing: this does. A queue command
 // after -- goes in front of every play, so each takes its own turn on a shared GPU (CLAUDE.md, Playing a page). Each
 // play's output goes to <out>/<n>-<browser>-<pages|build>.log, its summary beside it as .json, and the plan's shot
-// steps write into <out> (its cwd); --out is a new temporary dir without it, kept and named at the end.
+// steps write into <out> (its cwd); --out is a new temporary dir without it, kept and named at the end. Run again with
+// the same --out, it reads the plays that have a summary there and plays the rest: queue waits can add up to hours,
+// longer than what started it may live, and a play stopped part way records nothing.
 //
 // A build's run is worse when it fails where a Pages run of the same browser didn't, has WebGPU errors where none of
 // those had any, or presents a second more than 10% below the lowest of theirs, play_page's own noise for an uncapped
@@ -73,20 +75,24 @@ const playOnce = async (condition, which) => {
   const n = ++count;
   const name = `${n}-${condition.browser}-${which === 'P' ? 'pages' : 'build'}`;
   const json = path.join(out, `${name}.json`);
-  fs.rmSync(json, { force: true });
+  const done = fs.existsSync(json);
   const runNote = [which === 'P' ? `the page Pages serves, interleaved with the ${build} build` :
     `the ${build} build served locally, interleaved with Pages' ${pagesBuild}`, 'tools/ab_pages.mjs', note].filter(Boolean).join('; ');
   const command = [...queue, process.execPath, playPage, condition.browser, which === 'P' ? pagesWhere : buildPath, rom, planFile,
     '--uncapped', '--size', size, '--port', port, '--json', json, ...(firefox && condition.browser === 'firefox' ? ['--browser', firefox] : []), ...(condition.throttle > 1 ? ['--cpu-throttle', String(condition.throttle)] : []),
     ...(record ? ['--record', record, '--game', game, '--build', which === 'P' ? pagesBuild : build, '--note', runNote] : [])];
-  process.stdout.write(`${new Date().toISOString().slice(11, 19)} ${n}. ${condition.name}, ${which === 'P' ? `Pages (${pagesBuild})` : `the build (${build})`}: `);
-  const logFd = fs.openSync(path.join(out, `${name}.log`), 'w');
-  const code = await new Promise((resolve) => {
-    const child = spawn(command[0], command.slice(1), { cwd: out, stdio: ['ignore', logFd, logFd] });
-    child.on('error', (error) => resolve(error.message));
-    child.on('exit', resolve);
-  });
-  fs.closeSync(logFd);
+  process.stdout.write(`${new Date().toISOString().slice(11, 19)} ${n}. ${condition.name}, ${which === 'P' ? `Pages (${pagesBuild})` : `the build (${build})`}: ` +
+    (done ? '(played before) ' : ''));
+  let code = 0;
+  if (!done) {
+    const logFd = fs.openSync(path.join(out, `${name}.log`), 'w');
+    code = await new Promise((resolve) => {
+      const child = spawn(command[0], command.slice(1), { cwd: out, stdio: ['ignore', logFd, logFd] });
+      child.on('error', (error) => resolve(error.message));
+      child.on('exit', resolve);
+    });
+    fs.closeSync(logFd);
+  }
   const summary = fs.existsSync(json) ? JSON.parse(fs.readFileSync(json, 'utf8'))
     : { failed: `play_page gave no summary (exit ${code}; ${name}.log)` };
   const run = { which, median: summary.presents?.median ?? null, failed: summary.failed ?? (summary.presents ? null : 'no presents'),
