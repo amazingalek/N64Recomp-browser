@@ -595,9 +595,10 @@ time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "lap
   WARP draws on the CPU, and the logos before it were no faster). Both played with no WebGPU errors or exceptions,
   SwiftShader without `shader-f16`, and RT64 paced presents to the game's frames as the GPU fell behind, as on a laptop.
 - `--affinity 4` (two cores) changed nothing at the display's rate: Banjo in Firefox 62.8 presents a second against
-  63.0 on all 16, its browser at 0.5-0.6 cores; GoldenEye in Firefox held Dam at 63.6-64.2, its two shader waits 3.6
-  and 4.3 s, Bond's holds 3626 ticks of 3624. Where Banjo's intro presents faster than the display it showed:
-  112-159 a second on 4 against 92-220 on 16. So neither Firefox's pacing to 30 on the laptop's screen nor
+  63.0 on all 16, its browser at 0.5-0.6 cores; GoldenEye in Firefox held Dam at 63.6-64.2 against 63.5-64.0, its
+  two shader waits 3.6 and 4.3 s against 3.0 and 3.5 (Firefox builds the pipelines on its GPU process, on the same
+  cores), Bond's holds 3626 and 3628 ticks of 3624. Where the intros present faster than the display, one run each
+  went either way (Banjo 112-159 on 4 against 92-220 on 16, GoldenEye 152-190 against 118-138). So neither Firefox's pacing to 30 on the laptop's screen nor
   GoldenEye's Dam collapse there is the laptop's CPU: the first was Windows' compositor's share of the GPU, the second
   shaders the list lacked drawn with the ubershader (A laptop, measured), which a desktop shows as `shader missed:`
   lines, not as a slower Dam.

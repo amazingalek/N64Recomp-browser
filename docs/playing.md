@@ -121,7 +121,7 @@ measured, and Laptop-like limits on a desktop, measured):
   rate there, so it is for the other limits and for memory, not for presents.
 - `--affinity <n>` holds the browser, every process of it, to n logical processors (4: two cores), in Firefox as in
   Chrome, where `--cpu-throttle` slows only Chrome's page thread. It shows a page short of cores: on 4 Banjo and
-  GoldenEye played in Firefox as on 16 at the display's rate, and lost only where a page runs faster than the display.
+  GoldenEye played in Firefox as on 16 at the display's rate, its shader waits ~20% longer.
 - `--fallback-adapter` gives the page the browser's software adapter (SwiftShader in Chrome, WARP in Firefox), tens of
   times slower than Intel UHD: GoldenEye's Dam drew 2 presents a second. It checks a page boots and draws with no
   WebGPU errors on a weak adapter's features and limits (no `shader-f16`) and how it behaves far behind (RT64 pacing
