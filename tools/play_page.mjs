@@ -387,6 +387,68 @@ const procCpu = () => {
     gpuProcessMB: mine.filter((p) => isGpuProcess(p.commandLine)).reduce((t, p) => t + p.mb, 0) };
 };
 
+// Which side stopped, once the page stops answering (Windows): each of the browser's processes' cores over 3 s and its
+// main thread's (its first), and the busiest threads, by name, of the busiest tab and of the GPU process. A tab's main
+// thread runs the page's script and the driver's script.evaluate or Runtime.evaluate both, and a worker's console lines
+// pass through it in Firefox (Chrome's aren't taken at all), so nothing from inside the page tells a
+// blocked page from a gone one: its main thread busy (a loop, or a futex wait, which Emscripten spins on the main
+// thread) or waiting is the page; the browser process's main thread, where Firefox's WebDriver BiDi lives, stuck at a
+// core is the browser. Its last line, "main threads: ...", goes into the run's failure.
+const threadReport = () => new Promise((resolve) => {
+  if (process.platform !== 'win32') return resolve(null);
+  const script = `
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ThreadName {
+  [DllImport("kernel32.dll")] static extern IntPtr OpenThread(int access, bool inherit, int id);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+  [DllImport("kernel32.dll")] static extern int GetThreadDescription(IntPtr handle, out IntPtr name);
+  [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr p);
+  public static string Of(int id) {
+    IntPtr h = OpenThread(0x800, false, id); if (h == IntPtr.Zero) return "";
+    IntPtr n; string s = "";
+    if (GetThreadDescription(h, out n) >= 0 && n != IntPtr.Zero) { s = Marshal.PtrToStringUni(n); LocalFree(n); }
+    CloseHandle(h); return s;
+  } }'
+$all = Get-CimInstance Win32_Process -Filter "Name='chrome.exe' OR Name='firefox.exe'"
+$mine = @($all | ? { $_.CommandLine -and $_.CommandLine.Contains($env:PLAY_PAGE_PROFILE) })
+$ids = $mine | % { $_.ProcessId }
+$mine += @($all | ? { $_.CommandLine -match '-parentPid (\\d+)' -and $ids -contains [int]$Matches[1] })
+function Times { $h = @{}; foreach ($p in $mine) { $g = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
+  if ($g) { foreach ($t in $g.Threads) { try { $h["$($p.ProcessId) $($t.Id)"] = $t.TotalProcessorTime.TotalSeconds } catch {} } } }; $h }
+$a = Times; Start-Sleep -Seconds 3; $b = Times
+$rows = foreach ($p in $mine) {
+  $g = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
+  if (-not $g -or $g.Threads.Count -lt 2) { continue }
+  $kind = if ($p.CommandLine -match '--type=(\\S+)') { $Matches[1] } elseif ($p.CommandLine -match '-parentPid .*\\s(\\w+)\\s*$') { $Matches[1] } else { 'browser' }
+  $threads = @(foreach ($t in $g.Threads) { $k = "$($p.ProcessId) $($t.Id)"
+    if ($a.ContainsKey($k) -and $b.ContainsKey($k)) { try {
+      [pscustomobject]@{ id = $t.Id; start = $t.StartTime; cores = ($b[$k] - $a[$k]) / 3
+        state = if ("$($t.ThreadState)" -eq 'Wait') { "waiting ($($t.WaitReason))" } else { "$($t.ThreadState)".ToLower() } } } catch {} } })
+  [pscustomobject]@{ kind = $kind; id = $p.ProcessId; cores = ($threads | Measure-Object cores -Sum).Sum; threads = $threads
+    main = ($threads | Sort-Object start | Select-Object -First 1) }
+}
+$tab = $rows | ? { $_.kind -eq 'tab' -or $_.kind -eq 'renderer' } | Sort-Object cores -Descending | Select-Object -First 1
+foreach ($r in $rows) {
+  if ($r.kind -ne 'browser' -and $r.kind -notmatch 'gpu' -and $r.cores -lt 0.01) { continue }
+  "{0} pid {1}: {2:N2} cores, its main thread {3:N2}, {4}" -f $r.kind, $r.id, $r.cores, $r.main.cores, $r.main.state
+  if ($r -eq $tab -or $r.kind -match 'gpu') {
+    foreach ($t in ($r.threads | Sort-Object cores -Descending | Select-Object -First 5)) {
+      $name = [ThreadName]::Of($t.id); if (-not $name) { $name = "thread $($t.id)" }
+      "  {0}: {1:N2} cores, {2}" -f $name, $t.cores, $t.state
+    }
+  }
+}
+$browser = $rows | ? { $_.kind -eq 'browser' } | Sort-Object cores -Descending | Select-Object -First 1
+"main threads: the tab's {0:N2} cores, {1}; the browser's {2:N2}, {3}" -f $tab.main.cores, $tab.main.state, $browser.main.cores, $browser.main.state
+`;
+  const ps = spawn('powershell', ['-NoProfile', '-Command', script],
+    { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PLAY_PAGE_PROFILE: profile } });
+  let out = '';
+  ps.stdout.on('data', (data) => { out += data; });
+  ps.on('error', () => resolve(null));
+  ps.on('exit', () => resolve(out.trim() || null));
+  setTimeout(() => { try { ps.kill(); } catch {} }, 60000);
+});
+
 const server = /^https?:\/\//.test(where) ? null : await serve(where, port);
 const base = server ? `http://127.0.0.1:${server.address().port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
@@ -401,7 +463,7 @@ log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? 
 // it, the run is stopped and fails with the exception's text; without an exception, a stretch with no presents (a load, a
 // shader wait) goes on as before. A page that gives a sample no answer for stalledSeconds (its thread blocked, the
 // browser gone) stops the run the same way, as "the page stopped answering", so it is recorded and the tool ends,
-// rather than every sample and step after it waiting on the page for good.
+// rather than every sample and step after it waiting on the page for good, and says which side stopped (threadReport).
 const stalledSeconds = 15;
 let presentedAt = 0;
 const samples = [];
@@ -429,7 +491,12 @@ const sample = async () => {
       log(`shader missed: ${miss.shader} (section ${section})`);
     }
   } catch (error) {
-    if (error.unanswered) page.stop(`the page stopped answering: ${error.message}`);
+    if (error.unanswered) {
+      const report = await threadReport();
+      if (report) log(`the browser's processes as the page stopped answering:\n${report}`);
+      const mains = report?.split('\n').pop();
+      page.stop(`the page stopped answering: ${error.message}${mains?.startsWith('main threads:') ? ` (${mains})` : ''}`);
+    }
   }
   const now = { at: seconds(), presents, animationFrames, audio, cpu: procCpu() };
   const gpu = gpuNow();
