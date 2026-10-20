@@ -264,4 +264,13 @@ RecompFrontend 2114cc6 on a page mouse motion reaches nothing while relative mod
                        focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
                        cursor's position on the canvas as motion, so GoldenEye's mouse look turned at once by however
                        far that was from the last locked one, and the menu opened only at a second Esc
+N64ModernRuntime       ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS: RT64's interpreter marks the RDRAM it reads each
+bf96a62,               display list's commands from (256-byte units) in an array ultramodern owns, RecompFrontend's glue
+rt64 02f0a7c,          hands it and counts the lists read, librecomp the ones sent, and a PI DMA from ROM onto commands
+RecompFrontend         one of the last 8 lists read ran waits (at most 2 s) until RT64 has read every list sent before
+ab544ca                it, as a console's RSP has long before a load lands; a load anywhere else goes at once. Mario
+                       Kart 64 loads its title screen's textures over its logos' model the frame after their last list;
+                       on a laptop's integrated GPU RT64's thread, a frame or more behind, read that list after the
+                       load, took texture words for commands (color images 1792-3072 wide) and the page trapped in
+                       free(). Every load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
 ```
