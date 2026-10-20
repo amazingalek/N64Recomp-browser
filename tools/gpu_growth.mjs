@@ -12,7 +12,8 @@
 // GPU committed and shared), and --json writes the reads. The kinds run in the order given, default every one with
 // "present" first and "all" last. A kind whose parts grow where "present" doesn't is what grows the process; one
 // growing like "all", the whole of it. --query is added to every visit (&rate=...&kb=... for one kind). The window
-// is off the desktop at --size (1920x945) unless --on-screen, as play_page.mjs's (page_driver.mjs).
+// is off the desktop at --size (1920x945) unless --on-screen, as play_page.mjs's (page_driver.mjs). The page is served
+// on a free port and Firefox's debugging port is a free one, unless --port <n> gives n and n + 1.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -29,7 +30,9 @@ for (const kind of kinds) if (!pageKinds.includes(kind)) throw new Error(`no kin
 const seconds = Number(option(args, '--seconds', 120));
 const settle = Number(option(args, '--settle', 15));
 const size = (option(args, '--size') ?? '1920x945').split('x').map(Number);
-const port = Number(option(args, '--port', 8947));
+// --port <n> serves on n and gives Firefox n + 1; without it both are free ones, for runs beside each other.
+const portOption = option(args, '--port');
+const port = portOption ? Number(portOption) : 0;
 const query = option(args, '--query') ?? '';
 const jsonFile = option(args, '--json');
 const freshProfile = !option(args, '--profile');
@@ -38,8 +41,9 @@ const t0 = Date.now();
 const log = (text) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}] ${text}`);
 
 const results = [];
-const server = serve(dir, port);
-const page = await open('firefox', { profile, port: port + 1, size, executable: option(args, '--browser'),
+const server = await serve(dir, port);
+const origin = `http://127.0.0.1:${server.address().port}`;
+const page = await open('firefox', { profile, port: portOption ? port + 1 : undefined, size, executable: option(args, '--browser'),
   onScreen: args.includes('--on-screen'), uncapped: args.includes('--uncapped'), log,
   onLine: (text) => {
     if (/gpu_growth|error|exception/i.test(text)) log(text);
@@ -50,7 +54,7 @@ try {
   for (const kind of kinds) {
     const result = { kind, reads: [] };
     results.push(result);
-    await page.navigate(`http://127.0.0.1:${port}/gpu_growth.html?kind=${kind}${query}`);
+    await page.navigate(`${origin}/gpu_growth.html?kind=${kind}${query}`);
     await sleep(settle * 1000);
     result.reads.push(await read());
     for (let s = 30; s < seconds; s += 30) { await sleep(30000); result.reads.push(await read()); }

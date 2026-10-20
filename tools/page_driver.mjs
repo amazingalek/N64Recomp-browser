@@ -71,25 +71,31 @@ export const option = (args, name, fallback) => {
   return value;
 };
 
-// The build dir on 127.0.0.1, with the headers that give the page SharedArrayBuffer. The ROM and saves are kept per
-// origin, port included, so a profile kept between runs needs the same port. A path ending in / is its index.html, as
+// The build dir on 127.0.0.1, with the headers that give the page SharedArrayBuffer, once it is listening. Port 0 (the
+// default) is a free one, server.address().port, so plays started beside each other don't clash; a port taken is
+// refused. The ROM and saves are kept per origin, port included, so a profile kept between runs needs the same port
+// each time. A path ending in / is its index.html, as
 // GitHub Pages serves it: a plan whose page is "" opens publish_page.sh's staged dir at /. A file it hasn't got is
 // printed once, since a page that 404s on its own files loads nothing and says nothing in its console.
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
 const missing = new Set();
-export const serve = (dir, port) => http.createServer((req, res) => {
-  const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  const file = path.join(dir, pathname.endsWith('/') ? pathname + 'index.html' : pathname);
-  fs.readFile(file, (err, data) => {
-    if (err) {
-      if (!missing.has(pathname)) { missing.add(pathname); console.error(`serve: 404 ${pathname} (${err.code})`); }
-      res.writeHead(404); res.end(); return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store',
-      'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' });
-    res.end(data);
+export const serve = (dir, port = 0) => new Promise((resolve, reject) => {
+  const server = http.createServer((req, res) => {
+    const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    const file = path.join(dir, pathname.endsWith('/') ? pathname + 'index.html' : pathname);
+    fs.readFile(file, (err, data) => {
+      if (err) {
+        if (!missing.has(pathname)) { missing.add(pathname); console.error(`serve: 404 ${pathname} (${err.code})`); }
+        res.writeHead(404); res.end(); return;
+      }
+      res.writeHead(200, { 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store',
+        'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' });
+      res.end(data);
+    });
   });
-}).listen(port, '127.0.0.1');
+  server.once('error', (err) => reject(err.code === 'EADDRINUSE' ? new Error(`port ${port} is taken on 127.0.0.1: give another --port`) : err));
+  server.listen(port, '127.0.0.1', () => resolve(server));
+});
 
 // Chrome on Windows is in Program Files since Chrome 155, Program Files (x86) before.
 const defaultExecutable = {
@@ -196,6 +202,8 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   if (cpuThrottle && browser !== 'chrome') throw new Error('cpuThrottle is Chrome\'s only');
   // A debugging port another browser holds is refused, not shared: the browser started here would take the other
   // address (Chrome binds [::1] when 127.0.0.1 is taken), and the tool would drive and measure the other one's page.
+  // Without one given it is a free one, so plays started beside each other each get their own.
+  port ??= await freePort();
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
@@ -286,6 +294,14 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
 };
 
 // Wraps js so that both protocols give back its value, awaited, as JSON text.
+// A port free on 127.0.0.1 now, the system's pick, for the browser to take.
+const freePort = () => new Promise((resolve, reject) => {
+  const server = net.createServer().once('error', reject).listen(0, '127.0.0.1', () => {
+    const { port } = server.address();
+    server.close(() => resolve(port));
+  });
+});
+
 const listening = (host, port) => new Promise((resolve) => {
   const socket = net.connect({ host, port });
   socket.setTimeout(1000);
