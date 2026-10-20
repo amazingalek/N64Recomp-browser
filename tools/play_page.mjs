@@ -8,7 +8,9 @@
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
-// (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). The browser starts with
+// (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). A build dir's .html is the
+// same for a build: its dir is served and that page played, whatever plan.page says (a plan whose page is index.html,
+// which Pages has and a build hasn't). The browser starts with
 // a profile of its own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
@@ -70,7 +72,10 @@
 // shader wait (RT64's "built in ... the game waiting" lines, Firefox's for the shaders the list missed among them, with
 // missed: true), WebGPU errors and exceptions, the GPU and the cores, and
 // the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
-// Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
+// Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too, a
+// failed run's with "failed" (tools/ab_pages.mjs reads it).
+// A run the host slept through (its clock jumped more than 30 s between two of play_page's 1 s ticks) is stopped and
+// fails: its samples would span the sleep, and one such run read as a clean one in a retest.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
 //
 // Every shader the game asks for that the page's prebuilt list doesn't have is a miss (docs/porting.md,
@@ -358,9 +363,10 @@ const procCpu = () => {
     gpuProcessMB: mine.filter((p) => isGpuProcess(p.commandLine)).reduce((t, p) => t + p.mb, 0) };
 };
 
-const server = /^https?:\/\//.test(where) ? null : serve(where, port);
+const remote = /^https?:\/\//.test(where);
+const server = remote ? null : serve(/\.html$/.test(where) ? path.dirname(where) : where, port);
 const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
-const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
+const pageUrl = /\.html$/.test(where) ? (remote ? where : base + path.basename(where)) + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
   preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, onLine, log });
 log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
@@ -429,9 +435,20 @@ const sample = async () => {
   sampleBusy = false;
 };
 const sampling = setInterval(sample, interval * 1000);
+// A sleep of the host: nothing in play_page holds its own thread for seconds, so a tick that comes 30 s late is one.
+let slept = null, tickedAt = Date.now();
+const ticking = setInterval(() => {
+  const late = (Date.now() - tickedAt) / 1000 - 1;
+  tickedAt = Date.now();
+  if (late > 30 && !slept) {
+    slept = `the host's clock jumped ${Math.round(late)} s at ${Math.round(seconds() - late)} s (it slept): the run measures nothing`;
+    page.stop(slept);
+  }
+}, 1000);
 
 const finish = async (code) => {
   clearInterval(sampling);
+  clearInterval(ticking);
   await page.close();
   for (const child of [smi, sampler, counters]) { try { child?.kill(); } catch {} }
   server?.close();
@@ -475,8 +492,9 @@ try {
   failure = error.message;
   // A run that failed before the play still records the viewport it had, on screen the window's, not --size.
   viewport ??= await page.viewport().catch(() => null);
-  if (!recordFile) await finish(1);
+  if (!recordFile && !jsonFile) await finish(1);
 }
+if (slept && !failure) { log(`failed: ${slept}`); failure = slept; }
 const hostAfter = hostTimes();
 
 const during = samples.filter((s) => s.playing);
@@ -544,7 +562,7 @@ if (summary.gpuProcessMB) console.log(`  GPU process private bytes ${summary.gpu
   `${summary.gpuProcessMB.perSecond} MB a second`);
 if (summary.gpuProcessMemory) console.log(`  GPU process memory, start -> end of the play (about:memory, MB): ` +
   Object.keys(memoryAfter).map((k) => `${k} ${memoryBefore[k] ?? '-'} -> ${memoryAfter[k]}`).join(', '));
-if (jsonFile && !failure) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
+if (jsonFile) fs.writeFileSync(jsonFile, JSON.stringify({ ...summary, ...(failure ? { failed: failure } : {}) }, null, 2) + '\n');
 let regressions = [];
 if (recordFile) {
   const round = (x) => x === null ? null : Math.round(x * 100) / 100;
