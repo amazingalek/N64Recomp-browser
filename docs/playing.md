@@ -92,6 +92,9 @@ options; `docs/findings.md` has what was measured this way.
 - Whether timed waits off its thread end on time all through a play: `--preload tools/wait_probe.js` logs, each
   second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
   the page starts (docs/findings.md, A host that holds Chrome's presents).
+- How much of its heap a page has taken, and what ran it out: `--preload tools/heap_probe.js` logs the heap's break
+  each second (`heap <s> sbrk <MB>`) and, before an `Aborted(OOM)`, the request's size and the stack that made it
+  (`heapoom`) (docs/findings.md, Memory).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
