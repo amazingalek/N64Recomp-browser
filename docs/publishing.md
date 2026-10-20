@@ -9,8 +9,14 @@ A run on a schedule that takes every change since the last one at once:
 
 - For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build in
   Chrome and Firefox, each run recorded in `plays.jsonl` and compared with the earlier runs like it
-  (`play_page.mjs --record`). A run flagged as a regression is played again, the host's load read first, and is a
+  (`play_page.mjs --record`, the page Pages serves and the build interleaved under one `--set`, each with its `--role`
+  and the host's reading before it: docs/playing.md). A run flagged as a regression is played again, the host's load read first, and is a
   regression only if the second run is worse too and nothing beside it explains it; a drop within the noise is not one.
+  On a desktop GPU, where a host's load moves the numbers more than a build does, `tools/ab_pages.mjs` plays the build
+  and the page Pages serves interleaved instead, uncapped at the stand-in's size: Firefox Pages, build, build, Pages,
+  then CPU-throttled Chrome Pages, build, each run recorded with a note saying so. It prints each run's presents a
+  second as a table and a verdict by the same rule, a pair at a time (its header says how), and fails a run the host
+  slept through.
 - Only a page that boots with no WebGPU errors and plays no worse than its row and its earlier runs moves its fork's
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
   worse stays on Pages as it was, its fork on its last tag, and has work filed. So a fork's `main` is what its page was
@@ -52,5 +58,11 @@ which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks 
 time); `tools/publish_pages.sh` does it for every game, or the ones it is given. Each page's commit names the main it
 was built from (`git log -1 origin/gh-pages`). A change to one game's own repo is played from a `--dry-run` build of
 that game, then published by a `tools/publish_pages.sh` run with its name.
+
+A test page, a game fork's branch to be played by hand before it lands (GoldenEye's `mouse`), is published beside
+main's page with `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "<branch> <sha>" --into <branch>`, at
+`https://amazingalek.github.io/<fork>/<branch>/`, and taken off with `--drop <branch>` when the branch lands or is
+dropped. Publishing main's page keeps every folder, and a test page leaves main's page and the other folders alone
+(the script's header says how).
 
 The first visit reloads once (`coi_serviceworker.js`); right after a publish that can take a second visit.
