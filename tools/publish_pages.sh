@@ -91,6 +91,7 @@ oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
 jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web
 dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
 snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
+rush2  amazingalek/rush2recompiled-web            Rush2Recompiled      build-web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -307,6 +308,11 @@ build_snap() {
     # Patches its submodules from clean whenever N64Recomp-browser or patches/web moved (build-web-prep/web-patched).
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
+build_rush2() {
+    # Patches its submodules from clean whenever its own patches, N64Recomp-browser or web/patches moved
+    # (build-web-prep/web-patched).
+    bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
 
 # --- Here ---
 
@@ -387,7 +393,7 @@ for g in "${published[@]}"; do
     git -C "$clone" archive origin/main $(git -C "$clone" ls-tree --name-only origin/main tools web) | tar xf - -C "$work/$g-tools"
     plan="$work/$g-tools/tools/shader_plan.json"
     [[ -f "$plan" ]] || plan="$work/$g-tools/web/shader_plan.json"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 --port $((20000 + RANDOM % 9000)) \
+    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 \
         --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true

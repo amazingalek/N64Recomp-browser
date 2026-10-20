@@ -181,8 +181,11 @@ and its survey, the warps.
 `amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled. Its upstream's base recomp has its own frontend
 (an RmlUi launcher and menus, no RecompFrontend); on the page (`patches/web/dkr.patch`) it plays rumble through the
 Gamepad API and keeps the dummy frame out of RDRAM as RecompFrontend 75fe596 does. The game binds draw buffers the
-workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. The
-base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
+workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. Its
+`patches/web/rt64.patch` is the base's own renderer (F3DDKR, its bloom and SSAO, the shader cache's pause), so it can't
+move into rt64-web, and it goes on top of the web's: CI's `jfg-patches` job runs its `tools/build_web.sh --patches`
+(the whole patch step, no ROM) with the PR's checkout, so a change here to the lines it touches is red in its own PR
+and is settled there, by rebasing the fork's patch or keeping the web's lines off its. The base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
 never waits there. Its list, `src/rt64_shaders.txt`, is 210 descriptions in 16 sections, the boot 36
 and a planet 20-86 descriptions each. The early release took the sound short over its play plan (the first room of every
 planet in 160 s, headless Chrome 155) from 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display
@@ -247,15 +250,36 @@ code but for three Firefox plays missed: `web/survey.cpp` starts a course from t
 rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
 `tools/check_web_patches.sh`, `web/page.cmake` and `web/rt64_shaders.txt` have the rest.
 
+`amazingalek/rush2recompiled-web` is Rush 2 Recompiled, Rush 2: Extreme Racing USA (US), whose repo has no license
+(CLAUDE.md, Rules). It is on its own commits of rt64, N64ModernRuntime and RecompFrontend, which its
+`lib/patches/<submodule>.patch` change (3,800 lines on rt64's 41 files: car reflection and ambient occlusion shaders,
+the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched by the N64Recomp-browser tag its
+`lib/N64Recomp-browser` pins. Its `tools/build_web.sh` applies Rush 2's patches first, then `apply.cmake` project by
+project, but for the files where both change the same lines (`web/patches/files.txt`: 5 of rt64's, the runtime's
+`events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand; its
+`tools/check_web_patches.sh` stops the build when N64Recomp-browser's change to one of them has moved, as Snap64's
+does. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
+the merge's choices: Rush 2's generated mipmaps and texels of a region of a larger image are read through the web's draw
+texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`), and `RasterPS.hlsl`'s coverage output (`SV_Coverage`)
+is left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel. Its
+texture cache binds a generated-mipmap texture with no view as the decoder's storage target for the first level, which
+plume 827a073 binds as that level, as D3D12 does (before it every race drew black, 10,208 WebGPU errors in one play).
+The page leaves out online play, for
+`src/online/online_web.cpp`, an offline machine to the game, the texture upscaler, which starts a program, and N64:
+Recompiled code mods. Its list is 82 shaders: the boot (the launcher, the title and the menus, 37) and 9 sections (the
+title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web/shader_plan.json`, which drives the
+menus by the front end's screen and the track select's entry in RDRAM. Its docs/BUILDING.md (The web page) and the
+headers of `tools/build_web.sh` and `tools/check_web_patches.sh` have the rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
 game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
-cartridge's for the other eight: Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
+cartridge's for the other nine: Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, Star Fox 64 30 (20 where a scene sets 3 VIs a
-frame), GoldenEye's and Conker's variable. None of the eight has an option to run faster.
+frame), GoldenEye's and Conker's variable. None of the nine has an option to run faster.
 
 A game fork may take a change that runs its game faster when that makes the page play better. Weigh it: logic at 60
 gives lower input lag, motion the game computes rather than RT64 interpolates, and what interpolation misses (some

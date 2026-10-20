@@ -77,17 +77,18 @@ branches only: upstream's others are deleted when it is made.
   no AI-made contribution and no AI talking to its maintainers). Each fork's README opens with a banner, and its GitHub
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
-- Code from a repo without a license is never copied: facts learned from one only.
+- A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
+  the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it
   is built where the ROM is, never in CI, and its `.data` holds only what it preloads (`tools/publish_page.sh`).
 - Nothing here names a game, includes from a game's repo or needs its ROM: the web side gets what it needs through the
   runtime's own interfaces, as every recomp does.
 - CI (`.github/workflows/ci.yml`) builds every library of a page with Emscripten from the forks, checks every WGSL
   shader, the plume device thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply
-  to every recomp commit in `patches/pins.txt` and over DKR-R-web's and CBFD-Recompiled-web's own patches. It builds
-  no page (that needs a game), so anything that changes what a page runs is built and played before it lands. A change
-  to only `*.md`, `plays.jsonl`, `site/` and the tools that play, serve, read and publish pages runs only the `changes`
-  job.
+  to every recomp commit in `patches/pins.txt` and over DKR-R-web's, CBFD-Recompiled-web's and
+  JetForceGemini-Recomp-web's own patches. It builds no page (that needs a game), so anything that changes what a page
+  runs is built and played before it lands. A change to only `*.md`, `plays.jsonl`, `site/` and the tools that play,
+  serve, read and publish pages runs only the `changes` job.
 
 ## The forks
 
@@ -97,9 +98,10 @@ hlslpp-web; N64ModernRuntime-web's `N64Recomp` is N64Recomp-web. Notes name a ch
 `rt64-0010`) or by fork and commit (`rt64 c89ced0`): `docs/forks.md` has every one, a line each, and a change pushed to
 a fork gets its row there in the PR that moves `forks.txt` onto it.
 
-Five options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
+Six options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64 179adb8), `ULTRAMODERN_LIBULTRA_THREAD_STOP`
-(N64ModernRuntime 0df8334) and `ULTRAMODERN_HOLD_BLOCKED_MESSAGES` (N64ModernRuntime 66539ab).
+(N64ModernRuntime 0df8334), `ULTRAMODERN_HOLD_BLOCKED_MESSAGES` (N64ModernRuntime 66539ab) and
+`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS` (N64ModernRuntime bf96a62).
 
 ## Changing it
 

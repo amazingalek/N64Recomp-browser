@@ -7,7 +7,10 @@
 #   if its build dir sits at the same depth inside it. Keep the build dir inside the checkout: from one outside it,
 #   every file that reads a generated header (the shaders, half of them) misses. On Windows em++.exe is a launcher that
 #   stays the same from one Emscripten to the next, so the version is the compiler's identity. Depend mode reads what a
-#   file included from the compile's own .d file, instead of running emcc a second time to preprocess it.
+#   file included from the compile's own .d file, instead of running emcc a second time to preprocess it. Every compile
+#   runs through frontend/ccache_launcher.cmake, which gives the files outside the build dir their absolute paths back
+#   in the .d file, so Ninja rebuilds what includes a file that a custom command writes into the source tree (a
+#   recomp's RecompiledPatches/) in the same build.
 #   Measured on 2026-10-12, a fresh build dir after a build of the same sources: Rush 2049's page on Windows (12 cores)
 #   587 s -> 116 s with N64RECOMP_BROWSER_FAST_LINK, 636 of 636 hits; tests/build's libraries on Linux
 #   (16 cores) 47 s -> 5 s.
@@ -32,8 +35,9 @@ add_compile_options(-ffile-prefix-map=${N64RECOMP_BROWSER_CHECKOUT}/=)
 
 find_program(CCACHE_PROGRAM ccache)
 if (CCACHE_PROGRAM)
-    set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_COMMAND} -E env CCACHE_BASEDIR=${N64RECOMP_BROWSER_CHECKOUT}
-        CCACHE_COMPILERCHECK=string:${EMSCRIPTEN_VERSION} CCACHE_DEPEND=1 ${CCACHE_PROGRAM})
+    set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_COMMAND} -DCHECKOUT=${N64RECOMP_BROWSER_CHECKOUT}
+        -DBUILD_DIR=${CMAKE_BINARY_DIR} -DEMSCRIPTEN_VERSION=${EMSCRIPTEN_VERSION}
+        -P ${CMAKE_CURRENT_LIST_DIR}/ccache_launcher.cmake -- ${CCACHE_PROGRAM})
     set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_C_COMPILER_LAUNCHER})
     set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
 endif()

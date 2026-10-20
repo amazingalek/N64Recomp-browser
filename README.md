@@ -30,8 +30,9 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Star Fox 64 | [Starfox64Recomp](https://github.com/sonicdcer/Starfox64Recomp) by sonicdcer | [Starfox64Recomp-web](https://github.com/amazingalek/Starfox64Recomp-web) | [play](https://amazingalek.github.io/Starfox64Recomp-web/) | 173* | 201* | 2026-10-19, v0.69.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/amazingalek/oot-recompiled-web) | [play](https://amazingalek.github.io/oot-recompiled-web/) | 60; 320* | 37; 282* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/amazingalek/DKR-R-web) | [play](https://amazingalek.github.io/DKR-R-web/) | 353* | 267* | 2026-10-19, v0.67.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 58; 336* | 44; 311* | 2026-10-19, v0.67.0; laptop 2026-10-18, v0.63.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 58; 336* | 44; 311* | 2026-10-19, v0.71.0; laptop 2026-10-18, v0.63.0 |
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-19, v0.70.0 |
+| Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/amazingalek/rush2recompiled-web) | [play](https://amazingalek.github.io/rush2recompiled-web/) | not yet | not yet | 2026-10-19, v0.72.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
@@ -398,7 +399,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `frame_lengths.js`, a preload too, logs how long the game's frames are against the page's presents, and
   `frame_lengths.mjs` counts from that what each guess at a frame's length would hold and cut. `wait_probe.js` logs
-  whether a timed wait off the page's thread ends on time, each second of a play.
+  whether a timed wait off the page's thread ends on time, each second of a play, and `heap_probe.js` how much of its
+  heap the page has taken, and the request that ran it out.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one. `wasm_offset.mjs`
   names the function of a page's wasm at the offset a trap gives.

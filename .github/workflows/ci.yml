@@ -241,6 +241,29 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$cbfd/tools/N64Recomp-browser"
           sh "$cbfd/tools/web_patch.sh"
 
+  # The patches under Jet Force Gemini's web fork's own (JetForceGemini-Recomp-web, its main): its tools/build_web.sh
+  # puts patches/apply.cmake's on upstream's commits, then its patches/web/*.patch, the base project's rt64 and runtime
+  # changes made again for them, on top, so a change here to the lines those touch stops its page building. Its
+  # --patches does the whole patch step without a ROM, with this checkout as its lib/N64Recomp-browser. Red on a PR that
+  # keeps main's patches means JetForceGemini-Recomp-web's main stopped applying over them, which is fixed there.
+  jfg-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: JetForceGemini-Recomp-web's apply over them
+        run: |
+          jfg="$RUNNER_TEMP/jfg"
+          git clone -q --depth 1 https://github.com/amazingalek/JetForceGemini-Recomp-web "$jfg"
+          git -C "$jfg" log -1 --format='JetForceGemini-Recomp-web %h %s'
+          rmdir "$jfg/lib/N64Recomp-browser"
+          ln -s "$GITHUB_WORKSPACE" "$jfg/lib/N64Recomp-browser"
+          bash "$jfg/tools/build_web.sh" --patches
+
   # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
   # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
@@ -311,6 +334,10 @@ jobs:
             echo "frontend_signature_mismatch linked"; exit 1
           fi
           grep "function signature mismatch: native" mismatch.log
+      # frontend/ccache_launcher.cmake: what includes a file a custom command writes into the source tree is rebuilt in
+      # the build that writes it (tests/depfile).
+      - name: Incremental build
+        run: bash tests/depfile/run.sh build-depfile
 
   # A push to main that changes what a page is built from (forks.txt, patches/, frontend/, renderer/) is tagged
   # v0.<n+1>.0 once its jobs pass: a tag is a release, and the retest builds the newest one, so a change left untagged
@@ -318,7 +345,7 @@ jobs:
   # covered by that one's, and the changes job builds a docs-only push's whenever this would tag. A tag pushed with
   # GITHUB_TOKEN starts no workflow: this run, on the same commit, is its CI.
   tag:
-    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, emscripten]
+    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, jfg-patches, emscripten]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')

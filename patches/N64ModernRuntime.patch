@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 6456ba6aadce150cbf893da52cd0256910bc126f
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web bf96a62e720a8623218d76f8c8202d2ef6c5c963
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -126,6 +126,44 @@ index 37556bd..9380157 100644
          void register_deprecated_mod(const std::string& mod_id, DeprecationStatus deprecation_status, const Version &maximum_version);
          void scan_mods();
          void close_mods();
+diff --git a/librecomp/src/config.cpp b/librecomp/src/config.cpp
+index 6bc03fd..04894fb 100644
+--- a/librecomp/src/config.cpp
++++ b/librecomp/src/config.cpp
+@@ -361,9 +361,20 @@ nlohmann::json Config::get_json_config() const {
+ 
+ nlohmann::json Config::get_storage_json() const {
+     nlohmann::json json;
++#ifdef __EMSCRIPTEN__
++    json = nlohmann::json::object();
++#endif
+     for (const auto& option : schema.options) {
+         const ConfigValueVariant value = get_option_value(option.id);
+ 
++#ifdef __EMSCRIPTEN__
++        // A page's build changes under its player at every update, so only what the player changed is saved: an option
++        // left at its default follows the default of the build that reads the file, not the one that first wrote it.
++        if (value == get_option_default_value(option.id)) {
++            continue;
++        }
++#endif
++
+         if (json_serialize_option_map.contains(option.id)) {
+             auto cb = json_serialize_option_map.at(option.id);
+             json[option.id] = cb(value);
+@@ -462,6 +473,12 @@ void Config::derive_all_config_option_dependencies() {
+ }
+ 
+ ConfigValueVariant Config::parse_config_option_json_value(const nlohmann::json& json_value, const ConfigOption &option) {
++#ifdef __EMSCRIPTEN__
++    // An option the file leaves out is at its default (get_storage_json), which an option's own parser isn't given.
++    if (json_value.is_null()) {
++        return get_option_default_value(option.id);
++    }
++#endif
+     if (json_parse_option_map.contains(option.id)) {
+         return json_parse_option_map[option.id](json_value);
+     }
 diff --git a/librecomp/src/mods.cpp b/librecomp/src/mods.cpp
 index 0f7de83..9bec0ec 100644
 --- a/librecomp/src/mods.cpp
@@ -485,6 +523,19 @@ index 0f7de83..9bec0ec 100644
      loaded_mods_by_id.clear();
      hook_slots.clear();
      processed_hook_slots.clear();
+diff --git a/librecomp/src/pi.cpp b/librecomp/src/pi.cpp
+index 43509ba..71ee4d9 100644
+--- a/librecomp/src/pi.cpp
++++ b/librecomp/src/pi.cpp
+@@ -271,6 +271,8 @@ void do_dma(RDRAM_ARG PTR(OSMesgQueue) mq, gpr rdram_address, uint32_t physical_
+     // TODO implement unaligned DMA correctly
+     if (direction == 0) {
+         if (physical_addr >= recomp::rom_base) {
++            // Not onto commands of a display list the renderer hasn't read yet (ultramodern's displaylists.cpp).
++            ultramodern::wait_for_displaylists_read((uint32_t)rdram_address & 0x1FFFFFFF, size);
+             // read cart rom
+             recomp::do_rom_read(rdram, rdram_address, physical_addr, size);
+ 
 diff --git a/librecomp/src/recomp.cpp b/librecomp/src/recomp.cpp
 index ea1c49b..7dda401 100644
 --- a/librecomp/src/recomp.cpp
@@ -562,11 +613,24 @@ index ea1c49b..7dda401 100644
  }
  
  bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
+diff --git a/librecomp/src/sp.cpp b/librecomp/src/sp.cpp
+index ae0f44f..2376c76 100644
+--- a/librecomp/src/sp.cpp
++++ b/librecomp/src/sp.cpp
+@@ -14,6 +14,8 @@ extern "C" void osSpTaskStartGo_recomp(uint8_t* rdram, recomp_context* ctx) {
+     OSTask* task = TO_PTR(OSTask, ctx->r4);
+     if (task->t.type == M_GFXTASK) {
+         //printf("[sp] Gfx task: %08X\n", (uint32_t)ctx->r4);
++        // Counted for the loads from ROM that wait for the renderer to read it (ultramodern's displaylists.cpp).
++        ultramodern::displaylist_sent();
+     } else if (task->t.type == M_AUDTASK) {
+         //printf("[sp] Audio task: %08X\n", (uint32_t)ctx->r4);
+     }
 diff --git a/ultramodern/CMakeLists.txt b/ultramodern/CMakeLists.txt
-index 5593172..873586d 100644
+index 5593172..e1e782f 100644
 --- a/ultramodern/CMakeLists.txt
 +++ b/ultramodern/CMakeLists.txt
-@@ -39,3 +39,17 @@ target_compile_options(ultramodern PRIVATE
+@@ -39,3 +39,24 @@ target_compile_options(ultramodern PRIVATE
  if (WIN32)
      add_compile_definitions(NOMINMAX)
  endif()
@@ -584,6 +648,42 @@ index 5593172..873586d 100644
 +if (ULTRAMODERN_HOLD_BLOCKED_MESSAGES OR EMSCRIPTEN)
 +    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_HOLD_BLOCKED_MESSAGES=1)
 +endif()
++
++# A load from ROM onto display list commands the renderer may not have read yet waits until it has (src/displaylists.cpp).
++target_sources(ultramodern PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/displaylists.cpp")
++option(ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS "A load from ROM onto display list commands the renderer may not have read yet waits for it (always on with Emscripten)" OFF)
++if (ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS OR EMSCRIPTEN)
++    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS=1)
++endif()
+diff --git a/ultramodern/include/ultramodern/displaylists.hpp b/ultramodern/include/ultramodern/displaylists.hpp
+new file mode 100644
+index 0000000..fd0af15
+--- /dev/null
++++ b/ultramodern/include/ultramodern/displaylists.hpp
+@@ -0,0 +1,23 @@
++#ifndef __ULTRAMODERN_DISPLAYLISTS_HPP__
++#define __ULTRAMODERN_DISPLAYLISTS_HPP__
++
++#include <atomic>
++#include <cstdint>
++
++// With ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS (on with Emscripten; displaylists.cpp says why), a load from ROM onto
++// commands of a display list the renderer hasn't read yet waits until it has. Without it these do nothing.
++namespace ultramodern {
++    // Where the renderer marks the RDRAM it reads display list commands from: [0] the lists read in full (counted by
++    // displaylist_read), [1 + physical address / 256] the number of the last list that read a command from those 256
++    // bytes of RDRAM's first 8 MB ([0] + 1 while it is read). nullptr without the option.
++    std::atomic<uint32_t>* displaylist_reads();
++    // A graphics task sent to the renderer.
++    void displaylist_sent();
++    // The renderer has read the oldest list sent to it.
++    void displaylist_read();
++    // Waits, at most 2 s, until the renderer has read every list sent so far if a load to RDRAM at this physical
++    // address and size would land on commands of one of the last lists it read.
++    void wait_for_displaylists_read(uint32_t rdram_address, uint32_t size);
++}
++
++#endif
 diff --git a/ultramodern/include/ultramodern/renderer_context.hpp b/ultramodern/include/ultramodern/renderer_context.hpp
 index d60c4ec..c543624 100644
 --- a/ultramodern/include/ultramodern/renderer_context.hpp
@@ -613,6 +713,114 @@ index 31eb106..50e8244 100644
      UltraThreadContext* context; // An actual pointer regardless of platform
      int32_t sp;
  } OSThread;
+diff --git a/ultramodern/include/ultramodern/ultramodern.hpp b/ultramodern/include/ultramodern/ultramodern.hpp
+index 46aea61..da24a61 100644
+--- a/ultramodern/include/ultramodern/ultramodern.hpp
++++ b/ultramodern/include/ultramodern/ultramodern.hpp
+@@ -2,6 +2,7 @@
+ #define __ultramodern_HPP__
+ 
+ #include <thread>
++#include "ultramodern/displaylists.hpp"
+ #include <cassert>
+ #include <stdexcept>
+ #include <span>
+diff --git a/ultramodern/src/displaylists.cpp b/ultramodern/src/displaylists.cpp
+new file mode 100644
+index 0000000..be6c588
+--- /dev/null
++++ b/ultramodern/src/displaylists.cpp
+@@ -0,0 +1,90 @@
++#include <algorithm>
++#include <atomic>
++#include <chrono>
++#include <thread>
++
++#include "ultramodern/displaylists.hpp"
++
++// On a console the RSP reads a display list within a few ms of the game sending it, long before the game's next load
++// from ROM lands, so a game may load over commands its last list runs: one loads its title screen's textures over its
++// logos' model the frame after their last list. Here the renderer reads a list on the graphics thread, which on a slow
++// GPU can be a frame or more behind the game, and would take what the load left there for commands. So the renderer
++// marks in displaylist_reads() the RDRAM it reads each list's commands from (RT64's interpreter, given the array by
++// RecompFrontend's glue, which counts the lists read), librecomp counts the graphics tasks sent, and a load from ROM
++// onto commands one of the last lists read ran waits until the renderer has read every list sent before it, on
++// whichever thread the load is (the one that loads over a list needn't be the one that sends it). A load anywhere else,
++// as a sound's samples, goes at once.
++
++#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
++
++namespace {
++    // RDRAM's 8 MB in 256-byte units.
++    constexpr uint32_t unit_shift = 8;
++    constexpr uint32_t units = 0x800000 >> unit_shift;
++
++    // Commands one of the last this many lists the renderer read ran are ones the lists it hasn't read yet may run.
++    constexpr uint32_t recent_lists = 8;
++
++    // [0] the lists the renderer has read in full; [1 + unit] the number of the last list it read commands from there
++    // in (counting from 1, so 0 is none; displaylists.hpp).
++    std::atomic<uint32_t> reads[1 + units];
++    std::atomic<uint32_t> lists_sent{ 0 };
++}
++
++std::atomic<uint32_t>* ultramodern::displaylist_reads() {
++    return reads;
++}
++
++void ultramodern::displaylist_sent() {
++    lists_sent.fetch_add(1, std::memory_order_relaxed);
++}
++
++void ultramodern::displaylist_read() {
++    reads[0].fetch_add(1, std::memory_order_release);
++}
++
++void ultramodern::wait_for_displaylists_read(uint32_t rdram_address, uint32_t size) {
++    uint32_t sent = lists_sent.load(std::memory_order_relaxed);
++    uint32_t read = reads[0].load(std::memory_order_acquire);
++    uint32_t first = rdram_address >> unit_shift;
++    if (read >= sent || size == 0 || first >= units) {
++        return;
++    }
++
++    uint32_t last = std::min((rdram_address + size - 1) >> unit_shift, units - 1);
++    bool over_commands = false;
++    for (uint32_t unit = first; unit <= last && !over_commands; unit++) {
++        uint32_t list = reads[1 + unit].load(std::memory_order_relaxed);
++        over_commands = (list != 0) && (list + recent_lists > read);
++    }
++
++    if (!over_commands) {
++        return;
++    }
++
++    // At most 2 s, after which the lists still unread count as read, so a renderer that stopped reading them (or reads
++    // fewer than are sent) costs one wait, not one per load.
++    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
++    while (reads[0].load(std::memory_order_acquire) < sent) {
++        if (std::chrono::steady_clock::now() >= deadline) {
++            lists_sent.store(reads[0].load(std::memory_order_acquire), std::memory_order_relaxed);
++            return;
++        }
++
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    }
++}
++
++#else
++
++std::atomic<uint32_t>* ultramodern::displaylist_reads() {
++    return nullptr;
++}
++
++void ultramodern::displaylist_sent() {}
++
++void ultramodern::displaylist_read() {}
++
++void ultramodern::wait_for_displaylists_read(uint32_t, uint32_t) {}
++
++#endif
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
 index 2f1cfb5..f237092 100644
 --- a/ultramodern/src/events.cpp

@@ -248,4 +248,29 @@ plume da273ff,         the device made with the adapter's maxTextureDimension2D 
 rt64 e5ee82d           and on Emscripten RT64's clamp on a render target, tile copy and reinterpreted tile
                        (RenderTarget::MaxDimension, D3D12's 16384) the device's limit: a target past 8192 failed
                        validation with every pass drawn on it (Mario Kart 64 at 7000x1201: an 8394x1440 target)
+plume 827a073,         a texture set on a read-write texture slot with no view binds a view of its first mip level
+rt64 e83ea6e           and every array slice, as D3D12's null UAV desc does, not its default view of every level:
+                       WebGPU binds one level as a storage texture, so a texture with mipmaps bound that way failed
+                       the bind group, its pass and the submit (Rush 2's texture cache decoding into its generated
+                       mipmaps: every upload failed and races drew black)
+N64ModernRuntime       a page saves only the settings and bindings its player changed: an option or input left at its
+d98135e,               default follows the default of the build that reads the file. Every option was saved at the
+RecompFrontend         first boot and every input whenever the Controls tab closed, so a default an update changed
+3993399                (GoldenEye's mouse branch's Mouse Sensitivity of 50 over RecompFrontend's 0) never reached a
+                       player who had played the page before. An option the file leaves out takes its default before
+                       an option's own parser sees it (the Graphics tab's downsampling would throw)
+RecompFrontend 2114cc6 on a page mouse motion reaches nothing while relative mode is on and the browser holds no pointer
+                       lock, and a lock the browser ended itself (Esc, which never reaches the page, or the page losing
+                       focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
+                       cursor's position on the canvas as motion, so GoldenEye's mouse look turned at once by however
+                       far that was from the last locked one, and the menu opened only at a second Esc
+N64ModernRuntime       ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS: RT64's interpreter marks the RDRAM it reads each
+bf96a62,               display list's commands from (256-byte units) in an array ultramodern owns, RecompFrontend's glue
+rt64 02f0a7c,          hands it and counts the lists read, librecomp the ones sent, and a PI DMA from ROM onto commands
+RecompFrontend         one of the last 8 lists read ran waits (at most 2 s) until RT64 has read every list sent before
+ab544ca                it, as a console's RSP has long before a load lands; a load anywhere else goes at once. Mario
+                       Kart 64 loads its title screen's textures over its logos' model the frame after their last list;
+                       on a laptop's integrated GPU RT64's thread, a frame or more behind, read that list after the
+                       load, took texture words for commands (color images 1792-3072 wide) and the page trapped in
+                       free(). Every load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
 ```
