@@ -175,7 +175,10 @@ presents fell 215 → 45 → 0 and the sound starved, and only then did the brea
 to the abort at 549.8 s. So a thread stalls first and then allocates in a loop, about 170 MB a second, a list
 interpreter walking a garbage display list say (Mario Kart 64's above); it needs neither a busy host nor a second page,
 only a long enough play. A 17-minute soak on an RTX 2070 played to the end (break 838.9 MB throughout). The request's
-size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop.
+size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
+slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
+checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
+the break at 843.9 MB throughout.
 
 ## A page that stops answering
 
