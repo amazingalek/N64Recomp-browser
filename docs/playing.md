@@ -111,6 +111,11 @@ options; `docs/findings.md` has what was measured this way.
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
   `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
   Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
+- How it comes through what a player's browser does to it: `--fault resize,hidden,audio,device,reload` (play_page's
+  header) does each in turn once the play is in its level (a resized window, another tab in front for 30 s, its
+  AudioContext suspended, its WebGPU device lost, then a reload over a warm cache and service worker), and records
+  whether it presents again after each, and what it said. Play it from Pages, whose cache and service worker a reload
+  finds warm (docs/findings.md, Faults).
 - A thread of the game that traps names only an offset in the wasm on a page linked without `--profiling-funcs`
   (`Game.wasm:8767891: RuntimeError: unreachable executed`); `node tools/wasm_offset.mjs <wasm or URL> <offset>`
   names the function that holds it. `unreachable executed` in the export the page's `.js` calls `___trap` is
