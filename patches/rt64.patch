@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web c9908d6e3a157566510b158c7f2738f79e1f9362
+rt64: https://github.com/amazingalek/rt64-web be95c2cf8afd06a02c0bf69bf204b31859cd0ed7
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1189,7 +1189,7 @@ index dccaa87..aeae7a6 100644
                      func(state, &dl);
                  }
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..58e3210 100644
+index 3227ab1..0369db4 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1281,23 +1281,8 @@ index 3227ab1..58e3210 100644
              if (lockedWorkloadMutex) {
                  ext.sharedResources->workloadMutex.unlock();
                  lockedWorkloadMutex = false;
-@@ -389,17 +419,64 @@ namespace RT64 {
-             }
- 
+@@ -391,15 +421,49 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
-+#           if defined(__EMSCRIPTEN__)
-+                // wait() for fewer presents in flight comes before the sleep until the slot, so the time it waits counts
-+                // toward the slot and a present costs whichever is longer. After the sleep, a GPU slower than the slots
-+                // made wait() run past the slot, the next slots started a period after that present, and each present
-+                // cost a period's sleep (ended on a display frame) and the GPU's wait after it: on a laptop's Intel UHD,
-+                // Banjo-Kazooie's frames before each present pace() dropped took 50-80 ms in Firefox, sleep 13-27 and
-+                // wait() 35-49, 20-30 presents a second at 60 Hz, and pace() went to 30.
-+                if (presentWaitEnabled) {
-+                    PhaseTimer phaseTimer(this, PhaseWait);
-+                    ext.swapChain->wait();
-+                }
-+#           endif
-+
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
 +#               if defined(__EMSCRIPTEN__)
@@ -1328,18 +1313,17 @@ index 3227ab1..58e3210 100644
 +#               else
                      Timer::preciseSleepUntil(presentTimestamp + std::chrono::nanoseconds(1'000'000'000 / targetRate));
 +#               endif
-                 }
--
++                }
 +#           if defined(__EMSCRIPTEN__)
 +                else {
 +                    presentSlot = Timestamp();
-+                }
-+#           else
+                 }
++#           endif
+ 
                  if (presentWaitEnabled) {
 +                    PhaseTimer phaseTimer(this, PhaseWait);
                      ext.swapChain->wait();
                  }
-+#           endif
  
                  RenderCommandSemaphore *waitSemaphore = drawSemaphores[swapChainIndex].get();
                  presentTimestamp = Timer::current();
@@ -1347,7 +1331,7 @@ index 3227ab1..58e3210 100644
                  swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
                  presentProfiler.logAndRestart();
              }
-@@ -416,6 +493,197 @@ namespace RT64 {
+@@ -416,6 +480,186 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1430,17 +1414,6 @@ index 3227ab1..58e3210 100644
 +        }
 +
 +        if ((pacingPrebuildWaited != Timestamp()) && (Timer::deltaMicroseconds(pacingPrebuildWaited, now) < 1'000'000)) {
-+            pacingPresents.clear();
-+            pacingDropped = 0;
-+            return;
-+        }
-+
-+        // Nor are the presents in the first half second after a try of the number above counted, while the present
-+        // thread moves from the fewer presents' slots onto the new ones. On a laptop's Intel UHD in Firefox,
-+        // Banjo-Kazooie fell back to 30 within 2 s of a try twice in a row, so the next tries came 20 s and then 40 s
-+        // later, while plume had each present's work done 14-18 ms after it and wait() held none (the GPU had room);
-+        // a try into a quiet moment held 60 to the end.
-+        if ((pacingRaised != Timestamp()) && (Timer::deltaMicroseconds(pacingRaised, now) < 500'000)) {
 +            pacingPresents.clear();
 +            pacingDropped = 0;
 +            return;
@@ -1545,7 +1518,7 @@ index 3227ab1..58e3210 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -450,8 +718,10 @@ namespace RT64 {
+@@ -450,8 +694,10 @@ namespace RT64 {
          const bool displayTiming = ext.device->getCapabilities().displayTiming;
          bool swapChainValid = !ext.swapChain->needsResize();
          while (presentThreadRunning) {
@@ -1556,7 +1529,7 @@ index 3227ab1..58e3210 100644
                  cursorCondition.wait(cursorLock, [&]() {
                      return (writeCursor != threadCursor) || !presentThreadRunning;
                  });
-@@ -463,6 +733,22 @@ namespace RT64 {
+@@ -463,6 +709,22 @@ namespace RT64 {
                  }
              }
  
@@ -1579,7 +1552,7 @@ index 3227ab1..58e3210 100644
              if (processCursor >= 0) {
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  const bool needsResize = ext.swapChain->needsResize() || !swapChainValid;
-@@ -504,12 +790,19 @@ namespace RT64 {
+@@ -504,12 +766,19 @@ namespace RT64 {
                  skipPresent = skipPresent || ext.swapChain->isEmpty();
  
                  Present &present = presents[processCursor];

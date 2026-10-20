@@ -12,6 +12,11 @@ A run on a schedule that takes every change since the last one at once:
   (`play_page.mjs --record`, the page Pages serves and the build interleaved under one `--set`, each with its `--role`
   and the host's reading before it: docs/playing.md). A run flagged as a regression is played again, the host's load read first, and is a
   regression only if the second run is worse too and nothing beside it explains it; a drop within the noise is not one.
+  On a desktop GPU, where a host's load moves the numbers more than a build does, `tools/ab_pages.mjs` plays the build
+  and the page Pages serves interleaved instead, uncapped at the stand-in's size: Firefox Pages, build, build, Pages,
+  then CPU-throttled Chrome Pages, build, each run recorded with a note saying so. It prints each run's presents a
+  second as a table and a verdict by the same rule, a pair at a time (its header says how), and fails a run the host
+  slept through.
 - Only a page that boots with no WebGPU errors and plays no worse than its row and its earlier runs moves its fork's
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
   worse stays on Pages as it was, its fork on its last tag, and has work filed. So a fork's `main` is what its page was

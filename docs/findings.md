@@ -643,6 +643,29 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
 
+## Laptop-like limits on a desktop, measured
+
+On 2026-10-20, GoldenEye's and Banjo's pages from Pages (v0.67.0), each game's plan, Chrome 155 and Firefox 158 off
+the desktop at a laptop window's 1920x945, cold, on a desktop GPU (RTX 5080, 8 cores of 16 threads), one page at a
+time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "laptop-like limits", with play_page's
+`--fallback-adapter` and `--affinity` (docs/playing.md, Laptop-like limits on a desktop).
+
+- A software adapter is far slower than a laptop's Intel UHD, so it stands in for no laptop. Chrome on SwiftShader
+  drew GoldenEye's logos at 33-65 presents a second and Dam at 0.2-3.8 (median 2.1), its GPU process taking 11.6
+  cores, where the laptop's Chrome draws Dam at 60; the plan's holds, 3624 ticks of the game's clock asked, held 10467,
+  since the game reads a key once a frame. Firefox on WARP drew the logos at 4-5 and then nothing for most of 280 s,
+  its GPU process on 2 cores, and Dam at 0.5-0.6 (a game somebody played took the GPU and the host from 28 s on, but
+  WARP draws on the CPU, and the logos before it were no faster). Both played with no WebGPU errors or exceptions,
+  SwiftShader without `shader-f16`, and RT64 paced presents to the game's frames as the GPU fell behind, as on a laptop.
+- `--affinity 4` (two cores) changed nothing at the display's rate: Banjo in Firefox 62.8 presents a second against
+  63.0 on all 16, its browser at 0.5-0.6 cores; GoldenEye in Firefox held Dam at 63.6-64.2 against 63.5-64.0, its
+  two shader waits 3.6 and 4.3 s against 3.0 and 3.5 (Firefox builds the pipelines on its GPU process, on the same
+  cores), Bond's holds 3626 and 3628 ticks of 3624. Where the intros present faster than the display, one run each
+  went either way (Banjo 112-159 on 4 against 92-220 on 16, GoldenEye 152-190 against 118-138). So neither Firefox's pacing to 30 on the laptop's screen nor
+  GoldenEye's Dam collapse there is the laptop's CPU: the first was Windows' compositor's share of the GPU, the second
+  shaders the list lacked drawn with the ubershader (A laptop, measured), which a desktop shows as `shader missed:`
+  lines, not as a slower Dam.
+
 ## WebGPU in Chrome and Firefox
 
 
@@ -846,6 +869,31 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   for the main thread costs 50-120 µs from a pthread in a race, behind whatever is queued before it (RT64 asking at
   each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
   100 µs sleep there ~1.9 ms.
+
+## A page's thread in Chrome, throttled
+
+Banjo-Tooie's page is the slowest in Chrome with the CPU throttled 6 times (retest run 7, RTX 5080, uncapped at
+3840x2000: 76-77 presents a second, the other pages 126-290), and plays like them in Firefox (210-214). From Pages
+(built from main e8df837), its plan's boot and then Jinjo Village, the plan's first map, for 30 s, traced
+(`play_page.mjs --chrome-trace`; an idle host, 12-23% busy, no other GPU context; tracing cost the page ~15%):
+
+- Throttled 6 times, 72 presents a second, the page's thread is 92% busy. Two thirds of it is the WebGPU calls the
+  render thread hands it (Emscripten's mailbox): `writeBuffer` 14% of the thread's time, `setBindGroup` 10%,
+  `submit` 3%, `beginRenderPass`, `drawIndexed` and `setPipeline` 1-2% each, Emscripten's object lookup for each
+  call 3.5%, and 22% native time V8 can't name (Blink's WebGPU bindings and their IPC). Printing is 1.4%. The game's
+  threads, which Chrome's throttling doesn't slow, wait most of the time.
+- Unthrottled it reaches the 360 cap with the same thread 55% busy, the same calls on top.
+
+`--preload tools/webgpu_census.js`, throttled 6 times (87-95 presents a second, a shared GPU turn), counts what a
+present asks of that thread: ~1,710 `drawIndexed`, ~2,940 `setBindGroup`, ~680 `setPipeline`, 27 `writeBuffer`s of
+~1 MB, 39 `copyBufferToBuffer` and 11 render passes. Rush 2049's attract race makes 250-500 draws a present (Memory,
+above). plume already skips a pipeline or a bind group the pass has bound (`setPassPipeline`, `bindGroups`), so what
+is left is RT64's own per draw, as on a desktop build: the draw, its push constants (`renderIndex` changes every
+draw, so each gets a 256-byte slot of plume's ring, `writeBuffer`'s bytes, and a `setBindGroup` at its offset), and
+the texture set and pipeline where they change. So Banjo-Tooie is slow there because it draws ~1,700 batches a frame
+and each costs the page's thread its calls: its own, not the web support's. On the laptop's Chrome it plays 59
+(README, Games). The push constants' per-draw bind and 256 bytes are about a tenth of the throttled thread, the one
+part of it shared code could take out.
 
 ## Present gaps after Start
 
