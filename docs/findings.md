@@ -155,7 +155,10 @@ task either (the video thread sends both kinds; the audio thread only loads). Wh
 lands: N64ModernRuntime bf96a62 (`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten, with rt64 02f0a7c and
 RecompFrontend ab544ca) has RT64 mark the RDRAM it reads each list's commands from, and only a load onto commands one
 of the last 8 lists ran waits, at most 2 s; a sound's samples go at once. On a desktop GPU RT64 reads a list in a few
-ms, so a load rarely waits at all.
+ms, so a load rarely waits at all. On the laptop that wait played 5 of 5 clean, taking turns with main's page in the
+same minutes: presents 58.5-58.8 from its second play on against main's 58.2-58.8, and 549 frames short over its 5
+plays against main's 120, where waiting on every load cost 71,000 a play. Without the checked build's delay the trap
+is rarer there: main's page played 8 of 8 clean that day, and v0.67.0's trapped 1 in 5.
 
 A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
 `Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
