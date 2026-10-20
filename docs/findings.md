@@ -887,6 +887,26 @@ So what decides the last frame's guess is the order of the frames where 10-27% t
 that shows it, as above): a play there with the preload, read by the simulator. Runs mostly of 3 frames or more make a
 test build worth trying, to look at the motion; runs mostly of one put the guess in Ruled out beside the most common.
 
+## Faults
+
+`play_page.mjs --fault resize,hidden,audio,device,reload` (its header), played from Pages on an RTX 5080 (headless
+Chrome 155 at a 240 Hz animation-frame clock, Firefox 158 off the desktop at 60-63), Mario Kart 64 mid-race and Star
+Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
+
+- A resized window (60% as wide and high for 10 s): both pages in both browsers drew at the new canvas size
+  (754x387) and back, no error, the rate unchanged.
+- A suspended AudioContext (10 s): the game ran on, and once resumed the sound came up short for a few seconds
+  (201-1,304 frames) and then played as before.
+- A lost WebGPU device (`device.destroy()`): in both browsers both pages froze on their last frame and said nothing
+  but the console's `WebGPU device lost` (plume's `device.lost` only logs), and never asked for a new device. They
+  still call `getCurrentTexture` each frame, so a count of presents doesn't show it: the screenshots do. A reload
+  brought each back.
+- A hidden tab (30 s) in Chrome: the pages presented ~60 a second while hidden, but Star Fox 64's sound came up
+  3,000-7,000 frames short every 5 s, and back in front both presented below their rate before (60, then 89 against
+  147; 60 for ~80 s against 114). Firefox played both through it unchanged.
+- A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
+  against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
