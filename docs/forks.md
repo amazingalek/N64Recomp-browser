@@ -264,10 +264,13 @@ RecompFrontend 2114cc6 on a page mouse motion reaches nothing while relative mod
                        focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
                        cursor's position on the canvas as motion, so GoldenEye's mouse look turned at once by however
                        far that was from the last locked one, and the menu opened only at a second Esc
-N64ModernRuntime       ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS: a PI DMA from ROM, on any thread, waits (at most 2 s)
-649c0cc                until RT64 has read every display list sent before it, as a console's RSP has long before a load
-                       lands. Mario Kart 64 loads its title screen's textures over its logos' model the frame after
-                       their last list; on a laptop's integrated GPU RT64's thread, a frame or more behind, read that
-                       list after the load, took texture words for commands (color images 1792-3072 wide) and the page
-                       trapped in free() (docs/findings.md, Memory)
+N64ModernRuntime       ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS: RT64's interpreter marks the RDRAM it reads each display
+23325d5,               list's commands from (256-byte units) and counts the lists it has read, in an array ultramodern
+rt64 7adbb05,          owns and RecompFrontend's glue hands it, and a PI DMA from ROM onto commands one of the last 8
+RecompFrontend         lists read ran waits (at most 2 s) until RT64 has read every list sent before it, as a console's
+115e099                RSP has long before a load lands; a load anywhere else goes at once. Mario Kart 64 loads its
+                       title screen's textures over its logos' model the frame after their last list; on a laptop's
+                       integrated GPU RT64's thread, a frame or more behind, read that list after the load, took
+                       texture words for commands (color images 1792-3072 wide) and the page trapped in free(). Every
+                       load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
 ```

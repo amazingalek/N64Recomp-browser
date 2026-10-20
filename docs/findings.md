@@ -147,11 +147,15 @@ reads a list on its graphics thread, a frame or more behind the game on the lapt
 the load. Telling the game sp_complete only after RT64 had read the list (the checked build's 0-30 ms delay moved
 after the read) trapped 1 in 2: the load comes from another thread and waits on no task. Making every PI DMA from ROM
 wait until RT64 had read every list sent before it played 10 of 10 clean through the same menu (6 of them at the
-players-0 menu where the traps came). No narrower wait does: holding only the thread that sends the lists trapped 2 of
-2 (the loader sends none), and exempting the audio thread's loads doesn't separate them either (the video thread sends
-both tasks; the audio thread only loads samples). N64ModernRuntime 649c0cc makes every load wait so, at most 2 s
-(`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten). On a desktop GPU RT64 reads a list in a few ms, so a
-load rarely waits at all.
+players-0 menu where the traps came), and so did the same wait without the checks and delay, 5 of 5 (presents 56-58
+from the second play on), but it cost the sound: 3.4% of the frames short (71,000-78,000 of 2.2 million a play), where
+main's page played 0-307 short in the same minutes. The audio thread's sample loads waited behind the graphics too.
+Holding only the thread that sends the lists trapped 2 of 2 (the loader sends none), and the threads don't separate by
+task either (the video thread sends both kinds; the audio thread only loads). What separates them is where a load
+lands: N64ModernRuntime 23325d5 (`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten, with rt64 7adbb05 and
+RecompFrontend 115e099) has RT64 mark the RDRAM it reads each list's commands from, and only a load onto commands one
+of the last 8 lists ran waits, at most 2 s; a sound's samples go at once. On a desktop GPU RT64 reads a list in a few
+ms, so a load rarely waits at all.
 
 A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
 `Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
