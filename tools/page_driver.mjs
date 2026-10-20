@@ -54,6 +54,7 @@
 // page.stop(reason) ends a run where it is: the step it is in is left (a clock wait included, which on a game that has
 // stopped waits out its whole 5 times and 30 s), no step after it starts, and run() throws reason, as a step that failed
 // does. A run started after it throws at once.
+import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
@@ -106,24 +107,89 @@ const defaultExecutable = {
   firefox: process.platform === 'win32' ? 'C:/Program Files/Mozilla Firefox/firefox.exe' : 'firefox',
 };
 
+// A WebSocket client of text messages (RFC 6455), resolving once open: send(text), and the caller's
+// onmessage(text) and onclose(code, reason, error), code 1006 for a socket that dropped with no close frame. Node's own
+// WebSocket isn't used: Node 22's (undici 6) masks every frame after its 4,096th with zeros, since its pool of masks,
+// 16,386 bytes, isn't a whole number of them, and Firefox drops the connection at the first such frame, which cut
+// every Firefox play that sampled each second about 12 minutes in (docs/findings.md, A page that stops answering).
+const webSocket = (url) => new Promise((resolve, reject) => {
+  const { hostname, port, pathname, search } = new URL(url);
+  const socket = net.connect({ host: hostname, port: Number(port) });
+  const ws = { onmessage: () => {}, onclose: () => {} };
+  let buffered = Buffer.alloc(0), open = false, closed = false, error = null, parts = [];
+  // A client's frame: its length in 7, 16 or 64 bits, then a mask of its own and the payload masked with it.
+  const frame = (opcode, payload) => {
+    const length = payload.length, at = length < 126 ? 2 : length < 65536 ? 4 : 10;
+    const out = Buffer.alloc(at + 4 + length);
+    out[0] = 0x80 | opcode;
+    out[1] = 0x80 | (at === 2 ? length : at === 4 ? 126 : 127);
+    if (at === 4) out.writeUInt16BE(length, 2);
+    else if (at === 10) out.writeBigUInt64BE(BigInt(length), 2);
+    crypto.randomFillSync(out, at, 4);
+    for (let i = 0; i < length; i++) out[at + 4 + i] = payload[i] ^ out[at + (i & 3)];
+    if (!socket.destroyed) socket.write(out);
+  };
+  const end = (code, reason) => {
+    if (closed) return;
+    closed = true;
+    socket.destroy();
+    if (open) ws.onclose(code, reason, error);
+    else reject(new Error(error ?? `no WebSocket at ${url}`));
+  };
+  ws.send = (text) => frame(0x1, Buffer.from(text));
+  socket.on('connect', () => socket.write(`GET ${pathname}${search} HTTP/1.1\r\nHost: ${hostname}:${port}\r\n` +
+    `Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}\r\n` +
+    'Sec-WebSocket-Version: 13\r\n\r\n'));
+  socket.on('error', (e) => { error = e.message; });
+  socket.on('close', () => end(1006, ''));
+  socket.on('data', (data) => {
+    buffered = Buffer.concat([buffered, data]);
+    if (!open) {
+      const at = buffered.indexOf('\r\n\r\n');
+      if (at < 0) return;
+      if (!/^HTTP\/1\.1 101/.test(buffered.toString('latin1', 0, at))) { error = buffered.toString('latin1', 0, at).split('\r\n')[0]; end(1006, ''); return; }
+      buffered = buffered.subarray(at + 4);
+      open = true;
+      resolve(ws);
+    }
+    // The server's frames, unmasked: a message in parts (continuations), ping answered, close answered and ended.
+    while (buffered.length >= 2) {
+      let length = buffered[1] & 127, at = 2;
+      if (length === 126) { if (buffered.length < 4) return; length = buffered.readUInt16BE(2); at = 4; }
+      else if (length === 127) { if (buffered.length < 10) return; length = Number(buffered.readBigUInt64BE(2)); at = 10; }
+      if (buffered.length < at + length) return;
+      const fin = buffered[0] & 0x80, opcode = buffered[0] & 15, payload = buffered.subarray(at, at + length);
+      buffered = buffered.subarray(at + length);
+      if (opcode === 0x8) { frame(0x8, payload.subarray(0, 2)); end(length >= 2 ? payload.readUInt16BE(0) : 1005, payload.toString('utf8', 2)); return; }
+      if (opcode === 0x9) frame(0xa, payload);
+      else if (opcode <= 0x2) {
+        parts.push(payload);
+        if (fin) { const text = Buffer.concat(parts).toString('utf8'); parts = []; ws.onmessage(text); }
+      }
+    }
+  });
+});
+
 // A JSON-over-WebSocket protocol (CDP and BiDi both are): send(method, params) resolves to the reply, and
 // send(method, params, sessionId) goes to one of CDP's attached targets (a worker). send(method, params, sessionId, ms)
 // gives up after ms. A call that gets no answer throws an error with unanswered set: one given up on, and every one
 // outstanding or sent once the socket has closed (the browser gone). Without that, one call a page never answered (its
 // thread blocked) or a browser killed mid-play held its tool for good.
 const connect = async (url, onEvent) => {
-  const ws = new WebSocket(url);
-  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+  const ws = await webSocket(url);
   let id = 0, closed = null;
   const pending = new Map();
   const unanswered = (message) => Object.assign(new Error(message), { unanswered: true });
-  ws.onmessage = (event) => {
-    const m = JSON.parse(event.data);
+  ws.onmessage = (data) => {
+    const m = JSON.parse(data);
     if (!m.id) onEvent(m);
     else { pending.get(m.id)?.resolve(m); pending.delete(m.id); }
   };
-  ws.onclose = ws.onerror = () => {
-    closed ??= unanswered('the browser closed its debugging connection');
+  // The close says by its code and reason which end closed and why (1006: the socket dropped with no close frame), the
+  // socket's error beside it.
+  ws.onclose = (code, reason, error) => {
+    closed ??= unanswered(`the debugging connection closed (code ${code}${reason ? `, "${reason}"` : ''}` +
+      `${error ? `, ${error}` : ''})`);
     for (const call of pending.values()) call.reject(closed);
     pending.clear();
   };
@@ -323,8 +389,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
   const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
-    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'],
-    { stdio: 'ignore' });
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
     line('page_driver: Chrome window not moved');
   }
@@ -433,7 +498,8 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
-    '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'], { stdio: 'ignore' });
+    '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
+    { stdio: 'ignore' });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
     try {

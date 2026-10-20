@@ -54,13 +54,15 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
   };
   self.Worker.prototype = PageWorker.prototype;
   // sbrk's pointer: the one function under 200 bytes that calls the resize import and holds one address (sizes and masks
-  // match too: an address is 4-aligned and neither a power of two nor one less).
+  // match too: an address is 4-aligned and neither a power of two nor one less). The call is found by its bytes, which
+  // other code can hold too: where more than one function passes (a build linked with --profiling-funcs), the one its
+  // name section calls sbrk.
   const findSbrk = (bytes) => {
     const b = new Uint8Array(bytes);
     let p = 8;
     const leb = () => { let r = 0, s = 0, x; do { x = b[p++]; r |= (x & 127) << s; s += 7; } while (x & 128); return r >>> 0; };
     const str = () => { const n = leb(); const t = new TextDecoder().decode(b.subarray(p, p + n)); p += n; return t; };
-    let imported = 0, target = -1;
+    let imported = 0, target = -1, named = -1;
     const found = [];
     while (p < b.length) {
       const id = b[p++], size = leb(), end = p + size;
@@ -85,14 +87,22 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
               if (b[q] === 0x10) { p = q + 1; if (leb() === target) calls = true; }
               if (b[q] === 0x41) { p = q + 1; const v = leb(); if (v > 65536 && v < 0x8000000) consts.add(v); }
             }
-            if (calls && consts.size) found.push([...consts]);
+            if (calls && consts.size) found.push(Object.assign([...consts], { index: imported + i }));
           }
           p = stop;
         }
       }
+      if (id === 0 && str() === 'name') {
+        while (p < end) {
+          const sub = b[p++], subEnd = leb() + p;
+          if (sub === 1) for (let i = 0, n = leb(); i < n; i++) { const index = leb(); if (str() === 'sbrk') named = index; }
+          p = subEnd;
+        }
+      }
       p = end;
     }
-    const one = found.filter((c) => c.length === 1 && !(c[0] & 3) && (c[0] & (c[0] - 1)) && ((c[0] + 1) & c[0]));
+    const one = found.filter((c) => c.length === 1 && !(c[0] & 3) && (c[0] & (c[0] - 1)) && ((c[0] + 1) & c[0]) &&
+      (named < 0 || c.index === named));
     return one.length === 1 ? one[0][0] : 0;
   };
   let sbrk = 0;

@@ -175,21 +175,25 @@ presents fell 215 → 45 → 0 and the sound starved, and only then did the brea
 to the abort at 549.8 s. So a thread stalls first and then allocates in a loop, about 170 MB a second, a list
 interpreter walking a garbage display list say (Mario Kart 64's above); it needs neither a busy host nor a second page,
 only a long enough play. A 17-minute soak on an RTX 2070 played to the end (break 838.9 MB throughout). The request's
-size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop.
+size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
+slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
+checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
+the break at 843.9 MB throughout.
 
 ## A page that stops answering
 
-GoldenEye's page from Pages (v0.67.0), in a Firefox 158 soak on an RTX 5080 desktop (uncapped, 3840x2000, its plan
-and then Dam held 20 minutes, the GPU kept ~99% busy by another program's work through it), played normally to 774 s
-(120-135 presents a second, no sound short, the GPU process flat at 2.7-2.8 GB, no exception or WebGPU error) and
-then answered no more script.evaluate. 2.5 hours on, its tab process still took 0.73 cores and the GPU process 0.38,
-and the browser's own process was idle and responding. Firefox's WebDriver BiDi runs on that process's main thread,
-so the browser's side of the driver was free; what gave no answer was the tab, whose main thread runs the page's
-script and BiDi's evaluate both. Five replays of the soak on an RTX 2070 played to the end, 1336 s each: v0.67.0's page
-(its gh-pages files, served locally) in Firefox and in Chrome, and v0.71.0's in Firefox three times, with play_page's
-1 s sampling and heap_probe.js, with a probe every 5 s instead, and with both. So a long play of the page is not
-enough; what none of them had is that desktop and its busy GPU, where Banjo's Firefox abort (Memory) came too and an
-RTX 2070 soak didn't. A heartbeat from inside the page can't tell a blocked page from a gone one: in Firefox a worker's
+Firefox drops play_page's connection at its 4,098th message when page_driver.mjs speaks WebSocket with Node's own
+client: Node 22.23 (undici 6.28) masks every frame after its 4,096th with zeros (its pool of masks, 16,386 bytes, isn't
+a whole number of them), Firefox 158 closes the socket at the first such frame with no close frame (1006), and Chrome
+takes them. At play_page's 1 s sampling, about 5.5 messages a second, that is 12.4 minutes into any Firefox play: four
+of Banjo-Kazooie's soaks on an RTX 5080 ended at 744-746 s with the page playing normally up to the drop, a blank page
+asked 5 times a second at 823 s, and one asked as fast as it answers at the 4,098th, while one asked once a second
+lived past 1,000 s. GoldenEye's page from Pages (v0.67.0) in a Firefox soak on the same desktop gave no more answers at
+774 s (120-135 presents a second, its tab still busy 2.5 hours on, the browser's process idle): the same count at its
+rate, and five replays of it on an RTX 2070 host played to the end (1336 s). page_driver.mjs has a client of its own,
+which took 6,000 requests in a row, a 70 kB request and a 1 MB answer in Firefox and in Chrome.
+
+A heartbeat from inside the page can't tell a blocked page from a gone one: in Firefox a worker's
 console lines pass through the page's main thread (a worker's beat each second stopped while a blank page's main
 thread was held 60 s), and in Chrome page_driver.mjs hears no worker's own console lines at all. play_page.mjs reads the
 threads from outside instead: a run that stops answering ends with each process's main thread, the tab's busiest
