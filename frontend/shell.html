@@ -105,7 +105,7 @@
       // plume_webgpu_device.js has made the device by now: it holds the program back until it has.
       Module.preinitializedWebGPUDevice?.lost.then((info) => {
         document.exitPointerLock?.();
-        fail('The game\'s graphics stopped: the browser lost its WebGPU device' + (info.message ? ' (' + info.message + ')' : '') +
+        fail('The game\'s graphics stopped: the browser lost its WebGPU device' + (info.message ? ' (' + info.message.replace(/\.$/, '') + ')' : '') +
              '.\nReload the page to carry on.');
       });
     },
