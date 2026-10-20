@@ -42,22 +42,21 @@
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
 // --fault does to the page, once the play is over (a plan's play ends in its level), what a player's browser or the
 // player does to one, then lets the game run by itself 30 s more, and a list (resize,hidden,audio,device,reload) does
-// each in turn in the one visit: device destroys every WebGPU device the page made (device.destroy(), as a driver
-// reset or a crashed GPU process loses one), resize makes the viewport 60% as wide and as high for 10 s and gives it
-// back (not with --on-screen), hidden puts another tab in front for 30 s, audio suspends the page's AudioContext for
-// 10 s and resumes it, and reload loads the page again over the browser's warm cache and service worker (a page from
-// Pages: a build dir is served uncached) and runs the plan's load and start steps, its setup's ROM kept: a player's
-// way back from a lost device, after one. For each it prints and records (in "faults") the presents a second before
-// it (the last 3 samples), during and after, the WebGPU errors, exceptions and sound frames short after, the console's
-// first 10 lines from it on (whether the page told the player), the canvas's size, the visibility, the AudioContext's
-// state, whether the picture stood still (two screenshots a second apart the same: a page whose device is gone still
-// calls getCurrentTexture), for reload both boots (seconds to the end of the load steps and to the first present: cold,
-// then warm), and
-// whether the page came through: presenting at half the rate before or more after, a picture that moves, no error or
-// exception, and
-// after a lost device with a new one. One that fails the run (the game stopped) ends the list there. --shot takes a
-// screenshot after each too, <file>-<n>-<fault>.png. The note starts "fault <list>", so the run is compared with
-// nothing; the play's own numbers leave the faults out; and a page that didn't come through one exits 4.
+// each in turn in the one visit: device destroys every WebGPU device the page made (device.destroy(), as a driver reset
+// or a crashed GPU process loses one), resize makes the viewport 60% as wide and as high for 10 s and gives it back
+// (not with --on-screen), hidden puts another tab in front for 30 s, audio suspends the page's AudioContext for 10 s
+// and resumes it, and reload loads the page again over the browser's warm cache and service worker (a page from Pages:
+// a build dir is served uncached) and runs the plan's load and start steps, its setup's ROM kept: a player's way back
+// from a lost device, after one. For each it prints and records (in "faults") the presents a second before it (the last
+// 3 samples), during and after, the WebGPU errors, exceptions and sound frames short after, the console's first 10
+// lines from it on (whether the page told the player), the canvas's size, the visibility, the AudioContext's state,
+// whether the picture stood still (two screenshots a second apart the same: a page whose device is gone still calls
+// getCurrentTexture), for reload both boots (seconds to the end of the load steps and to the first present: cold, then
+// warm), and whether the page came through: presenting at half the rate before or more after, a picture that moves, no
+// error or exception, and after a lost device with a new one. One that fails the run (the game stopped) ends the list
+// there. --shot takes a screenshot after each too, <file>-<n>-<fault>.png. The note starts "fault <list>", so the run
+// is compared with nothing; the play's own numbers leave the faults out; and a page that didn't come through one exits
+// 4.
 // Every run says when a WebGPU device the page made is lost, whoever lost it ("play_page: a WebGPU device was lost").
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
