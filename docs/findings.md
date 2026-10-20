@@ -178,7 +178,10 @@ only a long enough play. A 17-minute soak on an RTX 2070 played to the end (brea
 size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
 slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
 checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
-the break at 843.9 MB throughout.
+the break at 843.9 MB throughout. Whether v0.77.0's load wait (Mario Kart 64's fix above) ends it is still open, as an
+RTX 2070 doesn't bring it on: 16 Firefox soaks of 978-1,116 s there (2026-10-20 17:53-22:37 UTC, a shared host), the page
+from Pages and a v0.77.0 build of the same main in turn, 8 each, played to the end with the break at 838.9 and 839.0 MB
+throughout and no abort from either. The test is the same pairs on a GPU where the page from Pages aborts.
 
 ## A page that stops answering
 
@@ -671,6 +674,48 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
 
+On 2026-10-20 the same laptop played Banjo on screen in Firefox 158 with the default prefs and DWM at 0% in every run,
+three interleaved rounds of four test pages, each its main eafae14 with N64Recomp-browser at main 92e85dc (v0.77.0+),
+at one with RT64's present thread calling wait() before its slot sleep (rt64-web 4462e8e, not on main), at one with that
+and pace() leaving the first 0.5 s after a try out of its count (c9908d6, not on main), and main's with
+`?presents-in-flight=3` (plays.jsonl's 12 lines from 18:56 to 19:24 UTC): every run was paced to 30 at 28-31 s, and
+nearly every try of 60 after fell back within 2-5 s, in all four. Presents a second (median): 30.0, 31.5, 32.6 on main,
+30.0, 30.4, 30.0 with the wait first, 30.0, 30.0, 58.1 with the 0.5 s too (a try into a quiet moment), 30.0, 30.1, 30.1
+with 3 in flight.
+
+- At 60 the GPU doesn't keep up in Firefox's default path: the Intel GPU was 94-100% busy in every 5 s sample at 60 and
+  54-74% at 30. At 30 plume had each present done 10-14 ms after it with no time at the cap; right after a try of 60,
+  in the same scene, 18 ms (median, 82 at p90) and 181 ms a second at the cap even with 3 in flight, the present thread
+  taking 40-60 ms a game frame, 17-40 of it in wait(). So pace() going to 30 is right there, and a run's GPU reads
+  60-70% only because it spends most of its time at 30. With `gfx.webrender.compositor` false (above) the stretches
+  held at 60 had each present done 8-13 ms after it: what a present costs in Firefox's own compositing decides it.
+- The wait first can't change the rate: once the slots start again from a late present, the present goes out at the
+  later of its slot and the done signal wait() waits for, which comes when the GPU is done whenever the wait starts, in
+  either order. The sleep and wait() in present-stats' drop lines are the one interval split two ways.
+
+## Laptop-like limits on a desktop, measured
+
+On 2026-10-20, GoldenEye's and Banjo's pages from Pages (v0.67.0), each game's plan, Chrome 155 and Firefox 158 off
+the desktop at a laptop window's 1920x945, cold, on a desktop GPU (RTX 5080, 8 cores of 16 threads), one page at a
+time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "laptop-like limits", with play_page's
+`--fallback-adapter` and `--affinity` (docs/playing.md, Laptop-like limits on a desktop).
+
+- A software adapter is far slower than a laptop's Intel UHD, so it stands in for no laptop. Chrome on SwiftShader
+  drew GoldenEye's logos at 33-65 presents a second and Dam at 0.2-3.8 (median 2.1), its GPU process taking 11.6
+  cores, where the laptop's Chrome draws Dam at 60; the plan's holds, 3624 ticks of the game's clock asked, held 10467,
+  since the game reads a key once a frame. Firefox on WARP drew the logos at 4-5 and then nothing for most of 280 s,
+  its GPU process on 2 cores, and Dam at 0.5-0.6 (a game somebody played took the GPU and the host from 28 s on, but
+  WARP draws on the CPU, and the logos before it were no faster). Both played with no WebGPU errors or exceptions,
+  SwiftShader without `shader-f16`, and RT64 paced presents to the game's frames as the GPU fell behind, as on a laptop.
+- `--affinity 4` (two cores) changed nothing at the display's rate: Banjo in Firefox 62.8 presents a second against
+  63.0 on all 16, its browser at 0.5-0.6 cores; GoldenEye in Firefox held Dam at 63.6-64.2 against 63.5-64.0, its
+  two shader waits 3.6 and 4.3 s against 3.0 and 3.5 (Firefox builds the pipelines on its GPU process, on the same
+  cores), Bond's holds 3626 and 3628 ticks of 3624. Where the intros present faster than the display, one run each
+  went either way (Banjo 112-159 on 4 against 92-220 on 16, GoldenEye 152-190 against 118-138). So neither Firefox's pacing to 30 on the laptop's screen nor
+  GoldenEye's Dam collapse there is the laptop's CPU: the first was Windows' compositor's share of the GPU, the second
+  shaders the list lacked drawn with the ubershader (A laptop, measured), which a desktop shows as `shader missed:`
+  lines, not as a slower Dam.
+
 ## WebGPU in Chrome and Firefox
 
 
@@ -875,6 +920,31 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
   100 µs sleep there ~1.9 ms.
 
+## A page's thread in Chrome, throttled
+
+Banjo-Tooie's page is the slowest in Chrome with the CPU throttled 6 times (retest run 7, RTX 5080, uncapped at
+3840x2000: 76-77 presents a second, the other pages 126-290), and plays like them in Firefox (210-214). From Pages
+(built from main e8df837), its plan's boot and then Jinjo Village, the plan's first map, for 30 s, traced
+(`play_page.mjs --chrome-trace`; an idle host, 12-23% busy, no other GPU context; tracing cost the page ~15%):
+
+- Throttled 6 times, 72 presents a second, the page's thread is 92% busy. Two thirds of it is the WebGPU calls the
+  render thread hands it (Emscripten's mailbox): `writeBuffer` 14% of the thread's time, `setBindGroup` 10%,
+  `submit` 3%, `beginRenderPass`, `drawIndexed` and `setPipeline` 1-2% each, Emscripten's object lookup for each
+  call 3.5%, and 22% native time V8 can't name (Blink's WebGPU bindings and their IPC). Printing is 1.4%. The game's
+  threads, which Chrome's throttling doesn't slow, wait most of the time.
+- Unthrottled it reaches the 360 cap with the same thread 55% busy, the same calls on top.
+
+`--preload tools/webgpu_census.js`, throttled 6 times (87-95 presents a second, a shared GPU turn), counts what a
+present asks of that thread: ~1,710 `drawIndexed`, ~2,940 `setBindGroup`, ~680 `setPipeline`, 27 `writeBuffer`s of
+~1 MB, 39 `copyBufferToBuffer` and 11 render passes. Rush 2049's attract race makes 250-500 draws a present (Memory,
+above). plume already skips a pipeline or a bind group the pass has bound (`setPassPipeline`, `bindGroups`), so what
+is left is RT64's own per draw, as on a desktop build: the draw, its push constants (`renderIndex` changes every
+draw, so each gets a 256-byte slot of plume's ring, `writeBuffer`'s bytes, and a `setBindGroup` at its offset), and
+the texture set and pipeline where they change. So Banjo-Tooie is slow there because it draws ~1,700 batches a frame
+and each costs the page's thread its calls: its own, not the web support's. On the laptop's Chrome it plays 59
+(README, Games). The push constants' per-draw bind and 256 bytes are about a tenth of the throttled thread, the one
+part of it shared code could take out.
+
 ## Present gaps after Start
 
 What each thread does in a gap over 100 ms with no shader wait, read from a CDP trace of every thread of every
@@ -978,6 +1048,26 @@ So what decides the last frame's guess is the order of the frames where 10-27% t
 that shows it, as above): a play there with the preload, read by the simulator. Runs mostly of 3 frames or more make a
 test build worth trying, to look at the motion; runs mostly of one put the guess in Ruled out beside the most common.
 
+## Faults
+
+`play_page.mjs --fault resize,hidden,audio,device,reload` (its header), played from Pages on an RTX 5080 (headless
+Chrome 155 at a 240 Hz animation-frame clock, Firefox 158 off the desktop at 60-63), Mario Kart 64 mid-race and Star
+Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
+
+- A resized window (60% as wide and high for 10 s): both pages in both browsers drew at the new canvas size
+  (754x387) and back, no error, the rate unchanged.
+- A suspended AudioContext (10 s): the game ran on, and once resumed the sound came up short for a few seconds
+  (201-1,304 frames) and then played as before.
+- A lost WebGPU device (`device.destroy()`): in both browsers both pages froze on their last frame and said nothing
+  but the console's `WebGPU device lost` (plume's `device.lost` only logs), and never asked for a new device. They
+  still call `getCurrentTexture` each frame, so a count of presents doesn't show it: the screenshots do. A reload
+  brought each back.
+- A hidden tab (30 s) in Chrome: the pages presented ~60 a second while hidden, but Star Fox 64's sound came up
+  3,000-7,000 frames short every 5 s, and back in front both presented below their rate before (60, then 89 against
+  147; 60 for ~80 s against 114). Firefox played both through it unchanged.
+- A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
+  against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
@@ -1026,9 +1116,9 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
   Time's bar is 67-102 CSS pixels from the bottom at 1256x645, 75-126 at 1920x945 and 268-378 at 3840x2000, and its
   plan's click missed it at 1920x945 and 1920x889. Its plan presses Enter on the launcher's focused Load ROM instead (a
   `rom` step with a key, `page_driver.mjs`). And a click while Chrome builds the shader list behind the launcher, a
-  laptop's Intel UHD at 99% on screen, was not taken (Wave Race 64's 100, done at 11.1 s): its plan waits for
-  `RT64: all <n> prebuilt shaders built`. Firefox builds none there, so its misses on screen there have another cause,
-  not yet seen.
+  laptop's Intel UHD at 99% on screen, was not taken (Wave Race 64's 100, done at 11.1 s), nor on an RTX 5080
+  headless (Pilotwings 64's, the game never started): their plans wait for `RT64: all <n> prebuilt shaders built`.
+  Firefox builds none there, so its misses on screen there have another cause, not yet seen.
 - A debugging port shared by two browsers: the second Chrome took `[::1]` and the tool drove the first one's page, which
   is why `page_driver.mjs` refuses a port another browser holds.
 - Firefox's `\GPU Process Memory(*)\Dedicated Usage` climbs by a canvas a frame, past a terabyte in 15 minutes, while
@@ -1101,6 +1191,10 @@ What CLAUDE.md's Ruled out rests on.
 - Firefox's misses built where the game pauses, or with the next section's wait (What the prebuilt lists miss): in
   long plays a 100 ms pause after a miss came for 5-6 of Banjo-Tooie's 27-29 and none of GoldenEye's 5-7, and the
   misses come after the list's last section.
+- The present thread's wait() before its slot sleep, pace() leaving a try's first 0.5 s out of its count, or 3
+  presents in flight, as what holds Banjo at 30 in Firefox on a laptop's screen: each paced to 30 as often as main, with
+  the GPU 94-100% busy at 60 (A laptop, measured).
 - wait()'s trips to the page's thread, or Firefox's late timed waits, as what paces Banjo to 30 on a laptop's screen:
   with plume bf417cf it paced to 30 in every default-prefs Firefox run, as before, and what decided 60 against 30 was
-  how much of the GPU Windows' compositor took (A laptop, measured).
+  what each present cost the GPU in Firefox's compositing, Windows' compositor included, and with DWM at 0% Banjo
+  was paced to 30 all the same (A laptop, measured).

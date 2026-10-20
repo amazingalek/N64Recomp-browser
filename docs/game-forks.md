@@ -121,7 +121,10 @@ patch), the microcode labels it ignores, render to RAM off and why, the shader l
 (N64ModernRuntime 2e6aa0a). Upstream ships the Suplexmentary Comic NC font in `assets/`, and the page loads it. Its list
 is 284 descriptions in 11 sections. The word at 0x800459C8 counts 30 a second in every world, not frames
 drawn. The desktop build draws every world but Terrydactyland and Hailfire Peaks at 30. Upstream prints diagnostics of
-its own (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are. Its BUILDING.md and the headers of
+its own (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are. It draws ~1,700 batches a frame in
+Jinjo Village, 3-7 times Rush 2049's, and RT64 makes each one WebGPU calls on the page's thread, so with Chrome's CPU
+throttled 6 times it is the slowest page there, its own draw count and not the web support (docs/findings.md, A page's
+thread in Chrome, throttled). Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how its
 own patches and apply.cmake are layered and the files left out, the recompile with the web-patched N64Recomp, render to
 RAM off and the leak it showed, the shader list and its survey, the frame rates per world and the page's pacing.
@@ -131,7 +134,7 @@ ELF is built with are in the Docker image. It is Fast3D, which RT64 draws on Web
 both framebuffers' RDRAM stays stale and equal, so `uvCopyFrameBuf`'s copy changes no byte and RT64's check of a
 framebuffer's RDRAM before each list (`checkRAM`) sees nothing; the title's fade alternates black frames either way, so
 that is not the page's. A game whose CPU copies into a framebuffer RT64 has never drawn, or reads one, still needs it.
-Its list is 422 descriptions in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
+Its list is 428 descriptions in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
 before the first frame, split 7-9 s. Its docs/BUILDING.md (The web page) and the headers of `src/frontend.cpp`,
 `patches/clocks.c`, `patches/sched.c`, `tools/shader_survey.js` and `tools/merge_shader_sections.py` have the rest: the
 decompilation build and the patches, sound, render to RAM off and why, the clock waits, the shader list's sections and
@@ -142,7 +145,8 @@ how it was recorded, the scheduler's timeouts taken out, plays.
 Upstream's four workflows, native builds without a ROM, are disabled on the fork. Its boot logo draws with no tile,
 which on WebGPU left the pipelines built behind the game without a binding their layout named (rt64 f01c3a6). Its list's
 sections hold each of 16 courses and four arenas with four players. Its `tools/play_plan.json` is a 50cc Grand Prix's
-Luigi Raceway on the game's own AI. Its README and BUILDING.md, and the headers of `patches/gfx_config.c`,
+first three races in one load on the game's own AI, each finish and results passed with A as a player goes on with the
+cup, which no section of the list's plan plays. Its README and BUILDING.md, and the headers of `patches/gfx_config.c`,
 `tools/shader_survey.js` and `src/rt64_shaders.txt`, have the rest: what moving onto RecompFrontend took, the Controller
 Pak, the boot's first display list and its fix, render to RAM kept exact for the jumbotron, the shader list and how it
 was recorded.
@@ -156,12 +160,13 @@ MIO0-compressed: N64Recomp reads the ROM `tools/decompress_rom.sh` decompresses 
 RAM is off: the CPU never reads a frame it drew (the motion blur is the RDP drawing over the last frame). Its CMake
 makes `register_patches.cpp` depend on the patches' section table, which N64Recomp writes mid-build: without that an
 incremental build after a patch moved stopped at boot ("Failed to find function at"; Mario Kart 64's CMake lacks the
-same edge). Its list, 818 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
+same edge). Its list, 823 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
 zones, the training, Venom's two routes and Andross, game over, Versus and the ending), is recorded by code:
 `patches/shader_survey.c` hands a level, a phase or a game state from the script to the game's own change of state
 (`gNextGameState`), with the player's shields kept full; a straight switch to the ending crashed until the survey set
 it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corneria (Start skips the Lylat map's
-prologue, A picks the planet) and a minute of it. Its README, BUILDING.md and the headers of those files have the rest.
+prologue, A picks the planet) and a minute of it, then Meteo, Katina and Titania 45 s each, started as the list's
+plan starts them. Its README, BUILDING.md and the headers of those files have the rest.
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`

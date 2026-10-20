@@ -32,7 +32,12 @@ options; `docs/findings.md` has what was measured this way.
   draws black too (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
 - The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
   run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
-  takes.
+  takes. A plan that goes on to more levels in one load makes each level's start one too, checking in RDRAM that the
+  level it asked for is the one playing: Pilotwings 64's gyrocopter test didn't end when its results were pressed, so
+  the next test's start found a vehicle flying, resolved at once, and the gyrocopter flew on for minutes.
+- Load ROM waits for the shader list Chrome builds behind the launcher (an `until` on `RT64: all <n> prebuilt shaders
+  built`, or on Firefox's line that it builds none there): a click while it builds can be lost (docs/findings.md,
+  Behind CLAUDE.md's rules).
 - A level the survey starts may crash when it ends: the screens after it read what the menus before it would have set
   up. So a plan that starts one keeps the player alive for as long as it plays (GoldenEye's `setInvincible()`): a
   GoldenEye play of Dam long enough for its guards to kill Bond stopped on the Mission Failed screen in Chrome and
@@ -111,12 +116,40 @@ options; `docs/findings.md` has what was measured this way.
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
   `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
   Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
+- How it comes through what a player's browser does to it: `--fault resize,hidden,audio,device,reload` (play_page's
+  header) does each in turn once the play is in its level (a resized window, another tab in front for 30 s, its
+  AudioContext suspended, its WebGPU device lost, then a reload over a warm cache and service worker), and records
+  whether it presents again after each, and what it said. Play it from Pages, whose cache and service worker a reload
+  finds warm (docs/findings.md, Faults).
 - A thread of the game that traps names only an offset in the wasm on a page linked without `--profiling-funcs`
   (`Game.wasm:8767891: RuntimeError: unreachable executed`); `node tools/wasm_offset.mjs <wasm or URL> <offset>`
   names the function that holds it. `unreachable executed` in the export the page's `.js` calls `___trap` is
   Emscripten's `abort()`, not a bad pointer: it prints `Aborted(<reason>)` just before, play_page puts that line in
   front of the exception in the failure it records, and an empty reason is C's `abort()` (a failed `new`, libc++
   throwing with exceptions off, the runtime's own), which the stderr lines before it say.
+
+## Laptop-like limits on a desktop
+
+A laptop's integrated graphics finds most new flaws. Without one, a desktop takes these stand-ins, each recorded in
+the run, so plays.jsonl compares a run only with runs that set the same (numbers: docs/findings.md, The stand-in,
+measured, and Laptop-like limits on a desktop, measured):
+
+- `--size 3840x2000 --uncapped`, the stand-in of a cell: about 7 times a laptop window's pixels, so a frame's GPU cost
+  shows as presents a second. It finds a costly frame and clears none.
+- `--size 1920x945`, the laptop window's viewport: what the page lays out and clicks, and the sizes Auto draws at
+  (GoldenEye's scene 2682x1320), a target's memory with them. A desktop GPU draws every page at the display's
+  rate there, so it is for the other limits and for memory, not for presents.
+- `--affinity <n>` holds the browser, every process of it, to n logical processors (4: two cores), in Firefox as in
+  Chrome, where `--cpu-throttle` slows only Chrome's page thread. It shows a page short of cores: on 4 Banjo and
+  GoldenEye played in Firefox as on 16 at the display's rate, its shader waits ~20% longer.
+- `--fallback-adapter` gives the page the browser's software adapter (SwiftShader in Chrome, WARP in Firefox), tens of
+  times slower than Intel UHD: GoldenEye's Dam drew 2 presents a second. It checks a page boots and draws with no
+  WebGPU errors on a weak adapter's features and limits (no `shader-f16`) and how it behaves far behind (RT64 pacing
+  presents to the game's frames, holds overrunning the clock), and is no laptop's speed.
+
+None stands in for Windows composing a laptop's screen on the same GPU (what pacing Firefox to 30 on screen was) or
+for the GPU's own speed at a laptop's size; Firefox drawing a list's misses with the ubershader (GoldenEye's Dam
+collapse) shows on a desktop as `shader missed:` lines.
 
 ## A cell of the Games table
 
