@@ -652,10 +652,18 @@ index 31eb106..50e8244 100644
      int32_t sp;
  } OSThread;
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..f237092 100644
+index 2f1cfb5..b277711 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -175,6 +175,98 @@ uint64_t total_vis = 0;
+@@ -8,6 +8,7 @@
+ #include <mutex>
+ #include <queue>
+ #include <cstring>
++#include <cstdlib>
+ 
+ #include "blockingconcurrentqueue.h"
+ 
+@@ -175,6 +176,98 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -754,7 +762,7 @@ index 2f1cfb5..f237092 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +296,25 @@ void vi_thread_func() {
+@@ -204,10 +297,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
@@ -780,6 +788,18 @@ index 2f1cfb5..f237092 100644
          if (new_total_vis > total_vis + 1) {
              //printf("Skipped % " PRId64 " frames in VI interupt thread!\n", new_total_vis - total_vis - 1);
          }
+@@ -365,6 +473,11 @@ void gfx_thread_func(uint8_t* rdram, moodycamel::LightweightSemaphore* thread_re
+                 // If this causes issues then the logic can be replaced with responding to yield requests.
+                 sp_complete();
+                 ultramodern::measure_input_latency();
++#if defined(__EMSCRIPTEN__)
++                // Test build (wip/banjo-oom-slow-rt64): a laptop's slow RT64 thread, 0-30 ms between telling the game its
++                // task is done and reading its display list, as Mario Kart 64's checked build (wip/mk64-checked) had it.
++                std::this_thread::sleep_for(std::chrono::microseconds(rand() % 30000));
++#endif
+ 
+                 PTR(u64) displaylist = task_action->task.t.data_ptr;
+                 ultramodern::extensions::on_displaylist_submitted(displaylist);
 diff --git a/ultramodern/src/mesgqueue.cpp b/ultramodern/src/mesgqueue.cpp
 index 9944a02..b7a1a2a 100644
 --- a/ultramodern/src/mesgqueue.cpp

@@ -34,7 +34,7 @@
 add_library(n64recomp_browser_frontend INTERFACE)
 target_link_options(n64recomp_browser_frontend INTERFACE
     -pthread -fwasm-exceptions -mtail-call -sUSE_SDL=2 -sUSE_FREETYPE=1
-    -sPROXY_TO_PTHREAD -Wl,--fatal-warnings
+    -sPROXY_TO_PTHREAD -Wl,--fatal-warnings --profiling-funcs
     -lidbfs.js
     "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$addRunDependency,$removeRunDependency"
     "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/persistent_home.js"
