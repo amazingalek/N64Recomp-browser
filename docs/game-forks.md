@@ -131,7 +131,7 @@ ELF is built with are in the Docker image. It is Fast3D, which RT64 draws on Web
 both framebuffers' RDRAM stays stale and equal, so `uvCopyFrameBuf`'s copy changes no byte and RT64's check of a
 framebuffer's RDRAM before each list (`checkRAM`) sees nothing; the title's fade alternates black frames either way, so
 that is not the page's. A game whose CPU copies into a framebuffer RT64 has never drawn, or reads one, still needs it.
-Its list is 422 descriptions in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
+Its list is 428 descriptions in 29 sections; with the menus in the boot (80) Firefox waited 18-37 s
 before the first frame, split 7-9 s. Its docs/BUILDING.md (The web page) and the headers of `src/frontend.cpp`,
 `patches/clocks.c`, `patches/sched.c`, `tools/shader_survey.js` and `tools/merge_shader_sections.py` have the rest: the
 decompilation build and the patches, sound, render to RAM off and why, the clock waits, the shader list's sections and
@@ -157,12 +157,13 @@ MIO0-compressed: N64Recomp reads the ROM `tools/decompress_rom.sh` decompresses 
 RAM is off: the CPU never reads a frame it drew (the motion blur is the RDP drawing over the last frame). Its CMake
 makes `register_patches.cpp` depend on the patches' section table, which N64Recomp writes mid-build: without that an
 incremental build after a patch moved stopped at boot ("Failed to find function at"; Mario Kart 64's CMake lacks the
-same edge). Its list, 818 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
+same edge). Its list, 823 descriptions in 24 sections (the boot, the menus to the Lylat map, each planet, the warp
 zones, the training, Venom's two routes and Andross, game over, Versus and the ending), is recorded by code:
 `patches/shader_survey.c` hands a level, a phase or a game state from the script to the game's own change of state
 (`gNextGameState`), with the player's shields kept full; a straight switch to the ending crashed until the survey set
 it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corneria (Start skips the Lylat map's
-prologue, A picks the planet) and a minute of it. Its README, BUILDING.md and the headers of those files have the rest.
+prologue, A picks the planet) and a minute of it, then Meteo, Katina and Titania 45 s each, started as the list's
+plan starts them. Its README, BUILDING.md and the headers of those files have the rest.
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
