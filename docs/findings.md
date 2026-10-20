@@ -121,8 +121,8 @@ logged only the VI at boot: 320x240, 1920x947, 6.082 x 4.000. In the trapping on
 Their targets, 3072 x 6.08 clamped to RenderTarget::MaxDimension, are the 16384 x 440 the device refused; no tile copy
 or reinterpreted tile passed 8192. The worker trapped 0.8 s after the first, in `free()` again, with an "indirect call
 signature mismatch" beside it: a function pointer overwritten too. So the corruption reached what RT64 reads the
-display list from (RDRAM, or its segment addresses) before it reached the heap, which points at stray writes over
-both, not at RT64 or the VI sizing anything wrong. Who writes them is open.
+display list from before it reached the heap: RT64 read a list that no longer held commands (below), not the VI sizing
+anything wrong.
 
 A desktop doesn't make them, even with the laptop's slow RT64 thread put in by hand. A checked test build of the page
 (v0.72.0's forks plus checks) traps at the first address out of RDRAM's 512 MB in every recompiled load and store, the
@@ -136,6 +136,22 @@ those plays neither the game, the runtime nor the DMAs reached past RDRAM, the r
 list RT64 read held a wide color image. Each check reads its address once: a TO_PTR that evaluated its argument three
 times popped ultramodern's running queue as often and crashed at boot, which reads like a race between game threads
 and isn't one. The laptop trapped once in 21 plays, so 21 clean ones here rule out a likely cause, not every cause.
+
+On the laptop (Firefox 158 on screen, MK64's plan) the same checked build trapped in 3 of 4 plays, every time at its
+wide color image check and never at an address check: the game wrote nothing out of RDRAM. Each dump read alike: a
+G_SETCIMG 1792 wide at 0xF7B005FF, the command (`FFD716FF F7B005FF`) in segment 6's data 0x9438 in, the 16 words each
+side of it RGBA32 texture pixels and none of them changed 5 ms later. RDRAM held what RT64 read, and it was a texture
+where the logos' model had been: the game loads its title screen's textures (one PI DMA from its loader thread) over
+segment 6 the frame after the logos' last list, which on a console the RSP read within a few ms of its sending. RT64
+reads a list on its graphics thread, a frame or more behind the game on the laptop's Intel UHD, and read that one after
+the load. Telling the game sp_complete only after RT64 had read the list (the checked build's 0-30 ms delay moved
+after the read) trapped 1 in 2: the load comes from another thread and waits on no task. Making every PI DMA from ROM
+wait until RT64 had read every list sent before it played 10 of 10 clean through the same menu (6 of them at the
+players-0 menu where the traps came). No narrower wait does: holding only the thread that sends the lists trapped 2 of
+2 (the loader sends none), and exempting the audio thread's loads doesn't separate them either (the video thread sends
+both tasks; the audio thread only loads samples). N64ModernRuntime 649c0cc makes every load wait so, at most 2 s
+(`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten). On a desktop GPU RT64 reads a list in a few ms, so a
+load rarely waits at all.
 
 A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
 `Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
