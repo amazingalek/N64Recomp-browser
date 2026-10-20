@@ -32,7 +32,12 @@ options; `docs/findings.md` has what was measured this way.
   draws black too (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
 - The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
   run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
-  takes.
+  takes. A plan that goes on to more levels in one load makes each level's start one too, checking in RDRAM that the
+  level it asked for is the one playing: Pilotwings 64's gyrocopter test didn't end when its results were pressed, so
+  the next test's start found a vehicle flying, resolved at once, and the gyrocopter flew on for minutes.
+- Load ROM in Chrome waits for the shader list Chrome builds behind the launcher (an `until` on RT64's line saying it
+  is built, or the one saying the game draws first, which Firefox prints): a click while it builds can be lost and the
+  game never starts.
 - A level the survey starts may crash when it ends: the screens after it read what the menus before it would have set
   up. So a plan that starts one keeps the player alive for as long as it plays (GoldenEye's `setInvincible()`): a
   GoldenEye play of Dam long enough for its guards to kill Bond stopped on the Mission Failed screen in Chrome and
