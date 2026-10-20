@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web d98135e3f2a78dbcd2b4a076100b2ae6336d769a
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 649c0cccd4c1b190fb8e3ab1e1dd3edbe8cf6a75
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -523,6 +523,19 @@ index 0f7de83..9bec0ec 100644
      loaded_mods_by_id.clear();
      hook_slots.clear();
      processed_hook_slots.clear();
+diff --git a/librecomp/src/pi.cpp b/librecomp/src/pi.cpp
+index 43509ba..4ba3a46 100644
+--- a/librecomp/src/pi.cpp
++++ b/librecomp/src/pi.cpp
+@@ -271,6 +271,8 @@ void do_dma(RDRAM_ARG PTR(OSMesgQueue) mq, gpr rdram_address, uint32_t physical_
+     // TODO implement unaligned DMA correctly
+     if (direction == 0) {
+         if (physical_addr >= recomp::rom_base) {
++            // Not over a display list RT64 hasn't read yet (ultramodern's wait_for_displaylists_read).
++            ultramodern::wait_for_displaylists_read();
+             // read cart rom
+             recomp::do_rom_read(rdram, rdram_address, physical_addr, size);
+ 
 diff --git a/librecomp/src/recomp.cpp b/librecomp/src/recomp.cpp
 index ea1c49b..7dda401 100644
 --- a/librecomp/src/recomp.cpp
@@ -601,10 +614,10 @@ index ea1c49b..7dda401 100644
  
  bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
 diff --git a/ultramodern/CMakeLists.txt b/ultramodern/CMakeLists.txt
-index 5593172..873586d 100644
+index 5593172..4d983d3 100644
 --- a/ultramodern/CMakeLists.txt
 +++ b/ultramodern/CMakeLists.txt
-@@ -39,3 +39,17 @@ target_compile_options(ultramodern PRIVATE
+@@ -39,3 +39,24 @@ target_compile_options(ultramodern PRIVATE
  if (WIN32)
      add_compile_definitions(NOMINMAX)
  endif()
@@ -621,6 +634,13 @@ index 5593172..873586d 100644
 +option(ULTRAMODERN_HOLD_BLOCKED_MESSAGES "A blocked external message held in a list, not requeued (always on with Emscripten)" OFF)
 +if (ULTRAMODERN_HOLD_BLOCKED_MESSAGES OR EMSCRIPTEN)
 +    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_HOLD_BLOCKED_MESSAGES=1)
++endif()
++
++# A PI DMA from ROM waits until RT64 has read every display list sent before it, so a load can't land over what a list
++# RT64 is behind on points at (events.cpp, wait_for_displaylists_read).
++option(ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS "A load from ROM waits for RT64 to read the display lists sent before it (always on with Emscripten)" OFF)
++if (ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS OR EMSCRIPTEN)
++    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS=1)
 +endif()
 diff --git a/ultramodern/include/ultramodern/renderer_context.hpp b/ultramodern/include/ultramodern/renderer_context.hpp
 index d60c4ec..c543624 100644
@@ -651,11 +671,48 @@ index 31eb106..50e8244 100644
      UltraThreadContext* context; // An actual pointer regardless of platform
      int32_t sp;
  } OSThread;
+diff --git a/ultramodern/include/ultramodern/ultramodern.hpp b/ultramodern/include/ultramodern/ultramodern.hpp
+index 46aea61..5201826 100644
+--- a/ultramodern/include/ultramodern/ultramodern.hpp
++++ b/ultramodern/include/ultramodern/ultramodern.hpp
+@@ -100,6 +100,9 @@ void set_entrypoint_thread();
+ bool is_entrypoint_thread();
+ bool is_game_thread();
+ void submit_rsp_task(RDRAM_ARG PTR(OSTask) task);
++// Waits until RT64 has read every display list sent so far, at most 2 s (with ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS;
++// returns at once without it).
++void wait_for_displaylists_read();
+ void send_si_message();
+ uint32_t get_speed_multiplier();
+ 
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..f237092 100644
+index 2f1cfb5..946174a 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -175,6 +175,98 @@ uint64_t total_vis = 0;
+@@ -6,6 +6,7 @@
+ #include <unordered_map>
+ #include <utility>
+ #include <mutex>
++#include <condition_variable>
+ #include <queue>
+ #include <cstring>
+ 
+@@ -137,6 +138,14 @@ static struct {
+     moodycamel::ConcurrentQueue<OSThread*> deleted_threads{};
+ } events_context{};
+ 
++#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
++// Graphics tasks sent to the graphics thread and display lists RT64 has read, for wait_for_displaylists_read.
++static std::mutex displaylists_mutex;
++static std::condition_variable displaylists_read_cv;
++static uint64_t displaylists_sent = 0;
++static uint64_t displaylists_read = 0;
++#endif
++
+ ultramodern::renderer::ViRegs* ultramodern::renderer::get_vi_regs() {
+     return &events_context.vi.update_screen_regs;
+ }
+@@ -175,6 +184,98 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -754,7 +811,7 @@ index 2f1cfb5..f237092 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +296,25 @@ void vi_thread_func() {
+@@ -204,10 +305,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
@@ -780,6 +837,53 @@ index 2f1cfb5..f237092 100644
          if (new_total_vis > total_vis + 1) {
              //printf("Skipped % " PRId64 " frames in VI interupt thread!\n", new_total_vis - total_vis - 1);
          }
+@@ -373,6 +489,13 @@ void gfx_thread_func(uint8_t* rdram, moodycamel::LightweightSemaphore* thread_re
+                 renderer_context->send_dl(&task_action->task);
+                 [[maybe_unused]] auto renderer_end = std::chrono::high_resolution_clock::now();
+ 
++#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
++                {
++                    std::lock_guard lock{ displaylists_mutex };
++                    displaylists_read++;
++                }
++                displaylists_read_cv.notify_all();
++#endif
+                 dp_complete();
+                 // TODO hook the parsed event up to the actual parsing point when a callback is added to RT64.
+                 ultramodern::extensions::on_displaylist_parsed(displaylist);
+@@ -562,6 +685,12 @@ void ultramodern::submit_rsp_task(RDRAM_ARG PTR(OSTask) task_) {
+ 
+     // Send gfx tasks to the graphics action queue
+     if (task->t.type == M_GFXTASK) {
++#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
++        {
++            std::lock_guard lock{ displaylists_mutex };
++            displaylists_sent++;
++        }
++#endif
+         events_context.action_queue.enqueue(SpTaskAction{ *task });
+     }
+     // Set all other tasks as the RSP task
+@@ -570,6 +699,19 @@ void ultramodern::submit_rsp_task(RDRAM_ARG PTR(OSTask) task_) {
+     }
+ }
+ 
++// On a console the RSP reads a display list within a few ms of the game sending it, long before the game's next load
++// from ROM lands, so a game may load over what its last list points at (one loads its title screen's textures over its
++// logos' model). Here RT64 reads the list on the graphics thread, which on a slow GPU can be a frame or more behind the
++// game, so a load from ROM waits until RT64 has read every list sent before it (librecomp's do_dma), on whichever thread
++// it is: the one that loads over a list needn't be the one that sends it. None waits past 2 s.
++void ultramodern::wait_for_displaylists_read() {
++#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
++    std::unique_lock lock{ displaylists_mutex };
++    const uint64_t sent = displaylists_sent;
++    displaylists_read_cv.wait_for(lock, std::chrono::seconds(2), [sent] { return displaylists_read >= sent; });
++#endif
++}
++
+ void ultramodern::send_si_message() {
+     ultramodern::enqueue_external_message_src(events_context.si.mq, events_context.si.msg, false, ultramodern::EventMessageSource::Si);
+ }
 diff --git a/ultramodern/src/mesgqueue.cpp b/ultramodern/src/mesgqueue.cpp
 index 9944a02..b7a1a2a 100644
 --- a/ultramodern/src/mesgqueue.cpp
