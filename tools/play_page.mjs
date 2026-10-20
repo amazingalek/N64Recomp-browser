@@ -7,7 +7,10 @@
 //     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]
 //     [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
-// A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
+// A build dir is served on 127.0.0.1 on a free port, and the browser's debugging port is a free one too, so plays
+// started beside each other (shared GPU turns) don't clash; --port <n> gives n and the debugging port n + 1. With
+// --profile the build dir is served on 8937 unless --port, since the ROM and saves a kept profile holds are kept per
+// origin, port included. A URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
 // (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). The browser starts with
 // a profile of its own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
@@ -123,8 +126,9 @@ const uncapped = args.includes('--uncapped');
 if (uncapped) args.splice(args.indexOf('--uncapped'), 1);
 const cpuThrottle = Number(option(args, '--cpu-throttle', '0'));
 const scale = Number(option(args, '--scale', '1'));
-const port = Number(option(args, '--port', '8937'));
+const portOption = option(args, '--port', null);
 const profileOption = option(args, '--profile', null);
+const port = portOption ? Number(portOption) : profileOption !== null ? 8937 : 0;
 const section = option(args, '--section', null);
 const playFor = option(args, '--play', null);
 const shotFile = option(args, '--shot', null);
@@ -383,10 +387,10 @@ const procCpu = () => {
     gpuProcessMB: mine.filter((p) => isGpuProcess(p.commandLine)).reduce((t, p) => t + p.mb, 0) };
 };
 
-const server = /^https?:\/\//.test(where) ? null : serve(where, port);
-const base = server ? `http://127.0.0.1:${port}/` : (where.endsWith('/') ? where : where + '/');
+const server = /^https?:\/\//.test(where) ? null : await serve(where, port);
+const base = server ? `http://127.0.0.1:${server.address().port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
-const page = await open(browser, { profile, port: port + 1, size, executable, rom, planDir: path.dirname(planFile),
+const page = await open(browser, { profile, port: portOption ? port + 1 : undefined, size, executable, rom, planDir: path.dirname(planFile),
   preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, onLine, log });
 log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
 
@@ -395,7 +399,9 @@ log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? 
 // every hold and wait left on the clock would go on for its whole timeout (page_driver.mjs): one crashed GoldenEye run
 // on a laptop took 2,400 s for a plan of ~300. Once there has been an exception and no present for stalledSeconds since
 // it, the run is stopped and fails with the exception's text; without an exception, a stretch with no presents (a load, a
-// shader wait) goes on as before.
+// shader wait) goes on as before. A page that gives a sample no answer for stalledSeconds (its thread blocked, the
+// browser gone) stops the run the same way, as "the page stopped answering", so it is recorded and the tool ends,
+// rather than every sample and step after it waiting on the page for good.
 const stalledSeconds = 15;
 let presentedAt = 0;
 const samples = [];
@@ -410,18 +416,21 @@ const sample = async () => {
   if (sampleBusy) return;
   sampleBusy = true;
   let presents = null, animationFrames = null, audio = null, gaps = [];
+  const answer = stalledSeconds * 1000;
   try {
-    presents = await page.evaluate('window.__presents ?? null');
-    animationFrames = await page.evaluate('window.__animationFrames ?? null');
-    gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()'));
-    audio = await page.evaluate(audioStats);
-    const misses = JSON.parse(await page.evaluate('(() => { const m = window.__shaderMisses ?? []; window.__shaderMisses = []; return JSON.stringify(m); })()'));
+    presents = await page.evaluate('window.__presents ?? null', answer);
+    animationFrames = await page.evaluate('window.__animationFrames ?? null', answer);
+    gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()', answer));
+    audio = await page.evaluate(audioStats, answer);
+    const misses = JSON.parse(await page.evaluate('(() => { const m = window.__shaderMisses ?? []; window.__shaderMisses = []; return JSON.stringify(m); })()', answer));
     for (const [section, ...words] of misses) {
       const miss = { at: Math.round(seconds()), section, shader: words.map(hex).join(' ') };
       shaderMisses.push(miss);
       log(`shader missed: ${miss.shader} (section ${section})`);
     }
-  } catch {}
+  } catch (error) {
+    if (error.unanswered) page.stop(`the page stopped answering: ${error.message}`);
+  }
   const now = { at: seconds(), presents, animationFrames, audio, cpu: procCpu() };
   const gpu = gpuNow();
   const nvidia = countersAnswered ? smiGpu : null;
