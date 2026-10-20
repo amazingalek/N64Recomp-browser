@@ -1,4 +1,4 @@
-RecompFrontend: https://github.com/amazingalek/RecompFrontend-web cfd443b9242c8ec06fb69540c2f93537e8ff4cd0
+RecompFrontend: https://github.com/amazingalek/RecompFrontend-web ab544ca60645fe8a0f4c425f7cb55b1576664683
 on upstream b2c5c18d73054416c844486611fd2c2b9d8a4927 (tools/export_patches.sh)
 
 diff --git a/recompinput/CMakeLists.txt b/recompinput/CMakeLists.txt
@@ -16,6 +16,95 @@ index 899372b..9cd1199 100644
  endif()
  
  target_compile_options(recompinput PRIVATE
+diff --git a/recompinput/src/input_events.cpp b/recompinput/src/input_events.cpp
+index c76a1dc..a4a5430 100644
+--- a/recompinput/src/input_events.cpp
++++ b/recompinput/src/input_events.cpp
+@@ -5,6 +5,11 @@
+ #include "recompui/config.h"
+ #include "ultramodern/ultramodern.hpp"
+ 
++#ifdef __EMSCRIPTEN__
++#include <atomic>
++#include <emscripten/html5.h>
++#endif
++
+ static struct {
+     std::list<std::filesystem::path> files_dropped;
+ } DropState;
+@@ -38,6 +43,62 @@ void purge_deferred_controller_profiles() {
+     deferred_controller_profiles.clear();
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// On a page the cursor lock below is the browser's pointer lock, which SDL asks for when relative mode goes on and the
++// browser grants at a click or key. The browser also ends it by itself: at Esc, which then never reaches the page, and
++// when the page loses focus. Emscripten's SDL keeps relative mode on through that, and sends the cursor's position on
++// the canvas as motion from the last locked one, so a game looking with the mouse turned at once by however far that
++// was, and kept turning as the cursor moved; and Esc opened the menu only when pressed a second time. Here motion
++// counts only while the browser holds the lock, and a lock the browser ended while it was wanted opens the menu as Esc
++// does natively. Closing the menu turns relative mode on again, and SDL asks for the lock at once if the player's
++// click or key there still allows it, else at their next one (browsers don't count Esc as one).
++static std::atomic<bool> web_pointer_locked = false;
++static SDL_EventFilter web_next_filter = nullptr;
++static void* web_next_filter_userdata = nullptr;
++
++// Called on the page's thread at once, before the motion SDL's handlers then send on the thread they run on.
++static EM_BOOL web_pointerlock_change(int, const EmscriptenPointerlockChangeEvent* event, void*) {
++    web_pointer_locked = event->isActive;
++    return EM_FALSE;
++}
++
++// Run as SDL pushes an event, before any event watch sees it (a game's own mouse look included).
++static int web_mouse_filter(void*, SDL_Event* event) {
++    if (event->type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() && !web_pointer_locked) {
++        return 0;
++    }
++    return web_next_filter != nullptr ? web_next_filter(web_next_filter_userdata, event) : 1;
++}
++
++static void web_watch_pointer_lock() {
++    static bool watching = false;
++    static bool had_lock = false;
++    if (!watching) {
++        watching = true;
++        emscripten_set_pointerlockchange_callback_on_thread(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, EM_FALSE,
++            web_pointerlock_change, EM_CALLBACK_THREAD_CONTEXT_MAIN_RUNTIME_THREAD);
++        // RT64 chains the filter it finds when it installs its own, and this one chains whatever came before it.
++        if (!SDL_GetEventFilter(&web_next_filter, &web_next_filter_userdata)) {
++            web_next_filter = nullptr;
++            web_next_filter_userdata = nullptr;
++        }
++        SDL_SetEventFilter(web_mouse_filter, nullptr);
++    }
++
++    // Relative mode is still on only if the lock ended without this side turning it off (a menu opened another way).
++    bool has_lock = web_pointer_locked;
++    if (had_lock && !has_lock && SDL_GetRelativeMouseMode() && ultramodern::is_game_started()) {
++        SDL_Event escape{};
++        escape.type = SDL_KEYDOWN;
++        escape.key.state = SDL_PRESSED;
++        escape.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
++        escape.key.keysym.sym = SDLK_ESCAPE;
++        recompui::queue_event(escape);
++    }
++    had_lock = has_lock;
++}
++#endif
++
+ bool sdl_event_filter(void* userdata, SDL_Event* event) {
+     switch (event->type) {
+     case SDL_EventType::SDL_KEYDOWN:
+@@ -250,6 +311,9 @@ void handle_events() {
+     SDL_Event cur_event;
+     static bool started = false;
+     static bool exited = false;
++#ifdef __EMSCRIPTEN__
++    web_watch_pointer_lock();
++#endif
+     while (SDL_PollEvent(&cur_event) && !exited) {
+         exited = sdl_event_filter(nullptr, &cur_event);
+ 
 diff --git a/recompinput/src/input_state.cpp b/recompinput/src/input_state.cpp
 index 03ed871..ebbc5c7 100644
 --- a/recompinput/src/input_state.cpp
@@ -100,6 +189,42 @@ index 03ed871..ebbc5c7 100644
          if (err != 0) {
              state.rumble_failed = true;
          }
+diff --git a/recompinput/src/profiles.cpp b/recompinput/src/profiles.cpp
+index c89956e..39e46f2 100644
+--- a/recompinput/src/profiles.cpp
++++ b/recompinput/src/profiles.cpp
+@@ -415,6 +415,21 @@ namespace recompinput {
+     }
+ 
+     static void add_input_bindings(json& out, int profile_index, GameInput input) {
++#ifdef __EMSCRIPTEN__
++        // A page's build changes under its player at every update, so only the bindings the player changed are saved:
++        // an input left at its defaults follows the defaults of the build that reads the file (load_input_device_from_json
++        // gives an input the file leaves out its defaults), not those of the build that first wrote it.
++        const std::vector<InputField>& defaults =
++            recompinput::get_default_mapping_for_input(profiles::get_input_profile_device(profile_index), input);
++        bool changed = false;
++        for (size_t binding_index = 0; binding_index < recompinput::num_bindings_per_input; binding_index++) {
++            InputField default_field = binding_index < defaults.size() ? defaults[binding_index] : InputField{};
++            changed |= profiles::get_input_binding(profile_index, input, binding_index) != default_field;
++        }
++        if (!changed) {
++            return;
++        }
++#endif
+         const std::string& input_name = recompinput::get_game_input_enum_name(input);
+         json& out_array = out[input_name];
+         out_array = json::array();
+@@ -439,6 +454,9 @@ namespace recompinput {
+             profile["device"] = profiles::get_input_profile_device(i);
+             profile["custom"] = profiles::is_input_profile_custom(i);
+             profile["mappings"] = json();
++#ifdef __EMSCRIPTEN__
++            profile["mappings"] = json::object();
++#endif
+             
+             for (int j = 0; j < (int)(GameInput::COUNT); j++) {
+                 add_input_bindings(profile["mappings"], i, static_cast<GameInput>(j));
 diff --git a/recompui/CMakeLists.txt b/recompui/CMakeLists.txt
 index 4dce8e0..dd78891 100644
 --- a/recompui/CMakeLists.txt
@@ -277,7 +402,7 @@ index e99229a..d732a2b 100644
  #include "RmlUi/Core/StreamMemory.h"
  #include "RmlUi/../../Source/Core/DocumentHeader.h"
 diff --git a/recompui/src/renderer/rt64_render_context.cpp b/recompui/src/renderer/rt64_render_context.cpp
-index a7954c7..76a3fe9 100644
+index a7954c7..61c6bdf 100644
 --- a/recompui/src/renderer/rt64_render_context.cpp
 +++ b/recompui/src/renderer/rt64_render_context.cpp
 @@ -20,6 +20,8 @@ using namespace recompui;
@@ -308,7 +433,26 @@ index a7954c7..76a3fe9 100644
  
      // Set initial user config settings based on the current settings.
      auto& cur_config = ultramodern::renderer::get_graphics_config();
-@@ -351,6 +358,12 @@ void renderer::RT64Context::send_dummy_workload(uint32_t fb_address) {
+@@ -313,6 +320,10 @@ renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::Window
+         return;
+     }
+ 
++    // RT64 marks where it reads each display list's commands from, so a load from ROM can wait for a list it would land
++    // on (ultramodern's displaylists.cpp; nullptr, so none, without ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS).
++    app->state->displayListReads = ultramodern::displaylist_reads();
++
+     // Set the application's fullscreen state.
+     app->setFullScreen(cur_config.wm_option == ultramodern::renderer::WindowMode::Fullscreen);
+ 
+@@ -342,6 +353,7 @@ void renderer::RT64Context::send_dl(const OSTask* task) {
+     app->state->rsp->reset();
+     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
+     app->processDisplayLists(app->core.RDRAM, task->t.data_ptr & 0x3FFFFFF, 0, true);
++    ultramodern::displaylist_read();
+ }
+ 
+ void renderer::RT64Context::send_dummy_workload(uint32_t fb_address) {
+@@ -351,6 +363,12 @@ void renderer::RT64Context::send_dummy_workload(uint32_t fb_address) {
      // G_AC_NONE | G_ZS_PIXEL | G_RM_NOOP | G_RM_NOOP2
      app->state->rdp->setOtherMode(0x382C30, 0);
      app->state->rdp->fillRect(0, 0, 320 << 2, 240 << 2);
@@ -321,7 +465,7 @@ index a7954c7..76a3fe9 100644
      app->state->fullSync();
      app->state->listProcessEnd();
  }
-@@ -498,6 +511,14 @@ std::unique_ptr<ultramodern::renderer::RendererContext> renderer::create_render_
+@@ -498,6 +516,14 @@ std::unique_ptr<ultramodern::renderer::RendererContext> renderer::create_render_
      return std::make_unique<renderer::RT64Context>(rdram, window_handle, presentation_mode, developer_mode);
  }
  

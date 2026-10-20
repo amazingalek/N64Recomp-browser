@@ -5,8 +5,10 @@
 //   node tools/record_shaders.mjs <plan.json> <build dir> <rom> <out list> [--port <n>] [--profile <dir>] [--only <section>,...]
 //       [--from <load>]
 //
-// The build dir is served on 127.0.0.1 with the cross-origin headers a threaded page needs, on a fixed port (8917
-// unless --port: the ROM and saves are kept per origin, port included), and Chrome (headless, muted, WebGPU on) is
+// The build dir is served on 127.0.0.1 with the cross-origin headers a threaded page needs, on a free port, so
+// recordings and plays started beside each other don't clash, and Chrome's debugging port is a free one too; with
+// --port <n> it is n and n + 1. With --profile it is 8917 unless --port: the ROM and saves are kept per origin, port
+// included, so a kept profile needs the same port each time. Chrome (headless, muted, WebGPU on) is
 // started with a profile of its own (--profile, a fresh temporary one without) and driven over the DevTools protocol
 // (page_driver.mjs, shared with play_page.mjs). A profile kept from an earlier run (--profile, a folder that exists) has the ROM stored already, so "setup" is skipped.
 // Each section is recorded in a page loaded fresh, so it gets every shader it draws, not only the ones no earlier
@@ -36,8 +38,9 @@ import path from 'path';
 import { open, option, serve } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
-const port = Number(option(args, '--port', '8917'));
+const portOption = option(args, '--port', null);
 const profileOption = option(args, '--profile', null);
+const port = portOption ? Number(portOption) : profileOption !== null ? 8917 : 0;
 const freshProfile = (profileOption === null) || !fs.existsSync(profileOption);
 const profile = profileOption ?? fs.mkdtempSync(path.join(os.tmpdir(), 'record-shaders-'));
 const only = option(args, '--only', null)?.split(',');
@@ -54,8 +57,9 @@ const log = (text) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}] ${
 
 let printed = [];
 let keep = true;
-const server = serve(buildDir, port);
-const page = await open('chrome', { profile, port: port + 1, executable: chrome, rom, planDir: path.dirname(planFile), log,
+const server = await serve(buildDir, port);
+const origin = `http://127.0.0.1:${server.address().port}`;
+const page = await open('chrome', { profile, port: portOption ? port + 1 : undefined, executable: chrome, rom, planDir: path.dirname(planFile), log,
   onLine: (text) => {
     const shader = /rt64 shader: ((?:[0-9a-f]{8} ?){5})/.exec(text);
     if (shader) { if (keep) printed.push(shader[1].trim()); } else log(text);
@@ -93,7 +97,7 @@ for (const [index, section] of plan.sections.entries()) {
   log(`section ${section.name} (load ${index + 1} of ${plan.sections.length})`);
   printed = [];
   keep = true;
-  await page.navigate(`http://127.0.0.1:${port}/${plan.page}?record-shaders`);
+  await page.navigate(`${origin}/${plan.page}?record-shaders`);
   await run([...(plan.load ?? []), ...((first && freshProfile) ? (plan.setup ?? []) : []), ...(plan.start ?? [])]);
   first = false;
   addNew(boot, printed);
