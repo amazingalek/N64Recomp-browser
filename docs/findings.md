@@ -139,8 +139,8 @@ and isn't one. The laptop trapped once in 21 plays, so 21 clean ones here rule o
 
 A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
 `Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
-5080, the page from Pages, v0.67.0, and a v0.71.0 build both), at 70, 72 and 123 s; Chrome (throttled 6 times) played on, and no other
-game's page aborted. A page's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
+5080, the page from Pages, v0.67.0, and a v0.71.0 build both), at 70, 72 and 123 s; Chrome (throttled 6 times) played
+on, and no other game's page aborted. A page's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
 resize import aborts, and the trap names only abort(). `tools/heap_probe.js` read the heap's break at 843.9 MB from
 2 s in to the end of 15 plays of the same page in Firefox the next morning, one of them 5 minutes long: the page takes
 what it uses at boot (RDRAM's 512 MB among it) and nothing after. In each aborting run the sound and the presents
