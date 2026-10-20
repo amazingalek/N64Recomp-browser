@@ -253,6 +253,12 @@ rt64 e83ea6e           and every array slice, as D3D12's null UAV desc does, not
                        WebGPU binds one level as a storage texture, so a texture with mipmaps bound that way failed
                        the bind group, its pass and the submit (Rush 2's texture cache decoding into its generated
                        mipmaps: every upload failed and races drew black)
+N64ModernRuntime       a page saves only the settings and bindings its player changed: an option or input left at its
+d98135e,               default follows the default of the build that reads the file. Every option was saved at the
+RecompFrontend         first boot and every input whenever the Controls tab closed, so a default an update changed
+3993399                (GoldenEye's mouse branch's Mouse Sensitivity of 50 over RecompFrontend's 0) never reached a
+                       player who had played the page before. An option the file leaves out takes its default before
+                       an option's own parser sees it (the Graphics tab's downsampling would throw)
 RecompFrontend 2114cc6 on a page mouse motion reaches nothing while relative mode is on and the browser holds no pointer
                        lock, and a lock the browser ended itself (Esc, which never reaches the page, or the page losing
                        focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
