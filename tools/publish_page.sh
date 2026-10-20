@@ -2,39 +2,97 @@
 # Publishes a recomp's built page on GitHub Pages, https://<owner>.github.io/<repo>/: the build dir's <name>.html as
 # index.html, with its .js, .wasm, .data and coi_serviceworker.js (Pages can't send the cross-origin headers threads
 # need, so the service worker sets them after one reload), and a .nojekyll so Pages serves the files as they are.
-# They are the only commit on the orphan branch gh-pages, force-pushed each time, so the repo keeps one copy of the
-# page rather than every one published. The first time, Pages is switched on for that branch (with gh).
+# They go in as the only commit on the orphan branch gh-pages, force-pushed each time, so the repo keeps one copy of
+# the page rather than every one published. The first time, Pages is switched on for that branch (with gh).
 #
-#   bash tools/publish_page.sh <build dir> <name> <owner/repo> [<what it was built from>] [--dry-run]
+#   bash tools/publish_page.sh <build dir> <name> <owner/repo> [<what it was built from>] [--into <dir>] [--dry-run]
+#   bash tools/publish_page.sh --drop <dir> <owner/repo>
 #
 # e.g. bash lib/N64Recomp-browser/tools/publish_page.sh build-web BanjoRecompiled amazingalek/BanjoRecomp-web "main $(git rev-parse --short HEAD)"
 # A page holds the recompiled code, so it is built from the ROM wherever that is (CI has none) and published from
 # there, or copied to a machine with push access first: the script needs only the build's files. Check that the .data
 # holds no game data: it is what the page preloads (assets, a controller database), never the ROM or anything
 # extracted from it. --dry-run stages the page in <build dir>/page and pushes nothing.
+#
+# A test page (a branch's build, played by hand before it lands) is a folder of its own beside main's page:
+# --into <dir> publishes the build there, at https://<owner>.github.io/<repo>/<dir>/, and --drop <dir> takes it off
+# once it is done with. Each publish starts from the gh-pages it replaces: main's page replaces the files at the top
+# and keeps every folder, a test page replaces its folder and keeps the rest. The commit's subject names what main's
+# page was built from ("The web page, built from main <sha>", which is what `git log -1 origin/gh-pages` reads), and
+# a line in its body each test page's ("<dir>/: built from <branch> <sha>").
 set -euo pipefail
-dry_run=false
+dry_run=false into="" drop=""
 args=()
-for a in "$@"; do [ "$a" = --dry-run ] && dry_run=true || args+=("$a"); done
-[ ${#args[@]} -ge 3 ] || { sed -n '8p' "$0"; exit 1; }
-build="${args[0]}" name="${args[1]}" repo="${args[2]}" from="${args[3]:-}"
-
-stage="$build/page"
-rm -rf "$stage"
-mkdir -p "$stage"
-cp "$build/$name".{js,wasm,data} "$build"/coi_serviceworker.js "$stage"/
-cp "$build/$name.html" "$stage"/index.html
-touch "$stage"/.nojekyll
-if $dry_run; then
-    echo "staged in $stage, nothing pushed"
-    exit 0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) dry_run=true ;;
+        --into) into="${2:-}"; shift ;;
+        --drop) drop="${2:-}"; shift ;;
+        *) args+=("$1") ;;
+    esac
+    shift
+done
+folder="$into$drop"
+[[ -z "$into" || -z "$drop" ]] || { echo "--into or --drop, not both"; exit 1; }
+[[ -z "$folder" || "$folder" =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]] || { echo "--into and --drop take a folder's name"; exit 1; }
+if [ -n "$drop" ]; then
+    [ ${#args[@]} -eq 1 ] || { sed -n '9p' "$0"; exit 1; }
+    repo="${args[0]}" stage="$(mktemp -d)"
+    trap 'rm -rf "$stage"' EXIT
+else
+    [ ${#args[@]} -ge 3 ] || { sed -n '8p' "$0"; exit 1; }
+    build="${args[0]}" name="${args[1]}" repo="${args[2]}" from="${args[3]:-}"
+    stage="$build/page"
+    rm -rf "$stage"
+    mkdir -p "$stage"
+    cp "$build/$name".{js,wasm,data} "$build"/coi_serviceworker.js "$stage"/
+    cp "$build/$name.html" "$stage"/index.html
+    touch "$stage"/.nojekyll
+    if $dry_run; then
+        echo "staged in $stage, nothing pushed"
+        exit 0
+    fi
 fi
 
-git -C "$stage" init -q -b gh-pages
-git -C "$stage" config core.autocrlf false  # the files exactly as built
-git -C "$stage" add -A
-git -C "$stage" commit -q -m "The web page${from:+, built from $from}"
-git -C "$stage" push -q -f "https://github.com/$repo" gh-pages
+url="https://github.com/$repo"
+git=(git -C "$stage")
+"${git[@]}" init -q -b gh-pages
+# What gh-pages holds now, unless there is none yet (ls-remote's 2); it is a commit or two, as each publish is an
+# orphan.
+have=0
+git ls-remote -q --exit-code "$url" refs/heads/gh-pages > /dev/null || have=$?
+case $have in
+    0) "${git[@]}" fetch -q "$url" gh-pages
+       "${git[@]}" read-tree FETCH_HEAD
+       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 '^The web page' || true)"
+       lines="$("${git[@]}" log -1 --format=%b FETCH_HEAD | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)" ;;
+    2) subject="" lines="" ;;
+    *) exit $have ;;
+esac
+[ -z "$drop" ] || "${git[@]}" ls-files --error-unmatch "$drop" > /dev/null 2>&1 ||
+    { echo "gh-pages has no $drop/"; exit 1; }
+
+# Out with the files this replaces, in with the build's.
+if [ -n "$folder" ]; then
+    "${git[@]}" rm -r -q -f --cached --ignore-unmatch -- "$folder"
+    lines="$(awk -v d="$folder/:" 'index($0, d) != 1' <<< "$lines")"
+else
+    { "${git[@]}" ls-files | grep -v / || true; } | xargs -r "${git[@]}" rm -q -f --cached --
+fi
+if [ -z "$drop" ]; then
+    for f in $(ls -A "$stage" | grep -vx -e .git -e .nojekyll); do
+        "${git[@]}" update-index --add --cacheinfo \
+            "100644,$("${git[@]}" hash-object -w --no-filters "$f"),${into:+$into/}$f"  # the files exactly as built
+    done
+    if [ -n "$into" ]; then
+        lines="$(printf '%s\n%s' "$lines" "$into/:${from:+ built from $from}" | sed '/^$/d' | sort)"
+    else
+        subject="The web page${from:+, built from $from}"
+    fi
+fi
+"${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll"
+"${git[@]}" commit -q -F - <<< "${subject:-The web page}${lines:+$'\n\n'$lines}"
+"${git[@]}" push -q -f "$url" gh-pages
 gh api "repos/$repo/pages" > /dev/null 2>&1 ||
     gh api -X POST "repos/$repo/pages" -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null
-echo "pushed gh-pages: https://${repo%%/*}.github.io/${repo#*/}/ serves it in a minute or two"
+echo "pushed gh-pages: https://${repo%%/*}.github.io/${repo#*/}/${folder:+$folder/} $([ -n "$drop" ] && echo "is gone" || echo "serves it") in a minute or two"
