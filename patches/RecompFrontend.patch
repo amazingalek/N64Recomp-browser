@@ -1,4 +1,4 @@
-RecompFrontend: https://github.com/amazingalek/RecompFrontend-web cfd443b9242c8ec06fb69540c2f93537e8ff4cd0
+RecompFrontend: https://github.com/amazingalek/RecompFrontend-web 399339907fa67c4f5d840bff93231d2f275a83a4
 on upstream b2c5c18d73054416c844486611fd2c2b9d8a4927 (tools/export_patches.sh)
 
 diff --git a/recompinput/CMakeLists.txt b/recompinput/CMakeLists.txt
@@ -100,6 +100,42 @@ index 03ed871..ebbc5c7 100644
          if (err != 0) {
              state.rumble_failed = true;
          }
+diff --git a/recompinput/src/profiles.cpp b/recompinput/src/profiles.cpp
+index c89956e..39e46f2 100644
+--- a/recompinput/src/profiles.cpp
++++ b/recompinput/src/profiles.cpp
+@@ -415,6 +415,21 @@ namespace recompinput {
+     }
+ 
+     static void add_input_bindings(json& out, int profile_index, GameInput input) {
++#ifdef __EMSCRIPTEN__
++        // A page's build changes under its player at every update, so only the bindings the player changed are saved:
++        // an input left at its defaults follows the defaults of the build that reads the file (load_input_device_from_json
++        // gives an input the file leaves out its defaults), not those of the build that first wrote it.
++        const std::vector<InputField>& defaults =
++            recompinput::get_default_mapping_for_input(profiles::get_input_profile_device(profile_index), input);
++        bool changed = false;
++        for (size_t binding_index = 0; binding_index < recompinput::num_bindings_per_input; binding_index++) {
++            InputField default_field = binding_index < defaults.size() ? defaults[binding_index] : InputField{};
++            changed |= profiles::get_input_binding(profile_index, input, binding_index) != default_field;
++        }
++        if (!changed) {
++            return;
++        }
++#endif
+         const std::string& input_name = recompinput::get_game_input_enum_name(input);
+         json& out_array = out[input_name];
+         out_array = json::array();
+@@ -439,6 +454,9 @@ namespace recompinput {
+             profile["device"] = profiles::get_input_profile_device(i);
+             profile["custom"] = profiles::is_input_profile_custom(i);
+             profile["mappings"] = json();
++#ifdef __EMSCRIPTEN__
++            profile["mappings"] = json::object();
++#endif
+             
+             for (int j = 0; j < (int)(GameInput::COUNT); j++) {
+                 add_input_bindings(profile["mappings"], i, static_cast<GameInput>(j));
 diff --git a/recompui/CMakeLists.txt b/recompui/CMakeLists.txt
 index 4dce8e0..dd78891 100644
 --- a/recompui/CMakeLists.txt
