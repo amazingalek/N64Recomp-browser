@@ -13,8 +13,9 @@
 // it come out first, on the page's console. The stack names wasm functions by index (wasm-function[<n>]) and offset,
 // which wasm_offset.mjs or the same build linked with --profiling-funcs names. The break is read from the shared heap:
 // its address is the one constant in the small function that calls the resize import (sbrk), found in the page's
-// wasm as it loads. dlmalloc never gives the break back, so a page that leaks shows a break that climbs, and one
-// whose break holds ran out on a single request. Only a cross-origin isolated document runs it: the page's own, after
+// wasm as it loads. dlmalloc never gives the break back, so a page that leaks shows a break that climbs, one that
+// allocates in a loop a break that leaps in the seconds before the abort, and one whose break holds ran out on a single
+// request. Only a cross-origin isolated document runs it: the page's own, after
 // coi_serviceworker.js's reload.
 if (self.crossOriginIsolated && !self.__heapProbe) {
   self.__heapProbe = true;
