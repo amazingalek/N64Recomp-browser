@@ -253,4 +253,9 @@ rt64 e83ea6e           and every array slice, as D3D12's null UAV desc does, not
                        WebGPU binds one level as a storage texture, so a texture with mipmaps bound that way failed
                        the bind group, its pass and the submit (Rush 2's texture cache decoding into its generated
                        mipmaps: every upload failed and races drew black)
+RecompFrontend 866c002 on a page mouse motion reaches nothing while relative mode is on and the browser holds no pointer
+                       lock, and a lock the browser ended itself (Esc, which never reaches the page, or the page losing
+                       focus) opens the menu as Esc does natively: Emscripten's SDL kept relative mode on and sent the
+                       cursor's position on the canvas as motion, so GoldenEye's mouse look turned at once by however
+                       far that was from the last locked one, and the menu opened only at a second Esc
 ```
