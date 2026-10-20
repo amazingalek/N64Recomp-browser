@@ -14,7 +14,9 @@
 // Each play is one play_page.mjs run, uncapped at --size (3840x2000, the stand-in's) on a fresh profile, in this order:
 // Firefox Pages, build, build, Pages, then Chrome with --cpu-throttle (6; 0 plays it unthrottled) Pages, build. Played
 // in turn, a host that changes under the series reads on both. A run's line in --record (plays.jsonl) carries a --note
-// saying it was one of these (the --note given added), so play_page compares it with nothing: this does. A queue command
+// saying it was one of these (the --note given added), so play_page compares it with nothing: this does. Its --set is
+// <game>-<build>-<out's name>, its --role baseline for Pages and candidate for the build. --port is play_page's (a free
+// one without). A queue command
 // after -- goes in front of every play, so each takes its own turn on a shared GPU (CLAUDE.md, Playing a page). Each
 // play's output goes to <out>/<n>-<browser>-<pages|build>.log, its summary beside it as .json, and the plan's shot
 // steps write into <out> (its cwd); --out is a new temporary dir without it, kept and named at the end. Run again with
@@ -44,7 +46,7 @@ const recordFile = option(args, '--record', null);
 const note = option(args, '--note', null);
 const size = option(args, '--size', '3840x2000');
 const throttle = Number(option(args, '--cpu-throttle', '6'));
-const port = option(args, '--port', '8937');
+const port = option(args, '--port', null);
 const outOption = option(args, '--out', null);
 const firefox = option(args, '--firefox', null);
 if (args.length !== 5 || !pagesBuild || !build) {
@@ -79,8 +81,9 @@ const playOnce = async (condition, which) => {
   const runNote = [which === 'P' ? `the page Pages serves, interleaved with the ${build} build` :
     `the ${build} build served locally, interleaved with Pages' ${pagesBuild}`, 'tools/ab_pages.mjs', note].filter(Boolean).join('; ');
   const command = [...queue, process.execPath, playPage, condition.browser, which === 'P' ? pagesWhere : buildPath, rom, planFile,
-    '--uncapped', '--size', size, '--port', port, '--json', json, ...(firefox && condition.browser === 'firefox' ? ['--browser', firefox] : []), ...(condition.throttle > 1 ? ['--cpu-throttle', String(condition.throttle)] : []),
-    ...(record ? ['--record', record, '--game', game, '--build', which === 'P' ? pagesBuild : build, '--note', runNote] : [])];
+    '--uncapped', '--size', size, ...(port ? ['--port', port] : []), '--json', json, ...(firefox && condition.browser === 'firefox' ? ['--browser', firefox] : []), ...(condition.throttle > 1 ? ['--cpu-throttle', String(condition.throttle)] : []),
+    ...(record ? ['--record', record, '--game', game, '--build', which === 'P' ? pagesBuild : build, '--note', runNote,
+      '--set', `${game}-${build}-${path.basename(out)}`, '--role', which === 'P' ? 'baseline' : 'candidate'] : [])];
   process.stdout.write(`${new Date().toISOString().slice(11, 19)} ${n}. ${condition.name}, ${which === 'P' ? `Pages (${pagesBuild})` : `the build (${build})`}: ` +
     (done ? '(played before) ' : ''));
   let code = 0;

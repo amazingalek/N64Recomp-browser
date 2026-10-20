@@ -400,7 +400,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
   `frame_lengths.js`, a preload too, logs how long the game's frames are against the page's presents, and
   `frame_lengths.mjs` counts from that what each guess at a frame's length would hold and cut. `wait_probe.js` logs
-  whether a timed wait off the page's thread ends on time, each second of a play.
+  whether a timed wait off the page's thread ends on time, each second of a play, and `heap_probe.js` how much of its
+  heap the page has taken, and the request that ran it out.
   `page_driver.mjs` drives both browsers for them (each header says how), and in Chrome reports an exception on any
   of the page's threads with its stack, which the page itself gets only as an ErrorEvent without one. `wasm_offset.mjs`
   names the function of a page's wasm at the offset a trap gives.
