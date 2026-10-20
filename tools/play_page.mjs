@@ -4,7 +4,7 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
-//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]]
+//     [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]]
 //     [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
 // A build dir is served on 127.0.0.1 on a free port, and the browser's debugging port is a free one too, so plays
@@ -12,7 +12,9 @@
 // --profile the build dir is served on 8937 unless --port, since the ROM and saves a kept profile holds are kept per
 // origin, port included. A URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
-// (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). The browser starts with
+// (publish_page.sh puts a fork's <name>.html up as index.html, so give .../index.html for it). A build dir's .html is the
+// same for a build: its dir is served and that page played, whatever plan.page says (a plan whose page is index.html,
+// which Pages has and a build hasn't). The browser starts with
 // a profile of its own (--profile, a fresh temporary one without, deleted at the end), so a visit is cold unless the profile is kept:
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
@@ -43,6 +45,10 @@
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
+// --chrome-trace (Chrome only) records a Chrome trace over the play, every thread's JavaScript and wasm stacks sampled
+// (page_driver.mjs's chromeTrace), and writes it to the file, to open in DevTools' Performance panel or
+// ui.perfetto.dev; a wasm frame is named only in a page linked with --profiling-funcs. Sampling costs the page's
+// threads, so a traced run's numbers are the trace's, not the page's, and are not recorded.
 // --fault does to the page, once the play is over (a plan's play ends in its level), what a player's browser or the
 // player does to one, then lets the game run by itself 30 s more, and a list (resize,hidden,audio,device,reload) does
 // each in turn in the one visit: device destroys every WebGPU device the page made (device.destroy(), as a driver reset
@@ -92,7 +98,10 @@
 // shader wait (RT64's "built in ... the game waiting" lines, Firefox's for the shaders the list missed among them, with
 // missed: true), WebGPU errors and exceptions, the GPU and the cores, and
 // the GPU process's private bytes from the first sample to the last and MB a second between them (a leak's rate), in
-// Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too.
+// Firefox with its own report of which part grew (page_driver.mjs's gpuProcessMemory); --json writes it as JSON too, a
+// failed run's with "failed" (tools/ab_pages.mjs reads it).
+// A run the host slept through (its clock jumped more than 30 s between two of play_page's 1 s ticks) is stopped and
+// fails: its samples would span the sleep, and one such run read as a clean one in a retest.
 // The GPU readings are the whole adapter's, so note what else ran beside a number.
 //
 // Every shader the game asks for that the page's prebuilt list doesn't have is a miss (docs/porting.md,
@@ -168,6 +177,7 @@ const role = option(args, '--role', null);
 const hostReadingOption = option(args, '--host-reading', null);
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
+const chromeTraceFile = option(args, '--chrome-trace', null);
 const firefoxPrefs = {};
 for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
   const [name, value] = [pref.slice(0, pref.indexOf('=')), pref.slice(pref.indexOf('=') + 1)];
@@ -195,7 +205,7 @@ if (hostReadingOption !== null) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -203,6 +213,7 @@ const uncappedAs = uncapped && browser === 'firefox' ? firefoxUncappedRate : unc
 if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
 if (!(scale > 0) || (scale !== 1 && onScreen)) { console.error("--scale needs a number above 0, and is the desktop's own on screen"); process.exit(1); }
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
+if (chromeTraceFile && (browser !== 'chrome' || recordFile)) { console.error('--chrome-trace is Chrome\'s only, and not recorded'); process.exit(1); }
 if (!faultList.every((f) => faults.includes(f))) { console.error(`--fault is a list of ${faults.join(', ')}, by commas`); process.exit(1); }
 if (faultList.includes('resize') && onScreen) { console.error('--fault resize is off the desktop only'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
@@ -488,9 +499,10 @@ $browser = $rows | ? { $_.kind -eq 'browser' } | Sort-Object cores -Descending |
   setTimeout(() => { try { ps.kill(); } catch {} }, 60000);
 });
 
-const server = /^https?:\/\//.test(where) ? null : await serve(where, port);
+const remote = /^https?:\/\//.test(where);
+const server = remote ? null : await serve(/\.html$/.test(where) ? path.dirname(where) : where, port);
 const base = server ? `http://127.0.0.1:${server.address().port}/` : (where.endsWith('/') ? where : where + '/');
-const pageUrl = !server && /\.html$/.test(where) ? where + query : base + (plan.page ?? '') + query;
+const pageUrl = /\.html$/.test(where) ? (remote ? where : base + path.basename(where)) + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: portOption ? port + 1 : undefined, size, executable, rom, planDir: path.dirname(planFile),
   preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, onLine, log });
 log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
@@ -571,9 +583,20 @@ const sample = async () => {
   sampleBusy = false;
 };
 const sampling = setInterval(sample, interval * 1000);
+// A sleep of the host: nothing in play_page holds its own thread for seconds, so a tick that comes 30 s late is one.
+let slept = null, tickedAt = Date.now();
+const ticking = setInterval(() => {
+  const late = (Date.now() - tickedAt) / 1000 - 1;
+  tickedAt = Date.now();
+  if (late > 30 && !slept) {
+    slept = `the host's clock jumped ${Math.round(late)} s at ${Math.round(seconds() - late)} s (it slept): the run measures nothing`;
+    page.stop(slept);
+  }
+}, 1000);
 
 const finish = async (code) => {
   clearInterval(sampling);
+  clearInterval(ticking);
   await page.close();
   for (const child of [smi, sampler, counters]) { try { child?.kill(); } catch {} }
   server?.close();
@@ -614,6 +637,7 @@ try {
   if (memoryBefore) await sleep(500);
   await page.evaluate('window.__gaps = []; undefined').catch(() => {});
   if (geckoProfileFile) await page.geckoProfile.start();
+  if (chromeTraceFile) await page.chromeTrace.start();
   playing = true;
   hostBefore = hostTimes();
   viewport = await page.viewport();
@@ -622,14 +646,16 @@ try {
   await sample();
   playing = false;
   if (geckoProfileFile) await page.geckoProfile.dump(geckoProfileFile);
+  if (chromeTraceFile) await page.chromeTrace.stop(path.resolve(chromeTraceFile));
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
   // A run that failed before the play still records the viewport it had, on screen the window's, not --size.
   viewport ??= await page.viewport().catch(() => null);
-  if (!recordFile) await finish(1);
+  if (!recordFile && !jsonFile) await finish(1);
 }
+if (slept && !failure) { log(`failed: ${slept}`); failure = slept; }
 const hostAfter = hostTimes();
 
 // --fault, once the play is over (in its level): each fault in turn, then 30 s of the game running by itself.
@@ -772,7 +798,7 @@ if (summary.gpuProcessMB) console.log(`  GPU process private bytes ${summary.gpu
   `${summary.gpuProcessMB.perSecond} MB a second`);
 if (summary.gpuProcessMemory) console.log(`  GPU process memory, start -> end of the play (about:memory, MB): ` +
   Object.keys(memoryAfter).map((k) => `${k} ${memoryBefore[k] ?? '-'} -> ${memoryAfter[k]}`).join(', '));
-if (jsonFile && !failure) fs.writeFileSync(jsonFile, JSON.stringify(summary, null, 2) + '\n');
+if (jsonFile) fs.writeFileSync(jsonFile, JSON.stringify({ ...summary, ...(failure ? { failed: failure } : {}) }, null, 2) + '\n');
 let regressions = [];
 if (recordFile) {
   const round = (x) => x === null ? null : Math.round(x * 100) / 100;

@@ -242,8 +242,8 @@ const rdramHelpers = `(() => {
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js, ms) (the value, awaited and passed as JSON; throws on an exception, and with unanswered
 //   set when the page gives no answer in ms, evaluateMs unless given, or the browser is gone), run(steps, extra),
-//   stop(reason) (above), resize(w, h) and hide(ms) (the steps), close(), pid, profile, and in Firefox
-//   gpuProcessMemory() and geckoProfile (below).
+//   stop(reason) (above), resize(w, h) and hide(ms) (the steps), close(), pid, profile, in Firefox
+//   gpuProcessMemory() and geckoProfile, and in Chrome chromeTrace (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -407,7 +407,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
     try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); } catch { await sleep(200); }
   }
   if (!targets) throw new Error('Chrome never answered on its debugging port');
-  let fileChooser = null;
+  let fileChooser = null, tracingComplete = null;
   // The game's threads are workers, and an exception on one reaches the page only as an ErrorEvent without its stack,
   // so each worker is attached to as it starts and its exceptions are reported from there, stack and all (a wasm
   // frame names its function if the page was linked with --profiling-funcs). Its console lines come through the page
@@ -425,6 +425,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       return;
     }
     if (m.method === 'Page.fileChooserOpened') fileChooser = m.params;
+    if (m.method === 'Tracing.tracingComplete') tracingComplete = m.params;
     if (m.method === 'Runtime.consoleAPICalled' && !m.sessionId) {
       line(m.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
     }
@@ -475,6 +476,28 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       await sleep(ms);
       await send('Target.activateTarget', { targetId: target.id });
       await send('Target.closeTarget', { targetId });
+    },
+    // A Chrome trace, what DevTools' Performance panel records: start() traces every process and samples the
+    // JavaScript and wasm stacks of every thread of the page's (V8's sampler, the workers the game's threads are
+    // included), and stop(file) writes the trace as JSON for the Performance panel or ui.perfetto.dev.
+    chromeTrace: {
+      start: () => send('Tracing.start', { transferMode: 'ReturnAsStream', traceConfig: { recordMode: 'recordAsMuchAsPossible',
+        includedCategories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame',
+          'toplevel', 'v8.execute', 'blink.console', 'disabled-by-default-v8.cpu_profiler', 'gpu', 'webgpu'] } }),
+      stop: async (file) => {
+        tracingComplete = null;
+        await send('Tracing.end');
+        for (let i = 0; i < 1200 && !tracingComplete; i++) await sleep(100);
+        if (!tracingComplete?.stream) throw new Error('the trace never completed');
+        const out = fs.openSync(file, 'w');
+        for (;;) {
+          const r = (await send('IO.read', { handle: tracingComplete.stream, size: 1 << 22 })).result;
+          fs.writeSync(out, r.base64Encoded ? Buffer.from(r.data, 'base64') : r.data);
+          if (r.eof) break;
+        }
+        fs.closeSync(out);
+        await send('IO.close', { handle: tracingComplete.stream });
+      },
     },
     // Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
     close: async () => {
