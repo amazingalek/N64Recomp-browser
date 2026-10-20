@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 827a073ea08b6ada2b56b345ab2d3bcfdd70f23d
+plume: https://github.com/amazingalek/plume-web 77e521e2a66514efee1561bdf8b942d29ab01324
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2664,10 +2664,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..0b0ff01
+index 0000000..3c043a9
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,64 @@
 +//
 +// plume
 +//
@@ -2719,6 +2719,15 @@ index 0000000..0b0ff01
 +        }
 +
 +        return state == 2;
++    }
++};
++
++#else
++
++namespace plume {
++    // Without threads the page's is the only one, and it can't wait.
++    inline bool timedWaitsEndLate() {
++        return false;
 +    }
 +};
 +
