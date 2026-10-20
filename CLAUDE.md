@@ -98,9 +98,10 @@ hlslpp-web; N64ModernRuntime-web's `N64Recomp` is N64Recomp-web. Notes name a ch
 `rt64-0010`) or by fork and commit (`rt64 c89ced0`): `docs/forks.md` has every one, a line each, and a change pushed to
 a fork gets its row there in the PR that moves `forks.txt` onto it.
 
-Five options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
+Six options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
 fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64 179adb8), `ULTRAMODERN_LIBULTRA_THREAD_STOP`
-(N64ModernRuntime 0df8334) and `ULTRAMODERN_HOLD_BLOCKED_MESSAGES` (N64ModernRuntime 66539ab).
+(N64ModernRuntime 0df8334), `ULTRAMODERN_HOLD_BLOCKED_MESSAGES` (N64ModernRuntime 66539ab) and
+`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS` (N64ModernRuntime bf96a62).
 
 ## Changing it
 

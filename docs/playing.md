@@ -40,6 +40,13 @@ options; `docs/findings.md` has what was measured this way.
   `load_briefing_text_for_stage` under `init_menu0C_missionfailed`). A thread of the game that throws ends the run
   as a failed one once nothing has presented for 15 s, and a page that refuses the ROM ends it at once, with the line
   it said that in (`play_page.mjs`).
+- A page that gives play_page no answer for 15 s ends the run as failed, "the page stopped answering", and says which
+  side stopped (Windows): each of the browser's processes' cores, its main thread's and the tab's busiest threads by
+  name, and the failure ends `main threads: the tab's <cores>, <state>; the browser's <cores>, <state>`. The tab's at
+  a core, running, is the page's script in a loop (or Emscripten's spin on a futex); the tab's waiting with the
+  browser's at a core is the browser's driver. Nothing from inside the page tells them apart: a worker's console lines
+  stop with the page's main thread in Firefox and don't reach the driver in Chrome (docs/findings.md, A page that stops
+  answering).
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key reached RmlUi): Enter starts the game on
   the second press, or click Start Game. Every RecompFrontend game does it, desktop too.

@@ -54,4 +54,10 @@ time); `tools/publish_pages.sh` does it for every game, or the ones it is given.
 was built from (`git log -1 origin/gh-pages`). A change to one game's own repo is played from a `--dry-run` build of
 that game, then published by a `tools/publish_pages.sh` run with its name.
 
+A test page, a game fork's branch to be played by hand before it lands (GoldenEye's `mouse`), is published beside
+main's page with `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "<branch> <sha>" --into <branch>`, at
+`https://amazingalek.github.io/<fork>/<branch>/`, and taken off with `--drop <branch>` when the branch lands or is
+dropped. Publishing main's page keeps every folder, and a test page leaves main's page and the other folders alone
+(the script's header says how).
+
 The first visit reloads once (`coi_serviceworker.js`); right after a publish that can take a second visit.
