@@ -5,6 +5,7 @@
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
 //     [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]]
+//     [--affinity <n>] [--fallback-adapter]
 //     [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
 // A build dir is served on 127.0.0.1 on a free port, and the browser's debugging port is a free one too, so plays
@@ -32,6 +33,11 @@
 // browser, a size or a build with another where every page would read 60 at the display's rate; a run at 342 or more
 // (95% of 360) is held by the rate, not the page, and says so. --cpu-throttle 3 (Chrome only) slows the page's thread
 // 3 times (Chrome's CPU throttling), a stand-in for a laptop's CPU, which the stand-in's GPU load leaves out.
+// --affinity 4 holds the browser, every process of it, to the first 4 logical processors (Windows' processor affinity;
+// on an SMT processor, two cores), a laptop's few cores in Firefox too. --fallback-adapter gives the page the browser's
+// software WebGPU adapter, which draws on the CPU, a slow GPU: SwiftShader in Chrome, WARP in Firefox (page_driver.mjs
+// says how). Which laptop flaw each of these shows is docs/playing.md's (Laptop-like limits on a desktop). A run
+// records its affinity and fallbackAdapter and is compared only with runs that set the same.
 // --scale 2 (not with --on-screen) gives the page 2 device pixels a CSS pixel, as a laptop at 200% does, where a page
 // that draws at device pixels shows (page_driver.mjs); --size stays in CSS pixels. A run records its devicePixelRatio
 // and is compared only with runs at the same one.
@@ -152,6 +158,9 @@ if (onScreen) args.splice(args.indexOf('--on-screen'), 1);
 const uncapped = args.includes('--uncapped');
 if (uncapped) args.splice(args.indexOf('--uncapped'), 1);
 const cpuThrottle = Number(option(args, '--cpu-throttle', '0'));
+const affinity = Number(option(args, '--affinity', '0'));
+const fallbackAdapter = args.includes('--fallback-adapter');
+if (fallbackAdapter) args.splice(args.indexOf('--fallback-adapter'), 1);
 const scale = Number(option(args, '--scale', '1'));
 const portOption = option(args, '--port', null);
 const profileOption = option(args, '--profile', null);
@@ -205,7 +214,7 @@ if (hostReadingOption !== null) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--affinity <n>] [--fallback-adapter] [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -215,6 +224,9 @@ if (!(scale > 0) || (scale !== 1 && onScreen)) { console.error("--scale needs a 
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
 if (chromeTraceFile && (browser !== 'chrome' || recordFile)) { console.error('--chrome-trace is Chrome\'s only, and not recorded'); process.exit(1); }
 if (!faultList.every((f) => faults.includes(f))) { console.error(`--fault is a list of ${faults.join(', ')}, by commas`); process.exit(1); }
+if (!Number.isInteger(affinity) || affinity < 0 || affinity > os.cpus().length) {
+  console.error(`--affinity needs a number of logical processors, 1-${os.cpus().length}`); process.exit(1);
+}
 if (faultList.includes('resize') && onScreen) { console.error('--fault resize is off the desktop only'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
@@ -504,8 +516,9 @@ const server = remote ? null : await serve(/\.html$/.test(where) ? path.dirname(
 const base = server ? `http://127.0.0.1:${server.address().port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = /\.html$/.test(where) ? (remote ? where : base + path.basename(where)) + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: portOption ? port + 1 : undefined, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, onLine, log });
-log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
+  preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, affinity, fallbackAdapter, onLine, log });
+log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''}` +
+  `${affinity ? ` on ${affinity} logical processors` : ''}${fallbackAdapter ? ' on the software adapter' : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 // A game whose thread threw (a wasm RuntimeError on a worker) presents nothing more, and its clock no longer moves, so
@@ -806,6 +819,7 @@ if (recordFile) {
   const run = {
     time: new Date(t0).toISOString(), game, build, note, ...(set ? { set } : {}), ...(role ? { role } : {}), ...(hostReading ? { hostReading } : {}), browser, page: pageUrl, size: summary.size,
     ...(onScreen ? { onScreen } : {}), ...(summary.devicePixelRatio ? { devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped: uncappedAs } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}),
+    ...(affinity ? { affinity } : {}), ...(fallbackAdapter ? { fallbackAdapter } : {}),
     ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits, shaderMisses,
@@ -834,7 +848,7 @@ function compare(run, lines) {
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.hostReading?.building && !p.hostReading?.gpuOthers && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
       like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && (p.uncapped ?? false) === (run.uncapped ?? false) && !p.onScreen === !run.onScreen &&
-      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && (run.onScreen || (p.devicePixelRatio ?? 1) === (run.devicePixelRatio ?? 1)) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}))
+      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && (p.affinity ?? 0) === (run.affinity ?? 0) && !p.fallbackAdapter === !run.fallbackAdapter && (run.onScreen || (p.devicePixelRatio ?? 1) === (run.devicePixelRatio ?? 1)) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}))
     .slice(-5);
   if (!before.length) {
     console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);

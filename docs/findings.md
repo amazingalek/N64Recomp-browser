@@ -643,6 +643,29 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
 
+## Laptop-like limits on a desktop, measured
+
+On 2026-10-20, GoldenEye's and Banjo's pages from Pages (v0.67.0), each game's plan, Chrome 155 and Firefox 158 off
+the desktop at a laptop window's 1920x945, cold, on a desktop GPU (RTX 5080, 8 cores of 16 threads), one page at a
+time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "laptop-like limits", with play_page's
+`--fallback-adapter` and `--affinity` (docs/playing.md, Laptop-like limits on a desktop).
+
+- A software adapter is far slower than a laptop's Intel UHD, so it stands in for no laptop. Chrome on SwiftShader
+  drew GoldenEye's logos at 33-65 presents a second and Dam at 0.2-3.8 (median 2.1), its GPU process taking 11.6
+  cores, where the laptop's Chrome draws Dam at 60; the plan's holds, 3624 ticks of the game's clock asked, held 10467,
+  since the game reads a key once a frame. Firefox on WARP drew the logos at 4-5 and then nothing for most of 280 s,
+  its GPU process on 2 cores, and Dam at 0.5-0.6 (a game somebody played took the GPU and the host from 28 s on, but
+  WARP draws on the CPU, and the logos before it were no faster). Both played with no WebGPU errors or exceptions,
+  SwiftShader without `shader-f16`, and RT64 paced presents to the game's frames as the GPU fell behind, as on a laptop.
+- `--affinity 4` (two cores) changed nothing at the display's rate: Banjo in Firefox 62.8 presents a second against
+  63.0 on all 16, its browser at 0.5-0.6 cores; GoldenEye in Firefox held Dam at 63.6-64.2 against 63.5-64.0, its
+  two shader waits 3.6 and 4.3 s against 3.0 and 3.5 (Firefox builds the pipelines on its GPU process, on the same
+  cores), Bond's holds 3626 and 3628 ticks of 3624. Where the intros present faster than the display, one run each
+  went either way (Banjo 112-159 on 4 against 92-220 on 16, GoldenEye 152-190 against 118-138). So neither Firefox's pacing to 30 on the laptop's screen nor
+  GoldenEye's Dam collapse there is the laptop's CPU: the first was Windows' compositor's share of the GPU, the second
+  shaders the list lacked drawn with the ubershader (A laptop, measured), which a desktop shows as `shader missed:`
+  lines, not as a slower Dam.
+
 ## WebGPU in Chrome and Firefox
 
 
