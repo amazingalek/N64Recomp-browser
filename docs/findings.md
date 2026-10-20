@@ -847,6 +847,31 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
   100 µs sleep there ~1.9 ms.
 
+## A page's thread in Chrome, throttled
+
+Banjo-Tooie's page is the slowest in Chrome with the CPU throttled 6 times (retest run 7, RTX 5080, uncapped at
+3840x2000: 76-77 presents a second, the other pages 126-290), and plays like them in Firefox (210-214). From Pages
+(built from main e8df837), its plan's boot and then Jinjo Village, the plan's first map, for 30 s, traced
+(`play_page.mjs --chrome-trace`; an idle host, 12-23% busy, no other GPU context; tracing cost the page ~15%):
+
+- Throttled 6 times, 72 presents a second, the page's thread is 92% busy. Two thirds of it is the WebGPU calls the
+  render thread hands it (Emscripten's mailbox): `writeBuffer` 14% of the thread's time, `setBindGroup` 10%,
+  `submit` 3%, `beginRenderPass`, `drawIndexed` and `setPipeline` 1-2% each, Emscripten's object lookup for each
+  call 3.5%, and 22% native time V8 can't name (Blink's WebGPU bindings and their IPC). Printing is 1.4%. The game's
+  threads, which Chrome's throttling doesn't slow, wait most of the time.
+- Unthrottled it reaches the 360 cap with the same thread 55% busy, the same calls on top.
+
+`--preload tools/webgpu_census.js`, throttled 6 times (87-95 presents a second, a shared GPU turn), counts what a
+present asks of that thread: ~1,710 `drawIndexed`, ~2,940 `setBindGroup`, ~680 `setPipeline`, 27 `writeBuffer`s of
+~1 MB, 39 `copyBufferToBuffer` and 11 render passes. Rush 2049's attract race makes 250-500 draws a present (Memory,
+above). plume already skips a pipeline or a bind group the pass has bound (`setPassPipeline`, `bindGroups`), so what
+is left is RT64's own per draw, as on a desktop build: the draw, its push constants (`renderIndex` changes every
+draw, so each gets a 256-byte slot of plume's ring, `writeBuffer`'s bytes, and a `setBindGroup` at its offset), and
+the texture set and pipeline where they change. So Banjo-Tooie is slow there because it draws ~1,700 batches a frame
+and each costs the page's thread its calls: its own, not the web support's. On the laptop's Chrome it plays 59
+(README, Games). The push constants' per-draw bind and 256 bytes are about a tenth of the throttled thread, the one
+part of it shared code could take out.
+
 ## Present gaps after Start
 
 What each thread does in a gap over 100 ms with no shader wait, read from a CDP trace of every thread of every
