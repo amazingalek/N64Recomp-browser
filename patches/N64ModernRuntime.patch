@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 23325d512b7c848b4bbc2649dfce85809dbd0f8b
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web bf96a62e720a8623218d76f8c8202d2ef6c5c963
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -655,6 +655,35 @@ index 5593172..e1e782f 100644
 +if (ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS OR EMSCRIPTEN)
 +    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS=1)
 +endif()
+diff --git a/ultramodern/include/ultramodern/displaylists.hpp b/ultramodern/include/ultramodern/displaylists.hpp
+new file mode 100644
+index 0000000..fd0af15
+--- /dev/null
++++ b/ultramodern/include/ultramodern/displaylists.hpp
+@@ -0,0 +1,23 @@
++#ifndef __ULTRAMODERN_DISPLAYLISTS_HPP__
++#define __ULTRAMODERN_DISPLAYLISTS_HPP__
++
++#include <atomic>
++#include <cstdint>
++
++// With ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS (on with Emscripten; displaylists.cpp says why), a load from ROM onto
++// commands of a display list the renderer hasn't read yet waits until it has. Without it these do nothing.
++namespace ultramodern {
++    // Where the renderer marks the RDRAM it reads display list commands from: [0] the lists read in full (counted by
++    // displaylist_read), [1 + physical address / 256] the number of the last list that read a command from those 256
++    // bytes of RDRAM's first 8 MB ([0] + 1 while it is read). nullptr without the option.
++    std::atomic<uint32_t>* displaylist_reads();
++    // A graphics task sent to the renderer.
++    void displaylist_sent();
++    // The renderer has read the oldest list sent to it.
++    void displaylist_read();
++    // Waits, at most 2 s, until the renderer has read every list sent so far if a load to RDRAM at this physical
++    // address and size would land on commands of one of the last lists it read.
++    void wait_for_displaylists_read(uint32_t rdram_address, uint32_t size);
++}
++
++#endif
 diff --git a/ultramodern/include/ultramodern/renderer_context.hpp b/ultramodern/include/ultramodern/renderer_context.hpp
 index d60c4ec..c543624 100644
 --- a/ultramodern/include/ultramodern/renderer_context.hpp
@@ -685,51 +714,39 @@ index 31eb106..50e8244 100644
      int32_t sp;
  } OSThread;
 diff --git a/ultramodern/include/ultramodern/ultramodern.hpp b/ultramodern/include/ultramodern/ultramodern.hpp
-index 46aea61..eba988b 100644
+index 46aea61..da24a61 100644
 --- a/ultramodern/include/ultramodern/ultramodern.hpp
 +++ b/ultramodern/include/ultramodern/ultramodern.hpp
 @@ -2,6 +2,7 @@
  #define __ultramodern_HPP__
  
  #include <thread>
-+#include <atomic>
++#include "ultramodern/displaylists.hpp"
  #include <cassert>
  #include <stdexcept>
  #include <span>
-@@ -100,6 +101,13 @@ void set_entrypoint_thread();
- bool is_entrypoint_thread();
- bool is_game_thread();
- void submit_rsp_task(RDRAM_ARG PTR(OSTask) task);
-+// With ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS (displaylists.cpp, which says why): where a renderer counts the display
-+// lists it reads and marks the RDRAM it reads their commands from (nullptr without it), a graphics task sent, and a load
-+// from ROM to RDRAM (physical addresses) waiting, at most 2 s, until the renderer has read every list that may run
-+// commands where it lands.
-+std::atomic<uint32_t>* displaylist_reads();
-+void displaylist_sent();
-+void wait_for_displaylists_read(uint32_t rdram_address, uint32_t size);
- void send_si_message();
- uint32_t get_speed_multiplier();
- 
 diff --git a/ultramodern/src/displaylists.cpp b/ultramodern/src/displaylists.cpp
 new file mode 100644
-index 0000000..94f592b
+index 0000000..be6c588
 --- /dev/null
 +++ b/ultramodern/src/displaylists.cpp
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,90 @@
 +#include <algorithm>
 +#include <atomic>
 +#include <chrono>
 +#include <thread>
 +
-+#include "ultramodern/ultramodern.hpp"
++#include "ultramodern/displaylists.hpp"
 +
 +// On a console the RSP reads a display list within a few ms of the game sending it, long before the game's next load
 +// from ROM lands, so a game may load over commands its last list runs: one loads its title screen's textures over its
 +// logos' model the frame after their last list. Here the renderer reads a list on the graphics thread, which on a slow
 +// GPU can be a frame or more behind the game, and would take what the load left there for commands. So the renderer
-+// marks in displaylist_reads() the RDRAM it reads each list's commands from, and a load from ROM onto commands one of
-+// the last lists it read ran waits until it has read every list sent before it, on whichever thread the load is (the
-+// one that loads over a list needn't be the one that sends it). A load anywhere else, as a sound's samples, goes at once.
++// marks in displaylist_reads() the RDRAM it reads each list's commands from (RT64's interpreter, given the array by
++// RecompFrontend's glue, which counts the lists read), librecomp counts the graphics tasks sent, and a load from ROM
++// onto commands one of the last lists read ran waits until the renderer has read every list sent before it, on
++// whichever thread the load is (the one that loads over a list needn't be the one that sends it). A load anywhere else,
++// as a sound's samples, goes at once.
 +
 +#if ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS
 +
@@ -742,7 +759,7 @@ index 0000000..94f592b
 +    constexpr uint32_t recent_lists = 8;
 +
 +    // [0] the lists the renderer has read in full; [1 + unit] the number of the last list it read commands from there
-+    // in (counting from 1, so 0 is none).
++    // in (counting from 1, so 0 is none; displaylists.hpp).
 +    std::atomic<uint32_t> reads[1 + units];
 +    std::atomic<uint32_t> lists_sent{ 0 };
 +}
@@ -753,6 +770,10 @@ index 0000000..94f592b
 +
 +void ultramodern::displaylist_sent() {
 +    lists_sent.fetch_add(1, std::memory_order_relaxed);
++}
++
++void ultramodern::displaylist_read() {
++    reads[0].fetch_add(1, std::memory_order_release);
 +}
 +
 +void ultramodern::wait_for_displaylists_read(uint32_t rdram_address, uint32_t size) {
@@ -794,6 +815,8 @@ index 0000000..94f592b
 +}
 +
 +void ultramodern::displaylist_sent() {}
++
++void ultramodern::displaylist_read() {}
 +
 +void ultramodern::wait_for_displaylists_read(uint32_t, uint32_t) {}
 +
