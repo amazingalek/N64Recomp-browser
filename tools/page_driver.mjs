@@ -58,7 +58,7 @@ import fs from 'fs';
 import http from 'http';
 import net from 'net';
 import path from 'path';
-import { spawn, execFile } from 'child_process';
+import { spawn, execFile, execFileSync } from 'child_process';
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -166,11 +166,39 @@ const rdramHelpers = `(() => {
 // page whose canvas went to device pixels (SDL_WINDOW_ALLOW_HIGHDPI) drew four times the pixels and took every click
 // at the wrong spot, so Load ROM opened nothing, which no run at 1 shows. onScreen (above) leaves size and scale to the
 // window. firefoxPrefs are Firefox prefs of the caller's, set over
-// the ones below.
+// the ones below. affinity holds the browser, every process of it, to the first that many logical processors (0: all),
+// a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
+// WebGPU adapter in place of the GPU, a slow GPU: Chrome started with --use-webgpu-adapter=swiftshader (SwiftShader,
+// Vulkan on the CPU; Chrome 155 has no other: its warp, d3d11 and opengles values give the GPU or no adapter) and every
+// requestAdapter() asked for forceFallbackAdapter, which is what gives Firefox one (D3D12's WARP, from wgpu's dx12
+// backend; Firefox names no adapter to a page, and has none with forceFallbackAdapter on its vulkan backend).
 export const firefoxUncappedRate = 360;
 
+const fallbackAdapterPreload = `() => {
+  if (!self.GPU) return;
+  const requestAdapter = GPU.prototype.requestAdapter;
+  GPU.prototype.requestAdapter = function (options) { return requestAdapter.call(this, { ...options, forceFallbackAdapter: true }); };
+}`;
+
+// spawn(), held to the first affinity logical processors (0: all) on Windows, where a process starts with its parent's
+// affinity: this process is held to them while spawn() creates the browser (CreateProcess, before spawn() returns) and
+// let go after, so the browser and every process it starts later (Chrome's GPU process and renderers, Firefox's
+// launcher's browser and its GPU and content processes) take them, which no flag of either browser does, and the
+// helpers started after it (the counters' PowerShell, nvidia-smi) don't. On an SMT processor two logical processors are
+// one core (0 and 1 on this repo's desktops), so 4 is two cores of four threads, as a laptop's i3 has. Elsewhere taskset.
+const spawnHeld = (affinity, command, args, options) => {
+  if (!affinity) return spawn(command, args, options);
+  if (process.platform !== 'win32') return spawn('taskset', ['-c', `0-${affinity - 1}`, command, ...args], options);
+  const hold = (mask) => execFileSync('powershell', ['-NoProfile', '-Command',
+    `$p = Get-Process -Id ${process.pid}; $o = $p.ProcessorAffinity; $p.ProcessorAffinity = ${mask}; [int64]$o`], { encoding: 'utf8' }).trim();
+  const all = hold((2n ** BigInt(affinity) - 1n).toString());
+  try { return spawn(command, args, options); } finally { hold(all); }
+};
+
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, onLine = () => {}, log = console.log }) => {
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, affinity = 0, fallbackAdapter = false,
+  onLine = () => {}, log = console.log }) => {
+  if (fallbackAdapter) preload = preload ? `() => { (${fallbackAdapterPreload})(); (${preload})(); }` : fallbackAdapterPreload;
   fs.mkdirSync(profile, { recursive: true });
   profile = path.resolve(profile);
   const [width, height] = size;
@@ -183,8 +211,8 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line });
-  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line });
+  else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
   page.profile = profile;
@@ -280,7 +308,7 @@ const listening = (host, port) => new Promise((resolve) => {
 
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
   // another window over it would hide it too).
   const mode = headed || onScreen
@@ -288,8 +316,9 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       '--disable-renderer-backgrounding', '--no-default-browser-check']
     : ['--headless=new'];
   if (uncapped) mode.push('--disable-frame-rate-limit');
+  if (fallbackAdapter) mode.push('--use-webgpu-adapter=swiftshader');
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
-  const proc = spawn(executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'],
     { stdio: 'ignore' });
@@ -391,7 +420,7 @@ if ($w) { ${place} | Out-Null; 'moved' }`;
     (err, stdout) => resolve(!err && stdout.includes('moved')));
 });
 
-const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, line }) => {
+const openFirefox = async ({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line }) => {
   // No first-run pages or crash restore, scale device pixels a CSS pixel (but on screen), sound allowed to start without a click
   // but silent.
   const prefs = { 'browser.shell.checkDefaultBrowser': false, 'datareporting.policy.dataSubmissionEnabled': false,
@@ -400,7 +429,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'], { stdio: 'ignore' });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
