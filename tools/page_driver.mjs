@@ -29,7 +29,10 @@
 // ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
 // ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
-// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page) and
+// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page),
+// ["resize", w, h] (the viewport to that many CSS pixels, as a player's window resized: not on screen, where the
+// window is the desktop's), ["hide", ms] (another tab in front of the page's for ms of wall time, then the page's again,
+// as a player switching tabs: the page's document is hidden, and the browser throttles it as it does a player's) and
 // ["pressUntil", code, key, keyCode, holdMs, everyMs, test, ms] (holds the key for holdMs every everyMs until the
 // JavaScript test, which can read RDRAM with n64r, is true, for at most ms: a menu that takes its time, or ignores a
 // press while it animates, is passed without timing the presses), and ["clock", read, perSecond] (below). A tool can add
@@ -151,7 +154,8 @@ const rdramHelpers = `(() => {
 
 // Opens the browser ("chrome" or "firefox") on about:blank and gives back the page:
 //   navigate(url), evaluate(js) (the value, awaited and passed as JSON; throws on an exception), run(steps, extra),
-//   stop(reason) (above), close(), pid, profile, and in Firefox gpuProcessMemory() and geckoProfile (below).
+//   stop(reason) (above), resize(w, h) and hide(ms) (the steps), close(), pid, profile, and in Firefox
+//   gpuProcessMemory() and geckoProfile (below).
 // onLine gets every console line and uncaught exception, as text. preload is JavaScript run in every document before
 // the page's own.
 // size is the viewport in CSS pixels, one a pixel, which a plan's clicks are in: 1256x645 unless given, what headless
@@ -262,6 +266,11 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
           : async () => page.click(...await place(a[0], a[1])));
       }
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
+      else if (op === 'resize') {
+        if (onScreen) throw new Error('resize is off the desktop only: on screen the window is the desktop\'s');
+        await page.resize(a[0], a[1]);
+      }
+      else if (op === 'hide') await page.hide(a[0]);
       else throw new Error(`unknown step ${op}`);
     }
     if (asked) log(`holds on the clock: ${asked} ticks asked, ${held} held`);
@@ -309,8 +318,9 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   // a host without the headers), held until resumed, and Runtime.enable doesn't answer a held service worker: resumed
   // only once that answered, it never activated, and the page from such a host was never cross-origin isolated. So
   // the two go out together; each target takes them in order, so a worker still has Runtime on before it runs.
+  const target = targets.find((t) => t.type === 'page');
   let send;
-  send = await connect(targets.find((t) => t.type === 'page').webSocketDebuggerUrl, (m) => {
+  send = await connect(target.webSocketDebuggerUrl, (m) => {
     if (m.method === 'Target.attachedToTarget') {
       const session = m.params.sessionId;
       send('Runtime.enable', {}, session);
@@ -361,6 +371,14 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
       await send('Page.setInterceptFileChooserDialog', { enabled: false });
     },
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'),
+    resize: (w, h) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile: false }),
+    hide: async (ms) => {
+      const { targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result;
+      await send('Target.activateTarget', { targetId });
+      await sleep(ms);
+      await send('Target.activateTarget', { targetId: target.id });
+      await send('Target.closeTarget', { targetId });
+    },
     // Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
     close: async () => {
       const exited = new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 10000); });
@@ -506,6 +524,13 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       throw new Error('the page never asked for a file');
     },
     screenshot: async () => Buffer.from((await send('browsingContext.captureScreenshot', { context })).result.data, 'base64'),
+    resize: (w, h) => send('browsingContext.setViewport', { context, viewport: { width: w, height: h }, devicePixelRatio: scale }),
+    hide: async (ms) => {
+      const tab = (await send('browsingContext.create', { type: 'tab' })).result.context;
+      await sleep(ms);
+      await send('browsingContext.activate', { context });
+      await send('browsingContext.close', { context: tab });
+    },
     close: async () => {
       const exited = new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 30000); });
       send('browser.close');

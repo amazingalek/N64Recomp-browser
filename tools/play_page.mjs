@@ -4,7 +4,8 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
-//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>]
+//     [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -39,6 +40,20 @@
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
+// --fault does to the page, once the play is over (a plan's play ends in its level), what a player's browser or the
+// player does to one, then lets the game run by itself 30 s more: device destroys every WebGPU device the page made
+// (device.destroy(), as a driver reset or a crashed GPU process loses one), resize makes the viewport 60% as wide and
+// as high for 10 s and gives it back (not with --on-screen), hidden puts another tab in front for 30 s, audio suspends
+// the page's AudioContext for 10 s and resumes it, and reload loads the page again over the browser's warm cache and
+// service worker (a page from Pages: a build dir is served uncached) and runs the plan's load and start steps, its
+// setup's ROM kept. It prints and records (as "fault") the presents a second before it (the play's last 3 samples),
+// during and after, the WebGPU errors, exceptions and sound frames short after, the console's first 10 lines from it
+// on (whether the page told the player), the canvas's size, the visibility, the AudioContext's state, for reload both
+// boots (seconds to the end of the load steps and to the first present), and whether the page came through:
+// presenting at half its rate or more after, with no error or exception, and after a lost device with a new one.
+// --shot takes a second screenshot at the end, <file>-<fault>.png. The note starts "fault <name>", so the run is
+// compared with nothing, the play's own numbers leave the fault's out, and a page that didn't come through exits 4.
+// Every run says when a WebGPU device the page made is lost, whoever lost it ("play_page: a WebGPU device was lost").
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -129,7 +144,10 @@ const executable = option(args, '--browser', undefined);
 const recordFile = option(args, '--record', null);
 const game = option(args, '--game', null);
 const build = option(args, '--build', null);
-const note = option(args, '--note', null);
+const fault = option(args, '--fault', null);
+const faults = ['device', 'resize', 'hidden', 'audio', 'reload'];
+const noteOption = option(args, '--note', null);
+const note = fault ? [`fault ${fault}`, noteOption].filter(Boolean).join('; ') : noteOption;
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
 const firefoxPrefs = {};
@@ -145,7 +163,7 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>] [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -153,6 +171,8 @@ const uncappedAs = uncapped && browser === 'firefox' ? firefoxUncappedRate : unc
 if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
 if (!(scale > 0) || (scale !== 1 && onScreen)) { console.error("--scale needs a number above 0, and is the desktop's own on screen"); process.exit(1); }
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
+if (fault && !faults.includes(fault)) { console.error(`--fault is one of ${faults.join(', ')}`); process.exit(1); }
+if (fault === 'resize' && onScreen) { console.error('--fault resize is off the desktop only'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
@@ -186,12 +206,16 @@ const romRefused = new RegExp(String.raw`\[launch\] rom refused: ` +
   String.raw`|\[ERROR\] (Failed to open ROM file|This is not a valid ROM file|This (ROM )?is(n't)? .*(version|not the correct game)` +
   String.raw`|This game isn't supported yet|An unknown error has occurred|The file (couldn't be opened|isn't an N64 ROM)|The ROM couldn't be loaded)` +
   String.raw`|\[boot\]\[page\] (This page plays |The ROM could not be opened|The selected |This .* is not supported)`);
+// The console's first lines from a --fault on, which say whether the page told the player.
+let faultPhase = null;
+const faultLines = [];
 const onLine = (text) => {
   if (/^rt64 shader: /.test(text)) return;
   log(text);
   const wait = /RT64: (\d+) (prebuilt shaders|shaders the list missed) built in ([\d.]+) s, the game waiting/.exec(text);
   if (wait) shaderWaits.push({ at: Math.round(seconds()), shaders: Number(wait[1]), seconds: Number(wait[3]), ...(wait[2] === 'prebuilt shaders' ? {} : { missed: true }) });
   if (/^WebGPU (error|device lost)/.test(text)) errors.push(text);
+  if (faultPhase && faultLines.length < 10) faultLines.push(`${Math.round(seconds())}: ${text.split('\n')[0].slice(0, 300)}`);
   // Emscripten's abort() prints "Aborted(<reason>)" and then traps in the wasm's ___trap, which a worker reports only as
   // "unreachable executed" at that function's offset (docs/playing.md, What a page says about itself), so the line
   // that says why goes in front of the exception's.
@@ -236,6 +260,7 @@ const ownPreload = `() => {
       context.getCurrentTexture = function () {
         window.__presents++;
         const now = performance.now();
+        window.__firstPresent ??= now;
         if (lastPresent) window.__gaps.push(Math.round((now - lastPresent) * 10) / 10);
         lastPresent = now;
         return getCurrentTexture.apply(this, arguments);
@@ -243,6 +268,17 @@ const ownPreload = `() => {
     }
     return context;
   };
+  // Every WebGPU device the page asks for, which --fault device destroys, and a line when one is lost, whoever lost it.
+  window.__devices = [];
+  if (window.GPUAdapter) {
+    const requestDevice = GPUAdapter.prototype.requestDevice;
+    GPUAdapter.prototype.requestDevice = async function () {
+      const device = await requestDevice.apply(this, arguments);
+      window.__devices.push(device);
+      device.lost.then((info) => console.log(\`play_page: a WebGPU device was lost (\${info.reason}): \${info.message}\`));
+      return device;
+    };
+  }
 }`;
 const preload = preloadFile ? `() => {
 (${ownPreload})();
@@ -403,11 +439,13 @@ const sample = async () => {
   if (last) {
     const dt = now.at - last.at;
     const fresh = now.cpu && last.cpu && now.cpu.at > last.cpu.at;
+    // A page loaded again (--fault reload) counts from 0 again: the sample across it is left out.
     const s = {
-      at: Math.round(now.at), playing,
-      presents: (presents !== null && last.presents !== null) ? (presents - last.presents) / dt : null,
-      animationFrames: (animationFrames !== null && last.animationFrames !== null) ? (animationFrames - last.animationFrames) / dt : null,
-      short: (audio && last.audio) ? audio.short - last.audio.short : null,
+      at: Math.round(now.at), playing, ...(faultPhase ? { fault: faultPhase } : {}),
+      presents: (presents !== null && last.presents !== null && presents >= last.presents) ? (presents - last.presents) / dt : null,
+      animationFrames: (animationFrames !== null && last.animationFrames !== null && animationFrames >= last.animationFrames) ?
+        (animationFrames - last.animationFrames) / dt : null,
+      short: (audio && last.audio && audio.short >= last.audio.short) ? audio.short - last.audio.short : null,
       gaps, gpu, nvidia,
       gpuProcess: fresh ? (now.cpu.gpuProcess - last.cpu.gpuProcess) / (now.cpu.at - last.cpu.at) : null,
       browser: fresh ? (now.cpu.all - last.cpu.all) / (now.cpu.at - last.cpu.at) : null,
@@ -450,9 +488,20 @@ const hostTimes = () => os.cpus().reduce((t, c) => {
 let hostBefore = null;
 let viewport = null;
 const steps = { keep: () => {} };  // record_shaders.mjs's own step, in a shader plan's sections
-try {
+// The page from navigate to the end of the plan's load steps (its launcher) and to its first present, in seconds.
+const tenths = (x) => Math.round(x * 10) / 10;
+const boot = async () => {
+  const from = Date.now();
   await page.navigate(pageUrl);
-  await page.run([...(plan.load ?? []), ...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])], steps);
+  await page.run(plan.load ?? [], steps);
+  const loaded = (Date.now() - from) / 1000;
+  const first = await page.evaluate('window.__firstPresent ? performance.timeOrigin + window.__firstPresent : null').catch(() => null);
+  return { loaded: tenths(loaded), firstPresent: first ? tenths((first - from) / 1000) : null };
+};
+let firstBoot = null;
+try {
+  firstBoot = await boot();
+  await page.run([...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])], steps);
   audioBefore = last?.audio ?? null;
   memoryBefore = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
   // That report runs every process's memory reporters, which held a Firefox page's presents and animation frames 120-203
@@ -478,6 +527,71 @@ try {
   if (!recordFile) await finish(1);
 }
 const hostAfter = hostTimes();
+
+// --fault, once the play is over (in its level): the fault, then 30 s of the game running by itself.
+const playErrors = errors.slice(), playExceptions = exceptions;
+let faultResult = null;
+if (fault && !failure) {
+  faultResult = { name: fault, at: Math.round(seconds()),
+    presentsBefore: median(samples.filter((s) => s.playing).slice(-3).map((s) => s.presents)) };
+  const canvas = `(() => { const c = document.getElementById('canvas') ?? document.querySelector('canvas'); return c ? [c.width, c.height] : null; })()`;
+  const audioContext = `(typeof Module !== 'undefined' && Module.SDL2 && Module.SDL2.audioContext && Module.SDL2.audioContext.suspend ? Module.SDL2.audioContext : null)`;
+  const devices = await page.evaluate('window.__devices.length').catch(() => 0);
+  log(`fault ${fault}`);
+  faultPhase = 'during';
+  try {
+    if (fault === 'device') {
+      faultResult.destroyed = await page.evaluate('(window.__devices.forEach((d) => d.destroy()), window.__devices.length)');
+    } else if (fault === 'resize') {
+      faultResult.canvasBefore = await page.evaluate(canvas);
+      await page.run([['resize', Math.round(size[0] * 0.6), Math.round(size[1] * 0.6)], ['wait', 10000]]);
+      faultResult.canvasResized = await page.evaluate(canvas);
+      await page.run([['resize', size[0], size[1]]]);
+    } else if (fault === 'hidden') {
+      const hidden = page.run([['hide', 30000]]);
+      await sleep(2000);
+      faultResult.visibilityHidden = await page.evaluate('document.visibilityState');
+      await hidden;
+    } else if (fault === 'audio') {
+      faultResult.audioSuspended = await page.evaluate(`${audioContext}?.suspend().then(() => ${audioContext}.state) ?? null`);
+      await page.run([['wait', 10000]]);
+      await page.evaluate(`${audioContext}?.resume()`);
+    } else if (fault === 'reload') {
+      faultResult.boots = [firstBoot, await boot()];
+      await page.run(plan.start ?? [], steps);
+    }
+    faultPhase = 'after';
+    await page.run([['wait', 30000]]);
+    await sample();
+    Object.assign(faultResult, await page.evaluate(`({ visibility: document.visibilityState, audio: ${audioContext}?.state ?? null,
+      canvas: ${canvas}, devices: window.__devices.length })`));
+    if (shotFile) fs.writeFileSync(shotFile.replace(/(\.png)?$/, `-${fault}.png`), await page.screenshot());
+  } catch (error) {
+    log(`failed after the fault: ${error.message}`);
+    faultResult.failed = error.message;
+  }
+  faultPhase = null;
+  const faultSamples = (phase) => samples.filter((s) => s.fault === phase);
+  Object.assign(faultResult, {
+    presentsDuring: median(faultSamples('during').map((s) => s.presents)),
+    presentsAfter: median(faultSamples('after').map((s) => s.presents)),
+    audioShortAfter: faultSamples('after').reduce((t, s) => t + (s.short ?? 0), 0),
+    webgpuErrors: errors.length - playErrors.length, firstErrors: [...new Set(errors.slice(playErrors.length))].slice(0, 3),
+    exceptions: exceptions - playExceptions, lines: faultLines,
+  });
+  // Through it: presenting at half the play's rate or more, no WebGPU error or exception since, and after a lost device
+  // a new one (the page's own device is in window.__devices; one it asks for again comes after them).
+  faultResult.recovered = !faultResult.failed && faultResult.exceptions === 0 && faultResult.webgpuErrors === 0 &&
+    faultResult.presentsAfter !== null && faultResult.presentsAfter >= 0.5 * (faultResult.presentsBefore ?? 0) &&
+    (fault !== 'device' || (faultResult.devices ?? 0) > devices);
+  const r1 = (x) => x?.toFixed(1) ?? '-';
+  console.log(`fault ${fault}: ${faultResult.recovered ? 'came through' : 'did not come through'}, presents/s ${r1(faultResult.presentsBefore)} ` +
+    `before, ${r1(faultResult.presentsDuring)} during, ${r1(faultResult.presentsAfter)} after; ${faultResult.webgpuErrors} WebGPU errors, ` +
+    `${faultResult.exceptions} exceptions, ${faultResult.audioShortAfter} sound frames short after` +
+    (faultResult.failed ? `; failed: ${faultResult.failed}` : ''));
+  console.log(`  ${JSON.stringify(Object.fromEntries(Object.entries(faultResult).filter(([k]) => !['lines', 'firstErrors'].includes(k))))}`);
+  for (const text of faultLines) console.log(`  console ${text}`);
+}
 
 const during = samples.filter((s) => s.playing);
 const presents = during.map((s) => s.presents).filter((p) => p !== null);
@@ -512,13 +626,14 @@ const summary = {
     longestMs: gaps.reduce((m, g) => Math.max(m, g)), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
     over250Ms: gaps.filter((g) => g > 250).length } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
-  shaderWaits, shaderMisses: shaderMisses.length, webgpuErrors: errors, exceptions,
+  shaderWaits, shaderMisses: shaderMisses.length, webgpuErrors: playErrors, exceptions: playExceptions,
   gpu: gpuMedians('gpu'), nvidia: gpuMedians('nvidia'),
   cores: during.some((s) => s.gpuProcess !== null) ?
     { gpuProcess: median(during.map((s) => s.gpuProcess)), browser: median(during.map((s) => s.browser)) } : null,
   gpuProcessMB: memory.length > 1 ? { first: Math.round(memory[0].gpuProcessMB), last: Math.round(memory.at(-1).gpuProcessMB),
     perSecond: Math.round(100 * (memory.at(-1).gpuProcessMB - memory[0].gpuProcessMB) / (memory.at(-1).at - memory[0].at)) / 100 } : null,
   gpuProcessMemory: memoryBefore && memoryAfter ? { before: memoryBefore, after: memoryAfter } : null,
+  fault: faultResult,
 };
 const r = (x, digits = 1) => x?.toFixed(digits) ?? '-';
 console.log(`summary: ${browser} ${summary.size}${uncapped ? ' uncapped' : ''}, ${during.length} samples of ${interval} s played`);
@@ -535,7 +650,7 @@ const bySection = {};
 for (const m of shaderMisses) bySection[m.section] = (bySection[m.section] ?? 0) + 1;
 console.log(`  shader misses ${shaderMisses.length}${shaderMisses.length ? ', by section: ' +
   Object.entries(bySection).map(([section, n]) => `${n} in ${section}`).join(', ') : ''}`);
-console.log(`  WebGPU errors ${errors.length}${errors.length ? ': ' + [...new Set(errors)].slice(0, 5).join(' | ') : ''}, exceptions ${exceptions}`);
+console.log(`  WebGPU errors ${playErrors.length}${playErrors.length ? ': ' + [...new Set(playErrors)].slice(0, 5).join(' | ') : ''}, exceptions ${playExceptions}`);
 if (summary.gpu?.adapter) console.log(`  GPU ${summary.gpu.busy}% busy (3D), ${summary.gpu.mib} MiB, ${summary.gpu.sharedMib} MiB shared (medians, the page's adapter ${summary.gpu.adapter})`);
 else if (summary.gpu) console.log(`  GPU ${summary.gpu.busy}% busy, ${summary.gpu.watts} W (medians, the whole GPU)`);
 if (summary.nvidia) console.log(`  nvidia-smi's GPU 0 ${summary.nvidia.busy}% busy, ${summary.nvidia.watts} W (medians)`);
@@ -559,19 +674,20 @@ if (recordFile) {
     interval, series: { presents: during.map((s) => s.presents === null ? null : Math.round(s.presents * 10) / 10),
       short: during.map((s) => s.short), gpuBusy: during.map((s) => s.gpu?.busy ?? null),
       gpuProcessMB: during.map((s) => s.gpuProcessMB === null ? null : Math.round(s.gpuProcessMB)) },
-    webgpuErrors: errors.length, firstErrors: [...new Set(errors)].slice(0, 3), exceptions, gpu: summary.gpu,
+    webgpuErrors: playErrors.length, firstErrors: [...new Set(playErrors)].slice(0, 3), exceptions: playExceptions, gpu: summary.gpu,
     ...(summary.nvidia ? { nvidia: summary.nvidia } : {}),
     cores: summary.cores && { gpuProcess: round(summary.cores.gpuProcess), browser: round(summary.cores.browser) },
     gpuProcessMB: summary.gpuProcessMB,
     ...(summary.gpuProcessMemory ? { gpuProcessMemory: summary.gpuProcessMemory } : {}),
     host: { cores: os.cpus().length, busy: host ? Math.round(100 * (1 - (hostAfter.idle - hostBefore.idle) / host)) : null },
+    ...(faultResult ? { fault: faultResult } : {}),
     failed: failure,
   };
   if (!note) regressions = compare(run, fs.existsSync(recordFile) ? fs.readFileSync(recordFile, 'utf8') : '');
   fs.appendFileSync(recordFile, JSON.stringify(run) + '\n');
 }
 for (const r of regressions) console.log(`regression: ${r}`);
-await finish(failure ? 1 : regressions.length ? 3 : 0);
+await finish(failure ? 1 : regressions.length ? 3 : faultResult && !faultResult.recovered ? 4 : 0);
 
 // The ways a run plays worse than the last 5 like it in the file (the header says which are like it).
 function compare(run, lines) {
