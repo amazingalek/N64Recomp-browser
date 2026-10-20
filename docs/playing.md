@@ -108,6 +108,29 @@ options; `docs/findings.md` has what was measured this way.
   front of the exception in the failure it records, and an empty reason is C's `abort()` (a failed `new`, libc++
   throwing with exceptions off, the runtime's own), which the stderr lines before it say.
 
+## Laptop-like limits on a desktop
+
+A laptop's integrated graphics finds most new flaws. Without one, a desktop takes these stand-ins, each recorded in
+the run, so plays.jsonl compares a run only with runs that set the same (numbers: docs/findings.md, The stand-in,
+measured, and Laptop-like limits on a desktop, measured):
+
+- `--size 3840x2000 --uncapped`, the stand-in of a cell: about 7 times a laptop window's pixels, so a frame's GPU cost
+  shows as presents a second. It finds a costly frame and clears none.
+- `--size 1920x945`, the laptop window's viewport: what the page lays out and clicks, and the sizes Auto draws at
+  (GoldenEye's scene 2682x1320), a target's memory with them. A desktop GPU draws every page at the display's
+  rate there, so it is for the other limits and for memory, not for presents.
+- `--affinity <n>` holds the browser, every process of it, to n logical processors (4: two cores), in Firefox as in
+  Chrome, where `--cpu-throttle` slows only Chrome's page thread. It shows a page short of cores: on 4 Banjo and
+  GoldenEye played in Firefox as on 16 at the display's rate, and lost only where a page runs faster than the display.
+- `--fallback-adapter` gives the page the browser's software adapter (SwiftShader in Chrome, WARP in Firefox), tens of
+  times slower than Intel UHD: GoldenEye's Dam drew 2 presents a second. It checks a page boots and draws with no
+  WebGPU errors on a weak adapter's features and limits (no `shader-f16`) and how it behaves far behind (RT64 pacing
+  presents to the game's frames, holds overrunning the clock), and is no laptop's speed.
+
+None stands in for Windows composing a laptop's screen on the same GPU (what pacing Firefox to 30 on screen was) or
+for the GPU's own speed at a laptop's size; Firefox drawing a list's misses with the ubershader (GoldenEye's Dam
+collapse) shows on a desktop as `shader missed:` lines.
+
 ## A cell of the Games table
 
 - A cell is written from a run on integrated graphics (a laptop report or a hand test there), or else from the
