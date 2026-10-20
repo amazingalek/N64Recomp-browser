@@ -116,8 +116,13 @@ const connect = async (url, onEvent) => {
     if (!m.id) onEvent(m);
     else { pending.get(m.id)?.resolve(m); pending.delete(m.id); }
   };
-  ws.onclose = ws.onerror = () => {
-    closed ??= unanswered('the browser closed its debugging connection');
+  // An error is always followed by the close, which says by its code and reason which end closed and why (1006: the
+  // socket dropped with no close frame), the error's message beside it.
+  let error = null;
+  ws.onerror = (event) => { error = event.error?.message ?? event.message ?? 'error'; };
+  ws.onclose = (event) => {
+    closed ??= unanswered(`the debugging connection closed (code ${event.code}${event.reason ? `, "${event.reason}"` : ''}` +
+      `${error ? `, ${error}` : ''})`);
     for (const call of pending.values()) call.reject(closed);
     pending.clear();
   };
