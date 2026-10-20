@@ -395,7 +395,9 @@ log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? 
 // every hold and wait left on the clock would go on for its whole timeout (page_driver.mjs): one crashed GoldenEye run
 // on a laptop took 2,400 s for a plan of ~300. Once there has been an exception and no present for stalledSeconds since
 // it, the run is stopped and fails with the exception's text; without an exception, a stretch with no presents (a load, a
-// shader wait) goes on as before.
+// shader wait) goes on as before. A page that gives a sample no answer for stalledSeconds (its thread blocked, the
+// browser gone) stops the run the same way, as "the page stopped answering", so it is recorded and the tool ends,
+// rather than every sample and step after it waiting on the page for good.
 const stalledSeconds = 15;
 let presentedAt = 0;
 const samples = [];
@@ -410,18 +412,21 @@ const sample = async () => {
   if (sampleBusy) return;
   sampleBusy = true;
   let presents = null, animationFrames = null, audio = null, gaps = [];
+  const answer = stalledSeconds * 1000;
   try {
-    presents = await page.evaluate('window.__presents ?? null');
-    animationFrames = await page.evaluate('window.__animationFrames ?? null');
-    gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()'));
-    audio = await page.evaluate(audioStats);
-    const misses = JSON.parse(await page.evaluate('(() => { const m = window.__shaderMisses ?? []; window.__shaderMisses = []; return JSON.stringify(m); })()'));
+    presents = await page.evaluate('window.__presents ?? null', answer);
+    animationFrames = await page.evaluate('window.__animationFrames ?? null', answer);
+    gaps = JSON.parse(await page.evaluate('(() => { const g = window.__gaps ?? []; window.__gaps = []; return JSON.stringify(g); })()', answer));
+    audio = await page.evaluate(audioStats, answer);
+    const misses = JSON.parse(await page.evaluate('(() => { const m = window.__shaderMisses ?? []; window.__shaderMisses = []; return JSON.stringify(m); })()', answer));
     for (const [section, ...words] of misses) {
       const miss = { at: Math.round(seconds()), section, shader: words.map(hex).join(' ') };
       shaderMisses.push(miss);
       log(`shader missed: ${miss.shader} (section ${section})`);
     }
-  } catch {}
+  } catch (error) {
+    if (error.unanswered) page.stop(`the page stopped answering: ${error.message}`);
+  }
   const now = { at: seconds(), presents, animationFrames, audio, cpu: procCpu() };
   const gpu = gpuNow();
   const nvidia = countersAnswered ? smiGpu : null;
