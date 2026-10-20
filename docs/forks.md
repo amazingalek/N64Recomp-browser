@@ -278,5 +278,7 @@ plume c5c9195          first instance, which RasterVS reads as instance_index an
                        as a flat varying, and renderIndex stays 0; a render pass binds a push constants block it has
                        bound already once, with no slot of the ring. renderIndex changed every draw, so each draw cost
                        the page's thread a setBindGroup and 256 bytes of writeBuffer (Banjo-Tooie throttled in Chrome:
-                       ~1,710 a present, docs/findings.md, A page's thread in Chrome, throttled)
+                       ~1,710 a present). setBindGroup a draw 1.70 to 0.93 on Banjo-Tooie and 1.65 to 0.65 on
+                       Banjo-Kazooie, which throttled 6 times in Chrome presents 51-53 a second, from 41-45
+                       (docs/findings.md, A page's thread in Chrome, throttled)
 ```

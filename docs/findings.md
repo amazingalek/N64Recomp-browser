@@ -872,6 +872,20 @@ and each costs the page's thread its calls: its own, not the web support's. On t
 (README, Games). The push constants' per-draw bind and 256 bytes are about a tenth of the throttled thread, the one
 part of it shared code could take out.
 
+rt64 447ad0f with plume c5c9195 takes it out: a raster draw's index is its first instance, so its push constants stay
+the same from draw to draw and plume binds them once a pass (docs/forks.md). Measured with the census on an RTX 2070,
+Chrome 155, at 3840x2000 uncapped, builds of main and of the change from the same game commits, each play with no
+other page on the GPU (plays.jsonl, sets `firstinst-*`):
+
+- Banjo-Tooie, Jinjo Village: `setBindGroup` 1.70 a draw to 0.93, and `writeBuffer` 1.02 KB a draw to 0.81,
+  throttled 6 times (0.52 to 0.39 unthrottled). Throttled 6 times, this host's CPU leaves both builds at or near
+  0 presents a second there once the host is busy, so their presents compare nothing.
+- Banjo-Kazooie, its plan's walk in Mumbo's Mountain, throttled 6 times, two pairs: ~745 draws a present in both,
+  `setBindGroup` 1,217-1,231 a present to 477-484, `writeBuffer` 871-917 KB to 596-635, and 41.4 and 45.2
+  presents a second to 50.9 and 52.5 (a host 8-100% busy).
+
+What is left a draw is the texture set and the pipeline where they change: RT64's own.
+
 ## Present gaps after Start
 
 What each thread does in a gap over 100 ms with no shader wait, read from a CDP trace of every thread of every
