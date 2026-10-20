@@ -142,7 +142,8 @@ how it was recorded, the scheduler's timeouts taken out, plays.
 Upstream's four workflows, native builds without a ROM, are disabled on the fork. Its boot logo draws with no tile,
 which on WebGPU left the pipelines built behind the game without a binding their layout named (rt64 f01c3a6). Its list's
 sections hold each of 16 courses and four arenas with four players. Its `tools/play_plan.json` is a 50cc Grand Prix's
-Luigi Raceway on the game's own AI. Its README and BUILDING.md, and the headers of `patches/gfx_config.c`,
+first three races in one load on the game's own AI, each finish and results passed with A as a player goes on with the
+cup, which no section of the list's plan plays. Its README and BUILDING.md, and the headers of `patches/gfx_config.c`,
 `tools/shader_survey.js` and `src/rt64_shaders.txt`, have the rest: what moving onto RecompFrontend took, the Controller
 Pak, the boot's first display list and its fix, render to RAM kept exact for the jumbotron, the shader list and how it
 was recorded.
