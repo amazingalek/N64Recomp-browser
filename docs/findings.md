@@ -177,6 +177,25 @@ interpreter walking a garbage display list say (Mario Kart 64's above); it needs
 only a long enough play. A 17-minute soak on an RTX 2070 played to the end (break 838.9 MB throughout). The request's
 size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop.
 
+## A page that stops answering
+
+GoldenEye's page from Pages (v0.67.0), in a Firefox 158 soak on an RTX 5080 desktop (uncapped, 3840x2000, its plan
+and then Dam held 20 minutes, the GPU kept ~99% busy by another program's work through it), played normally to 774 s
+(120-135 presents a second, no sound short, the GPU process flat at 2.7-2.8 GB, no exception or WebGPU error) and
+then answered no more script.evaluate. 2.5 hours on, its tab process still took 0.73 cores and the GPU process 0.38,
+and the browser's own process was idle and responding. Firefox's WebDriver BiDi runs on that process's main thread,
+so the browser's side of the driver was free; what gave no answer was the tab, whose main thread runs the page's
+script and BiDi's evaluate both. Five replays of the soak on an RTX 2070 played to the end, 1336 s each: v0.67.0's page
+(its gh-pages files, served locally) in Firefox and in Chrome, and v0.71.0's in Firefox three times, with play_page's
+1 s sampling and heap_probe.js, with a probe every 5 s instead, and with both. So a long play of the page is not
+enough; what none of them had is that desktop and its busy GPU, where Banjo's Firefox abort (Memory) came too and an
+RTX 2070 soak didn't. A heartbeat from inside the page can't tell a blocked page from a gone one: in Firefox a worker's
+console lines pass through the page's main thread (a worker's beat each second stopped while a blank page's main
+thread was held 60 s), and in Chrome page_driver.mjs hears no worker's own console lines at all. play_page.mjs reads the
+threads from outside instead: a run that stops answering ends with each process's main thread, the tab's busiest
+threads by name, and `main threads: the tab's 1.05 cores, running; the browser's 0.21, waiting (UserRequest)` (the
+blank page held, in Firefox; Chrome's read the same) in its failure.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
