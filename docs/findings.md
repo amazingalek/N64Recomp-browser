@@ -1085,9 +1085,9 @@ The measurements behind rules CLAUDE.md and the other docs state without them.
   Time's bar is 67-102 CSS pixels from the bottom at 1256x645, 75-126 at 1920x945 and 268-378 at 3840x2000, and its
   plan's click missed it at 1920x945 and 1920x889. Its plan presses Enter on the launcher's focused Load ROM instead (a
   `rom` step with a key, `page_driver.mjs`). And a click while Chrome builds the shader list behind the launcher, a
-  laptop's Intel UHD at 99% on screen, was not taken (Wave Race 64's 100, done at 11.1 s): its plan waits for
-  `RT64: all <n> prebuilt shaders built`. Firefox builds none there, so its misses on screen there have another cause,
-  not yet seen.
+  laptop's Intel UHD at 99% on screen, was not taken (Wave Race 64's 100, done at 11.1 s), nor on an RTX 5080
+  headless (Pilotwings 64's, the game never started): their plans wait for `RT64: all <n> prebuilt shaders built`.
+  Firefox builds none there, so its misses on screen there have another cause, not yet seen.
 - A debugging port shared by two browsers: the second Chrome took `[::1]` and the tool drove the first one's page, which
   is why `page_driver.mjs` refuses a port another browser holds.
 - Firefox's `\GPU Process Memory(*)\Dedicated Usage` climbs by a canvas a frame, past a terabyte in 15 minutes, while
