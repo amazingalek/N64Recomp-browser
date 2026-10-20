@@ -45,6 +45,13 @@ options; `docs/findings.md` has what was measured this way.
   `load_briefing_text_for_stage` under `init_menu0C_missionfailed`). A thread of the game that throws ends the run
   as a failed one once nothing has presented for 15 s, and a page that refuses the ROM ends it at once, with the line
   it said that in (`play_page.mjs`).
+- A page that gives play_page no answer for 15 s ends the run as failed, "the page stopped answering", and says which
+  side stopped (Windows): each of the browser's processes' cores, its main thread's and the tab's busiest threads by
+  name, and the failure ends `main threads: the tab's <cores>, <state>; the browser's <cores>, <state>`. The tab's at
+  a core, running, is the page's script in a loop (or Emscripten's spin on a futex); the tab's waiting with the
+  browser's at a core is the browser's driver. Nothing from inside the page tells them apart: a worker's console lines
+  stop with the page's main thread in Firefox and don't reach the driver in Chrome (docs/findings.md, A page that stops
+  answering).
 - After any mouse click (Load ROM's included) recompui is in mouse mode with nothing focused, and the first key only
   brings the focus back (`update_focus` in `ui_state.cpp` runs after the key reached RmlUi): Enter starts the game on
   the second press, or click Start Game. Every RecompFrontend game does it, desktop too.
@@ -97,6 +104,9 @@ options; `docs/findings.md` has what was measured this way.
 - Whether timed waits off its thread end on time all through a play: `--preload tools/wait_probe.js` logs, each
   second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
   the page starts (docs/findings.md, A host that holds Chrome's presents).
+- How much of its heap a page has taken, and what ran it out: `--preload tools/heap_probe.js` logs the heap's break
+  each second (`heap <s> sbrk <MB>`) and, before an `Aborted(OOM)`, the request's size and the stack that made it
+  (`heapoom`) (docs/findings.md, Memory).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
@@ -106,12 +116,40 @@ options; `docs/findings.md` has what was measured this way.
   work grows it: `tools/gpu_growth.mjs` (its header) plays each kind of a page's calls alone, at the rates
   `--preload tools/webgpu_census.js` reads off the page; whose code made what it grows (D3D12's, a driver's, DXC's,
   Firefox's): `tools/memory_scan.ps1`, unelevated, from outside the process.
+- How it comes through what a player's browser does to it: `--fault resize,hidden,audio,device,reload` (play_page's
+  header) does each in turn once the play is in its level (a resized window, another tab in front for 30 s, its
+  AudioContext suspended, its WebGPU device lost, then a reload over a warm cache and service worker), and records
+  whether it presents again after each, and what it said. Play it from Pages, whose cache and service worker a reload
+  finds warm (docs/findings.md, Faults).
 - A thread of the game that traps names only an offset in the wasm on a page linked without `--profiling-funcs`
   (`Game.wasm:8767891: RuntimeError: unreachable executed`); `node tools/wasm_offset.mjs <wasm or URL> <offset>`
   names the function that holds it. `unreachable executed` in the export the page's `.js` calls `___trap` is
   Emscripten's `abort()`, not a bad pointer: it prints `Aborted(<reason>)` just before, play_page puts that line in
   front of the exception in the failure it records, and an empty reason is C's `abort()` (a failed `new`, libc++
   throwing with exceptions off, the runtime's own), which the stderr lines before it say.
+
+## Laptop-like limits on a desktop
+
+A laptop's integrated graphics finds most new flaws. Without one, a desktop takes these stand-ins, each recorded in
+the run, so plays.jsonl compares a run only with runs that set the same (numbers: docs/findings.md, The stand-in,
+measured, and Laptop-like limits on a desktop, measured):
+
+- `--size 3840x2000 --uncapped`, the stand-in of a cell: about 7 times a laptop window's pixels, so a frame's GPU cost
+  shows as presents a second. It finds a costly frame and clears none.
+- `--size 1920x945`, the laptop window's viewport: what the page lays out and clicks, and the sizes Auto draws at
+  (GoldenEye's scene 2682x1320), a target's memory with them. A desktop GPU draws every page at the display's
+  rate there, so it is for the other limits and for memory, not for presents.
+- `--affinity <n>` holds the browser, every process of it, to n logical processors (4: two cores), in Firefox as in
+  Chrome, where `--cpu-throttle` slows only Chrome's page thread. It shows a page short of cores: on 4 Banjo and
+  GoldenEye played in Firefox as on 16 at the display's rate, its shader waits ~20% longer.
+- `--fallback-adapter` gives the page the browser's software adapter (SwiftShader in Chrome, WARP in Firefox), tens of
+  times slower than Intel UHD: GoldenEye's Dam drew 2 presents a second. It checks a page boots and draws with no
+  WebGPU errors on a weak adapter's features and limits (no `shader-f16`) and how it behaves far behind (RT64 pacing
+  presents to the game's frames, holds overrunning the clock), and is no laptop's speed.
+
+None stands in for Windows composing a laptop's screen on the same GPU (what pacing Firefox to 30 on screen was) or
+for the GPU's own speed at a laptop's size; Firefox drawing a list's misses with the ubershader (GoldenEye's Dam
+collapse) shows on a desktop as `shader missed:` lines.
 
 ## A cell of the Games table
 
@@ -137,7 +175,10 @@ options; `docs/findings.md` has what was measured this way.
   laptop's slower CPU, but isn't what held Chrome at 51-55 there on v0.46.0 (docs/findings.md, A laptop, measured).
 - Every run, failed ones too, goes in `plays.jsonl`, committed with the row
   (`play_page.mjs --record plays.jsonl --game <name> --build <tag>`, with `--note` for anything a player's visit
-  wouldn't have: a preload, a test build). A laptop report goes in by hand, its `note` saying so and its `gpu` the
+  wouldn't have: a preload, a test build). What a script compares runs by goes in fields, not the note: `--set <id>`
+  for the runs of one interleaved set, `--role baseline` for the page Pages serves and `--role candidate` for the
+  build under test, `--host-reading '<json>'` for the host as read just before the play (`gpuBusy`, `cpuBusy`,
+  `gpuOthers`, `sessions`, `building`; play_page's header says what each is). A laptop report goes in by hand, its `note` saying so and its `gpu` the
   laptop's adapter. A run without `--note` is compared with the last 5 like it (game, browser, size, play) and flagged
   `regression:` when clearly worse (play_page's header says by how much). The first 216 lines, 2026-10-14 and 10-15,
   were recovered from the runs' logs (`recovered`).

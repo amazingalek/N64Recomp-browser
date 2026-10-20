@@ -121,7 +121,10 @@ patch), the microcode labels it ignores, render to RAM off and why, the shader l
 (N64ModernRuntime 2e6aa0a). Upstream ships the Suplexmentary Comic NC font in `assets/`, and the page loads it. Its list
 is 284 descriptions in 11 sections. The word at 0x800459C8 counts 30 a second in every world, not frames
 drawn. The desktop build draws every world but Terrydactyland and Hailfire Peaks at 30. Upstream prints diagnostics of
-its own (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are. Its BUILDING.md and the headers of
+its own (`[entry-probe]`, `[task1]`, ~100 lines a second), left as they are. It draws ~1,700 batches a frame in
+Jinjo Village, 3-7 times Rush 2049's, and RT64 makes each one WebGPU calls on the page's thread, so with Chrome's CPU
+throttled 6 times it is the slowest page there, its own draw count and not the web support (docs/findings.md, A page's
+thread in Chrome, throttled). Its BUILDING.md and the headers of
 `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how its
 own patches and apply.cmake are layered and the files left out, the recompile with the web-patched N64Recomp, render to
 RAM off and the leak it showed, the shader list and its survey, the frame rates per world and the page's pacing.
