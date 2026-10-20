@@ -643,6 +643,25 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
 
+On 2026-10-20 the same laptop played Banjo on screen in Firefox 158 with the default prefs and DWM at 0% in every run,
+three interleaved rounds of four test pages, each its main eafae14 with N64Recomp-browser at main 92e85dc (v0.77.0+),
+at one with RT64's present thread calling wait() before its slot sleep (rt64-web 4462e8e, not on main), at one with that
+and pace() leaving the first 0.5 s after a try out of its count (c9908d6, not on main), and main's with
+`?presents-in-flight=3` (plays.jsonl's 12 lines from 18:56 to 19:24 UTC): every run was paced to 30 at 28-31 s, and
+nearly every try of 60 after fell back within 2-5 s, in all four. Presents a second (median): 30.0, 31.5, 32.6 on main,
+30.0, 30.4, 30.0 with the wait first, 30.0, 30.0, 58.1 with the 0.5 s too (a try into a quiet moment), 30.0, 30.1, 30.1
+with 3 in flight.
+
+- At 60 the GPU doesn't keep up in Firefox's default path: the Intel GPU was 94-100% busy in every 5 s sample at 60 and
+  54-74% at 30. At 30 plume had each present done 10-14 ms after it with no time at the cap; right after a try of 60,
+  in the same scene, 18 ms (median, 82 at p90) and 181 ms a second at the cap even with 3 in flight, the present thread
+  taking 40-60 ms a game frame, 17-40 of it in wait(). So pace() going to 30 is right there, and a run's GPU reads
+  60-70% only because it spends most of its time at 30. With `gfx.webrender.compositor` false (above) the stretches
+  held at 60 had each present done 8-13 ms after it: what a present costs in Firefox's own compositing decides it.
+- The wait first can't change the rate: once the slots start again from a late present, the present goes out at the
+  later of its slot and the done signal wait() waits for, which comes when the GPU is done whenever the wait starts, in
+  either order. The sleep and wait() in present-stats' drop lines are the one interval split two ways.
+
 ## Laptop-like limits on a desktop, measured
 
 On 2026-10-20, GoldenEye's and Banjo's pages from Pages (v0.67.0), each game's plan, Chrome 155 and Firefox 158 off
@@ -1141,6 +1160,10 @@ What CLAUDE.md's Ruled out rests on.
 - Firefox's misses built where the game pauses, or with the next section's wait (What the prebuilt lists miss): in
   long plays a 100 ms pause after a miss came for 5-6 of Banjo-Tooie's 27-29 and none of GoldenEye's 5-7, and the
   misses come after the list's last section.
+- The present thread's wait() before its slot sleep, pace() leaving a try's first 0.5 s out of its count, or 3
+  presents in flight, as what holds Banjo at 30 in Firefox on a laptop's screen: each paced to 30 as often as main, with
+  the GPU 94-100% busy at 60 (A laptop, measured).
 - wait()'s trips to the page's thread, or Firefox's late timed waits, as what paces Banjo to 30 on a laptop's screen:
   with plume bf417cf it paced to 30 in every default-prefs Firefox run, as before, and what decided 60 against 30 was
-  how much of the GPU Windows' compositor took (A laptop, measured).
+  what each present cost the GPU in Firefox's compositing, Windows' compositor included, and with DWM at 0% Banjo
+  was paced to 30 all the same (A laptop, measured).
