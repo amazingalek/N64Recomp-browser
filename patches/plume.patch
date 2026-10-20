@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 827a073ea08b6ada2b56b345ab2d3bcfdd70f23d
+plume: https://github.com/amazingalek/plume-web 1c7b759d9d6113326c7901e63476d4433563b7a3
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -859,10 +859,10 @@ index 0000000..03b3ea0
 +}
 diff --git a/plume_device_thread.cpp b/plume_device_thread.cpp
 new file mode 100644
-index 0000000..08d098c
+index 0000000..3ba7faa
 --- /dev/null
 +++ b/plume_device_thread.cpp
-@@ -0,0 +1,1580 @@
+@@ -0,0 +1,1587 @@
 +//
 +// plume
 +//
@@ -1849,11 +1849,12 @@ index 0000000..08d098c
 +        uint32_t nextTextureIndex = 0;
 +        bool vsyncEnabled = true;
 +
-+        // What needsResize() and getRefreshRate() answer: the backend's answers at the last present, resize or refresh on
-+        // the device thread. A caller that waited for them each frame waited behind everything queued before (RT64's
-+        // present thread asks both before every present), so it reads these and queues a refresh instead.
++        // What needsResize(), getRefreshRate() and isHidden() answer: the backend's answers at the last present, resize or
++        // refresh on the device thread. A caller that waited for them each frame waited behind everything queued before
++        // (RT64's present thread asks them before every present), so it reads these and queues a refresh instead.
 +        mutable std::atomic<bool> innerNeedsResize = false;
 +        mutable std::atomic<uint32_t> innerRefreshRate = 0;
++        mutable std::atomic<bool> innerHidden = false;
 +        mutable std::atomic<bool> refreshing = false;
 +
 +        // The presents queued for the device thread that haven't reached the backend's present() yet, which waitOnCaller()
@@ -1913,6 +1914,7 @@ index 0000000..08d098c
 +        void publish() const {
 +            innerNeedsResize = inner->needsResize();
 +            innerRefreshRate = inner->getRefreshRate();
++            innerHidden = inner->isHidden();
 +        }
 +
 +        // Queues a publish(), unless one is queued already.
@@ -2070,6 +2072,11 @@ index 0000000..08d098c
 +        uint32_t getRefreshRate() const override {
 +            refresh();
 +            return innerRefreshRate;
++        }
++
++        bool isHidden() const override {
++            refresh();
++            return innerHidden;
 +        }
 +    };
 +
@@ -2445,7 +2452,7 @@ index 0000000..08d098c
 +};
 diff --git a/plume_device_thread.h b/plume_device_thread.h
 new file mode 100644
-index 0000000..8d4a8ab
+index 0000000..a535b7f
 --- /dev/null
 +++ b/plume_device_thread.h
 @@ -0,0 +1,80 @@
@@ -2487,7 +2494,7 @@ index 0000000..8d4a8ab
 +//   tasks of its event loop whenever it updates the rendering, so a canvas texture acquired in one task can be gone
 +//   by the next. That costs a copy of the window each present. wait() waits on the calling thread where the backend
 +//   can tell it there (waitOnCaller()), and otherwise polls the backend's isWaitReady() from it, as map() does
-+//   isMapReady(). needsResize() and getRefreshRate() don't wait for the device thread:
++//   isMapReady(). needsResize(), getRefreshRate() and isHidden() don't wait for the device thread:
 +//   they answer what the backend said at the last present, resize() or refresh, and queue a refresh.
 +// - On the device thread itself, everything runs in place, after whatever is queued.
 +// - Raytracing and acceleration structures aren't forwarded: WebGPU has neither.
@@ -2530,7 +2537,7 @@ index 0000000..8d4a8ab
 +#endif
 +};
 diff --git a/plume_render_interface.h b/plume_render_interface.h
-index 2048557..0622476 100644
+index 2048557..eb27448 100644
 --- a/plume_render_interface.h
 +++ b/plume_render_interface.h
 @@ -7,6 +7,8 @@
@@ -2564,7 +2571,7 @@ index 2048557..0622476 100644
      };
  
      struct RenderPipelineLayout {
-@@ -89,6 +99,26 @@ namespace plume {
+@@ -89,6 +99,30 @@ namespace plume {
          virtual ~RenderSwapChain() { }
          virtual bool present(uint32_t textureIndex, RenderCommandSemaphore **waitSemaphores, uint32_t waitSemaphoreCount) = 0;
          virtual void wait() = 0;
@@ -2588,10 +2595,14 @@ index 2048557..0622476 100644
 +        // plume_device_thread.cpp's native test reaches it.
 +        virtual bool waitOnCaller(const std::atomic<uint32_t> &queued) { return false; }
 +
++        // Whether the window is hidden, where the backend can tell: a page in a tab behind another, or minimized (WebGPU).
++        // Nothing presented then is seen, and a caller can stop presenting. Any thread may call it.
++        virtual bool isHidden() const { return false; }
++
          virtual bool resize() = 0;
          virtual bool needsResize() const = 0;
          virtual void setVsyncEnabled(bool vsyncEnabled) = 0;
-@@ -249,6 +279,11 @@ namespace plume {
+@@ -249,6 +283,11 @@ namespace plume {
          virtual RenderSampleCounts getSampleCountsSupported(RenderFormat format) const = 0;
          virtual bool beginCapture() = 0;
          virtual bool endCapture() = 0;
@@ -2725,10 +2736,10 @@ index 0000000..0b0ff01
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..9c86158
+index 0000000..b97a8b9
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3429 @@
+@@ -0,0 +1,3447 @@
 +//
 +// plume
 +//
@@ -2777,6 +2788,11 @@ index 0000000..9c86158
 +// process 1.2 cores instead of 0.5 and the GPU 80% busy instead of 43% (RTX 2070). Chrome cost the same either way.
 +EM_JS(int, plume_webgpu_bgra_swap_chain, (), {
 +    return navigator.gpu.getPreferredCanvasFormat() === 'bgra8unorm' ? 1 : 0;
++});
++
++// Whether the page is hidden: in a tab behind another, or a window minimized.
++EM_JS(int, plume_webgpu_document_hidden, (), {
++    return ((typeof document !== 'undefined') && document.hidden) ? 1 : 0;
 +});
 +
 +// A number from the page's query: -1 without the name, 0 for one with no number (present-stats).
@@ -4525,7 +4541,7 @@ index 0000000..9c86158
 +        for (;;) {
 +            const uint32_t queuedNow = queued;
 +            const uint32_t inFlight = presentState->inFlight;
-+            if ((queuedNow + inFlight) < maxPresentsInFlight) {
++            if (((queuedNow + inFlight) < maxPresentsInFlight) || presentState->hidden) {
 +                break;
 +            }
 +
@@ -4799,6 +4815,19 @@ index 0000000..9c86158
 +
 +    uint32_t WebGPUSwapChain::getRefreshRate() const {
 +        return (uncappedRate > 0) ? uncappedRate : frameTimer->refreshRate;
++    }
++
++    // On the page's thread it asks the document, and keeps the answer for other threads and waitOnCaller(), which it
++    // wakes when the page is hidden.
++    bool WebGPUSwapChain::isHidden() const {
++        if (emscripten_is_main_browser_thread()) {
++            const bool hidden = (plume_webgpu_document_hidden() != 0);
++            if (hidden != presentState->hidden.exchange(hidden)) {
++                emscripten_futex_wake(&presentState->inFlight, INT_MAX);
++            }
++        }
++
++        return presentState->hidden;
 +    }
 +
 +    // WebGPUFramebuffer
@@ -6160,10 +6189,10 @@ index 0000000..9c86158
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..5e504ec
+index 0000000..eac8aed
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,709 @@
+@@ -0,0 +1,716 @@
 +//
 +// plume
 +//
@@ -6259,7 +6288,11 @@ index 0000000..5e504ec
 +// - The browser doesn't say what the display's refresh rate is, so a swap chain times the animation frames with a
 +//   loop of its own on the device's thread, whatever its caller presents at, and reports displayTiming. The loop wakes
 +//   a thread in sleepUntil() at each frame, where a timed sleep on a page's thread ends late (plume_web_waits.h).
-+//   sleepUntil() and waitOnCaller() are the calls another thread may make.
++//   sleepUntil(), waitOnCaller() and isHidden() are the calls another thread may make.
++// - isHidden() is document.hidden, asked on the page's thread. While the page is hidden, waitOnCaller() doesn't hold a
++//   present to the cap on presents in flight: nothing is shown then, and Chrome calls a hidden page's
++//   onSubmittedWorkDone back late, at times by seconds for the first 5-15 s (an empty submission's callback came back
++//   0-12 times a second, against 80 shown, RTX 2070), so a caller that waited for it held its game behind it.
 +// - Every call must come from the thread that owns the device's JavaScript object: WebGPU objects can't be shared
 +//   between workers.
 +// - Shaders are WGSL text (RenderShaderFormat::WGSL). Specialization constants are WGSL overrides named by their id,
@@ -6548,10 +6581,12 @@ index 0000000..5e504ec
 +
 +    // The presents whose work the GPU hasn't finished (a futex, woken as each is done), and for present-stats how long
 +    // each one's took to be reported done. Shared with their callbacks, which can outlive the swap chain. inFlight,
-+    // caughtUp and waitedMs (the time waitOnCaller() held presents, not yet counted) are read on other threads too.
++    // caughtUp, hidden (isHidden()'s last answer) and waitedMs (the time waitOnCaller() held presents, not yet counted)
++    // are read on other threads too.
 +    struct WebGPUPresentState {
 +        std::atomic<uint32_t> inFlight = 0;
 +        std::atomic<bool> caughtUp = false;
++        std::atomic<bool> hidden = false;
 +        std::atomic<double> waitedMs = 0.0;
 +        bool timeWorkDone = false;
 +        std::vector<double> workDoneMs;
@@ -6604,6 +6639,7 @@ index 0000000..5e504ec
 +        bool isWaitReady() override;
 +        bool sleepUntil(std::chrono::steady_clock::time_point time) override;
 +        bool waitOnCaller(const std::atomic<uint32_t> &queued) override;
++        bool isHidden() const override;
 +        bool resize() override;
 +        bool needsResize() const override;
 +        void setVsyncEnabled(bool vsyncEnabled) override;
