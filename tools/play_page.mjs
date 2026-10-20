@@ -4,7 +4,8 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
-//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]
+//     [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -85,14 +86,21 @@
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
 // mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2), --build what the page was built from (a tag of this repo, or Pages),
-// and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). The line
+// and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). A
+// run's conditions are fields of their own, for a script to read without parsing the note: --set an id shared by the runs
+// of one interleaved set (the page Pages serves and a new build, played in turn), --role which side of it the run is
+// (baseline, the page as it is, or candidate, the build under test), and --host-reading the host as read just before the
+// play, a JSON object of gpuBusy and cpuBusy (percent), gpuOthers (other jobs on the GPU), sessions (other agents at work
+// on the host) and building (a build running beside it), any of them and nothing else. A CPU throttle is the run's
+// cpuThrottle and the host's load over the play its host.busy already; the note is for the rest. The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
 // between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms; the animation frames a second),
 // each sample's presents, sound short and GPU load, every shader miss ({at, section, shader}, at in seconds since the
 // start, to the sample's 5), the page, the query and the host's processor load over the play.
 //
 // A run without --note is then compared with the file's last 5 like it: the same game, browser, size, play,
-// freshness of profile, uncapped the same way or not and on screen or not, none with a note, failed or without a frame (one with
+// freshness of profile, uncapped the same way or not and on screen or not, none with a note or a host reading of a build or
+// another job on the GPU, failed or without a frame (one with
 // no play or profile recorded, as a line recovered from a log, matches any). It is flagged as a regression, "regression: ..." and exit code 3 (1 if it
 // failed), when it fails where they didn't, has WebGPU errors where the last had none, presents a second more than 3
 // below the lowest of theirs, a 99th percentile gap between presents over 50 ms and half again the longest of theirs,
@@ -130,6 +138,9 @@ const recordFile = option(args, '--record', null);
 const game = option(args, '--game', null);
 const build = option(args, '--build', null);
 const note = option(args, '--note', null);
+const set = option(args, '--set', null);
+const role = option(args, '--role', null);
+const hostReadingOption = option(args, '--host-reading', null);
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
 const firefoxPrefs = {};
@@ -142,10 +153,24 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2 (publish_pages.sh\'s names)');
   process.exit(1);
 }
+if (role !== null && (!['baseline', 'candidate'].includes(role) || set === null)) {
+  console.error('--role is baseline or candidate, with --set <id> for the set it is a side of');
+  process.exit(1);
+}
+let hostReading = null;
+if (hostReadingOption !== null) {
+  const kinds = { gpuBusy: 'number', cpuBusy: 'number', gpuOthers: 'number', sessions: 'number', building: 'boolean' };
+  try { hostReading = JSON.parse(hostReadingOption); } catch { /* refused below */ }
+  if (!hostReading || typeof hostReading !== 'object' || Array.isArray(hostReading) ||
+      Object.entries(hostReading).some(([k, v]) => typeof v !== kinds[k])) {
+    console.error(`--host-reading needs a JSON object of ${Object.entries(kinds).map(([k, t]) => `${k} (${t})`).join(', ')}, any of them and nothing else`);
+    process.exit(1);
+  }
+}
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -550,7 +575,7 @@ if (recordFile) {
   const round = (x) => x === null ? null : Math.round(x * 100) / 100;
   const host = hostBefore ? (hostAfter.all - hostBefore.all) : 0;
   const run = {
-    time: new Date(t0).toISOString(), game, build, note, browser, page: pageUrl, size: summary.size,
+    time: new Date(t0).toISOString(), game, build, note, ...(set ? { set } : {}), ...(role ? { role } : {}), ...(hostReading ? { hostReading } : {}), browser, page: pageUrl, size: summary.size,
     ...(onScreen ? { onScreen } : {}), ...(summary.devicePixelRatio ? { devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped: uncappedAs } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}),
     ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
@@ -577,7 +602,7 @@ await finish(failure ? 1 : regressions.length ? 3 : 0);
 function compare(run, lines) {
   const like = (a, b) => a === null || a === undefined || b === null || b === undefined || a === b;
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
-    .filter((p) => p && !p.note && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
+    .filter((p) => p && !p.note && !p.hostReading?.building && !p.hostReading?.gpuOthers && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
       like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && (p.uncapped ?? false) === (run.uncapped ?? false) && !p.onScreen === !run.onScreen &&
       (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && (run.onScreen || (p.devicePixelRatio ?? 1) === (run.devicePixelRatio ?? 1)) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}))
     .slice(-5);

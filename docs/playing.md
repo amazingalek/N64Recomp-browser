@@ -132,7 +132,10 @@ options; `docs/findings.md` has what was measured this way.
   laptop's slower CPU, but isn't what held Chrome at 51-55 there on v0.46.0 (docs/findings.md, A laptop, measured).
 - Every run, failed ones too, goes in `plays.jsonl`, committed with the row
   (`play_page.mjs --record plays.jsonl --game <name> --build <tag>`, with `--note` for anything a player's visit
-  wouldn't have: a preload, a test build). A laptop report goes in by hand, its `note` saying so and its `gpu` the
+  wouldn't have: a preload, a test build). What a script compares runs by goes in fields, not the note: `--set <id>`
+  for the runs of one interleaved set, `--role baseline` for the page Pages serves and `--role candidate` for the
+  build under test, `--host-reading '<json>'` for the host as read just before the play (`gpuBusy`, `cpuBusy`,
+  `gpuOthers`, `sessions`, `building`; play_page's header says what each is). A laptop report goes in by hand, its `note` saying so and its `gpu` the
   laptop's adapter. A run without `--note` is compared with the last 5 like it (game, browser, size, play) and flagged
   `regression:` when clearly worse (play_page's header says by how much). The first 216 lines, 2026-10-14 and 10-15,
   were recovered from the runs' logs (`recovered`).

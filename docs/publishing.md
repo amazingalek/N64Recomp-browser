@@ -9,7 +9,8 @@ A run on a schedule that takes every change since the last one at once:
 
 - For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build in
   Chrome and Firefox, each run recorded in `plays.jsonl` and compared with the earlier runs like it
-  (`play_page.mjs --record`). A run flagged as a regression is played again, the host's load read first, and is a
+  (`play_page.mjs --record`, the page Pages serves and the build interleaved under one `--set`, each with its `--role`
+  and the host's reading before it: docs/playing.md). A run flagged as a regression is played again, the host's load read first, and is a
   regression only if the second run is worse too and nothing beside it explains it; a drop within the noise is not one.
 - Only a page that boots with no WebGPU errors and plays no worse than its row and its earlier runs moves its fork's
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
