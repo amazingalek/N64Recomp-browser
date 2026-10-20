@@ -121,8 +121,8 @@ logged only the VI at boot: 320x240, 1920x947, 6.082 x 4.000. In the trapping on
 Their targets, 3072 x 6.08 clamped to RenderTarget::MaxDimension, are the 16384 x 440 the device refused; no tile copy
 or reinterpreted tile passed 8192. The worker trapped 0.8 s after the first, in `free()` again, with an "indirect call
 signature mismatch" beside it: a function pointer overwritten too. So the corruption reached what RT64 reads the
-display list from (RDRAM, or its segment addresses) before it reached the heap, which points at stray writes over
-both, not at RT64 or the VI sizing anything wrong. Who writes them is open.
+display list from before it reached the heap: RT64 read a list that no longer held commands (below), not the VI sizing
+anything wrong.
 
 A desktop doesn't make them, even with the laptop's slow RT64 thread put in by hand. A checked test build of the page
 (v0.72.0's forks plus checks) traps at the first address out of RDRAM's 512 MB in every recompiled load and store, the
@@ -136,6 +136,69 @@ those plays neither the game, the runtime nor the DMAs reached past RDRAM, the r
 list RT64 read held a wide color image. Each check reads its address once: a TO_PTR that evaluated its argument three
 times popped ultramodern's running queue as often and crashed at boot, which reads like a race between game threads
 and isn't one. The laptop trapped once in 21 plays, so 21 clean ones here rule out a likely cause, not every cause.
+
+On the laptop (Firefox 158 on screen, MK64's plan) the same checked build trapped in 3 of 4 plays, every time at its
+wide color image check and never at an address check: the game wrote nothing out of RDRAM. Each dump read alike: a
+G_SETCIMG 1792 wide at 0xF7B005FF, the command (`FFD716FF F7B005FF`) in segment 6's data 0x9438 in, the 16 words each
+side of it RGBA32 texture pixels and none of them changed 5 ms later. RDRAM held what RT64 read, and it was a texture
+where the logos' model had been: the game loads its title screen's textures (one PI DMA from its loader thread) over
+segment 6 the frame after the logos' last list, which on a console the RSP read within a few ms of its sending. RT64
+reads a list on its graphics thread, a frame or more behind the game on the laptop's Intel UHD, and read that one after
+the load. Telling the game sp_complete only after RT64 had read the list (the checked build's 0-30 ms delay moved
+after the read) trapped 1 in 2: the load comes from another thread and waits on no task. Making every PI DMA from ROM
+wait until RT64 had read every list sent before it played 10 of 10 clean through the same menu (6 of them at the
+players-0 menu where the traps came), and so did the same wait without the checks and delay, 5 of 5 (presents 56-58
+from the second play on), but it cost the sound: 3.4% of the frames short (71,000-78,000 of 2.2 million a play), where
+main's page played 0-307 short in the same minutes. The audio thread's sample loads waited behind the graphics too.
+Holding only the thread that sends the lists trapped 2 of 2 (the loader sends none), and the threads don't separate by
+task either (the video thread sends both kinds; the audio thread only loads). What separates them is where a load
+lands: N64ModernRuntime bf96a62 (`ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS`, on with Emscripten, with rt64 02f0a7c and
+RecompFrontend ab544ca) has RT64 mark the RDRAM it reads each list's commands from, and only a load onto commands one
+of the last 8 lists ran waits, at most 2 s; a sound's samples go at once. On a desktop GPU RT64 reads a list in a few
+ms, so a load rarely waits at all. On the laptop that wait played 5 of 5 clean, taking turns with main's page in the
+same minutes: presents 58.5-58.8 from its second play on against main's 58.2-58.8, and 549 frames short over its 5
+plays against main's 120, where waiting on every load cost 71,000 a play. Without the checked build's delay the trap
+is rarer there: main's page played 8 of 8 clean that day, and v0.67.0's trapped 1 in 5.
+
+A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
+`Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
+5080, the page from Pages, v0.67.0, and a v0.71.0 build both), at 70, 72 and 123 s; Chrome (throttled 6 times) played
+on, and no other game's page aborted. A page's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
+resize import aborts, and the trap names only abort(). `tools/heap_probe.js` read the heap's break at 843.9 MB from
+2 s in to the end of 15 plays of the same page in Firefox the next morning, one of them 5 minutes long: the page takes
+what it uses at boot (RDRAM's 512 MB among it) and nothing after. In each aborting run the sound and the presents
+stopped together 0-4 s before the abort (the 123 s one: 160,000 frames short and presents 151 → 53 in the 5 s before
+it), with nothing on the console. None of the 15 plays aborted: 8 on a quiet host, 3 with 12 busy loops on the host's
+16 cores, 3 with a second page (headless Chrome) beside it. A 20-minute soak of the page from Pages (2026-10-20 07:33
+UTC, the same RTX 5080 about 20% busy) did, with the probe on: the break held at 843.9 MB for 9 minutes, at 546 s the
+presents fell 215 → 45 → 0 and the sound starved, and only then did the break climb, 843.9 → 987.9 → 1179.9 MB in 2 s,
+to the abort at 549.8 s. So a thread stalls first and then allocates in a loop, about 170 MB a second, a list
+interpreter walking a garbage display list say (Mario Kart 64's above); it needs neither a busy host nor a second page,
+only a long enough play. A 17-minute soak on an RTX 2070 played to the end (break 838.9 MB throughout). The request's
+size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
+slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
+checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
+the break at 843.9 MB throughout.
+
+## A page that stops answering
+
+Firefox drops play_page's connection at its 4,098th message when page_driver.mjs speaks WebSocket with Node's own
+client: Node 22.23 (undici 6.28) masks every frame after its 4,096th with zeros (its pool of masks, 16,386 bytes, isn't
+a whole number of them), Firefox 158 closes the socket at the first such frame with no close frame (1006), and Chrome
+takes them. At play_page's 1 s sampling, about 5.5 messages a second, that is 12.4 minutes into any Firefox play: four
+of Banjo-Kazooie's soaks on an RTX 5080 ended at 744-746 s with the page playing normally up to the drop, a blank page
+asked 5 times a second at 823 s, and one asked as fast as it answers at the 4,098th, while one asked once a second
+lived past 1,000 s. GoldenEye's page from Pages (v0.67.0) in a Firefox soak on the same desktop gave no more answers at
+774 s (120-135 presents a second, its tab still busy 2.5 hours on, the browser's process idle): the same count at its
+rate, and five replays of it on an RTX 2070 host played to the end (1336 s). page_driver.mjs has a client of its own,
+which took 6,000 requests in a row, a 70 kB request and a 1 MB answer in Firefox and in Chrome.
+
+A heartbeat from inside the page can't tell a blocked page from a gone one: in Firefox a worker's
+console lines pass through the page's main thread (a worker's beat each second stopped while a blank page's main
+thread was held 60 s), and in Chrome page_driver.mjs hears no worker's own console lines at all. play_page.mjs reads the
+threads from outside instead: a run that stops answering ends with each process's main thread, the tab's busiest
+threads by name, and `main threads: the tab's 1.05 cores, running; the browser's 0.21, waiting (UserRequest)` (the
+blank page held, in Firefox; Chrome's read the same) in its failure.
 
 ## Two pages at once
 
