@@ -422,7 +422,8 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const proc = spawn(executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
-    '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'], { stdio: 'ignore' });
+    '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
+    { stdio: process.env.DIAG_FIREFOX_LOG ? ['ignore', fs.openSync(process.env.DIAG_FIREFOX_LOG, 'a'), fs.openSync(process.env.DIAG_FIREFOX_LOG, 'a')] : 'ignore' });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
     try {
