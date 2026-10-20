@@ -178,7 +178,10 @@ only a long enough play. A 17-minute soak on an RTX 2070 played to the end (brea
 size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
 slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
 checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
-the break at 843.9 MB throughout.
+the break at 843.9 MB throughout. Whether v0.77.0's load wait (Mario Kart 64's fix above) ends it is still open, as an
+RTX 2070 doesn't bring it on: 16 Firefox soaks of 978-1,116 s there (2026-10-20 17:53-22:37 UTC, a shared host), the page
+from Pages and a v0.77.0 build of the same main in turn, 8 each, played to the end with the break at 838.9 and 839.0 MB
+throughout and no abort from either. The test is the same pairs on a GPU where the page from Pages aborts.
 
 ## A page that stops answering
 
