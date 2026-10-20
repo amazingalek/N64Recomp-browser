@@ -4,7 +4,8 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
-//     [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]
+//     [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]...
+//     [--record <file> --game <name> [--build <label>] [--note <text>]]
 //
 // A build dir is served on 127.0.0.1 (port 8937 unless --port; the debugging port is the one after it); a URL is where
 // the page is, a GitHub Pages one say, and plan.page is taken relative to it, unless the URL names an .html itself
@@ -39,6 +40,10 @@
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
+// --chrome-trace (Chrome only) records a Chrome trace over the play, every thread's JavaScript and wasm stacks sampled
+// (page_driver.mjs's chromeTrace), and writes it to the file, to open in DevTools' Performance panel or
+// ui.perfetto.dev; a wasm frame is named only in a page linked with --profiling-funcs. Sampling costs the page's
+// threads, so a traced run's numbers are the trace's, not the page's, and are not recorded.
 //
 // The plan is record_shaders.mjs's, JSON, with what to play:
 //
@@ -132,6 +137,7 @@ const build = option(args, '--build', null);
 const note = option(args, '--note', null);
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
+const chromeTraceFile = option(args, '--chrome-trace', null);
 const firefoxPrefs = {};
 for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
   const [name, value] = [pref.slice(0, pref.indexOf('=')), pref.slice(pref.indexOf('=') + 1)];
@@ -145,7 +151,7 @@ if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--record <file> --game <name> [--build <label>] [--note <text>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
@@ -153,6 +159,7 @@ const uncappedAs = uncapped && browser === 'firefox' ? firefoxUncappedRate : unc
 if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
 if (!(scale > 0) || (scale !== 1 && onScreen)) { console.error("--scale needs a number above 0, and is the desktop's own on screen"); process.exit(1); }
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
+if (chromeTraceFile && (browser !== 'chrome' || recordFile)) { console.error('--chrome-trace is Chrome\'s only, and not recorded'); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
@@ -461,6 +468,7 @@ try {
   if (memoryBefore) await sleep(500);
   await page.evaluate('window.__gaps = []; undefined').catch(() => {});
   if (geckoProfileFile) await page.geckoProfile.start();
+  if (chromeTraceFile) await page.chromeTrace.start();
   playing = true;
   hostBefore = hostTimes();
   viewport = await page.viewport();
@@ -469,6 +477,7 @@ try {
   await sample();
   playing = false;
   if (geckoProfileFile) await page.geckoProfile.dump(geckoProfileFile);
+  if (chromeTraceFile) await page.chromeTrace.stop(path.resolve(chromeTraceFile));
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
 } catch (error) {
   log(`failed: ${error.message}`);
