@@ -7,16 +7,17 @@ CLAUDE.md (The pins) has the rules this carries out; `tools/publish_pages.sh`'s 
 
 A run on a schedule that takes every change since the last one at once:
 
-- For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build in
-  Chrome and Firefox, each run recorded in `plays.jsonl` and compared with the earlier runs like it
-  (`play_page.mjs --record`, the page Pages serves and the build interleaved under one `--set`, each with its `--role`
-  and the host's reading before it: docs/playing.md). A run flagged as a regression is played again, the host's load read first, and is a
-  regression only if the second run is worse too and nothing beside it explains it; a drop within the noise is not one.
-  On a desktop GPU, where a host's load moves the numbers more than a build does, `tools/ab_pages.mjs` plays the build
-  and the page Pages serves interleaved instead, uncapped at the stand-in's size: Firefox Pages, build, build, Pages,
-  then CPU-throttled Chrome Pages, build, each run recorded with a note saying so. It prints each run's presents a
-  second as a table and a verdict by the same rule, a pair at a time (its header says how), and fails a run the host
-  slept through.
+- For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build as
+  docs/playing.md (Which browser, how long) says: its performance in Chrome, the page Pages serves and the build
+  interleaved, and Firefox once as a smoke test. `tools/ab_pages.mjs` does both, uncapped at the stand-in's size, each
+  play by the game's plan (2-5 minutes): Chrome Pages, build, then build, Pages only when the first pair isn't clearly
+  within the noise, then Firefox the build, read for a crash, a trap, WebGPU errors and exceptions and never for its
+  presents. Each run goes in `plays.jsonl` under one `--set` with its `--role` and a note saying so. It prints each
+  run's presents a second as a table and a verdict, a pair at a time (its header says how): a build is worse only if
+  its second Chrome run is worse too, a drop within the noise is not, and a run the host slept through is played again.
+  A build whose Firefox play fails or errs ("not clean") has the page Pages serves played the same way in Firefox: the
+  build is worse if Pages plays clean, and the failure is filed either way. Leaks, OOMs and other faults that take many
+  minutes to show are the soak's, not the retest's.
 - Only a page that boots with no WebGPU errors and plays no worse than its row and its earlier runs moves its fork's
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
   worse stays on Pages as it was, its fork on its last tag, and has work filed. So a fork's `main` is what its page was
