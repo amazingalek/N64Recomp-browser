@@ -7,16 +7,19 @@ CLAUDE.md (The pins) has the rules this carries out; `tools/publish_pages.sh`'s 
 
 A run on a schedule that takes every change since the last one at once:
 
-- For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build in
-  Chrome and Firefox, each run recorded in `plays.jsonl` and compared with the earlier runs like it
-  (`play_page.mjs --record`, the page Pages serves and the build interleaved under one `--set`, each with its `--role`
-  and the host's reading before it: docs/playing.md). A run flagged as a regression is played again, the host's load read first, and is a
-  regression only if the second run is worse too and nothing beside it explains it; a drop within the noise is not one.
-  On a desktop GPU, where a host's load moves the numbers more than a build does, `tools/ab_pages.mjs` plays the build
-  and the page Pages serves interleaved instead, uncapped at the stand-in's size: Firefox Pages, build, build, Pages,
-  then CPU-throttled Chrome Pages, build, each run recorded with a note saying so. It prints each run's presents a
-  second as a table and a verdict by the same rule, a pair at a time (its header says how), and fails a run the host
-  slept through.
+- For each game fork it builds the page on main's newest tag and, if the page's files changed, plays that build by
+  what the tag can break (docs/playing.md, What a change plays), read from what it took since the last retest
+  (`git log <played>..<tag>`). Every changed page gets the smoke play of its build in Firefox,
+  `tools/ab_pages.mjs --smoke`, and Chrome's boot from Pages after it is published (`tools/publish_pages.sh`). A tag
+  that can move speed or timing also gets the A/B, `tools/ab_pages.mjs`, on two or three games that stand for the rest
+  (Banjo-Kazooie and Conker's Bad Fur Day, and the game a change in it was about): a shared change moves every page the
+  same way, so an A/B of each would measure the same thing again and again. If one of those plays worse, every other
+  changed page gets the A/B too before any moves. Each play is by the game's plan (2-5 minutes), uncapped at the
+  stand-in's size, and goes in `plays.jsonl` under one `--set` with its `--role` and a note saying so; ab_pages.mjs's
+  header says what it plays and how it reads a verdict: a build is worse only if its second Chrome run is worse too, a
+  drop within the noise is not, and a build whose Firefox play isn't clean is worse only if Pages' plays clean, its
+  failure filed either way. Leaks, OOMs and other faults that take many minutes to show are the soak's, not the
+  retest's.
 - Only a page that boots with no WebGPU errors and plays no worse than its row and its earlier runs moves its fork's
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
   worse stays on Pages as it was, its fork on its last tag, and has work filed. So a fork's `main` is what its page was

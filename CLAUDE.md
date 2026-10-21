@@ -118,24 +118,26 @@ so commit to a fork from a separate clone of it:
    and move its upstream commit in `patches/patches.txt`.
 3. Here, on the task's branch: bump `forks.txt`, run `tools/export_patches.sh`, commit `patches/` with it, and open the
    PR. A patch that stops applying to a commit in `patches/pins.txt` means the fork has to change.
-4. Before it merges, build pages on the branch and play them (docs/playing.md): its game and one other, each a game
-   fork's checkout with its N64Recomp-browser at the branch's commit. After the merge, CI's `tag` job tags main
-   `v0.<n+1>.0` when its jobs pass, for a merge that changes `forks.txt`, `patches/`, `frontend/` or `renderer/`; check
-   it came (`git ls-remote --tags origin`). A tag is a release: a recomp checks this repo out at one, and the retest
-   builds the newest.
+4. Before it merges, build pages on the branch and play them by what the change can break (docs/playing.md, What a
+   change plays): the smoke play of its own game where it can't move speed, the A/B on its game and one other where it
+   can, each a game fork's checkout with its N64Recomp-browser at the branch's commit. After the merge, CI's `tag` job
+   tags main `v0.<n+1>.0` when its jobs pass, for a merge that changes `forks.txt`, `patches/`, `frontend/` or
+   `renderer/`; check it came (`git ls-remote --tags origin`). A tag is a release: a recomp checks this repo out at
+   one, and the retest builds the newest.
 
 Read docs/porting.md before a fork change, and docs/findings.md (WebGPU in Chrome and Firefox) before changing plume's
 backend or how RT64 builds pipelines or presents on the web.
 
 ## The pins
 
-A change to what a page runs (a fork, `forks.txt`, `patches/`, `frontend/`) ends at its merge and tag, played on its
-game and one other. Every game takes it in the next retest, a run on a schedule that takes every change since the last
-one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files changed in
-Chrome and Firefox, and only a page that boots with no WebGPU errors and plays no worse than its row and its earlier
-runs moves its fork onto the tag, is published and gets its row updated. One that plays worse stays on Pages as it was
-and has work filed. Rush 2049 is retested in the same work; its pin moves by a PR on its repo, even to a tag that left
-its page's bytes alone.
+A change to what a page runs (a fork, `forks.txt`, `patches/`, `frontend/`) ends at its merge and tag, played by what
+it can break (Changing it). Every game takes it in the next retest, a run on a schedule that takes every change since
+the last one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files
+changed (each once in Firefox for crashes and errors, and an A/B in Chrome against the page Pages serves on two or three
+games that stand for the rest when the tag can move speed), and only a page that boots with no WebGPU errors and plays
+no worse than Pages moves its fork onto the tag, is published and gets its row updated. One that plays worse stays on
+Pages as it was and has work filed. Rush 2049 is retested in the same work; its pin moves by
+a PR on its repo, even to a tag that left its page's bytes alone.
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages that crashes, never boots, loses its WebGPU
 device or can't be played moves the pins of the games it fixes (Rush 2049's by a PR), builds, plays in Chrome and
@@ -155,27 +157,36 @@ graphics (Intel UHD) or a stand-in for one, and when it was last played (no desk
 all). Whoever plays a page that changed (a retest, a critical fix, a change to a game's repo or shader list) does all
 of this in the same work, as docs/playing.md says:
 
-- Plays it in Chrome and Firefox, always both (Firefox is where pages fall behind), its build before it is published
-  and from Pages after: launcher, Load ROM, the shader wait, menus (look at them, a `shot` step), a level or race,
-  sound, the frame rate, WebGPU errors in the console.
+- Plays it in Chrome and Firefox, always both (Chrome for the numbers, Firefox for what only it turns up: a race in
+  the game's loads, an OOM), its build before it is published and from Pages after: launcher, Load ROM, the shader
+  wait, menus (look at them, a `shot` step), a level or race, sound, the frame rate, WebGPU errors in the console.
 - Records every run, failed ones too, in `plays.jsonl` (`play_page.mjs --record`), committed with the row and nowhere
   else.
 - Writes the cell as a number, from a laptop run or else the stand-in (`*`), never "smooth" and never against an
-  earlier result. A new game gets a row in its port's work.
+  earlier result; a page given only the smoke play keeps its numbers. A new game gets a row in its port's work.
 
 ## Playing a page
 
+- Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes, and so is every game's plan. A longer
+  one (a plan of more, a run of 10 minutes or more) is for a card that needs it and says why: a soak, a leak or OOM
+  hunt, a timing bug that takes many minutes to show (docs/playing.md, Which browser, how long).
+- Chrome measures, in interleaved pairs. Firefox with its default prefs is played for crashes, traps, WebGPU errors and
+  exceptions, not presents: on Windows' integrated graphics its compositor caps every page at 30-45. Firefox's
+  performance is measured only for a change that could move it, with `gfx.webrender.compositor` false.
+- A smoke play is a shared turn in the GPU queue with a short limit (about 10 minutes), an A/B's play or a soak a
+  whole turn with a limit that fits its plan. A card queues one series at a time and stops it at its first failed
+  play, and checks its plan's files are there before it queues (docs/playing.md, What a change plays).
 - On a desktop GPU a page is measured uncapped (`--uncapped`): capped, every page and build reads about 60 there.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never
   message each other about turns: the queue says it.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: write down what else was running
-  beside a number. The page Pages serves, played in the same minutes as a new build, several runs of each interleaved
-  (`--note` them), tells the host from the build; one pair before and after doesn't (docs/findings.md, Behind
-  CLAUDE.md's rules).
-- A plan reaches a level as a player does and plays it a minute or more, its holds on the game's own clock; a plan that
-  ends on black is the plan's fault until a direct warp there draws black too (docs/playing.md, Plans).
+  beside a number. The page Pages serves, played in the same minutes as a new build, interleaved (`--note` them, a
+  second pair where the first isn't clearly within the noise), tells the host from the build; one pair before and after
+  doesn't (docs/findings.md, Behind CLAUDE.md's rules).
+- A plan reaches a level as a player does and plays a minute or more in its levels, its holds on the game's own clock;
+  a plan that ends on black is the plan's fault until a direct warp there draws black too (docs/playing.md, Plans).
 
 ## Ruled out, so don't retry
 
@@ -215,3 +226,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   flight, for Banjo held at 30 in Firefox on a laptop's screen: each paced as often, the GPU 94-100% busy at 60.
 - The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.
+- Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
+  silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.
