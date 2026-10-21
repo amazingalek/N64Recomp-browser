@@ -32,7 +32,8 @@
 // ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
 // ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
-// key instead, for a launcher whose Load ROM no one spot reaches at every size), ["shot", file] (a screenshot of the page),
+// key instead, for a launcher whose Load ROM no one spot reaches at every size; then waits for the launcher to take it,
+// below), ["shot", file] (a screenshot of the page),
 // ["resize", w, h] (the viewport to that many CSS pixels, as a player's window resized: not on screen, where the
 // window is the desktop's), ["hide", ms] (another tab in front of the page's for ms of wall time, then the page's again,
 // as a player switching tabs: the page's document is hidden, and the browser throttles it as it does a player's) and
@@ -56,6 +57,12 @@
 // says how many ticks its holds asked for and how many the clock had moved by when each was let go: a hold lets go
 // after the tick it waited for, so the game can read the key in one frame more, and more where the page's thread is
 // busy.
+//
+// The launcher shows Start Game where Load ROM was only once recomp::select_rom has hashed the ROM and stored a copy
+// (in HOME/.config/<program id>; every recomp's launcher calls it), and on a busy host that came after a plan's fixed
+// wait: its click hit Load ROM, the game never started and the run failed later at 'RDRAM not found'. So a rom step
+// ends once a file the ROM's size is in the page's file system outside /tmp (where the picker puts what is picked),
+// polled for up to romStoredMs, and says how long that took; with none by then it says so and goes on as before.
 //
 // page.stop(reason) ends a run where it is: the step it is in is left (a clock wait included, which on a game that has
 // stopped waits out its whole 5 times and 30 s), no step after it starts, and run() throws reason, as a step that failed
@@ -223,6 +230,24 @@ const evaluateMs = 30000;
 // while go() started on the next test, found the skydive still flying and gave it back. A page that stops answering
 // is caught by play_page's sample, in its stalledSeconds.
 const stepMs = 600000;
+// How long a rom step waits for the launcher to store the ROM.
+const romStoredMs = 30000;
+// The path of a file of size bytes in the page's file system, outside /tmp, /dev and /proc, or null; false with no FS.
+const storedFile = (size) => `(() => {
+  if (typeof FS === 'undefined') return false;
+  const find = (dir) => {
+    for (const name of FS.readdir(dir)) {
+      const p = (dir === '/' ? '' : dir) + '/' + name;
+      if (name === '.' || name === '..' || p === '/tmp' || p === '/dev' || p === '/proc') continue;
+      let st;
+      try { st = FS.stat(p); } catch { continue; }
+      const found = FS.isDir(st.mode) ? find(p) : st.size === ${size} ? p : null;
+      if (found) return found;
+    }
+    return null;
+  };
+  return find('/');
+})()`;
 
 // RDRAM in the wasm heap, found by the boot globals every game has at 0x80000300: osTvType, osRomBase and osMemSize.
 const rdramHelpers = `(() => {
@@ -432,6 +457,17 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'rom') {
         await page.rom(typeof a[0] === 'string' ? async () => { await page.key('down', a); await page.key('up', a); }
           : async () => page.click(...await place(a[0], a[1])));
+        const given = Date.now(), size = (fs.statSync(rom).size + 3) & ~3;
+        let at = null;
+        while (!at && Date.now() - given < romStoredMs) {
+          at = await page.evaluate(storedFile(size));
+          if (at === false) break;
+          if (!at) await sleep(250);
+        }
+        const seconds = ((Date.now() - given) / 1000).toFixed(1);
+        if (at === false) log('the page has no FS to see the launcher store the ROM in');
+        else log(at ? `the launcher stored the ROM (${at}) ${seconds} s after it was given`
+          : `the launcher stored no copy of the ROM in ${seconds} s`);
       }
       else if (op === 'shot') fs.writeFileSync(a[0], await page.screenshot());
       else if (op === 'resize') {
