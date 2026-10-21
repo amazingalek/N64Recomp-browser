@@ -182,8 +182,9 @@ window to the launcher and to the game's aspect; the page leaves the window alon
 frame at its 20 a second, so a script holds a key 150-300 ms. Its list, `src/rt64_shaders.txt`, is 564 descriptions in
 24 sections, the boot 69. Its survey clears a new file's opening cutscene at the file select's hand-over, since clearing
 it mid-cutscene hung the game on a black screen, and warps as a child or an adult by the play state's `linkAgeOnLoad`,
-since the save's `linkAge` alone is overwritten. Its `tools/play_plan.json` plays Link's house, Kokiri Forest, the pause
-menu, Hyrule Field, the market and the Forest Temple. With its survey waiting on a timer, Chrome's longest gap as the
+since the save's `linkAge` alone is overwritten. Its `tools/play_plan.json` loads File 1 as a player does and plays
+Link's house and the pause menu; `tools/play_plan_extended.json` goes on to Lake Hylia, the graveyard and the Desert
+Colossus by the survey's warp. With its survey waiting on a timer, Chrome's longest gap as the
 file loads is under a second. Its BUILDING.md and the headers of `web/page.cmake`, `web/stubs.cpp`, `web/survey.cpp`,
 `tools/shader_survey.js` and `src/rt64_shaders.txt` have the rest: what differs on a page (the launcher, the window as
 the canvas and dp scaling, the first run's defaults), render to RAM kept exact for the pause background, the shader list
