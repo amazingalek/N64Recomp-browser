@@ -63,6 +63,37 @@ options; `docs/findings.md` has what was measured this way.
   still running, with its processes). A debugging port another browser on the machine holds is
   refused (`page_driver.mjs`).
 
+## What a change plays
+
+A change is played by what it can break, before it merges (CLAUDE.md, Changing it) and in the retest
+(docs/publishing.md, The retest). A change that could be two kinds is played as the one that risks more.
+
+- Can't change a page's bytes (`*.md`, `plays.jsonl`, `site/`, the tools that play, serve, read and publish pages):
+  nothing is played. A new or changed plan is the exception: it is played as a smoke play is, once in each browser, to
+  show that it reaches its levels.
+- Changes a page but can't move its speed or timing (the launcher's or a notice's text, a patch merge that builds the
+  same code, an entry in a shader list): the smoke play. Its own game's build plays its plan once in Chrome and once in
+  Firefox, read for a page that boots and plays, WebGPU errors and exceptions (`failed`, `webgpuErrors` and
+  `exceptions` in play_page's `--json`), never for its presents. No second game, no Pages pair.
+- Can move speed or timing (a fork's renderer, its device thread, present or wait path, the runtime's threads and
+  messages, `frontend/`'s timing, a build option): the A/B, `tools/ab_pages.mjs` on its game and one other, and the
+  smoke play in Firefox of each (`ab_pages.mjs --smoke`).
+- Can crash or leak only over time (memory, a cache, a timing bug that takes minutes to show): a soak, played only for
+  a card that says why.
+
+A card that moves a game's pin onto a tag the retest plays, or will, gives it the smoke play and leaves the A/B to the
+retest.
+
+Each play takes its own turn in the machine's GPU queue (CLAUDE.md, Playing a page). A smoke play is a shared turn,
+beside others' shared turns, with a short limit (about 10 minutes); an A/B's play and a soak are each a whole turn, the
+GPU to themselves, with a limit that fits the plan. So a queue that serves the shortest limit first can put a smoke
+play ahead of a soak.
+
+A card queues one series at a time (an `ab_pages.mjs` run, or a game's smoke plays) and stops a series at its first
+failed play: the cause is fixed, then the series is played again, rather than its other plays queued behind a failure.
+A series stands on its plan and the files its `evalFile` steps name, so they are checked before it is queued
+(`ab_pages.mjs` refuses a plan whose files aren't there before it queues a play, `play_page.mjs` as it starts).
+
 ## Which browser, how long
 
 - Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes from the launcher to the plan's last
@@ -138,7 +169,9 @@ options; `docs/findings.md` has what was measured this way.
   header) does each in turn once the play is in its level (a resized window, another tab in front for 30 s, its
   AudioContext suspended, its WebGPU device lost, then a reload over a warm cache and service worker), and records
   whether it presents again after each, and what it said. Play it from Pages, whose cache and service worker a reload
-  finds warm (docs/findings.md, Faults).
+  finds warm (docs/findings.md, Faults), and in Chrome with `--chrome-flag --disable-audio-output`: muted, a hidden
+  tab counts as silent and Chrome idles its process, which a player's tab with sound doesn't see (docs/findings.md, A
+  page in a hidden tab).
 - A thread of the game that traps names only an offset in the wasm on a page linked without `--profiling-funcs`
   (`Game.wasm:8767891: RuntimeError: unreachable executed`); `node tools/wasm_offset.mjs <wasm or URL> <offset>`
   names the function that holds it. `unreachable executed` in the export the page's `.js` calls `___trap` is
@@ -186,6 +219,8 @@ collapse) shows on a desktop as `shader missed:` lines.
   without a `†` has work filed to make it 60. A Played cell is the date and the tag the page was built on
   ("2026-10-16, v0.39.0"); one that names no tag is played in the next retest. Under the table are two lines and no
   more.
+- A page given only the smoke play (What a change plays) keeps its cells' numbers, which a change
+  that can't move speed leaves standing, and its Played cell moves to the tag.
 - A laptop's cell comes from a run on screen (`--on-screen`: maximized at the laptop's own scale, as a player's window
   is) as well as the usual one off the desktop, and gives the on-screen number: Windows never composites a window off
   the desktop, which flattered Firefox on Intel UHD. Its Chrome cell is played headless too, whose presents never wait

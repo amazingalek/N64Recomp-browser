@@ -118,23 +118,25 @@ so commit to a fork from a separate clone of it:
    and move its upstream commit in `patches/patches.txt`.
 3. Here, on the task's branch: bump `forks.txt`, run `tools/export_patches.sh`, commit `patches/` with it, and open the
    PR. A patch that stops applying to a commit in `patches/pins.txt` means the fork has to change.
-4. Before it merges, build pages on the branch and play them (docs/playing.md): its game and one other, each a game
-   fork's checkout with its N64Recomp-browser at the branch's commit. After the merge, CI's `tag` job tags main
-   `v0.<n+1>.0` when its jobs pass, for a merge that changes `forks.txt`, `patches/`, `frontend/` or `renderer/`; check
-   it came (`git ls-remote --tags origin`). A tag is a release: a recomp checks this repo out at one, and the retest
-   builds the newest.
+4. Before it merges, build pages on the branch and play them by what the change can break (docs/playing.md, What a
+   change plays): the smoke play of its own game where it can't move speed, the A/B on its game and one other where it
+   can, each a game fork's checkout with its N64Recomp-browser at the branch's commit. After the merge, CI's `tag` job
+   tags main `v0.<n+1>.0` when its jobs pass, for a merge that changes `forks.txt`, `patches/`, `frontend/` or
+   `renderer/`; check it came (`git ls-remote --tags origin`). A tag is a release: a recomp checks this repo out at
+   one, and the retest builds the newest.
 
 Read docs/porting.md before a fork change, and docs/findings.md (WebGPU in Chrome and Firefox) before changing plume's
 backend or how RT64 builds pipelines or presents on the web.
 
 ## The pins
 
-A change to what a page runs (a fork, `forks.txt`, `patches/`, `frontend/`) ends at its merge and tag, played on its
-game and one other. Every game takes it in the next retest, a run on a schedule that takes every change since the last
-one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files changed (in
-Chrome against the page Pages serves, and once in Firefox for crashes and errors), and only a page that boots with no
-WebGPU errors and plays no worse than Pages moves its fork onto the tag, is published and gets its row updated. One
-that plays worse stays on Pages as it was and has work filed. Rush 2049 is retested in the same work; its pin moves by
+A change to what a page runs (a fork, `forks.txt`, `patches/`, `frontend/`) ends at its merge and tag, played by what
+it can break (Changing it). Every game takes it in the next retest, a run on a schedule that takes every change since
+the last one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files
+changed (each once in Firefox for crashes and errors, and an A/B in Chrome against the page Pages serves on two or three
+games that stand for the rest when the tag can move speed), and only a page that boots with no WebGPU errors and plays
+no worse than Pages moves its fork onto the tag, is published and gets its row updated. One that plays worse stays on
+Pages as it was and has work filed. Rush 2049 is retested in the same work; its pin moves by
 a PR on its repo, even to a tag that left its page's bytes alone.
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages that crashes, never boots, loses its WebGPU
@@ -161,7 +163,7 @@ of this in the same work, as docs/playing.md says:
 - Records every run, failed ones too, in `plays.jsonl` (`play_page.mjs --record`), committed with the row and nowhere
   else.
 - Writes the cell as a number, from a laptop run or else the stand-in (`*`), never "smooth" and never against an
-  earlier result. A new game gets a row in its port's work.
+  earlier result; a page given only the smoke play keeps its numbers. A new game gets a row in its port's work.
 
 ## Playing a page
 
@@ -171,6 +173,9 @@ of this in the same work, as docs/playing.md says:
 - Chrome measures, in interleaved pairs. Firefox with its default prefs is played for crashes, traps, WebGPU errors and
   exceptions, not presents: on Windows' integrated graphics its compositor caps every page at 30-45. Firefox's
   performance is measured only for a change that could move it, with `gfx.webrender.compositor` false.
+- A smoke play is a shared turn in the GPU queue with a short limit (about 10 minutes), an A/B's play or a soak a
+  whole turn with a limit that fits its plan. A card queues one series at a time and stops it at its first failed
+  play, and checks its plan's files are there before it queues (docs/playing.md, What a change plays).
 - On a desktop GPU a page is measured uncapped (`--uncapped`): capped, every page and build reads about 60 there.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
@@ -221,3 +226,5 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   flight, for Banjo held at 30 in Firefox on a laptop's screen: each paced as often, the GPU 94-100% busy at 60.
 - The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.
+- Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
+  silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.

@@ -379,7 +379,7 @@ take the web support without moving its submodules to the forks (Using it in a r
   (its header says what each part does): threads, the page, HOME kept in IndexedDB (a database a page, a ROM stored from a worker), a thread's prints without
   waiting for the page's thread, SDL2 audio from a thread, sound
   played on the browser's audio thread (`audio_output.h`), the browser's file picker for a recomp with menus of its own
-  (`file_picker.h`), the WebGPU device, a notice in Firefox recommending Chrome or Edge, and `coi_serviceworker.js`.
+  (`file_picker.h`), the WebGPU device, a notice in Firefox on Windows' Intel graphics naming its fixes, and `coi_serviceworker.js`.
 - `renderer/`: RT64 as the runtime's renderer without RecompFrontend, for a test page with no menus.
 - `tools/`: `fetch_forks.sh` checks out the forks at `forks.txt`'s commits (CI uses it), `fetch_pins.sh` a recomp's
   own commits in `patches/pins.txt`, patched, and `publish_page.sh` puts
@@ -394,7 +394,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   load and the browser's cores, a line every few seconds and a summary, for a game's notes and the Games table;
   `--record` appends the run to `plays.jsonl`, every page play kept, a JSON line each, so how each game's page plays
   can be followed day by day; `ab_pages.mjs` plays a new build and the page Pages serves interleaved in Chrome, says
-  whether the build plays worse and plays the build once in Firefox for crashes and errors (the retest's comparison). `pass_probe.js`, a preload for it, says what a page's presents spend the GPU on: its
+  whether the build plays worse, and with `--smoke` plays the build once in Firefox for crashes and errors (the retest's
+  checks). `pass_probe.js`, a preload for it, says what a page's presents spend the GPU on: its
   passes, their size, their draws by shader and the GPU time of each; `webgpu_census.js`, another, counts its WebGPU calls
   and bytes a second by kind, and `gpu_growth.mjs` plays those kinds one at a time in a test page, `gpu_growth.html`,
   reading Firefox's GPU process memory around each; `memory_scan.ps1` says whose code made what that process grows.
