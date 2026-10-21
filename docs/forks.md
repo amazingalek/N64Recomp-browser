@@ -291,7 +291,7 @@ rt64 52ec88f           pacing counts no presents while it is hidden or for a sec
                        game: Mario Kart 64's and Star Fox 64's sound broke up while hidden, and their dropped presents
                        read as the GPU falling behind (Mario Kart 64 on a 240 Hz display: 114 presents a second, then
                        60 for 80 s after the tab came back). docs/findings.md, A page in a hidden tab
-rt64 5249040           the workload thread reads no GPU profiler timestamps on Emscripten: WebGPU has none (plume's
+rt64 5249040, e696b69  the workload thread reads no GPU profiler timestamps on Emscripten: WebGPU has none (plume's
                        queries do nothing and read zeros), and behind plume's device thread queryResults() and
                        getResults() were two round trips to the page's thread after every workload, two of every three
                        of that thread's trips. Presents stayed within the noise (docs/findings.md, A page in a hidden

@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 5249040240ba20231a86bebfab03539723a5c0f8
+rt64: https://github.com/amazingalek/rt64-web e696b69f3b5cc96438908fdb2eb9e21b1a548fb5
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2176,7 +2176,7 @@ index 8ea27d5..f97f6c6 100644
  
          void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..1131acf 100644
+index 5a331aa..33335ac 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -2234,15 +2234,13 @@ index 5a331aa..1131acf 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -844,10 +859,14 @@ namespace RT64 {
-             ext.workloadGraphicsWorker->wait();
+@@ -845,9 +860,13 @@ namespace RT64 {
              workerMutex.unlock();
  
--            // Update the GPU profiler with the results from the timestamps of the frame.
-+            // Update the GPU profiler with the results from the timestamps of the frame. Not on WebGPU, which has no
-+            // timestamps (plume's queries there do nothing and read zeros), and where behind plume's device thread each
-+            // of the two calls waits for a round trip to the page's thread after every workload.
+             // Update the GPU profiler with the results from the timestamps of the frame.
 +#       if !defined(__EMSCRIPTEN__)
++            // Not on WebGPU, which has no timestamps (plume's queries there do nothing and read zeros), and where behind
++            // plume's device thread each of the two calls waits for a round trip to the page's thread after every workload.
              queryPool->queryResults();
              const uint64_t *frameTimestamps = queryPool->getResults();
              rendererGPUProfiler.log(double(frameTimestamps[1] - frameTimestamps[0]) / 1000000.0);
