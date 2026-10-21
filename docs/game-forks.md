@@ -239,11 +239,10 @@ render to RAM off, the fixed heap, the shader list and how it is recorded by the
 N64ModernRuntime (their `snap64` branches), the one game fork whose rt64 isn't upstream's: ~8,000 lines of the port's
 in RT64 (each object's identity for interpolation, its frame pacing and presentation, Photo Detail's framebuffer
 readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` patches them, but for the files where
-both change the same lines (`patches/web/files.txt`, 16 of rt64's and 6 of the runtime's), whose web change is its
-`patches/web/<project>.patch`, merged by hand. Its `tools/check_web_patches.sh`, run first by its `tools/build_web.sh`,
-stops the build when N64Recomp-browser's change to one of those files has moved since that patch was merged, so a
-change here to one of them reaches its page once it is merged there too (run it on the change's branch, or the
-retest's build stops on it). On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
+both change the same lines (`patches/web/files.txt`, 17 of rt64's and 6 of the runtime's), whose web change is its
+`patches/web/<project>.patch`, merged by hand. Its `tools/build_web.sh` then takes what N64Recomp-browser has changed in
+those files since that merge (`apply.cmake --since`, README), and stops only where that meets the port's own lines:
+that is merged into its patch by hand. On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
 the build had left out with nothing said. Two of that merge's choices: in `rt64_vi.cpp` frames of uneven VIs
 interpolate at the fastest (rt64 179adb8) and the port's last measured rate is what's left, in place of 0; in
 `RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
@@ -253,7 +252,7 @@ photo from the frame it has just drawn and finds the viewfinder's focus dot in i
 Its list is 199 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
 code but for three Firefox plays missed: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js`
 rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
-`tools/check_web_patches.sh`, `web/page.cmake` and `web/rt64_shaders.txt` have the rest.
+`web/page.cmake` and `web/rt64_shaders.txt` have the rest.
 
 `amazingalek/rush2recompiled-web` is Rush 2 Recompiled, Rush 2: Extreme Racing USA (US), whose repo has no license
 (CLAUDE.md, Rules). It is on its own commits of rt64, N64ModernRuntime and RecompFrontend, which its
@@ -261,9 +260,8 @@ rides it to its end, taking photos and throwing the items. Its docs/WEB.md and t
 the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched by the N64Recomp-browser tag its
 `lib/N64Recomp-browser` pins. Its `tools/build_web.sh` applies Rush 2's patches first, then `apply.cmake` project by
 project, but for the files where both change the same lines (`web/patches/files.txt`: 5 of rt64's, the runtime's
-`events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand; its
-`tools/check_web_patches.sh` stops the build when N64Recomp-browser's change to one of them has moved, as Snap64's
-does. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
+`events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand, and what N64Recomp-browser
+has changed in them since is merged in by `apply.cmake --since`, as Snap64's is. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
 the merge's choices: Rush 2's generated mipmaps and texels of a region of a larger image are read through the web's draw
 texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`), and `RasterPS.hlsl`'s coverage output (`SV_Coverage`)
 is left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel. Its
@@ -274,7 +272,7 @@ The page leaves out online play, for
 Recompiled code mods. Its list is 82 shaders: the boot (the launcher, the title and the menus, 37) and 9 sections (the
 title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web/shader_plan.json`, which drives the
 menus by the front end's screen and the track select's entry in RDRAM. Its docs/BUILDING.md (The web page) and the
-headers of `tools/build_web.sh` and `tools/check_web_patches.sh` have the rest.
+header of `tools/build_web.sh` has the rest.
 
 ## The games' own frame rates
 
