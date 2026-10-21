@@ -67,6 +67,13 @@ import { spawn, execFile, execFileSync } from 'child_process';
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Takes "--name value" out of args, or gives the fallback.
+// The files a plan's evalFile steps name (relative to the plan) that aren't there: a run refuses the plan before it
+// waits for a turn, rather than failing part way through one.
+export const missingPlanFiles = (plan, planFile) =>
+  [plan.load, plan.setup, plan.start, plan.play, ...(plan.sections ?? []).map((s) => s.steps)].flat().filter(Boolean)
+    .filter((step) => Array.isArray(step) && step[0] === 'evalFile')
+    .map((step) => path.resolve(path.dirname(planFile), step[1])).filter((file) => !fs.existsSync(file));
+
 export const option = (args, name, fallback) => {
   const i = args.indexOf(name);
   if (i < 0) return fallback;
