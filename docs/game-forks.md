@@ -242,7 +242,9 @@ readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` pa
 both change the same lines (`patches/web/files.txt`, 17 of rt64's and 6 of the runtime's), whose web change is its
 `patches/web/<project>.patch`, merged by hand. Its `tools/build_web.sh` then takes what N64Recomp-browser has changed in
 those files since that merge (`apply.cmake --since`, README), and stops only where that meets the port's own lines:
-that is merged into its patch by hand. On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
+that is merged into its patch by hand. CI's `snap-patches` job runs its `tools/build_web.sh --patches` (that step, no
+ROM) with the PR's checkout, against its main, so a web change that meets the port's lines, in a file left out or one
+that isn't yet, is red in the PR that makes it and is merged into `patches/web` there (a new file added to `files.txt`). On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
 the build had left out with nothing said. Two of that merge's choices: in `rt64_vi.cpp` frames of uneven VIs
 interpolate at the fastest (rt64 179adb8) and the port's last measured rate is what's left, in place of 0; in
 `RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
@@ -261,7 +263,8 @@ the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched
 `lib/N64Recomp-browser` pins. Its `tools/build_web.sh` applies Rush 2's patches first, then `apply.cmake` project by
 project, but for the files where both change the same lines (`web/patches/files.txt`: 5 of rt64's, the runtime's
 `events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand, and what N64Recomp-browser
-has changed in them since is merged in by `apply.cmake --since`, as Snap64's is. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
+has changed in them since is merged in by `apply.cmake --since`, as Snap64's is, and CI's `rush2-patches` job runs its
+`tools/build_web.sh --patches` on each PR as `snap-patches` does Snap64's. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
 the merge's choices: Rush 2's generated mipmaps and texels of a region of a larger image are read through the web's draw
 texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`), and `RasterPS.hlsl`'s coverage output (`SV_Coverage`)
 is left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel. Its
