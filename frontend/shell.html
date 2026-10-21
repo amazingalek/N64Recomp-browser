@@ -142,18 +142,21 @@
   // A game that looks with the mouse (SDL's relative mode, whose pointer lock Emscripten asks for with no options) gets
   // the mouse's own counts, as SDL reads them on a desktop (raw input), not the cursor's motion. Without them a
   // browser keeps the locked cursor in place by moving it back, and takes each move back out of the motion it reports
-  // (Firefox's coalesced pointer events show them): a move counted against the wrong position is a jump, which turned
-  // GoldenEye's view tens of degrees at once in fast turns (running, strafing and turning). A browser that has no raw
-  // counts (NotSupportedError) gets the lock without them.
-  const requestPointerLock = Element.prototype.requestPointerLock;
-  if (requestPointerLock) {
-    Element.prototype.requestPointerLock = function (options) {
-      const locked = requestPointerLock.call(this, { unadjustedMovement: true, ...options });
-      return locked?.catch((e) => {
-        if (e.name !== 'NotSupportedError') throw e;
-        return requestPointerLock.call(this, options);
-      }) ?? locked;
-    };
+  // (Firefox's coalesced pointer events show them): a move counted against the wrong position is a jump, the likeliest
+  // cause of GoldenEye's view turning all at once, now and then, in fast turns (running, strafing and turning). A
+  // browser that has no raw counts (NotSupportedError) gets the lock without them. In a block, since the program's
+  // script has a global function of the same name.
+  {
+    const requestPointerLock = Element.prototype.requestPointerLock;
+    if (requestPointerLock) {
+      Element.prototype.requestPointerLock = function (options) {
+        const locked = requestPointerLock.call(this, { unadjustedMovement: true, ...options });
+        return locked?.catch((e) => {
+          if (e.name !== 'NotSupportedError') throw e;
+          return requestPointerLock.call(this, options);
+        }) ?? locked;
+      };
+    }
   }
   // The program (its script, in #program) starts only on a page that is cross-origin isolated, which it needs anyway.
   // A first visit to a host that can't send the headers isn't, and coi_serviceworker.js reloads it: started there, the
