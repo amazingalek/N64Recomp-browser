@@ -3,7 +3,7 @@
      is and RT64 draws on (SDL follows its CSS size), and a line saying what is loading or what went wrong. The program
      sets the title through SDL. coi_serviceworker.js makes the page cross-origin isolated where the server doesn't,
      and the program starts only once it is (below).
-     The #gpu notice recommends Chrome or Edge in Firefox (below). #shaders, in a corner, is the progress of the
+     The #gpu notice (below) is for Firefox on Intel graphics. #shaders, in a corner, is the progress of the
      shaders the game waits for (RasterShaderCache::startPrebuild(), a game's RT64_PREBUILT_SHADER_LIST), over the frame
      it holds meanwhile. The browser keeps them, so a later visit builds them in under a second, and the indicator shows
      only if they take longer than one.
@@ -24,6 +24,7 @@
   #status.failed { padding: 12px; background: #000c; }
   #gpu { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); max-width: 46em; padding: 8px 32px 8px 12px;
          background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif; }
+  #gpu code { font-size: 13px; }
   #gpu[hidden], #shaders[hidden] { display: none; }
   #shaders { position: fixed; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
              background: #0009; color: #bbb; border-radius: 4px; font: 12px/1 system-ui, sans-serif;
@@ -41,8 +42,9 @@
 <div id="status">Loading…</div>
 <template id="program">{{{ SCRIPT }}}</template>
 <div id="shaders" hidden><span class="spin"></span><span>Preparing graphics</span><span class="figures"></span></div>
-<div id="gpu" hidden><span>This game plays best in Chrome or Edge. Firefox draws it slowly on many computers,
-  integrated graphics above all.</span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
+<div id="gpu" hidden><span>Firefox runs this at half speed on Intel graphics. Either play in Chrome or Edge, or set
+  <code>gfx.webrender.compositor</code> to false in <code>about:config</code>. If this PC also has a graphics card,
+  setting Firefox to High performance in Windows' Graphics settings works too.</span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
 <script>
   const statusLine = document.getElementById('status');
   const fail = (text) => { statusLine.textContent = text; statusLine.style.color = '#f88'; statusLine.className = 'failed'; };
@@ -114,11 +116,28 @@
     rt64LearnedShaders: learnedShaders,
     rt64ShaderMissed: shaderMissed,
   };
-  // Firefox (157) builds a pipeline on its GPU process in line with its other work and costs a present about twice
-  // what Chrome's does, so on integrated graphics the games here crawl or stutter there and play smoothly in Chrome
-  // and Edge. Its WebGPU adapter's info is empty, so the page can't tell what it draws with: in Firefox it always
-  // recommends Chrome or Edge. Without WebGPU the status line already says so.
-  if (navigator.gpu && /Firefox\//.test(navigator.userAgent)) document.getElementById('gpu').hidden = false;
+  // Firefox on Windows hands the canvas to Windows' compositor (WebRender's native compositor, DirectComposition),
+  // redrawing it every frame at device pixels and blending it as if it had alpha. On a laptop's Intel graphics (Tiger
+  // Lake GT1, 4K at 200%) a present then takes 27-83 ms on the GPU, against 9-25 with gfx.webrender.compositor false,
+  // and the games fall from 60 to 30-45; a discrete GPU has room for it (docs/findings.md, A laptop, measured). Set to
+  // High performance in Windows' graphics settings, Firefox on that laptop runs on its NVIDIA card (it ignores the
+  // page's powerPreference) and holds 60 in Banjo and GoldenEye, presents done in 2-4 ms. Chrome holds 60 on the Intel
+  // graphics, so the notice, which names all three fixes, is Firefox's only.
+  // Firefox's WebGPU adapter info is empty, but its WebGL renderer still names the vendor, generalized ("ANGLE (Intel,
+  // Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar"), so the notice shows only for Intel's integrated
+  // graphics, leaving out an Arc card where the name says so. Without WebGPU the status line already says so.
+  const intelGraphics = () => {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      if (!gl) return false;
+      const renderer = String(gl.getParameter(gl.RENDERER));
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return /\bIntel\b/i.test(renderer) && !/\bArc\b/i.test(renderer);
+    } catch { return false; }
+  };
+  if (navigator.gpu && /Firefox\//.test(navigator.userAgent) && /Windows/.test(navigator.userAgent) && intelGraphics()) {
+    document.getElementById('gpu').hidden = false;
+  }
   // The program (its script, in #program) starts only on a page that is cross-origin isolated, which it needs anyway.
   // A first visit to a host that can't send the headers isn't, and coi_serviceworker.js reloads it: started there, the
   // program fetched its .wasm and .data only for the reload to cut them off, and in Firefox (158, from GitHub Pages)
