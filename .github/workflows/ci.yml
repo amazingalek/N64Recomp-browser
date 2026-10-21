@@ -283,6 +283,59 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$jfg/lib/N64Recomp-browser"
           bash "$jfg/tools/build_web.sh" --patches
 
+  # The patches under Pokémon Snap's web fork's own (Snap64Recomp-web, its main), on its port's own rt64 and
+  # N64ModernRuntime (their snap64 branches): its tools/build_web.sh leaves out the files where the port's lines and the
+  # web's meet, applies its patches/web/*.patch to them, and merges in the web's change to them since with apply.cmake
+  # --since. Its --patches does that step without a ROM, with this checkout as its lib/N64Recomp-browser. Red on a PR
+  # means the PR's web change meets the port's own lines in one of them, or in a file it doesn't leave out yet: it is
+  # merged into Snap64Recomp-web's patches/web by hand (its files.txt says how), in that PR's work.
+  snap-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Snap64Recomp-web's apply over them
+        run: |
+          snap="$RUNNER_TEMP/snap"
+          git clone -q --depth 1 https://github.com/amazingalek/Snap64Recomp-web "$snap"
+          git -C "$snap" log -1 --format='Snap64Recomp-web %h %s'
+          git -C "$snap" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 2 lib/rt64 lib/N64ModernRuntime
+          git -C "$snap/lib/rt64" -c protocol.version=2 submodule update -q --init --depth 1 src/contrib/plume src/contrib/hlslpp
+          git -C "$snap/lib/N64ModernRuntime" -c protocol.version=2 submodule update -q --init --depth 1 N64Recomp
+          rmdir "$snap/lib/N64Recomp-browser"
+          ln -s "$GITHUB_WORKSPACE" "$snap/lib/N64Recomp-browser"
+          bash "$snap/tools/build_web.sh" --patches
+
+  # The patches under Rush 2's web fork's own (rush2recompiled-web, its main), as Snap64Recomp-web's: its
+  # tools/build_web.sh applies Rush 2's lib/patches to rt64, N64ModernRuntime and RecompFrontend first, then these but for
+  # the files its web/patches/*.patch take over, with the web's change to them since merged in by apply.cmake --since.
+  # Red on a PR means the same as snap-patches', merged into rush2recompiled-web's web/patches by hand.
+  rush2-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: rush2recompiled-web's apply over them
+        run: |
+          rush2="$RUNNER_TEMP/rush2"
+          git clone -q --depth 1 https://github.com/amazingalek/rush2recompiled-web "$rush2"
+          git -C "$rush2" log -1 --format='rush2recompiled-web %h %s'
+          git -C "$rush2" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 3 \
+            lib/rt64 lib/N64ModernRuntime lib/RecompFrontend
+          git -C "$rush2/lib/rt64" -c protocol.version=2 submodule update -q --init --depth 1 src/contrib/plume src/contrib/hlslpp
+          git -C "$rush2/lib/N64ModernRuntime" -c protocol.version=2 submodule update -q --init --depth 1 N64Recomp
+          rmdir "$rush2/lib/N64Recomp-browser"
+          ln -s "$GITHUB_WORKSPACE" "$rush2/lib/N64Recomp-browser"
+          bash "$rush2/tools/build_web.sh" --patches
+
   # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
   # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
@@ -364,7 +417,8 @@ jobs:
   # covered by that one's, and the changes job builds a docs-only push's whenever this would tag. A tag pushed with
   # GITHUB_TOKEN starts no workflow: this run, on the same commit, is its CI.
   tag:
-    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, jfg-patches, emscripten]
+    needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, jfg-patches, snap-patches,
+      rush2-patches, emscripten]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
