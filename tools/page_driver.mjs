@@ -290,8 +290,11 @@ const spawnHeld = (affinity, command, args, options) => {
 // close(): asks the browser to close (ask, Browser.close or browser.close) and waits up to ms for it to exit, then stops it
 // with every process it started if it is still running. Chrome can close the socket without answering Browser.close,
 // so this waits for the process, not the reply; and over a debugging connection that dropped (1006) the ask never gets
-// there, so a browser left running would hold the GPU and its profile after the tool ended, into whatever plays next.
-// taskkill /T takes the browser's own processes with it (it walks the tree from the browser, so before it is gone).
+// there. A browser left running holds the GPU and its profile until something stops it: on Windows the tool's own exit
+// does (libuv starts a child in a job object that ends with its parent), elsewhere nothing, into whatever plays next.
+// taskkill /T takes the browser's own processes with it (it walks the tree from the browser, so before it is gone). The
+// wait is 30 s in both: Chrome stopped before it has ended loses what it wrote to its caches (docs/playing.md), and on a
+// host at 100% it took 10-12 s to end after Browser.close.
 const closeBrowser = async (proc, ask, ms, line) => {
   const running = () => proc.exitCode === null && proc.signalCode === null;
   if (running()) {
@@ -551,7 +554,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
         await send('IO.close', { handle: tracingComplete.stream });
       },
     },
-    close: () => closeBrowser(proc, () => send('Browser.close'), 10000, line),
+    close: () => closeBrowser(proc, () => send('Browser.close'), 30000, line),
   };
 };
 

@@ -58,7 +58,8 @@ options; `docs/findings.md` has what was measured this way.
 - Keep `--profile` between runs for a warm one, on its fixed port: IndexedDB belongs to the origin, port included. For
   a cold visit in Chrome, start a new `--user-data-dir` once on the launcher first: a profile's first run stores nothing
   that hits later, and one whose first run built the shaders never hits. Close Chrome with `Browser.close` and wait for
-  the process to end, or it loses what it wrote to its caches. A debugging port another browser on the machine holds is
+  the process to end, or it loses what it wrote to its caches (page_driver.mjs's close() waits 30 s, then stops a browser
+  still running, with its processes). A debugging port another browser on the machine holds is
   refused (`page_driver.mjs`).
 
 ## Uncapped, and the browsers' clocks
