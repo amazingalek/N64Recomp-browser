@@ -113,7 +113,7 @@ A series stands on its plan and the files its `evalFile` steps name, so they are
 ## Soaks
 
 A soak plays a page long, for what shows only after many minutes: a leak, a slow crash, Banjo-Kazooie's
-`Aborted(OOM)` 550 s into a Firefox play. It plays in Firefox, where those turn up; Chrome's soaks of nine pages found
+`Aborted(OOM)` 550 s into a Firefox play. It plays in Firefox, where those turn up; Chrome's soaks of ten pages found
 nothing Firefox's didn't (docs/findings.md, Memory). Each play is the game's plan with its `shot` steps left out and 20
 `wait`s of 60 s added, its last scene held 20 minutes (on the game's clock where the plan has one), played from Pages
 uncapped at 3840x2000 with `--interval 1 --preload tools/heap_probe.js`, one play a whole turn with `--max 35`. Read
