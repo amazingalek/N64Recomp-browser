@@ -296,4 +296,6 @@ rt64 5249040, e696b69  the workload thread reads no GPU profiler timestamps on E
                        getResults() were two round trips to the page's thread after every workload, two of every three
                        of that thread's trips. Presents stayed within the noise (docs/findings.md, A page in a hidden
                        tab)
+N64Recomp df17690      an op with $zero as its destination (lw $zero, ...) written (void)(<value>): done, nothing assigned
+                       ("0 = MEM_W(...)" didn't compile)
 ```
