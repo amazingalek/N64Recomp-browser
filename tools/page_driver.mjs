@@ -2,7 +2,7 @@
 // build dir with the headers a threaded page needs, starts the browser with a profile of its own, and runs a plan's
 // steps on the page.
 //
-// Chrome runs headless (muted, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
+// Chrome runs headless (muted or with no audio output, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
 // events are trusted, and the ROM goes to the file chooser the page opens. Headless Chrome draws to no display, so its
 // presents never go through the desktop's compositor or wait for the display; with headed it runs in a window of its own,
 // moved off the desktop as Firefox's is below, with its throttling of hidden windows off, which presents as a player's
@@ -24,8 +24,8 @@
 // A step is one of: ["wait", ms], ["until", regex, ms] (a console line), ["click", x, y] (CSS pixels in a 1256x645
 // viewport, moved to where recompui puts the same spot in the viewport the page has at the time: it lays its launcher
 // and menus out by the viewport's height, about the centre), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
-// ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
-// n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
+// ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited, up to stepMs, below; the
+// page has n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
 // ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
 // ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
@@ -67,6 +67,13 @@ import { spawn, execFile, execFileSync } from 'child_process';
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Takes "--name value" out of args, or gives the fallback.
+// The files a plan's evalFile steps name (relative to the plan) that aren't there: a run refuses the plan before it
+// waits for a turn, rather than failing part way through one.
+export const missingPlanFiles = (plan, planFile) =>
+  [plan.load, plan.setup, plan.start, plan.play, ...(plan.sections ?? []).map((s) => s.steps)].flat().filter(Boolean)
+    .filter((step) => Array.isArray(step) && step[0] === 'evalFile')
+    .map((step) => path.resolve(path.dirname(planFile), step[1])).filter((file) => !fs.existsSync(file));
+
 export const option = (args, name, fallback) => {
   const i = args.indexOf(name);
   if (i < 0) return fallback;
@@ -207,6 +214,12 @@ const connect = async (url, onEvent) => {
 
 // How long evaluate waits for the page to answer unless told otherwise: a page's own work answers well within it.
 const evaluateMs = 30000;
+// How long an eval, evalFile or need step waits for its promise: a plan's own script runs on the game's clock (a 30 s
+// flight, landing through a test's results, a menu walk of up to 90 s), and one given up on at evaluateMs went on in
+// the page beside the steps after it: Pilotwings 64's land(), still pressing A through the skydive's results, ran on
+// while go() started on the next test, found the skydive still flying and gave it back. A page that stops answering
+// is caught by play_page's sample, in its stalledSeconds.
+const stepMs = 600000;
 
 // RDRAM in the wasm heap, found by the boot globals every game has at 0x80000300: osTvType, osRomBase and osMemSize.
 const rdramHelpers = `(() => {
@@ -257,9 +270,9 @@ const rdramHelpers = `(() => {
 // laptop's CPU. scale is the device pixels a CSS pixel off the desktop, 1 unless given: 2 is a laptop at 200%, where a
 // page whose canvas went to device pixels (SDL_WINDOW_ALLOW_HIGHDPI) drew four times the pixels and took every click
 // at the wrong spot, so Load ROM opened nothing, which no run at 1 shows. onScreen (above) leaves size and scale to the
-// window. firefoxPrefs are Firefox prefs of the caller's, set over
-// the ones below. affinity holds the browser, every process of it, to the first that many logical processors (0: all),
-// a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
+// window. firefoxPrefs are Firefox prefs of the caller's, set over the ones below, and chromeFlags Chrome switches of the
+// caller's, after the ones below. affinity holds the browser, every process of it, to the first that many logical
+// processors (0: all), a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
 // WebGPU adapter in place of the GPU, a slow GPU: Chrome started with --use-webgpu-adapter=swiftshader (SwiftShader,
 // Vulkan on the CPU; Chrome 155 has no other: its warp, d3d11 and opengles values give the GPU or no adapter) and every
 // requestAdapter() asked for forceFallbackAdapter, which is what gives Firefox one (D3D12's WARP, from wgpu's dx12
@@ -287,8 +300,34 @@ const spawnHeld = (affinity, command, args, options) => {
   try { return spawn(command, args, options); } finally { hold(all); }
 };
 
+// close(): asks the browser to close (ask, Browser.close or browser.close) and waits up to ms for it to exit, then stops it
+// with every process it started if it is still running. Chrome can close the socket without answering Browser.close,
+// so this waits for the process, not the reply; and over a debugging connection that dropped (1006) the ask never gets
+// there. A browser left running holds the GPU and its profile until something stops it: on Windows the tool's own exit
+// does (libuv starts a child in a job object that ends with its parent), elsewhere nothing, into whatever plays next.
+// taskkill /T takes the browser's own processes with it (it walks the tree from the browser, so before it is gone). The
+// wait is 30 s in both: Chrome stopped before it has ended loses what it wrote to its caches (docs/playing.md), and on a
+// host at 100% it took 10-12 s to end after Browser.close.
+const closeBrowser = async (proc, ask, ms, line) => {
+  const running = () => proc.exitCode === null && proc.signalCode === null;
+  if (running()) {
+    let timer;
+    const exited = new Promise((resolve) => { proc.once('exit', resolve); timer = setTimeout(resolve, ms); });
+    ask().catch(() => {});
+    await exited;
+    clearTimeout(timer);
+  }
+  if (!running()) return;
+  line(`page_driver: the browser had not exited ${ms / 1000} s after it was asked to close, so it was stopped`);
+  if (process.platform === 'win32') {
+    try { execFileSync('taskkill', ['/T', '/F', '/PID', String(proc.pid)], { stdio: 'ignore', windowsHide: true, timeout: 10000 }); } catch {}
+  } else {
+    try { proc.kill('SIGKILL'); } catch {}
+  }
+};
+
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, affinity = 0, fallbackAdapter = false,
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, chromeFlags = [], affinity = 0, fallbackAdapter = false,
   onLine = () => {}, log = console.log }) => {
   if (fallbackAdapter) preload = preload ? `() => { (${fallbackAdapterPreload})(); (${preload})(); }` : fallbackAdapterPreload;
   fs.mkdirSync(profile, { recursive: true });
@@ -305,7 +344,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, chromeFlags, affinity, fallbackAdapter, line });
   else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
@@ -375,7 +414,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'eval' || op === 'evalFile' || op === 'need') {
         const js = (op === 'evalFile') ? fs.readFileSync(path.resolve(planDir, a[0]), 'utf8') : a[0];
         let value, failed = false;
-        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; failed = true; }
+        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js, stepMs); } catch (e) { value = 'exception: ' + e.message; failed = true; }
         if (value !== undefined) log(`${op}: ${JSON.stringify(value)}`);
         if (op === 'need' && (failed || value === false || value === null)) throw new Error(`${a[0]} gave ${JSON.stringify(value)}`);
       }
@@ -415,7 +454,7 @@ const listening = (host, port) => new Promise((resolve) => {
 
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, chromeFlags = [], affinity, fallbackAdapter, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
   // another window over it would hide it too).
   const mode = headed || onScreen
@@ -425,9 +464,13 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   if (uncapped) mode.push('--disable-frame-rate-limit');
   if (fallbackAdapter) mode.push('--use-webgpu-adapter=swiftshader');
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
-  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
+  // Muted, nothing reaches a speaker, but the page's sound is zeroes, so Chrome reads its tab as silent and lowers a
+  // hidden one's process to the background priority it spares a tab that plays sound. --disable-audio-output in
+  // chromeFlags plays it to no device instead, which Chrome still hears, so it replaces --mute-audio.
+  const mute = chromeFlags.includes('--disable-audio-output') ? [] : ['--mute-audio'];
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', ...mute,
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
-    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'], { stdio: 'ignore' });
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...chromeFlags, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
     line('page_driver: Chrome window not moved');
   }
@@ -528,12 +571,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
         await send('IO.close', { handle: tracingComplete.stream });
       },
     },
-    // Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
-    close: async () => {
-      const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 10000); }) : null;
-      send('Browser.close').catch(() => {});
-      await exited;
-    },
+    close: () => closeBrowser(proc, () => send('Browser.close'), 30000, line),
   };
 };
 
@@ -681,11 +719,6 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       await send('browsingContext.activate', { context });
       await send('browsingContext.close', { context: tab });
     },
-    close: async () => {
-      const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 30000); }) : null;
-      send('browser.close').catch(() => {});
-      await exited;
-      try { process.kill(proc.pid); } catch {}
-    },
+    close: () => closeBrowser(proc, () => send('browser.close'), 30000, line),
   };
 };
