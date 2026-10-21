@@ -3,7 +3,10 @@
 // steps on the page.
 //
 // Chrome runs headless (muted or with no audio output, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
-// events are trusted, and the ROM goes to the file chooser the page opens. Headless Chrome draws to no display, so its
+// events are trusted, and the ROM goes to the file chooser the page opens. The page opens one only while the click's
+// user activation lasts (5 s), and where its thread came to the picker later (a busy host) it shows its own "Choose a
+// file" button instead, which the ROM step clicks with a user gesture; where neither came in 10 s (a click before the
+// launcher took clicks) it clicks Load ROM again, twice at most, and says so each time. Headless Chrome draws to no display, so its
 // presents never go through the desktop's compositor or wait for the display; with headed it runs in a window of its own,
 // moved off the desktop as Firefox's is below, with its throttling of hidden windows off, which presents as a player's
 // Chrome does. Firefox has no WebGPU adapter headless, so
@@ -279,7 +282,15 @@ const rdramHelpers = `(() => {
 // backend; Firefox names no adapter to a page, and has none with forceFallbackAdapter on its vulkan backend).
 export const firefoxUncappedRate = 360;
 
-const fallbackAdapterPreload = `() => {
+// Clicks the button the page shows for its file picker when the click that asked for one carries no user activation
+// (frontend/file_picker.cpp), and says whether there was one.
+const clickChooseButton = `(() => {
+  const b = [...document.querySelectorAll('button')].find((b) => /^Choose (a file|files)$/.test(b.textContent.trim()));
+  b?.click();
+  return !!b;
+})()`;
+
+const fallbackAdapterPreload =`() => {
   if (!self.GPU) return;
   const requestAdapter = GPU.prototype.requestAdapter;
   GPU.prototype.requestAdapter = function (options) { return requestAdapter.call(this, { ...options, forceFallbackAdapter: true }); };
@@ -534,9 +545,17 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
     rom: async (act) => {
       await send('Page.setInterceptFileChooserDialog', { enabled: true });
       fileChooser = null;
-      await act();
-      for (let i = 0; i < 100 && !fileChooser; i++) await sleep(100);
-      if (!fileChooser) throw new Error('no file chooser opened');
+      for (let tries = 1; !fileChooser; tries++) {
+        await act();
+        for (const until = Date.now() + 10000; !fileChooser && Date.now() < until;) {
+          await sleep(100);
+          const r = await send('Runtime.evaluate', { expression: clickChooseButton, userGesture: true, returnByValue: true });
+          if (r.result?.result?.value) line('page_driver: the page asked for the ROM with its own button (the click\'s activation had run out): clicked it');
+        }
+        if (fileChooser) break;
+        if (tries === 3) throw new Error('no file chooser opened');
+        line('page_driver: no file chooser 10 s after Load ROM: pressing it again');
+      }
       await send('DOM.setFileInputFiles', { files: [path.resolve(rom)], backendNodeId: fileChooser.backendNodeId });
       await send('Page.setInterceptFileChooserDialog', { enabled: false });
     },
@@ -706,8 +725,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       await act();
       for (let i = 0; i < 100; i++) {
         await sleep(100);
-        if (await evaluate(`window.__romGiven || ([...document.querySelectorAll('button')]
-          .find((b) => /^Choose (a file|files)$/.test(b.textContent.trim()))?.click(), false)`)) return;
+        if (await evaluate(`window.__romGiven || (${clickChooseButton}, false)`)) return;
       }
       throw new Error('the page never asked for a file');
     },
