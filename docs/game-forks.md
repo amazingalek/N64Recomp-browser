@@ -88,7 +88,9 @@ Firefox's waits.
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream
 has them, and `tools/publish_pages.sh` runs the fork's `tools/web_patch.sh` too; the three files that leaves out are out
-of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. rt64-web
+of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. Its
+changes to those three are the web's as the commit the script names (`MERGED_FROM`) has it, and what the web has
+changed in them since is merged in by `apply.cmake --since`, as Snap64's are. rt64-web
 03b9dcc and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a
 game's patch adds none, or the next retest's Conker build stops on it. N64ModernRuntime 6456ba6 keeps the VI thread's
 frame wait off the lines Conker's runtime patch moves its retrace count to, and CI's `cbfd-patches` job applies the
@@ -220,8 +222,11 @@ before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs i
 PR's checkout, against DKR-R-web's main. A conflict there is settled in DKR-R-web (the skip list, `patches/web/`), as
 v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web 8a2ac6b), or by keeping the web's lines off DKR-R's in the
 fork. Where both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
-frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
-reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). N64ModernRuntime's
+frame and workload queue), its `patches/web/<project>.patch` makes the web's change, merged from the commit
+`scripts/build_web.sh` names (`web_merged_from`), and what the web has changed in them since is merged in by
+`apply.cmake --since`. Before it named one, a change here to those files reached the page only once that patch made it
+too: rt64 0560318's decal bounds did, but the workload queue went without the offscreen passes, the pipeline warm-up
+and the capped interpolated targets, and the runtime read the ROM 1 KB at a time, until v0.82.0. N64ModernRuntime's
 `mesgqueue.cpp` takes DKR-R's alone, without the web's held messages (66539ab): DKR-R's own
 `runtime-deferred-events.patch` does the same, a blocked external message kept in a list of its own until a receive
 frees its queue, and is staged over that file at configure time. rt64-web 0a9fcb6 keeps the web's
