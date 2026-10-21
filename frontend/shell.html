@@ -10,7 +10,8 @@
      A lost WebGPU device (a driver update or reset, the browser's GPU process crashing, a laptop switching GPUs) says
      so on the status line, over the last frame, which stands still from then on while the game runs behind it: nothing
      in plume or RT64 asks for a new device, which would mean making again everything RT64 made on the old one, and a
-     reload is the one recovery. The page itself never destroys its device. -->
+     reload is the one recovery. The page itself never destroys its device.
+     Pointer lock asks for the mouse's raw counts (below). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -137,6 +138,22 @@
   };
   if (navigator.gpu && /Firefox\//.test(navigator.userAgent) && /Windows/.test(navigator.userAgent) && intelGraphics()) {
     document.getElementById('gpu').hidden = false;
+  }
+  // A game that looks with the mouse (SDL's relative mode, whose pointer lock Emscripten asks for with no options) gets
+  // the mouse's own counts, as SDL reads them on a desktop (raw input), not the cursor's motion. Without them a
+  // browser keeps the locked cursor in place by moving it back, and takes each move back out of the motion it reports
+  // (Firefox's coalesced pointer events show them): a move counted against the wrong position is a jump, which turned
+  // GoldenEye's view tens of degrees at once in fast turns (running, strafing and turning). A browser that has no raw
+  // counts (NotSupportedError) gets the lock without them.
+  const requestPointerLock = Element.prototype.requestPointerLock;
+  if (requestPointerLock) {
+    Element.prototype.requestPointerLock = function (options) {
+      const locked = requestPointerLock.call(this, { unadjustedMovement: true, ...options });
+      return locked?.catch((e) => {
+        if (e.name !== 'NotSupportedError') throw e;
+        return requestPointerLock.call(this, options);
+      }) ?? locked;
+    };
   }
   // The program (its script, in #program) starts only on a page that is cross-origin isolated, which it needs anyway.
   // A first visit to a host that can't send the headers isn't, and coi_serviceworker.js reloads it: started there, the
