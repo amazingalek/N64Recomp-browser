@@ -674,6 +674,12 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   `gfx.webrender.dcomp-texture-overlay-win` holds 60 only when its overlay engages (above).
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
+- Firefox there ignores plume's `powerPreference` 'high-performance' (nvidia-smi read 0% in every Firefox run), but set
+  to High performance in Windows' per-app graphics settings it runs on the RTX A3000: Banjo and GoldenEye both 60.0,
+  presents done 2-4 ms after them, the GPU 17% busy. Chrome on the Intel GPU holds 59.7-60.1. So the page's notice
+  (`frontend/shell.html`, #gpu) shows in Firefox on Windows only, where its WebGL renderer, which Firefox generalizes
+  but keeps the vendor in ("ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar"), names Intel and
+  not Arc, and names the three fixes. Making that WebGL context and losing it took 37 ms once in Firefox on Windows.
 
 On 2026-10-20 the same laptop played Banjo on screen in Firefox 158 with the default prefs and DWM at 0% in every run,
 three interleaved rounds of four test pages, each its main eafae14 with N64Recomp-browser at main 92e85dc (v0.77.0+),
