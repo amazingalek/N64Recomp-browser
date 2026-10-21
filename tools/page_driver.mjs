@@ -287,6 +287,32 @@ const spawnHeld = (affinity, command, args, options) => {
   try { return spawn(command, args, options); } finally { hold(all); }
 };
 
+// close(): asks the browser to close (ask, Browser.close or browser.close) and waits up to ms for it to exit, then stops it
+// with every process it started if it is still running. Chrome can close the socket without answering Browser.close,
+// so this waits for the process, not the reply; and over a debugging connection that dropped (1006) the ask never gets
+// there. A browser left running holds the GPU and its profile until something stops it: on Windows the tool's own exit
+// does (libuv starts a child in a job object that ends with its parent), elsewhere nothing, into whatever plays next.
+// taskkill /T takes the browser's own processes with it (it walks the tree from the browser, so before it is gone). The
+// wait is 30 s in both: Chrome stopped before it has ended loses what it wrote to its caches (docs/playing.md), and on a
+// host at 100% it took 10-12 s to end after Browser.close.
+const closeBrowser = async (proc, ask, ms, line) => {
+  const running = () => proc.exitCode === null && proc.signalCode === null;
+  if (running()) {
+    let timer;
+    const exited = new Promise((resolve) => { proc.once('exit', resolve); timer = setTimeout(resolve, ms); });
+    ask().catch(() => {});
+    await exited;
+    clearTimeout(timer);
+  }
+  if (!running()) return;
+  line(`page_driver: the browser had not exited ${ms / 1000} s after it was asked to close, so it was stopped`);
+  if (process.platform === 'win32') {
+    try { execFileSync('taskkill', ['/T', '/F', '/PID', String(proc.pid)], { stdio: 'ignore', windowsHide: true, timeout: 10000 }); } catch {}
+  } else {
+    try { proc.kill('SIGKILL'); } catch {}
+  }
+};
+
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
   headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, affinity = 0, fallbackAdapter = false,
   onLine = () => {}, log = console.log }) => {
@@ -528,12 +554,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
         await send('IO.close', { handle: tracingComplete.stream });
       },
     },
-    // Chrome can close the socket without answering Browser.close, so wait for the process, not the reply.
-    close: async () => {
-      const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 10000); }) : null;
-      send('Browser.close').catch(() => {});
-      await exited;
-    },
+    close: () => closeBrowser(proc, () => send('Browser.close'), 30000, line),
   };
 };
 
@@ -681,11 +702,6 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
       await send('browsingContext.activate', { context });
       await send('browsingContext.close', { context: tab });
     },
-    close: async () => {
-      const exited = proc.exitCode === null ? new Promise((resolve) => { proc.on('exit', resolve); setTimeout(resolve, 30000); }) : null;
-      send('browser.close').catch(() => {});
-      await exited;
-      try { process.kill(proc.pid); } catch {}
-    },
+    close: () => closeBrowser(proc, () => send('browser.close'), 30000, line),
   };
 };
