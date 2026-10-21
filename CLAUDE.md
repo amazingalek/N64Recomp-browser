@@ -131,11 +131,11 @@ backend or how RT64 builds pipelines or presents on the web.
 
 A change to what a page runs (a fork, `forks.txt`, `patches/`, `frontend/`) ends at its merge and tag, played on its
 game and one other. Every game takes it in the next retest, a run on a schedule that takes every change since the last
-one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files changed in
-Chrome and Firefox, and only a page that boots with no WebGPU errors and plays no worse than its row and its earlier
-runs moves its fork onto the tag, is published and gets its row updated. One that plays worse stays on Pages as it was
-and has work filed. Rush 2049 is retested in the same work; its pin moves by a PR on its repo, even to a tag that left
-its page's bytes alone.
+one at once (docs/publishing.md): it builds each game's page on the newest tag, plays the ones whose files changed (in
+Chrome against the page Pages serves, and once in Firefox for crashes and errors), and only a page that boots with no
+WebGPU errors and plays no worse than Pages moves its fork onto the tag, is published and gets its row updated. One
+that plays worse stays on Pages as it was and has work filed. Rush 2049 is retested in the same work; its pin moves by
+a PR on its repo, even to a tag that left its page's bytes alone.
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages that crashes, never boots, loses its WebGPU
 device or can't be played moves the pins of the games it fixes (Rush 2049's by a PR), builds, plays in Chrome and
@@ -155,9 +155,9 @@ graphics (Intel UHD) or a stand-in for one, and when it was last played (no desk
 all). Whoever plays a page that changed (a retest, a critical fix, a change to a game's repo or shader list) does all
 of this in the same work, as docs/playing.md says:
 
-- Plays it in Chrome and Firefox, always both (Firefox is where pages fall behind), its build before it is published
-  and from Pages after: launcher, Load ROM, the shader wait, menus (look at them, a `shot` step), a level or race,
-  sound, the frame rate, WebGPU errors in the console.
+- Plays it in Chrome and Firefox, always both (Chrome for the numbers, Firefox for what only it turns up: a race in
+  the game's loads, an OOM), its build before it is published and from Pages after: launcher, Load ROM, the shader
+  wait, menus (look at them, a `shot` step), a level or race, sound, the frame rate, WebGPU errors in the console.
 - Records every run, failed ones too, in `plays.jsonl` (`play_page.mjs --record`), committed with the row and nowhere
   else.
 - Writes the cell as a number, from a laptop run or else the stand-in (`*`), never "smooth" and never against an
@@ -165,17 +165,23 @@ of this in the same work, as docs/playing.md says:
 
 ## Playing a page
 
+- Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes, and so is every game's plan. A longer
+  one (a plan of more, a run of 10 minutes or more) is for a card that needs it and says why: a soak, a leak or OOM
+  hunt, a timing bug that takes many minutes to show (docs/playing.md, Which browser, how long).
+- Chrome measures, in interleaved pairs. Firefox with its default prefs is played for crashes, traps, WebGPU errors and
+  exceptions, not presents: on Windows' integrated graphics its compositor caps every page at 30-45. Firefox's
+  performance is measured only for a change that could move it, with `gfx.webrender.compositor` false.
 - On a desktop GPU a page is measured uncapped (`--uncapped`): capped, every page and build reads about 60 there.
 - One page plays at a time on a machine, in any browser (docs/findings.md, Two pages at once). Where agents share a
   machine, each play (one `play_page.mjs` run, one `record_shaders.mjs` recording) takes its turn in that machine's GPU
   queue, started in the background and waited on, one play a turn so others' turns come between a series. Agents never
   message each other about turns: the queue says it.
 - A desktop GPU's clock wanders, and a contended host reads exactly like a slow page: write down what else was running
-  beside a number. The page Pages serves, played in the same minutes as a new build, several runs of each interleaved
-  (`--note` them), tells the host from the build; one pair before and after doesn't (docs/findings.md, Behind
-  CLAUDE.md's rules).
-- A plan reaches a level as a player does and plays it a minute or more, its holds on the game's own clock; a plan that
-  ends on black is the plan's fault until a direct warp there draws black too (docs/playing.md, Plans).
+  beside a number. The page Pages serves, played in the same minutes as a new build, interleaved (`--note` them, a
+  second pair where the first isn't clearly within the noise), tells the host from the build; one pair before and after
+  doesn't (docs/findings.md, Behind CLAUDE.md's rules).
+- A plan reaches a level as a player does and plays a minute or more in its levels, its holds on the game's own clock;
+  a plan that ends on black is the plan's fault until a direct warp there draws black too (docs/playing.md, Plans).
 
 ## Ruled out, so don't retry
 

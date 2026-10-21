@@ -178,10 +178,17 @@ only a long enough play. A 17-minute soak on an RTX 2070 played to the end (brea
 size and the stack that made it, heap_probe.js's `heapoom`, haven't been caught yet: they name the loop. Nor does
 slowing RT64 bring it on: Banjo built with RT64's thread waiting 0-30 ms after each sp_complete, as Mario Kart 64's
 checked build did, played 8 Firefox soaks on the same RTX 5080 (about 95 minutes, one of them 1,046 s) with no abort and
-the break at 843.9 MB throughout. Whether v0.77.0's load wait (Mario Kart 64's fix above) ends it is still open, as an
-RTX 2070 doesn't bring it on: 16 Firefox soaks of 978-1,116 s there (2026-10-20 17:53-22:37 UTC, a shared host), the page
-from Pages and a v0.77.0 build of the same main in turn, 8 each, played to the end with the break at 838.9 and 839.0 MB
-throughout and no abort from either. The test is the same pairs on a GPU where the page from Pages aborts.
+the break at 843.9 MB throughout. v0.77.0's load wait (Mario Kart 64's fix above) ends it. An RTX 2070 doesn't bring it
+on: 16 Firefox soaks of 978-1,116 s there (2026-10-20 17:53-22:37 UTC, a shared host), the page from Pages (main
+eafae14, v0.71.0) and a v0.77.0 build of the same main in turn, 8 each, played to the end with the break at 838.9 and
+839.0 MB throughout. On the RTX 5080 the same pairs (2026-10-21 06:41-08:42 UTC, 11-23% of the GPU busy, the host 12-50%
+with others' shared turns beside them) split: the page from Pages aborted in 3 of its 4 soaks, at 96, 516 and 793 s,
+and the v0.77.0 build played all 4 to the end (974-1,203 s, about 69 minutes), its break at 844.0 MB throughout. Each
+abort went as the first soak's: presents ~210 → 2-85 → 0 and the sound starved within a second, then the break
+843.9 → 891.9 or 987.9 → 1179.9 MB over 2 s, where it held ~18 s to the abort. heap_probe.js logged no `heapoom` in
+any of them, so the request that ran it out still isn't named. The soaks are 17-20 minutes, not a usual play's 2-5,
+since the abort comes anywhere from 70 to 793 s in and most come past 5 minutes. Banjo moved to v0.77.0 on that, as a
+critical fix.
 
 ## A page that stops answering
 
@@ -709,6 +716,12 @@ DWM at 0. Off the desktop DWM is at 0 for both browsers, and Firefox draws these
   `gfx.webrender.dcomp-texture-overlay-win` holds 60 only when its overlay engages (above).
 - None of it is a page setting: a page can't turn the native compositor off, so it is Firefox's to fix. One laptop,
   one GPU and a 200% panel: another scale or GPU may differ.
+- Firefox there ignores plume's `powerPreference` 'high-performance' (nvidia-smi read 0% in every Firefox run), but set
+  to High performance in Windows' per-app graphics settings it runs on the RTX A3000: Banjo and GoldenEye both 60.0,
+  presents done 2-4 ms after them, the GPU 17% busy. Chrome on the Intel GPU holds 59.7-60.1. So the page's notice
+  (`frontend/shell.html`, #gpu) shows in Firefox on Windows only, where its WebGL renderer, which Firefox generalizes
+  but keeps the vendor in ("ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar"), names Intel and
+  not Arc, and names the three fixes. Making that WebGL context and losing it took 37 ms once in Firefox on Windows.
 
 On 2026-10-20 the same laptop played Banjo on screen in Firefox 158 with the default prefs and DWM at 0% in every run,
 three interleaved rounds of four test pages, each its main eafae14 with N64Recomp-browser at main 92e85dc (v0.77.0+),
