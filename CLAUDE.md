@@ -209,6 +209,9 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
 - Building Firefox's shader misses where the game sends no frames or with a later section's wait, not at once: a
   recomp's loads are too short to give a pause after most misses, and they come after the list's last section.
 - A present's wait() trips to the page's thread, or Firefox's late timed waits, as what paces a page to 30 on a
-  laptop's screen: without the trips Banjo paced the same; how much of the GPU Windows' compositor takes decides it.
+  laptop's screen: without the trips Banjo paced the same; what each present costs the GPU in Firefox's compositing
+  (Windows' included) decides it.
+- The present thread's wait() before its slot sleep, a try's first 0.5 s left out of pace()'s count, or 3 presents in
+  flight, for Banjo held at 30 in Firefox on a laptop's screen: each paced as often, the GPU 94-100% busy at 60.
 - The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.

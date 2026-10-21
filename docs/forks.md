@@ -273,8 +273,11 @@ ab544ca                it, as a console's RSP has long before a load lands; a lo
                        on a laptop's integrated GPU RT64's thread, a frame or more behind, read that list after the
                        load, took texture words for commands (color images 1792-3072 wide) and the page trapped in
                        free(). Every load waiting cost 3.4% of the sound frames there (docs/findings.md, Memory)
-rt64 447ad0f,          RT64_RENDER_INDEX_BY_INSTANCE (rt64_raster_params.h, a WGSL build): a raster draw's index is its
-plume c5c9195          first instance, which RasterVS reads as instance_index and hands RasterPS and the dither noise
+plume 77e521e,         timedWaitsEndLate() (plume_web_waits.h) answers false in a build without threads, so plume's
+rt64 be95c2c           examples and plume_webgpu_checks build without -pthread again: sleepUntil() called it there
+                       and the build stopped at an undeclared identifier. Pages build with -pthread, unchanged
+rt64 cf8beb9,          RT64_RENDER_INDEX_BY_INSTANCE (rt64_raster_params.h, a WGSL build): a raster draw's index is its
+plume 84b785f          first instance, which RasterVS reads as instance_index and hands RasterPS and the dither noise
                        as a flat varying, and renderIndex stays 0; a render pass binds a push constants block it has
                        bound already once, with no slot of the ring. renderIndex changed every draw, so each draw cost
                        the page's thread a setBindGroup and 256 bytes of writeBuffer (Banjo-Tooie throttled in Chrome:
