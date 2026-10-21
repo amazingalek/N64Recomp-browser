@@ -89,7 +89,8 @@
 //     "play": [steps]                  what is measured: e.g. a wait while the attract demo runs, keys to reach a level
 //   }
 //
-// a step one of page_driver.mjs's. A shader plan's own section plays with --section <name> in place of "play" (its
+// a step one of page_driver.mjs's, and a plan whose evalFile steps name files that aren't there is refused at once.
+// A shader plan's own section plays with --section <name> in place of "play" (its
 // "keep" steps, which only say what record_shaders.mjs records, do nothing here), and
 // --play <s> plays nothing but lets the game run by itself that long (an attract demo; the stand-in's runs). --shot
 // takes a screenshot of the page when the play steps end.
@@ -153,7 +154,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import { firefoxUncappedRate, open, option, serve, sleep } from './page_driver.mjs';
+import { firefoxUncappedRate, missingPlanFiles, open, option, serve, sleep } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
 const headed = args.includes('--headed');
@@ -240,6 +241,10 @@ const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const play = playFor ? [['wait', Number(playFor) * 1000]] : section ? plan.sections?.find((s) => s.name === section)?.steps : plan.play;
 if (!play) {
   console.error(section ? `the plan has no section ${section}` : 'the plan has no "play" steps (or give --section)');
+  process.exit(1);
+}
+if (missingPlanFiles(plan, planFile).length) {
+  console.error(`the plan's evalFile steps name files that aren't there: ${missingPlanFiles(plan, planFile).join(', ')}`);
   process.exit(1);
 }
 const freshProfile = (profileOption === null) || !fs.existsSync(profileOption);
