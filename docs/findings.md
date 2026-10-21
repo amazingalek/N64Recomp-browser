@@ -306,7 +306,11 @@ of the 5 s. What the game lost was the rest of its time, in a process Windows ra
 probe, lowered on the same idle host, waited longer and lost nothing: its workload thread waited 1.0-2.8 s of each
 hidden 5 s against 0.4-0.5 s, its game's thread up to 0.74 s against 0.02-0.03 s, and the game still fenced all its 150
 frames. On the busy host the page's thread barely ran while hidden, and single trips took up to 1.3-2.7 s. The visible
-page's trips cost something too, and are work of their own.
+page's trips cost something too, and are work of their own. rt64 5249040 drops the two that do nothing, the
+query pool's, and no page measured the difference: on an idle host with a desktop GPU, uncapped at 3840x2000, Mario
+Kart 64 presented 356 a second from Pages (v0.80.0, main's pins but this) and 353 on the build, Star Fox 64 314 and 297
+from Pages against 298 and 307, and Mario Kart 64 with Chrome's CPU throttled 4 times 135 from Pages against 153 and
+136 (the build's two runs as far apart as the pair). Each fence wait, which stays, is a trip too.
 
 So a play that hides a page in Chrome sends its sound to no device (`--chrome-flag --disable-audio-output`). Muted,
 it measures Chrome idling a silent tab. A player's page plays its game's sound, so Chrome keeps it at normal priority
