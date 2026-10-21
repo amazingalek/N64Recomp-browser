@@ -284,4 +284,11 @@ plume 84b785f          first instance, which RasterVS reads as instance_index an
                        ~1,710 a present). setBindGroup a draw 1.70 to 0.93 on Banjo-Tooie and 1.65 to 0.65 on
                        Banjo-Kazooie, which throttled 6 times in Chrome presents 52 a second, from 41-45
                        (docs/findings.md, A page's thread in Chrome, throttled)
+plume 08f9327,         a hidden page (a tab behind another, minimized: document.hidden) presents nothing, and RT64's
+rt64 52ec88f           pacing counts no presents while it is hidden or for a second after: a swap chain says so
+                       (isHidden()), and plume holds no present to its cap then. In a hidden tab Chrome calls
+                       onSubmittedWorkDone back late, at times by seconds, and the present thread's wait() held the
+                       game: Mario Kart 64's and Star Fox 64's sound broke up while hidden, and their dropped presents
+                       read as the GPU falling behind (Mario Kart 64 on a 240 Hz display: 114 presents a second, then
+                       60 for 80 s after the tab came back). docs/findings.md, A page in a hidden tab
 ```
