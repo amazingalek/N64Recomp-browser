@@ -14,7 +14,7 @@ A run on a schedule that takes every change since the last one at once:
   that can move speed or timing also gets the A/B, `tools/ab_pages.mjs`, on two or three games that stand for the rest
   (Banjo-Kazooie and Conker's Bad Fur Day, and the game a change in it was about): a shared change moves every page the
   same way, so an A/B of each would measure the same thing again and again. If one of those plays worse, every other
-  changed page gets the A/B too before any moves. Each play is by the game's plan (2-5 minutes), uncapped at the
+  changed page gets the A/B too before any moves. Each play is by the game's regular plan (2-3 minutes), uncapped at the
   stand-in's size, and goes in `plays.jsonl` under one `--set` with its `--role` and a note saying so; ab_pages.mjs's
   header says what it plays and how it reads a verdict: a build is worse only if its second Chrome run is worse too, a
   drop within the noise is not, and a build whose Firefox play isn't clean is worse only if Pages' plays clean, its
