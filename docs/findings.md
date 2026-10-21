@@ -269,9 +269,9 @@ device and leaves Chrome hearing it, the renderer stayed at 8 in all 8 plays and
 short in a hidden 5 s (102,488 once) against 27,409-59,386 before, what that output costs a visible page too, and
 Pages' v0.71.0 kept presenting 179-212 a second hidden. Nor did any come back slow: in the 30 s after, each presented
 56-109% of its rate in the 30 s before (97-239 a second), v0.80.0's as Pages', not the 25-31 a second above. An idle
-host lowers a muted page too: a probe build of v0.80.0, below, made its workloads at the visible rate for the first
-10 s hidden and then at a third of it, 77,710 and 107,621 frames short in two of its hidden 5 s, and was back at 357
-presents a second within 5 s of coming back.
+host lowers a muted page too: on Mario Kart 64's page a probe build of v0.80.0, below, made its workloads at the
+visible rate for the first 10 s hidden and then at a third of it, 77,710 and 107,621 frames short in two of its hidden
+5 s, and was back at 357 presents a second within 5 s of coming back; on Star Fox 64's it lost 7,144 once.
 
 Skipping or batching the device thread's round trips wouldn't help either. The probe build times each call the page's
 thread runs for the device thread, from the call to its return. On Mario Kart 64's page on an idle host, visible, at
@@ -281,9 +281,11 @@ queryResults and getResults (WebGPU's query pool does nothing in the last two, b
 RDP thread 150 (0.13-0.16 s) and the texture uploader about 230 (0.03 s). Hidden and lowered, each trip took longer
 (a fence wait 1.4-2.0 ms against 0.4-0.6 ms), but the game made fewer of them: the workload thread 560-660 a 5 s,
 waiting about as long in all (0.9-1.3 s), and the game's thread fenced 82-122 frames against 150, waiting 0.16-0.29 s
-of the 5 s. What the game lost was the rest of its time, in a process Windows ran at idle priority. On the busy host
-the page's thread barely ran while hidden, and single trips took up to 1.3-2.7 s. The visible page's trips cost
-something too, and are work of their own.
+of the 5 s. What the game lost was the rest of its time, in a process Windows ran at idle priority. Star Fox 64's
+probe, lowered on the same idle host, waited longer and lost nothing: its workload thread waited 1.0-2.8 s of each
+hidden 5 s against 0.4-0.5 s, its game's thread up to 0.74 s against 0.02-0.03 s, and the game still fenced all its 150
+frames. On the busy host the page's thread barely ran while hidden, and single trips took up to 1.3-2.7 s. The visible
+page's trips cost something too, and are work of their own.
 
 So a play that hides a page in Chrome sends its sound to no device (`--chrome-flag --disable-audio-output`). Muted,
 it measures Chrome idling a silent tab. A player's page plays its game's sound, so Chrome keeps it at normal priority
