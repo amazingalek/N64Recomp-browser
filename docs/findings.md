@@ -259,9 +259,44 @@ same busy host, Mario Kart 64's test build came up 2,541 short over the 30 s and
 the game's WebGPU calls, and the game waits for it each frame, so a hidden page on a busy host can still stall: another
 Mario Kart 64 run lost 149,016 in one 5 s while hidden, and another Star Fox 64 run came back presenting 25-31 a
 second for the 30 s it was played after, its presents done 60-650 ms late with the GPU 9-21% busy and 7.5 of its 8 GB
-in use by other pages (Pages' build under the same load came back at 60). On an idle host neither build loses
-anything: Pages' kept 60 presents a second while hidden, and with a preload that times animation frames at 240 a
-second both came back at 221-225. Firefox 158 plays through it either way, its sound never short.
+in use by other pages (Pages' build under the same load came back at 60). On an idle host Pages' kept 60 presents a
+second while hidden, and with a preload that times animation frames at 240 a second both came back at 221-225. Firefox
+158 plays through it either way, its sound never short.
+
+What stalls it is Chrome's priority, not the page's work. On Windows, within 2 s of a tab going hidden, Chrome 155
+lowers its renderer process from normal priority (8) to idle (4), unless the tab plays sound;
+`--disable-renderer-backgrounding` doesn't keep it at 8. `play_page.mjs` started Chrome with `--mute-audio`, which
+zeroes a tab's sound before Chrome listens for it, so every hidden tab it played counted as silent. On a busy host stood
+in by 10 CPU spinner threads and a headless page holding 6,000 MB of an RTX 2070's 8 GB and copying 64 MB a frame
+(headless Chrome 155, 3840x2000, uncapped, a whole GPU turn), every muted play of Mario Kart 64's and Star Fox 64's
+pages, Pages' v0.71.0 and v0.80.0's builds interleaved (12, three with `--disable-renderer-backgrounding`), stopped its
+game while hidden: 214,011 sound frames short or more in a 5 s, about all of them, and 0-2 presents a second, against
+4,421-78,380 short in the 5 s before. Played with `--chrome-flag --disable-audio-output`, which sends the sound to no
+device and leaves Chrome hearing it, the renderer stayed at 8 in all 8 plays and the game played on: 30,425-58,200
+short in a hidden 5 s (102,488 once) against 27,409-59,386 before, what that output costs a visible page too, and
+Pages' v0.71.0 kept presenting 179-212 a second hidden. Nor did any come back slow: in the 30 s after, each presented
+56-109% of its rate in the 30 s before (97-239 a second), v0.80.0's as Pages', not the 25-31 a second above. An idle
+host lowers a muted page too: on Mario Kart 64's page a probe build of v0.80.0, below, made its workloads at the
+visible rate for the first 10 s hidden and then at a third of it, 77,710 and 107,621 frames short in two of its hidden
+5 s, and was back at 357 presents a second within 5 s of coming back; on Star Fox 64's it lost 7,144 once.
+
+Skipping or batching the device thread's round trips wouldn't help either. The probe build times each call the page's
+thread runs for the device thread, from the call to its return. On Mario Kart 64's page on an idle host, visible, at
+about 350 presents a second, in each 5 s the workload thread made 1,700-1,800 round trips each of waitForCommandFence,
+queryResults and getResults (WebGPU's query pool does nothing in the last two, but each is still a trip), waiting
+0.7-1.0 s, 0.09-0.15 s and 0.04-0.07 s in them; the present thread made about 1,750 fence waits (0.4-0.6 s), the game's
+RDP thread 150 (0.13-0.16 s) and the texture uploader about 230 (0.03 s). Hidden and lowered, each trip took longer
+(a fence wait 1.4-2.0 ms against 0.4-0.6 ms), but the game made fewer of them: the workload thread 560-660 a 5 s,
+waiting about as long in all (0.9-1.3 s), and the game's thread fenced 82-122 frames against 150, waiting 0.16-0.29 s
+of the 5 s. What the game lost was the rest of its time, in a process Windows ran at idle priority. Star Fox 64's
+probe, lowered on the same idle host, waited longer and lost nothing: its workload thread waited 1.0-2.8 s of each
+hidden 5 s against 0.4-0.5 s, its game's thread up to 0.74 s against 0.02-0.03 s, and the game still fenced all its 150
+frames. On the busy host the page's thread barely ran while hidden, and single trips took up to 1.3-2.7 s. The visible
+page's trips cost something too, and are work of their own.
+
+So a play that hides a page in Chrome sends its sound to no device (`--chrome-flag --disable-audio-output`). Muted,
+it measures Chrome idling a silent tab. A player's page plays its game's sound, so Chrome keeps it at normal priority
+and its game plays on.
 
 ## A host that holds Chrome's presents
 
