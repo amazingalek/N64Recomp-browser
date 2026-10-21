@@ -24,12 +24,13 @@ options; `docs/findings.md` has what was measured this way.
 ## Plans
 
 - A plan reaches a level as a player does (the menus where quick, the survey's warp or stage start where not; its
-  header says which) and plays it a minute or more. A walk sways out and back by as much each way about a spot it was
-  played to and looked at: a blind walk in one direction, or back the way it came, carries the character off a ledge,
-  into water or out an exit. Its waits and holds in the level are on the game's own clock (a `clock` step, page_driver's
-  header): in ms of the browser's time, uneven frames walked Firefox's runs of one plan to other places than Chrome's
-  (docs/findings.md, Behind CLAUDE.md's rules). A plan that ends on black is the plan's fault until a direct warp there
-  draws black too (Banjo-Tooie's: docs/findings.md, Behind CLAUDE.md's rules).
+  header says which) and plays a minute or more in its levels, the whole run 2-5 minutes (Which browser, how long). A
+  walk sways out and back by as much each way about a spot it was played to and looked at: a blind walk in one
+  direction, or back the way it came, carries the character off a ledge, into water or out an exit. Its waits and holds
+  in the level are on the game's own clock (a `clock` step, page_driver's header): in ms of the browser's time,
+  uneven frames walked Firefox's runs of one plan to other places than Chrome's (docs/findings.md, Behind CLAUDE.md's
+  rules). A plan that ends on black is the plan's fault until a direct warp there draws black too (Banjo-Tooie's:
+  docs/findings.md, Behind CLAUDE.md's rules).
 - The step the rest of a plan stands on (a survey's `play()`, which loads a file) is a `need` (page_driver's header): a
   run that never gets there fails, rather than its warps and walks pressing keys at a menu for minutes, a path no player
   takes. A plan that goes on to more levels in one load makes each level's start one too, checking in RDRAM that the
@@ -58,8 +59,25 @@ options; `docs/findings.md` has what was measured this way.
 - Keep `--profile` between runs for a warm one, on its fixed port: IndexedDB belongs to the origin, port included. For
   a cold visit in Chrome, start a new `--user-data-dir` once on the launcher first: a profile's first run stores nothing
   that hits later, and one whose first run built the shaders never hits. Close Chrome with `Browser.close` and wait for
-  the process to end, or it loses what it wrote to its caches. A debugging port another browser on the machine holds is
+  the process to end, or it loses what it wrote to its caches (page_driver.mjs's close() waits 30 s, then stops a browser
+  still running, with its processes). A debugging port another browser on the machine holds is
   refused (`page_driver.mjs`).
+
+## Which browser, how long
+
+- Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes from the launcher to the plan's last
+  step, in either browser, and so is every game's plan: more levels fit by playing each for less. A longer play (a
+  plan of more, a run of 10 minutes or more) is for a card that needs one and says why: a soak, a leak or OOM hunt, a
+  timing bug that takes many minutes to show.
+- Chrome gives the performance numbers, as interleaved pairs of the page Pages serves and the build.
+- Firefox with its default prefs is played once a build for what Chrome doesn't turn up (a race in the game's loads, an
+  OOM), read for a crash, a trap, WebGPU errors and exceptions, not presents: on Windows on integrated graphics its
+  native compositor holds every page to 30-45 presents a second whatever the page does (docs/findings.md, A laptop,
+  measured), so its numbers re-measure that cap. Long Firefox plays are the soak's, when hunting a fault that takes
+  time.
+- Firefox with `--firefox-pref gfx.webrender.compositor=false` measures only a change that could move Firefox's own
+  WebGPU performance: without the compositor's cap its numbers show the page's. Default-prefs Firefox pairs are for a
+  change about Firefox itself.
 
 ## Uncapped, and the browsers' clocks
 
