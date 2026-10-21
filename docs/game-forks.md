@@ -165,7 +165,7 @@ zones, the training, Venom's two routes and Andross, game over, Versus and the e
 `patches/shader_survey.c` hands a level, a phase or a game state from the script to the game's own change of state
 (`gNextGameState`), with the player's shields kept full; a straight switch to the ending crashed until the survey set
 it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corneria (Start skips the Lylat map's
-prologue, A picks the planet) and a minute of it, then Meteo, Katina and Titania 45 s each, started as the list's
+prologue, A picks the planet) and 45 s of it, then Meteo, Katina and Titania 30 s each, started as the list's
 plan starts them. Its README, BUILDING.md and the headers of those files have the rest.
 
 `amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
