@@ -1,14 +1,18 @@
 // How much of its wasm heap a page has taken, all through a play, and what ran it out: a preload for play_page.mjs
 // (--preload tools/heap_probe.js) that logs
 //
-//   heap sbrk pointer at <hex>          once, where the page's sbrk keeps the heap's break
-//   heap <s> sbrk <MB>                  each second, the break: what malloc has taken from the heap so far
+//   heap sbrk pointer at <hex> [or <hex>...]  once, where the page's sbrk keeps the heap's break (or may)
+//   heap <s> sbrk <MB> len <MB>         each second, the break: what malloc has taken from the heap so far, and the
+//                                       heap's length (HEAPU8.length)
 //   heapoom <thread> asked <bytes>: <stack>
 //                                       a thread's sbrk past the heap's end, the moment before abort("OOM")
+//   heapgrow <thread> asked <bytes>: <stack>
+//                                       the same on a page linked to grow its heap: the heap grows, or the malloc fails
 //
 // A page's heap is INITIAL_MEMORY (frontend/CMakeLists.txt) and never grows, so a malloc that doesn't fit calls
 // Emscripten's resize import, which aborts with "Aborted(OOM)" and a trap in Emscripten's abort() that names nothing
-// (tools/wasm_offset.mjs). The probe wraps that import in every thread, the page's and each pthread worker's (each
+// (tools/wasm_offset.mjs). A game's own link options can let it grow instead (Conker's page: -sALLOW_MEMORY_GROWTH,
+// whose resize import grows the Memory), and then the length is what climbs. The probe wraps that import in every thread, the page's and each pthread worker's (each
 // started from a blob that runs the probe and then the page's script), so the request's size and the stack that made
 // it come out first, on the page's console. The stack names wasm functions by index (wasm-function[<n>]) and offset,
 // which wasm_offset.mjs or the same build linked with --profiling-funcs names. The break is read from the shared heap:
@@ -27,10 +31,12 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
     const wrap = (imports) => {
       for (const ns of Object.values(imports || {})) for (const name of Object.keys(ns || {})) {
         const f = ns[name];
-        if (typeof f === 'function' && /abortOnCannotGrowMemory\(/.test(Function.prototype.toString.call(f))) {
+        const source = typeof f === 'function' ? Function.prototype.toString.call(f) : '';
+        if (/abortOnCannotGrowMemory\(|growMemory\(/.test(source)) {
           self.__heapProbeImport = name;
+          const kind = /growMemory\(/.test(source) ? 'heapgrow' : 'heapoom';
           ns[name] = (size) => {
-            channel.postMessage({ thread: self.name || 'main', size: size >>> 0, stack: new Error().stack });
+            channel.postMessage({ kind, thread: self.name || 'main', size: size >>> 0, stack: new Error().stack });
             return f(size);
           };
         }
@@ -43,7 +49,7 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
   };
   threadProbe();
   new BroadcastChannel('heapprobe').onmessage = ({ data }) =>
-    console.log(`heapoom ${data.thread} asked ${data.size}: ${String(data.stack).replace(/\s+/g, ' ').slice(0, 3000)}`);
+    console.log(`${data.kind} ${data.thread} asked ${data.size}: ${String(data.stack).replace(/\s+/g, ' ').slice(0, 3000)}`);
   const PageWorker = self.Worker;
   self.Worker = function (url, options) {
     if (options && options.name === 'em-pthread') {
@@ -53,10 +59,11 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
     return new PageWorker(url, options);
   };
   self.Worker.prototype = PageWorker.prototype;
-  // sbrk's pointer: the one function under 200 bytes that calls the resize import and holds one address (sizes and masks
+  // sbrk's pointer: a function under 200 bytes that calls the resize import and holds one address (sizes and masks
   // match too: an address is 4-aligned and neither a power of two nor one less). The call is found by its bytes, which
-  // other code can hold too: where more than one function passes (a build linked with --profiling-funcs), the one its
-  // name section calls sbrk.
+  // other code can hold too: where the wasm has a name section (a build linked with --profiling-funcs), the one it
+  // calls sbrk; without one every function that passes (GoldenEye's and Majora's Mask's pages have three), and the
+  // break is the largest of their values that is 8-aligned, past 1 MB and inside the heap: the others hold 0 there.
   const findSbrk = (bytes) => {
     const b = new Uint8Array(bytes);
     let p = 8;
@@ -101,16 +108,16 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
       }
       p = end;
     }
-    const one = found.filter((c) => c.length === 1 && !(c[0] & 3) && (c[0] & (c[0] - 1)) && ((c[0] + 1) & c[0]) &&
-      (named < 0 || c.index === named));
-    return one.length === 1 ? one[0][0] : 0;
+    const address = (v) => !(v & 3) && (v & (v - 1)) && ((v + 1) & v);
+    return found.filter((c) => named < 0 || c.index === named).map((c) => c.filter(address))
+      .filter((c) => c.length === 1).map((c) => c[0]);
   };
-  let sbrk = 0;
+  let sbrks = [];
   const pageStreaming = WebAssembly.instantiateStreaming;
   WebAssembly.instantiateStreaming = (response, imports) => pageStreaming(Promise.resolve(response).then((r) => {
     r.clone().arrayBuffer().then((bytes) => {
-      sbrk = findSbrk(bytes);
-      console.log(sbrk ? `heap sbrk pointer at 0x${sbrk.toString(16)}` : 'heap no sbrk pointer found');
+      sbrks = findSbrk(bytes);
+      console.log(sbrks.length ? `heap sbrk pointer at ${sbrks.map((a) => `0x${a.toString(16)}`).join(' or ')}` : 'heap no sbrk pointer found');
     }).catch((e) => console.log(`heap no wasm bytes: ${e}`));
     return r;
   }), imports);
@@ -124,6 +131,9 @@ if (self.crossOriginIsolated && !self.__heapProbe) {
   };
   WebAssembly.Memory.prototype = PageMemory.prototype;
   setInterval(() => {
-    if (memory && sbrk) console.log(`heap ${secs()} sbrk ${(new Uint32Array(memory.buffer)[sbrk >>> 2] / 1048576).toFixed(1)}`);
+    if (!memory || !sbrks.length) return;
+    const heap = new Uint32Array(memory.buffer);
+    const breaks = sbrks.map((a) => heap[a >>> 2]).filter((v) => !(v & 7) && v > 1 << 20 && v <= memory.buffer.byteLength);
+    if (breaks.length) console.log(`heap ${secs()} sbrk ${(Math.max(...breaks) / 1048576).toFixed(1)} len ${(memory.buffer.byteLength / 1048576).toFixed(1)}`);
   }, 1000);
 }
