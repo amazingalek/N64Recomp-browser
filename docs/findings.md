@@ -224,6 +224,15 @@ threads from outside instead: a run that stops answering ends with each process'
 threads by name, and `main threads: the tab's 1.05 cores, running; the browser's 0.21, waiting (UserRequest)` (the
 blank page held, in Firefox; Chrome's read the same) in its failure.
 
+A page also stops answering in Firefox 158 at a level load, rarely and unexplained: GoldenEye's page twice in a row on
+an RTX 2070 on a busy host (a build of v0.71.0 with the #gpu notice changed and Pages' v0.71.0 page, both with a
+preload, `--play 25`, at 3840x2000), 1-2 s after a section of prebuilt shaders built, its tab's main thread running at
+0.7 cores, and Mario Kart 64's v0.80.0-based test build once on a host at 26% CPU, 2 s after its section built.
+GoldenEye's two had reached their first shader wait at 91-165 s, where its page reaches it in 21-34 s. The next plays didn't: Mario Kart's two,
+and GoldenEye's page from Pages (v0.80.0) in eight with the fork's whole plan through Dam's load and a minute on foot,
+three on the busy RTX 2070 host and five on an idle host with an RTX 5080, no WebGPU errors, exceptions or misses. A
+run that stops there again is replayed with `--gecko-profile`, which records which of Firefox's threads holds the page.
+
 ## Two pages at once
 
 With two Firefox windows each playing a page, one window's animation frames came in bursts (a quarter of the intervals
