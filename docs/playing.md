@@ -110,6 +110,17 @@ A series stands on its plan and the files its `evalFile` steps name, so they are
   WebGPU performance: without the compositor's cap its numbers show the page's. Default-prefs Firefox pairs are for a
   change about Firefox itself.
 
+## Soaks
+
+A soak plays a page long, for what shows only after many minutes: a leak, a slow crash, Banjo-Kazooie's
+`Aborted(OOM)` 550 s into a Firefox play. It plays in Firefox, where those turn up; Chrome's soaks of ten pages found
+nothing Firefox's didn't (docs/findings.md, Memory). Each play is the game's plan with its `shot` steps left out and 20
+`wait`s of 60 s added, its last scene held 20 minutes (on the game's clock where the plan has one), played from Pages
+uncapped at 3840x2000 with `--interval 1 --preload tools/heap_probe.js`, one play a whole turn with `--max 35`. Read
+each run's heap break and length and its GPU process's private bytes by the minute: a leak climbs in its last 10
+minutes as in its first, the heap's high-water mark steps up and stops. A crash, an abort or steady growth is its own
+work, naming the game, the browser, the time and the curve.
+
 ## Uncapped, and the browsers' clocks
 
 - On a desktop GPU a page is played uncapped (`--uncapped`): capped, every page and build reads about 60 there.
@@ -154,8 +165,8 @@ A series stands on its plan and the files its `evalFile` steps name, so they are
   second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
   the page starts (docs/findings.md, A host that holds Chrome's presents).
 - How much of its heap a page has taken, and what ran it out: `--preload tools/heap_probe.js` logs the heap's break
-  each second (`heap <s> sbrk <MB>`) and, before an `Aborted(OOM)`, the request's size and the stack that made it
-  (`heapoom`) (docs/findings.md, Memory).
+  and length each second (`heap <s> sbrk <MB> len <MB>`) and, before an `Aborted(OOM)`, the request's size and the
+  stack that made it (`heapoom`) (docs/findings.md, Memory).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
