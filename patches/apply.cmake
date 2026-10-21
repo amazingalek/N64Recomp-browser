@@ -15,6 +15,10 @@
 #                                                                    leaving out a file (a path in the project) whose
 #                                                                    change the recomp's own patch already makes its own
 #                                                                    way, where the two would conflict
+#   cmake -P lib/N64Recomp-browser/patches/apply.cmake rt64 lib/rt64 --since <commit> <file>...
+#                                                                    files left out whose web change the recomp made its
+#                                                                    own way from this repo's <commit>: the web's change
+#                                                                    to them since, merged in (below)
 #
 # and again from the recomp's CMakeLists.txt when it configures for the web, before adding them, which does nothing if
 # they are patched already:
@@ -34,6 +38,29 @@ function(_n64recomp_browser_changes top sub out)
     execute_process(COMMAND git diff HEAD --binary -- "./${sub}" WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE diff)
     string(SHA1 hash "${diff}")
     set(${out} ${hash} PARENT_SCOPE)
+endfunction()
+
+# Fetches the upstream commit <name>.patch was made on from the fork patches.txt names into the repository at <top>, and
+# returns it, or nothing if it can't.
+function(_n64recomp_browser_fetch_base name top out)
+    file(STRINGS "${N64RECOMP_BROWSER_PATCHES_DIR}/patches.txt" rows REGEX "^${name} ")
+    string(REGEX REPLACE " +" ";" row "${rows}")
+    list(GET row 2 fork)
+    list(GET row 3 base)
+    message(STATUS "N64Recomp-browser: fetching ${name}'s upstream ${base} from ${fork}")
+    # --refetch brings the commit's files even where the checkout has the commit already: a partial clone
+    # (--filter=blob:none, as DKR-R's bootstrap makes) holds upstream's commits without their files, and git apply
+    # fetches none of them for the merge ("repository lacks the necessary blob"). Older gits have no --refetch.
+    execute_process(COMMAND git fetch -q --depth 1 --refetch "${fork}" "${base}" WORKING_DIRECTORY "${top}"
+        RESULT_VARIABLE result ERROR_QUIET)
+    if (NOT result EQUAL 0)
+        execute_process(COMMAND git fetch -q --depth 1 "${fork}" "${base}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result)
+    endif()
+    if (result EQUAL 0)
+        set(${out} ${base} PARENT_SCOPE)
+    else()
+        set(${out} "" PARENT_SCOPE)
+    endif()
 endfunction()
 
 # Patches one project's checkout, <dir>, with <name>.patch, but the files named after it (paths in the project).
@@ -90,21 +117,10 @@ function(n64recomp_browser_apply_patch name dir)
         return()
     endif()
 
-    # The three-way merge needs the upstream files the patch was made from: fetch that commit from the fork.
-    file(STRINGS "${N64RECOMP_BROWSER_PATCHES_DIR}/patches.txt" rows REGEX "^${name} ")
-    string(REGEX REPLACE " +" ";" row "${rows}")
-    list(GET row 2 fork)
-    list(GET row 3 base)
-    message(STATUS "N64Recomp-browser: ${name} needs a three-way merge, fetching ${base} from ${fork}")
-    # --refetch brings the commit's files even where the checkout has the commit already: a partial clone
-    # (--filter=blob:none, as DKR-R's bootstrap makes) holds upstream's commits without their files, and git apply
-    # fetches none of them for the merge ("repository lacks the necessary blob"). Older gits have no --refetch.
-    execute_process(COMMAND git fetch -q --depth 1 --refetch "${fork}" "${base}" WORKING_DIRECTORY "${top}"
-        RESULT_VARIABLE result ERROR_QUIET)
-    if (NOT result EQUAL 0)
-        execute_process(COMMAND git fetch -q --depth 1 "${fork}" "${base}" WORKING_DIRECTORY "${top}" RESULT_VARIABLE result)
-    endif()
-    if (result EQUAL 0)
+    # The three-way merge needs the upstream files the patch was made from.
+    message(STATUS "N64Recomp-browser: ${name} needs a three-way merge")
+    _n64recomp_browser_fetch_base(${name} "${top}" base)
+    if (base)
         # --3way merges against the index, so it works in an index of its own holding the checkout's files as they
         # are (its own changes included), and the checkout's index stays as it was.
         set(index "${stamp}.index")
@@ -123,6 +139,137 @@ function(n64recomp_browser_apply_patch name dir)
         set(plain "${merged}")
     endif()
     message(FATAL_ERROR "N64Recomp-browser: ${name}.patch doesn't apply to ${dir}:\n${plain}")
+endfunction()
+
+# A recomp that leaves files out of <name>.patch where its own changes meet the web's (n64recomp_browser_apply_patch's
+# files left out) makes the web's change to them its own way, merged by hand with its own, from this repository's
+# <commit>. Run after its own change is in, this merges into those files of <dir> what the web has changed in them
+# since <commit>, three ways: the files as upstream's commit with <commit>'s patch, as they are, and as upstream's
+# commit with this patch. So the recomp's merge takes the web's later changes by itself, and only a change that meets
+# its own lines stops, the file left with conflict markers to merge by hand into its own change, which is then from this
+# commit. Merging again, or where nothing moved, changes nothing.
+function(n64recomp_browser_merge_since name dir commit)
+    get_filename_component(dir "${dir}" ABSOLUTE)
+    execute_process(COMMAND git rev-parse --show-toplevel WORKING_DIRECTORY "${dir}"
+        RESULT_VARIABLE result OUTPUT_VARIABLE top OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if (NOT result EQUAL 0)
+        message(FATAL_ERROR "N64Recomp-browser: ${dir} (${name}) isn't a git checkout")
+    endif()
+    get_filename_component(top "${top}" REALPATH)
+    get_filename_component(real "${dir}" REALPATH)
+    file(RELATIVE_PATH sub "${top}" "${real}")
+    if (sub)
+        set(sub "${sub}/")
+    endif()
+
+    # <commit>'s patch, from this repository's history (fetched into a shallow checkout of it).
+    get_filename_component(browser "${N64RECOMP_BROWSER_PATCHES_DIR}" DIRECTORY)
+    execute_process(COMMAND git cat-file -e "${commit}:patches/${name}.patch" WORKING_DIRECTORY "${browser}"
+        RESULT_VARIABLE result ERROR_QUIET)
+    if (NOT result EQUAL 0)
+        execute_process(COMMAND git fetch -q --depth 1 origin "${commit}" WORKING_DIRECTORY "${browser}" ERROR_QUIET)
+    endif()
+    execute_process(COMMAND git rev-parse --path-format=absolute --git-path "n64recomp-browser-${name}-since"
+        WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE work OUTPUT_STRIP_TRAILING_WHITESPACE)
+    file(REMOVE_RECURSE "${work}")
+    file(MAKE_DIRECTORY "${work}")
+    execute_process(COMMAND git show "${commit}:patches/${name}.patch" WORKING_DIRECTORY "${browser}"
+        OUTPUT_FILE "${work}/old.patch" RESULT_VARIABLE result)
+    if (NOT result EQUAL 0)
+        message(FATAL_ERROR "N64Recomp-browser: no ${name}.patch at ${commit} in ${browser}")
+    endif()
+    execute_process(COMMAND git show "${commit}:patches/patches.txt" WORKING_DIRECTORY "${browser}"
+        OUTPUT_VARIABLE then)
+    string(REGEX MATCH "\n${name} +[^ ]+ +[^ ]+ +([0-9a-f]+)" then "\n${then}")
+    _n64recomp_browser_fetch_base(${name} "${top}" base)
+    if (NOT base)
+        message(FATAL_ERROR "N64Recomp-browser: can't fetch ${name}'s upstream commit to merge into ${dir}")
+    endif()
+    if (NOT CMAKE_MATCH_1 STREQUAL base)
+        # The web's change since <commit> would bring upstream's too, which isn't the recomp's.
+        message(FATAL_ERROR "N64Recomp-browser: ${name}'s upstream moved since ${commit} (${CMAKE_MATCH_1} to ${base}): "
+            "merge the web's change to ${ARGN} into ${dir}'s by hand")
+    endif()
+
+    # The files as upstream's commit with each patch, in an index of their own.
+    set(include "")
+    foreach (file IN LISTS ARGN)
+        list(APPEND include "--include=${sub}${file}")
+    endforeach()
+    foreach (side old new)
+        if (side STREQUAL old)
+            set(patch "${work}/old.patch")
+        else()
+            set(patch "${N64RECOMP_BROWSER_PATCHES_DIR}/${name}.patch")
+        endif()
+        set(env ${CMAKE_COMMAND} -E env "GIT_INDEX_FILE=${work}/${side}.index")
+        if (sub)
+            execute_process(COMMAND ${env} git read-tree "--prefix=${sub}" "${base}" WORKING_DIRECTORY "${top}")
+            set(directory "--directory=${sub}")
+        else()
+            execute_process(COMMAND ${env} git read-tree "${base}" WORKING_DIRECTORY "${top}")
+            set(directory "")
+        endif()
+        execute_process(COMMAND ${env} git apply --cached --whitespace=nowarn ${directory} ${include} "${patch}"
+            WORKING_DIRECTORY "${top}" RESULT_VARIABLE result ERROR_VARIABLE error)
+        if (NOT result EQUAL 0)
+            message(FATAL_ERROR "N64Recomp-browser: ${name}.patch (${side}) doesn't apply to upstream's ${base}:\n${error}")
+        endif()
+    endforeach()
+
+    set(merged "")
+    set(conflicts "")
+    foreach (file IN LISTS ARGN)
+        foreach (side old new)
+            set(env ${CMAKE_COMMAND} -E env "GIT_INDEX_FILE=${work}/${side}.index")
+            execute_process(COMMAND ${env} git ls-files -s -- "${sub}${file}" WORKING_DIRECTORY "${top}"
+                OUTPUT_VARIABLE ${side})
+            string(REGEX MATCH "^[0-9]+ ([0-9a-f]+)" ${side} "${${side}}")
+            set(${side} "${CMAKE_MATCH_1}")
+        endforeach()
+        if (old STREQUAL new)
+            continue()
+        endif()
+        foreach (side old new)
+            if (${side})
+                execute_process(COMMAND git cat-file blob ${${side}} WORKING_DIRECTORY "${top}" OUTPUT_FILE "${work}/${side}")
+            else()
+                file(WRITE "${work}/${side}" "")
+            endif()
+        endforeach()
+        if (NOT EXISTS "${top}/${sub}${file}")
+            file(WRITE "${top}/${sub}${file}" "")
+        endif()
+        # Where both only added lines at the same place (an include beside an include), both are kept, the recomp's
+        # first; any other conflict is left in the file with the lines both started from.
+        set(merge git merge-file -L "${dir} ${file}" -L "N64Recomp-browser ${commit}" -L "N64Recomp-browser"
+            "${top}/${sub}${file}" "${work}/old" "${work}/new")
+        execute_process(COMMAND ${merge} -p --diff3 WORKING_DIRECTORY "${top}" RESULT_VARIABLE result OUTPUT_VARIABLE text)
+        string(REGEX MATCHALL "\n<<<<<<< " starts "\n${text}")
+        string(REGEX MATCHALL "\n\\|\\|\\|\\|\\|\\|\\| [^\n]*\n=======\n" added "\n${text}")
+        list(LENGTH starts starts)
+        list(LENGTH added added)
+        if (result EQUAL 0)
+            execute_process(COMMAND ${merge} WORKING_DIRECTORY "${top}")
+            list(APPEND merged "${file}")
+        elseif (starts EQUAL added)
+            execute_process(COMMAND ${merge} --union WORKING_DIRECTORY "${top}")
+            list(APPEND merged "${file} (lines both added, kept)")
+        else()
+            execute_process(COMMAND ${merge} --diff3 WORKING_DIRECTORY "${top}")
+            list(APPEND conflicts "${file}")
+        endif()
+    endforeach()
+    file(REMOVE_RECURSE "${work}")
+    if (merged)
+        list(JOIN merged ", " merged)
+        message(STATUS "N64Recomp-browser: merged the web's change since ${commit} into ${dir}'s ${merged}")
+    endif()
+    if (conflicts)
+        list(JOIN conflicts "\n  " conflicts)
+        message(FATAL_ERROR "N64Recomp-browser: the web's change since ${commit} meets ${dir}'s own in these files, left "
+            "with conflict markers: merge them by hand into its change to them, which is then from this commit:\n  ${conflicts}")
+    endif()
 endfunction()
 
 # Patches every project under <dir>, the folder holding rt64, N64ModernRuntime and RecompFrontend, at the place in it
@@ -144,6 +291,13 @@ endfunction()
 if (CMAKE_SCRIPT_MODE_FILE AND CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
     if (CMAKE_ARGC EQUAL 4)
         n64recomp_browser_apply_patches("${CMAKE_ARGV3}")
+    elseif (CMAKE_ARGC GREATER_EQUAL 8 AND CMAKE_ARGV5 STREQUAL "--since")
+        set(files "")
+        math(EXPR last "${CMAKE_ARGC} - 1")
+        foreach (i RANGE 7 ${last})
+            list(APPEND files "${CMAKE_ARGV${i}}")
+        endforeach()
+        n64recomp_browser_merge_since("${CMAKE_ARGV3}" "${CMAKE_ARGV4}" "${CMAKE_ARGV6}" ${files})
     elseif (CMAKE_ARGC GREATER_EQUAL 5)
         set(excluded "")
         math(EXPR last "${CMAKE_ARGC} - 1")
@@ -154,6 +308,7 @@ if (CMAKE_SCRIPT_MODE_FILE AND CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIS
         endif()
         n64recomp_browser_apply_patch("${CMAKE_ARGV3}" "${CMAKE_ARGV4}" ${excluded})
     else()
-        message(FATAL_ERROR "cmake -P apply.cmake <folder> | <name> <folder> [<file left out>...]")
+        message(FATAL_ERROR "cmake -P apply.cmake <folder> | <name> <folder> [<file left out>...] | "
+            "<name> <folder> --since <commit> <file left out>...")
     endif()
 endif()
