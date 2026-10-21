@@ -4,8 +4,8 @@
 //   node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name> | --play <s>]
 //     [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] [--json <file>]
 //     [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>]
-//     [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--fault <device|resize|hidden|audio|reload>[,...]]
-//     [--affinity <n>] [--fallback-adapter]
+//     [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--chrome-flag <flag>]...
+//     [--fault <device|resize|hidden|audio|reload>[,...]] [--affinity <n>] [--fallback-adapter]
 //     [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]
 //
 // A build dir is served on 127.0.0.1 on a free port, and the browser's debugging port is a free one too, so plays
@@ -47,6 +47,10 @@
 // JSON where it parses (true, 0) and a string otherwise: a compositor path to try on a laptop's screen
 // (gfx.webrender.dcomp-texture-overlay-win, docs/findings.md, A laptop, measured). A run records its prefs and is
 // compared only with runs that set the same ones.
+// --chrome-flag (Chrome only, repeated for more) starts Chrome with one more switch of its own, after the tool's:
+// --disable-renderer-backgrounding keeps a hidden tab's renderer process at its usual priority, as Chrome does a tab
+// that plays sound (docs/findings.md, A page in a hidden tab). A run records its flags and is compared only with runs
+// that set the same ones.
 // --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
@@ -193,6 +197,8 @@ for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
   if (!pref.includes('=') || !name) { console.error('--firefox-pref needs <name>=<value>'); process.exit(1); }
   try { firefoxPrefs[name] = JSON.parse(value); } catch { firefoxPrefs[name] = value; }
 }
+const chromeFlags = [];
+for (let flag; (flag = option(args, '--chrome-flag', null)) !== null;) chromeFlags.push(flag);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
   console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2 (publish_pages.sh\'s names)');
   process.exit(1);
@@ -214,12 +220,13 @@ if (hostReadingOption !== null) {
 if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   console.error('usage: node tools/play_page.mjs <chrome|firefox> <build dir or URL> <rom> <plan.json> [--section <name>] ' +
     '[--play <s>] [--size <w>x<h>] [--shot <file>] [--interval <s>] [--query <?...>] [--port <n>] [--profile <dir>] ' +
-    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--affinity <n>] [--fallback-adapter] [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
+    '[--json <file>] [--browser <path>] [--headed | --on-screen] [--uncapped] [--cpu-throttle <rate>] [--scale <n>] [--preload <file>] [--gecko-profile <file> | --chrome-trace <file>] [--firefox-pref <name>=<value>]... [--chrome-flag <flag>]... [--affinity <n>] [--fallback-adapter] [--fault <device|resize|hidden|audio|reload>[,...]] [--record <file> --game <name> [--build <label>] [--note <text>] [--set <id> --role <baseline|candidate>] [--host-reading <json>]]');
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
 const uncappedAs = uncapped && browser === 'firefox' ? firefoxUncappedRate : uncapped;
 if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
+if (chromeFlags.length && browser !== 'chrome') { console.error('--chrome-flag is Chrome only'); process.exit(1); }
 if (!(scale > 0) || (scale !== 1 && onScreen)) { console.error("--scale needs a number above 0, and is the desktop's own on screen"); process.exit(1); }
 if (geckoProfileFile && browser !== 'firefox') { console.error('--gecko-profile is Firefox\'s only'); process.exit(1); }
 if (chromeTraceFile && (browser !== 'chrome' || recordFile)) { console.error('--chrome-trace is Chrome\'s only, and not recorded'); process.exit(1); }
@@ -516,9 +523,9 @@ const server = remote ? null : await serve(/\.html$/.test(where) ? path.dirname(
 const base = server ? `http://127.0.0.1:${server.address().port}/` : (where.endsWith('/') ? where : where + '/');
 const pageUrl = /\.html$/.test(where) ? (remote ? where : base + path.basename(where)) + query : base + (plan.page ?? '') + query;
 const page = await open(browser, { profile, port: portOption ? port + 1 : undefined, size, executable, rom, planDir: path.dirname(planFile),
-  preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, affinity, fallbackAdapter, onLine, log });
+  preload, headed, onScreen, uncapped, cpuThrottle, scale, firefoxPrefs, chromeFlags, affinity, fallbackAdapter, onLine, log });
 log(`${browser}${headed && browser === 'chrome' ? ' (headed)' : ''}${uncapped ? ' uncapped' : ''}${cpuThrottle > 1 ? ` CPU throttled ${cpuThrottle}x` : ''}` +
-  `${affinity ? ` on ${affinity} logical processors` : ''}${fallbackAdapter ? ' on the software adapter' : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}`);
+  `${affinity ? ` on ${affinity} logical processors` : ''}${fallbackAdapter ? ' on the software adapter' : ''} pid ${page.pid}, ${onScreen ? 'on screen, maximized' : `${size[0]}x${size[1]}${scale !== 1 ? ` at ${scale}x` : ''}`}, ${freshProfile ? 'a fresh profile' : 'profile ' + profile}${Object.keys(firefoxPrefs).length ? ', prefs ' + JSON.stringify(firefoxPrefs) : ''}${chromeFlags.length ? ', flags ' + chromeFlags.join(' ') : ''}`);
 
 // Every interval: presents, sound, GPU and cores since the last one.
 // A game whose thread threw (a wasm RuntimeError on a worker) presents nothing more, and its clock no longer moves, so
@@ -820,7 +827,7 @@ if (recordFile) {
     time: new Date(t0).toISOString(), game, build, note, ...(set ? { set } : {}), ...(role ? { role } : {}), ...(hostReading ? { hostReading } : {}), browser, page: pageUrl, size: summary.size,
     ...(onScreen ? { onScreen } : {}), ...(summary.devicePixelRatio ? { devicePixelRatio: summary.devicePixelRatio } : {}), freshProfile, ...(uncapped ? { uncapped: uncappedAs } : {}), ...(cpuThrottle > 1 ? { cpuThrottle } : {}),
     ...(affinity ? { affinity } : {}), ...(fallbackAdapter ? { fallbackAdapter } : {}),
-    ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
+    ...(Object.keys(firefoxPrefs).length ? { firefoxPrefs } : {}), ...(chromeFlags.length ? { chromeFlags } : {}), play: section ? `section ${section}` : playFor ? `${playFor} s` : 'plan', seconds: during.length * interval,
     presents: summary.presents && Object.fromEntries(Object.entries(summary.presents).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     frames: summary.frames, animationFrames: summary.animationFrames, audioShort: summary.audio?.short ?? null, shaderWaits, shaderMisses,
     // Each sample of the play, every interval seconds: presents a second, sound frames short, GPU busy.
@@ -848,7 +855,7 @@ function compare(run, lines) {
   const before = lines.split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } })
     .filter((p) => p && !p.note && !p.hostReading?.building && !p.hostReading?.gpuOthers && !p.failed && p.presents?.median > 0 && p.game === run.game && p.browser === run.browser && p.size === run.size &&
       like(p.play, run.play) && like(p.freshProfile, run.freshProfile) && (p.uncapped ?? false) === (run.uncapped ?? false) && !p.onScreen === !run.onScreen &&
-      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && (p.affinity ?? 0) === (run.affinity ?? 0) && !p.fallbackAdapter === !run.fallbackAdapter && (run.onScreen || (p.devicePixelRatio ?? 1) === (run.devicePixelRatio ?? 1)) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}))
+      (p.cpuThrottle ?? 1) === (run.cpuThrottle ?? 1) && (p.affinity ?? 0) === (run.affinity ?? 0) && !p.fallbackAdapter === !run.fallbackAdapter && (run.onScreen || (p.devicePixelRatio ?? 1) === (run.devicePixelRatio ?? 1)) && JSON.stringify(p.firefoxPrefs ?? {}) === JSON.stringify(run.firefoxPrefs ?? {}) && JSON.stringify(p.chromeFlags ?? []) === JSON.stringify(run.chromeFlags ?? []))
     .slice(-5);
   if (!before.length) {
     console.log(`compared: no earlier run of ${run.game} in ${run.browser} at ${run.size} like this one`);

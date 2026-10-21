@@ -257,9 +257,9 @@ const rdramHelpers = `(() => {
 // laptop's CPU. scale is the device pixels a CSS pixel off the desktop, 1 unless given: 2 is a laptop at 200%, where a
 // page whose canvas went to device pixels (SDL_WINDOW_ALLOW_HIGHDPI) drew four times the pixels and took every click
 // at the wrong spot, so Load ROM opened nothing, which no run at 1 shows. onScreen (above) leaves size and scale to the
-// window. firefoxPrefs are Firefox prefs of the caller's, set over
-// the ones below. affinity holds the browser, every process of it, to the first that many logical processors (0: all),
-// a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
+// window. firefoxPrefs are Firefox prefs of the caller's, set over the ones below, and chromeFlags Chrome switches of the
+// caller's, after the ones below. affinity holds the browser, every process of it, to the first that many logical
+// processors (0: all), a laptop's few cores in either browser (spawnHeld, below). fallbackAdapter gives the page the browser's software
 // WebGPU adapter in place of the GPU, a slow GPU: Chrome started with --use-webgpu-adapter=swiftshader (SwiftShader,
 // Vulkan on the CPU; Chrome 155 has no other: its warp, d3d11 and opengles values give the GPU or no adapter) and every
 // requestAdapter() asked for forceFallbackAdapter, which is what gives Firefox one (D3D12's WARP, from wgpu's dx12
@@ -288,7 +288,7 @@ const spawnHeld = (affinity, command, args, options) => {
 };
 
 export const open = async (browser, { profile, port, size = [1256, 645], executable, rom, planDir = '.', preload = '',
-  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, affinity = 0, fallbackAdapter = false,
+  headed = false, onScreen = false, uncapped = false, cpuThrottle = 0, scale = 1, firefoxPrefs = {}, chromeFlags = [], affinity = 0, fallbackAdapter = false,
   onLine = () => {}, log = console.log }) => {
   if (fallbackAdapter) preload = preload ? `() => { (${fallbackAdapterPreload})(); (${preload})(); }` : fallbackAdapterPreload;
   fs.mkdirSync(profile, { recursive: true });
@@ -305,7 +305,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
   for (const host of ['127.0.0.1', '::1']) {
     if (await listening(host, port)) throw new Error(`debugging port ${port} is taken on ${host}: give another --port`);
   }
-  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line });
+  if (browser === 'chrome') page = await openChrome({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, chromeFlags, affinity, fallbackAdapter, line });
   else if (browser === 'firefox') page = await openFirefox({ profile, port, width, height, executable, rom, preload, onScreen, uncapped, scale, firefoxPrefs, affinity, line });
   else throw new Error(`no browser ${browser}: chrome or firefox`);
 
@@ -415,7 +415,7 @@ const listening = (host, port) => new Promise((resolve) => {
 
 const asJson = (js) => `Promise.resolve((0, eval)(${JSON.stringify(js)})).then((v) => v === undefined ? undefined : JSON.stringify(v))`;
 
-const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, affinity, fallbackAdapter, line }) => {
+const openChrome = async ({ profile, port, width, height, executable, rom, preload, headed, onScreen, uncapped, cpuThrottle, scale, chromeFlags = [], affinity, fallbackAdapter, line }) => {
   // A window off the desktop counts as hidden, and Chrome stops drawing a hidden one unless told not to (on screen,
   // another window over it would hide it too).
   const mode = headed || onScreen
@@ -427,7 +427,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
   const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
-    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, 'about:blank'], { stdio: 'ignore' });
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...chromeFlags, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
     line('page_driver: Chrome window not moved');
   }
