@@ -186,8 +186,9 @@ with others' shared turns beside them) split: the page from Pages aborted in 3 o
 and the v0.77.0 build played all 4 to the end (974-1,203 s, about 69 minutes), its break at 844.0 MB throughout. Each
 abort went as the first soak's: presents ~210 → 2-85 → 0 and the sound starved within a second, then the break
 843.9 → 891.9 or 987.9 → 1179.9 MB over 2 s, where it held ~18 s to the abort. heap_probe.js logged no `heapoom` in
-any of them, so the request that ran it out still isn't named. The soaks are 17-20 minutes, not the 2-5 minutes of a usual
-(docs/playing.md), since the abort comes anywhere from 70 to 793 s in and most come past 5 minutes. Banjo moved to v0.77.0 on that, as a critical fix.
+any of them, so the request that ran it out still isn't named. The soaks are 17-20 minutes, not a usual play's 2-5,
+since the abort comes anywhere from 70 to 793 s in and most come past 5 minutes. Banjo moved to v0.77.0 on that, as a
+critical fix.
 
 ## A page that stops answering
 
