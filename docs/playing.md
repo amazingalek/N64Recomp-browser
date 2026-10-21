@@ -23,6 +23,11 @@ options; `docs/findings.md` has what was measured this way.
 
 ## Plans
 
+- A game's `tools/play_plan.json` (DKR-R's, Snap's and Rush 2's in `web/`) is its regular play, 2-3 minutes with
+  every timeout counted, and every play of the game is by it unless a card needs more. Its
+  `play_plan_extended.json` beside it starts the same and goes on to two or three more levels in 5 minutes or less,
+  played only when a change needs a longer play (one to a level or screen only it reaches). The shaders an extended play
+  misses go into the game's list, in the same work. Each plan's header says what it plays.
 - A plan reaches a level as a player does (the menus where quick, the survey's warp or stage start where not; its
   header says which) and plays a minute or more in its levels, the whole run 2-5 minutes (Which browser, how long). A
   walk sways out and back by as much each way about a spot it was played to and looked at: a blind walk in one
@@ -97,9 +102,9 @@ A series stands on its plan and the files its `evalFile` steps name, so they are
 ## Which browser, how long
 
 - Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes from the launcher to the plan's last
-  step, in either browser, and so is every game's plan: more levels fit by playing each for less. A longer play (a
-  plan of more, a run of 10 minutes or more) is for a card that needs one and says why: a soak, a leak or OOM hunt, a
-  timing bug that takes many minutes to show.
+  step, in either browser: a game's regular plan is 2-3 minutes and its extended one 5 or less (Plans), more levels
+  fitting by playing each for less. A longer play (a plan of more, a run of 10 minutes or more) is for a card that
+  needs one and says why: a soak, a leak or OOM hunt, a timing bug that takes many minutes to show.
 - Chrome gives the performance numbers, as interleaved pairs of the page Pages serves and the build.
 - Firefox with its default prefs is played once a build for what Chrome doesn't turn up (a race in the game's loads, an
   OOM), read for a crash, a trap, WebGPU errors and exceptions, not presents: on Windows on integrated graphics its

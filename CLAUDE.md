@@ -167,9 +167,11 @@ of this in the same work, as docs/playing.md says:
 
 ## Playing a page
 
-- Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes, and so is every game's plan. A longer
-  one (a plan of more, a run of 10 minutes or more) is for a card that needs it and says why: a soak, a leak or OOM
-  hunt, a timing bug that takes many minutes to show (docs/playing.md, Which browser, how long).
+- Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes. A game is played by its regular plan
+  (`play_plan.json`, 2-3 minutes); its extended plan (`play_plan_extended.json`, 5 at most) is played only when needed,
+  and the shaders it misses go into the game's list. A longer one (a plan of more, a run of 10 minutes or more) is for
+  a card that needs it and says why: a soak, a leak or OOM hunt, a timing bug that takes many minutes to show
+  (docs/playing.md, Which browser, how long).
 - Chrome measures, in interleaved pairs. Firefox with its default prefs is played for crashes, traps, WebGPU errors and
   exceptions, not presents: on Windows' integrated graphics its compositor caps every page at 30-45. Firefox's
   performance is measured only for a change that could move it, with `gfx.webrender.compositor` false.
