@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 52ec88f97c0484704e68cefbf07f3028982e8240
+rt64: https://github.com/amazingalek/rt64-web 5249040240ba20231a86bebfab03539723a5c0f8
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2176,7 +2176,7 @@ index 8ea27d5..f97f6c6 100644
  
          void reset();
 diff --git a/src/hle/rt64_workload_queue.cpp b/src/hle/rt64_workload_queue.cpp
-index 5a331aa..3c5bbef 100644
+index 5a331aa..1131acf 100644
 --- a/src/hle/rt64_workload_queue.cpp
 +++ b/src/hle/rt64_workload_queue.cpp
 @@ -111,7 +111,11 @@ namespace RT64 {
@@ -2234,7 +2234,23 @@ index 5a331aa..3c5bbef 100644
              framebufferRenderer->recordSetup(ext.workloadGraphicsWorker, bufferUploaders, processRSP ? rspProcessor.get() : nullptr, processWorldVertices ? vertexProcessor.get() : nullptr, &workload.outputBuffers, workloadConfig.raytracingEnabled);
              
              // Record all framebuffer pairs.
-@@ -888,6 +903,9 @@ namespace RT64 {
+@@ -844,10 +859,14 @@ namespace RT64 {
+             ext.workloadGraphicsWorker->wait();
+             workerMutex.unlock();
+ 
+-            // Update the GPU profiler with the results from the timestamps of the frame.
++            // Update the GPU profiler with the results from the timestamps of the frame. Not on WebGPU, which has no
++            // timestamps (plume's queries there do nothing and read zeros), and where behind plume's device thread each
++            // of the two calls waits for a round trip to the page's thread after every workload.
++#       if !defined(__EMSCRIPTEN__)
+             queryPool->queryResults();
+             const uint64_t *frameTimestamps = queryPool->getResults();
+             rendererGPUProfiler.log(double(frameTimestamps[1] - frameTimestamps[0]) / 1000000.0);
++#       endif
+ 
+             // Indicate to the texture cache it's safe to delete the textures if no locks are active.
+             ext.textureCache->decrementLock();
+@@ -888,6 +907,9 @@ namespace RT64 {
          uint32_t displayRateForTicks = 0;
          int processCursor = -1;
          bool frameReduction = false;
@@ -2244,7 +2260,7 @@ index 5a331aa..3c5bbef 100644
          while (threadsRunning) {
              {
                  std::unique_lock<std::mutex> cursorLock(cursorMutex);
-@@ -902,6 +920,12 @@ namespace RT64 {
+@@ -902,6 +924,12 @@ namespace RT64 {
              }
  
              if (processCursor >= 0) {
@@ -2257,7 +2273,7 @@ index 5a331aa..3c5bbef 100644
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  Workload &workload = workloads[processCursor];
                  ext.presentQueue->waitForPresentId(workload.presentId);
-@@ -914,22 +938,36 @@ namespace RT64 {
+@@ -914,22 +942,36 @@ namespace RT64 {
                  workloadProfiler.start();
                  threadConfigurationUpdate(workload.viFbSize, workloadConfig);
  
@@ -2298,7 +2314,7 @@ index 5a331aa..3c5bbef 100644
                      std::scoped_lock<std::mutex> managerLock(ext.sharedResources->managerMutex);
                      FramebufferManager &fbManager = ext.sharedResources->framebufferManager;
                      std::vector<uint32_t> &colorVector = ext.sharedResources->colorImageAddressVector;
-@@ -973,7 +1011,7 @@ namespace RT64 {
+@@ -973,7 +1015,7 @@ namespace RT64 {
                  float prevFrameWeight = 0.0f;
                  float curFrameWeight = 1.0f;
                  float deltaTimeMs = 1.0f / 30.0f;
@@ -2307,7 +2323,7 @@ index 5a331aa..3c5bbef 100644
                  bool generateInterpolatedFrames = false;
                  bool velocityUploaderUsed = false;
                  bool tileInterpolationUsed = false;
-@@ -1022,7 +1060,7 @@ namespace RT64 {
+@@ -1022,7 +1064,7 @@ namespace RT64 {
                  
                  // Get the current and previous set of frame counters. The other set can be in use by the present queue. Skip if no new present event has arrived before this workload event.
                  InterpolatedFrameCounters &prevFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -2316,7 +2332,7 @@ index 5a331aa..3c5bbef 100644
                  if (useDifferentCounters) {
                      ext.sharedResources->interpolatedFramesIndex = ext.sharedResources->interpolatedFramesIndex ^ 1;
                      lastPresentId = workload.presentId;
-@@ -1037,16 +1075,26 @@ namespace RT64 {
+@@ -1037,16 +1079,26 @@ namespace RT64 {
                  }
  
                  InterpolatedFrameCounters &curFrameCounters = ext.sharedResources->interpolatedFrames[ext.sharedResources->interpolatedFramesIndex];
@@ -2347,7 +2363,7 @@ index 5a331aa..3c5bbef 100644
                  if ((requiredFrames > 0) && (interpolatedTargets.size() < requiredFrames)) {
                      uint32_t previousSize = uint32_t(interpolatedTargets.size());
                      interpolatedTargets.resize(requiredFrames);
-@@ -1063,6 +1111,15 @@ namespace RT64 {
+@@ -1063,6 +1115,15 @@ namespace RT64 {
                  bool skipWorkloadNow = false;
                  uint32_t targetIndex = 0;
                  uint32_t framesRendered = 0;
@@ -2363,7 +2379,7 @@ index 5a331aa..3c5bbef 100644
                  int64_t renderTimeTotalMicro = 0;
                  for (uint32_t frame = 0; (frame < displayFrames) && !skipWorkloadNow; frame++) {
                      // Evaluate if this frame should be skipped. Measure the current time and compare it to what frame is estimated should be have been rendered by now.
-@@ -1086,15 +1143,43 @@ namespace RT64 {
+@@ -1086,15 +1147,43 @@ namespace RT64 {
  
                          // Override the render target.
                          if (usingMSAA || (frame > 0)) {
@@ -2412,7 +2428,7 @@ index 5a331aa..3c5bbef 100644
                                  });
                              }
  
-@@ -1130,10 +1215,7 @@ namespace RT64 {
+@@ -1130,10 +1219,7 @@ namespace RT64 {
  
                      // For every additional frame, we increase the frames available and notify the present queue.
                      if (generateInterpolatedFrames && (usingMSAA || (frame > 0))) {
@@ -2424,7 +2440,7 @@ index 5a331aa..3c5bbef 100644
  
                          {
                              std::scoped_lock<std::mutex> managerLock(ext.sharedResources->interpolatedMutex);
-@@ -1164,7 +1246,16 @@ namespace RT64 {
+@@ -1164,7 +1250,16 @@ namespace RT64 {
  
                  threadConfigurationValidate();
  
