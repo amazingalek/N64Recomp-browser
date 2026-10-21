@@ -163,7 +163,7 @@ is rarer there: main's page played 8 of 8 clean that day, and v0.67.0's trapped 
 A page that runs out of heap does so in a burst after a stall, not by leaking. Banjo-Kazooie's page aborted with
 `Aborted(OOM)` in Firefox 158 in 3 of 6 runs of a retest (2026-10-19 21:11-21:56 UTC, uncapped at 3840x2000 on an RTX
 5080, the page from Pages, v0.67.0, and a v0.71.0 build both), at 70, 72 and 123 s; Chrome (throttled 6 times) played
-on, and no other game's page aborted. A page's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
+on, and no other game's page aborted. Banjo's heap is fixed (INITIAL_MEMORY, no growth), so that is a malloc past its 1536 MB: the
 resize import aborts, and the trap names only abort(). `tools/heap_probe.js` read the heap's break at 843.9 MB from
 2 s in to the end of 15 plays of the same page in Firefox the next morning, one of them 5 minutes long: the page takes
 what it uses at boot (RDRAM's 512 MB among it) and nothing after. In each aborting run the sound and the presents
@@ -189,6 +189,20 @@ abort went as the first soak's: presents ~210 → 2-85 → 0 and the sound starv
 any of them, so the request that ran it out still isn't named. The soaks are 17-20 minutes, not a usual play's 2-5,
 since the abort comes anywhere from 70 to 793 s in and most come past 5 minutes. Banjo moved to v0.77.0 on that, as a
 critical fix.
+
+No other page leaks or aborts in a soak (docs/playing.md, Soaks). Thirteen games' pages from Pages were soaked in
+Firefox 158 and ten of them in Chrome, 2026-10-20 and 21 on an RTX 5080 (the host otherwise idle, other cards' GPU
+turns between plays), 21-23 minutes each, with no crash, no abort and no WebGPU error but Banjo-Kazooie's Firefox OOM
+above; Pokémon Snap's, Rush 2's and Rush 2049's weren't. dlmalloc's break takes what a page uses in its first minutes,
+then holds or steps up a few MB and stops. From the first minute to the last it is flat on Donkey Kong 64 (763.8 and
+766.9 MB), Pilotwings 64, Diddy Kong Racing, Banjo-Kazooie in Chrome, and Banjo-Tooie, Ocarina of Time and Jet Force
+Gemini from minute 3, and climbs +4.6-4.9 MB on GoldenEye, +8.6 on Mario Kart 64, +9.4 on Star Fox 64 (Firefox),
++6.9-10.2 on Wave Race 64 and +7.2 on Majora's Mask in Firefox (its last step at minute 18; flat in Chrome). At the
+fastest of those the 1536 MB heap lasts two days. Chrome's GPU process holds 1.3-2.3 GB through a play. Firefox's,
+1.6-2.9 GB, climbs about 100 MB every 6-10 minutes and drifts back down between, on every page, so it churns rather
+than grows. Presents hold all through, about 350 a second in Chrome and 180-200 in Firefox. Conker's page alone grows
+its heap (-sALLOW_MEMORY_GROWTH, in its own link options); heap_probe.js reads its length too, but Conker's soaks ran
+before it could find that page's sbrk, so its heap's curve is still unread.
 
 ## A page that stops answering
 

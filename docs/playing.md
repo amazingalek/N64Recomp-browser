@@ -63,6 +63,37 @@ options; `docs/findings.md` has what was measured this way.
   still running, with its processes). A debugging port another browser on the machine holds is
   refused (`page_driver.mjs`).
 
+## What a change plays
+
+A change is played by what it can break, before it merges (CLAUDE.md, Changing it) and in the retest
+(docs/publishing.md, The retest). A change that could be two kinds is played as the one that risks more.
+
+- Can't change a page's bytes (`*.md`, `plays.jsonl`, `site/`, the tools that play, serve, read and publish pages):
+  nothing is played. A new or changed plan is the exception: it is played as a smoke play is, once in each browser, to
+  show that it reaches its levels.
+- Changes a page but can't move its speed or timing (the launcher's or a notice's text, a patch merge that builds the
+  same code, an entry in a shader list): the smoke play. Its own game's build plays its plan once in Chrome and once in
+  Firefox, read for a page that boots and plays, WebGPU errors and exceptions (`failed`, `webgpuErrors` and
+  `exceptions` in play_page's `--json`), never for its presents. No second game, no Pages pair.
+- Can move speed or timing (a fork's renderer, its device thread, present or wait path, the runtime's threads and
+  messages, `frontend/`'s timing, a build option): the A/B, `tools/ab_pages.mjs` on its game and one other, and the
+  smoke play in Firefox of each (`ab_pages.mjs --smoke`).
+- Can crash or leak only over time (memory, a cache, a timing bug that takes minutes to show): a soak, played only for
+  a card that says why.
+
+A card that moves a game's pin onto a tag the retest plays, or will, gives it the smoke play and leaves the A/B to the
+retest.
+
+Each play takes its own turn in the machine's GPU queue (CLAUDE.md, Playing a page). A smoke play is a shared turn,
+beside others' shared turns, with a short limit (about 10 minutes); an A/B's play and a soak are each a whole turn, the
+GPU to themselves, with a limit that fits the plan. So a queue that serves the shortest limit first can put a smoke
+play ahead of a soak.
+
+A card queues one series at a time (an `ab_pages.mjs` run, or a game's smoke plays) and stops a series at its first
+failed play: the cause is fixed, then the series is played again, rather than its other plays queued behind a failure.
+A series stands on its plan and the files its `evalFile` steps name, so they are checked before it is queued
+(`ab_pages.mjs` refuses a plan whose files aren't there before it queues a play, `play_page.mjs` as it starts).
+
 ## Which browser, how long
 
 - Every automatic play (a test, the retest, an A/B, a smoke run) is 2-5 minutes from the launcher to the plan's last
@@ -78,6 +109,17 @@ options; `docs/findings.md` has what was measured this way.
 - Firefox with `--firefox-pref gfx.webrender.compositor=false` measures only a change that could move Firefox's own
   WebGPU performance: without the compositor's cap its numbers show the page's. Default-prefs Firefox pairs are for a
   change about Firefox itself.
+
+## Soaks
+
+A soak plays a page long, for what shows only after many minutes: a leak, a slow crash, Banjo-Kazooie's
+`Aborted(OOM)` 550 s into a Firefox play. It plays in Firefox, where those turn up; Chrome's soaks of ten pages found
+nothing Firefox's didn't (docs/findings.md, Memory). Each play is the game's plan with its `shot` steps left out and 20
+`wait`s of 60 s added, its last scene held 20 minutes (on the game's clock where the plan has one), played from Pages
+uncapped at 3840x2000 with `--interval 1 --preload tools/heap_probe.js`, one play a whole turn with `--max 35`. Read
+each run's heap break and length and its GPU process's private bytes by the minute: a leak climbs in its last 10
+minutes as in its first, the heap's high-water mark steps up and stops. A crash, an abort or steady growth is its own
+work, naming the game, the browser, the time and the curve.
 
 ## Uncapped, and the browsers' clocks
 
@@ -123,8 +165,8 @@ options; `docs/findings.md` has what was measured this way.
   second, a worker's shortest of three 100 us waits (`waitprobe <ms>`), what plume and the VI thread measure once as
   the page starts (docs/findings.md, A host that holds Chrome's presents).
 - How much of its heap a page has taken, and what ran it out: `--preload tools/heap_probe.js` logs the heap's break
-  each second (`heap <s> sbrk <MB>`) and, before an `Aborted(OOM)`, the request's size and the stack that made it
-  (`heapoom`) (docs/findings.md, Memory).
+  and length each second (`heap <s> sbrk <MB> len <MB>`) and, before an `Aborted(OOM)`, the request's size and the
+  stack that made it (`heapoom`) (docs/findings.md, Memory).
 - Video memory: read the adapter's `\GPU Adapter Memory(*)\Dedicated Usage` and nvidia-smi, never
   `\GPU Process Memory(*)\Dedicated Usage`, which climbs by a canvas a frame in Firefox (Windows 10 counts every reopen
   of its shared canvas texture, KB4490156). nvidia-smi's is the whole GPU's, so a page filling video memory beside
@@ -188,6 +230,8 @@ collapse) shows on a desktop as `shader missed:` lines.
   without a `†` has work filed to make it 60. A Played cell is the date and the tag the page was built on
   ("2026-10-16, v0.39.0"); one that names no tag is played in the next retest. Under the table are two lines and no
   more.
+- A page given only the smoke play (What a change plays) keeps its cells' numbers, which a change
+  that can't move speed leaves standing, and its Played cell moves to the tag.
 - A laptop's cell comes from a run on screen (`--on-screen`: maximized at the laptop's own scale, as a player's window
   is) as well as the usual one off the desktop, and gives the on-screen number: Windows never composites a window off
   the desktop, which flattered Firefox on Intel UHD. Its Chrome cell is played headless too, whose presents never wait
