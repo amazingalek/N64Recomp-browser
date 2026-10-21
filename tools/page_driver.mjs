@@ -27,8 +27,8 @@
 // A step is one of: ["wait", ms], ["until", regex, ms] (a console line), ["click", x, y] (CSS pixels in a 1256x645
 // viewport, moved to where recompui puts the same spot in the viewport the page has at the time: it lays its launcher
 // and menus out by the viewport's height, about the centre), ["key", code, key, keyCode], ["hold", code, key, keyCode, ms], ["down", code, key, keyCode] and ["up",
-// ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited; the page has
-// n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
+// ...] (a key held across the steps between, gas while steering), ["eval", js] (awaited, up to stepMs, below; the
+// page has n64r(addr) and n64w(addr, value), RDRAM words at N64 addresses), ["evalFile", path] (relative to the plan),
 // ["need", js] (an eval the rest of the plan stands on, a survey's play() that loads a file: false, null or an exception
 // ends the run there and fails it, rather than the steps after it pressing keys at a menu for minutes),
 // ["rom", x, y] (clicks there, moved as a click is, and gives the page the ROM; ["rom", code, key, keyCode] presses that
@@ -70,6 +70,13 @@ import { spawn, execFile, execFileSync } from 'child_process';
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Takes "--name value" out of args, or gives the fallback.
+// The files a plan's evalFile steps name (relative to the plan) that aren't there: a run refuses the plan before it
+// waits for a turn, rather than failing part way through one.
+export const missingPlanFiles = (plan, planFile) =>
+  [plan.load, plan.setup, plan.start, plan.play, ...(plan.sections ?? []).map((s) => s.steps)].flat().filter(Boolean)
+    .filter((step) => Array.isArray(step) && step[0] === 'evalFile')
+    .map((step) => path.resolve(path.dirname(planFile), step[1])).filter((file) => !fs.existsSync(file));
+
 export const option = (args, name, fallback) => {
   const i = args.indexOf(name);
   if (i < 0) return fallback;
@@ -210,6 +217,12 @@ const connect = async (url, onEvent) => {
 
 // How long evaluate waits for the page to answer unless told otherwise: a page's own work answers well within it.
 const evaluateMs = 30000;
+// How long an eval, evalFile or need step waits for its promise: a plan's own script runs on the game's clock (a 30 s
+// flight, landing through a test's results, a menu walk of up to 90 s), and one given up on at evaluateMs went on in
+// the page beside the steps after it: Pilotwings 64's land(), still pressing A through the skydive's results, ran on
+// while go() started on the next test, found the skydive still flying and gave it back. A page that stops answering
+// is caught by play_page's sample, in its stalledSeconds.
+const stepMs = 600000;
 
 // RDRAM in the wasm heap, found by the boot globals every game has at 0x80000300: osTvType, osRomBase and osMemSize.
 const rdramHelpers = `(() => {
@@ -412,7 +425,7 @@ export const open = async (browser, { profile, port, size = [1256, 645], executa
       else if (op === 'eval' || op === 'evalFile' || op === 'need') {
         const js = (op === 'evalFile') ? fs.readFileSync(path.resolve(planDir, a[0]), 'utf8') : a[0];
         let value, failed = false;
-        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js); } catch (e) { value = 'exception: ' + e.message; failed = true; }
+        try { await page.evaluate(rdramHelpers); value = await page.evaluate(js, stepMs); } catch (e) { value = 'exception: ' + e.message; failed = true; }
         if (value !== undefined) log(`${op}: ${JSON.stringify(value)}`);
         if (op === 'need' && (failed || value === false || value === null)) throw new Error(`${a[0]} gave ${JSON.stringify(value)}`);
       }
