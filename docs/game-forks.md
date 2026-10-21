@@ -67,8 +67,12 @@ submodules and the three-way merge, the mod store kept off without curl, the aud
 boot's shaders and its fix, render to RAM's late copy for the Banana Fairy photo and the dummy-frame crash, the shader
 list's sections and Firefox's waits, the ROM.
 
-`amazingalek/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. Its upstream pins its own runtime and
-RmlUi, so it has no pins of its own to go back to: its submodules are at the commits the forks are built on
+`amazingalek/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. It is a fork of podulator's
+GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
+cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
+`GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
+place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to
+go back to: its submodules are at the commits the forks are built on
 (`patches/patches.txt`, a row each in `pins.txt`), and the patched checkouts are the forks' trees file for file; its
 desktop build needs the patched N64Recomp too (9aabea3, ec0748e). Its patches' call to `yield_self_1ms`, whose signature
 isn't a native's, trapped the page after ~20 s. A wait that polls memory or the clock without an OS call starves every
