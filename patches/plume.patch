@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web f5c47ff12076688ea56b7da0765b755f03555308
+plume: https://github.com/amazingalek/plume-web 08f93274bbf8a8733bdfb60f8d86d8f3013a4260
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -479,10 +479,10 @@ index 0000000..bcc9c6f
 +)
 diff --git a/examples/webgpu_checks/main.cpp b/examples/webgpu_checks/main.cpp
 new file mode 100644
-index 0000000..03b3ea0
+index 0000000..b4650c5
 --- /dev/null
 +++ b/examples/webgpu_checks/main.cpp
-@@ -0,0 +1,374 @@
+@@ -0,0 +1,439 @@
 +//
 +// plume
 +//
@@ -495,6 +495,8 @@ index 0000000..03b3ea0
 +// - a formatted R8_UINT buffer of 7 bytes, bound as storage and unpacked by the shader;
 +// - clears of rectangles of color and depth, with a draw after them that needs its own viewport back;
 +// - push constants beside 4 descriptor sets, sharing bind group 3 with the 4th;
++// - push constants across the draws of a pass, the same block again bound once, and instance_index counting from the
++//   draw's first instance;
 +// - a compute shader writing an rgba8unorm storage texture, which WebGPU only allows write-only;
 +// - present() paced to animation frames, and the refresh rate it measures.
 +// Each check prints a line, then "plume WebGPU checks: N of M passed", and the canvas ends green when all passed.
@@ -559,6 +561,19 @@ index 0000000..03b3ea0
 +}
 +@fragment fn fs() -> @location(0) vec4f {
 +    return vec4f(0.0, 0.0, 1.0, 1.0);
++}
++)";
++
++static const char PushConstantsDrawShader[] = R"(
++struct PushConstants { color: vec4f }
++@group(3) @binding(999) var<uniform> pushConstants: PushConstants;
++@vertex fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> @builtin(position) vec4f {
++    let corners = array(vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0), vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0));
++    let c = corners[v];
++    return vec4f(f32(i) * 0.5 - 1.0 + c.x * 0.5, c.y * 2.0 - 1.0, 0.5, 1.0);
++}
++@fragment fn fs() -> @location(0) vec4f {
++    return pushConstants.color;
 +}
 +)";
 +
@@ -681,6 +696,55 @@ index 0000000..03b3ea0
 +    char detail[96];
 +    snprintf(detail, sizeof(detail), "read %u %u", results[0], results[1]);
 +    check((results[0] == 4321) && (results[1] == 50321), "push constants sharing group 3 with a 4th descriptor set", detail);
++    readback->unmap();
++}
++
++// Four draws in one pass, each into the quarter of the target its first instance picks, set red, red, green and red
++// through push constants: the second binds nothing (the pass has the same block bound), and the fourth has to bind red
++// again.
++static void checkPushConstantsAcrossDraws(Context &ctx) {
++    const uint32_t Size = 64;
++    auto color = ctx.device->createTexture(RenderTextureDesc::ColorTarget(Size, Size, RenderFormat::R8G8B8A8_UNORM));
++    const RenderTexture *colorTargets[] = { color.get() };
++    auto framebuffer = ctx.device->createFramebuffer(RenderFramebufferDesc(colorTargets, 1));
++    const RenderPushConstantRange pushConstantRange(0, 0, 0, 4 * sizeof(float), RenderShaderStageFlag::VERTEX | RenderShaderStageFlag::PIXEL);
++    auto layout = ctx.device->createPipelineLayout(RenderPipelineLayoutDesc(&pushConstantRange, 1, nullptr, 0));
++    auto vertexShader = ctx.device->createShader(PushConstantsDrawShader, strlen(PushConstantsDrawShader), "vs", RenderShaderFormat::WGSL);
++    auto pixelShader = ctx.device->createShader(PushConstantsDrawShader, strlen(PushConstantsDrawShader), "fs", RenderShaderFormat::WGSL);
++    RenderGraphicsPipelineDesc pipelineDesc;
++    pipelineDesc.pipelineLayout = layout.get();
++    pipelineDesc.vertexShader = vertexShader.get();
++    pipelineDesc.pixelShader = pixelShader.get();
++    pipelineDesc.renderTargetFormat[0] = RenderFormat::R8G8B8A8_UNORM;
++    pipelineDesc.renderTargetBlend[0] = RenderBlendDesc::Copy();
++    pipelineDesc.renderTargetCount = 1;
++    auto pipeline = ctx.device->createGraphicsPipeline(pipelineDesc);
++    auto readback = ctx.device->createBuffer(RenderBufferDesc::ReadbackBuffer(Size * Size * 4));
++
++    const float colors[4][4] = { { 1.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } };
++    ctx.commandList->begin();
++    ctx.commandList->setFramebuffer(framebuffer.get());
++    ctx.commandList->setGraphicsPipelineLayout(layout.get());
++    ctx.commandList->setPipeline(pipeline.get());
++    ctx.commandList->setViewports(RenderViewport(0.0f, 0.0f, float(Size), float(Size)));
++    ctx.commandList->setScissors(RenderRect(0, 0, Size, Size));
++    ctx.commandList->clearColor(0, RenderColor(0.0f, 0.0f, 1.0f, 1.0f));
++    for (uint32_t i = 0; i < 4; i++) {
++        ctx.commandList->setGraphicsPushConstants(0, colors[i], 0, sizeof(colors[i]));
++        ctx.commandList->drawInstanced(6, 1, 0, i);
++    }
++
++    ctx.commandList->setFramebuffer(nullptr);
++    ctx.commandList->copyTextureRegion(RenderTextureCopyLocation::PlacedFootprint(readback.get(), RenderFormat::R8G8B8A8_UNORM, Size, Size, 1, Size), RenderTextureCopyLocation::Subresource(color.get()));
++    ctx.execute();
++
++    const uint32_t *pixels = static_cast<const uint32_t *>(readback->map());
++    const uint32_t Red = 0xFF0000FF, Green = 0xFF00FF00;
++    const uint32_t row = (Size / 2) * Size;
++    const uint32_t quarters[4] = { pixels[row + 8], pixels[row + 24], pixels[row + 40], pixels[row + 56] };
++    char detail[160];
++    snprintf(detail, sizeof(detail), "quarters %08X %08X %08X %08X", quarters[0], quarters[1], quarters[2], quarters[3]);
++    check((quarters[0] == Red) && (quarters[1] == Red) && (quarters[2] == Green) && (quarters[3] == Red), "push constants across a pass's draws, placed by their first instance", detail);
 +    readback->unmap();
 +}
 +
@@ -841,6 +905,7 @@ index 0000000..03b3ea0
 +#endif
 +    checkFormattedBufferAndReadback(ctx);
 +    checkPushConstantsWithFourSets(ctx);
++    checkPushConstantsAcrossDraws(ctx);
 +    checkStorageTexture(ctx);
 +    checkRectangleClears(ctx);
 +    checkPresent(ctx);
@@ -2745,10 +2810,10 @@ index 0000000..3c043a9
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..b97a8b9
+index 0000000..b82aa73
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3447 @@
+@@ -0,0 +1,3474 @@
 +//
 +// plume
 +//
@@ -5057,9 +5122,12 @@ index 0000000..b97a8b9
 +                    wgpuBindGroupRelease(passGroup);
 +                }
 +
-+                passGroup = (offsetCount == 0) ? bindGroup : nullptr;
-+                if (passGroup != nullptr) {
-+                    wgpuBindGroupAddRef(passGroup);
++                // A group bound at an offset is held too, but is never the same as one bound without (its layout's
++                // binding is dynamic), and the push constants' slot is tracked beside it.
++                passGroup = bindGroup;
++                wgpuBindGroupAddRef(passGroup);
++                if (groupIndex == PushConstantsGroup) {
++                    pass.pushConstantsBound = false;
 +                }
 +            }
 +            else {
@@ -5086,7 +5154,42 @@ index 0000000..b97a8b9
 +            setBindGroup(i, device->emptyBindGroup, 0, nullptr);
 +        }
 +
-+        // Every draw or dispatch gets its own copy of the block in the ring.
++        // The binding's size is part of the bind group, so a chunk keeps one group per block size.
++        const uint32_t bindingSize = uint32_t(alignUp(pushConstantsSize, 16));
++        WebGPUDescriptorSet *sharedSet = (state.layout->descriptorSetCount > PushConstantsGroup) ? state.descriptorSets[PushConstantsGroup] : nullptr;
++        auto chunkBindGroup = [&](PushConstantsChunk &chunk) {
++            WGPUBindGroup &chunkGroup = chunk.bindGroups[bindingSize];
++            if ((sharedSet == nullptr) && (chunkGroup == nullptr)) {
++                WGPUBindGroupEntry entry = WGPU_BIND_GROUP_ENTRY_INIT;
++                entry.binding = PushConstantsBinding;
++                entry.buffer = chunk.buffer;
++                entry.offset = 0;
++                entry.size = bindingSize;
++                WGPUBindGroupDescriptor groupDesc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
++                groupDesc.layout = device->pushConstantsLayout;
++                groupDesc.entryCount = 1;
++                groupDesc.entries = &entry;
++                chunkGroup = wgpuDeviceCreateBindGroup(device->device, &groupDesc);
++            }
++
++            return (sharedSet != nullptr) ? sharedSet->getBindGroupWithPushConstants(chunk.buffer, chunk.id, bindingSize) : chunkGroup;
++        };
++
++        // A render pass that has the same bytes bound already, through the same group, binds nothing again: a renderer
++        // that sets its push constants before every draw (RT64's raster draws) mostly sets the same block, and on a page
++        // each slot is bytes for writeBuffer and each bind a setBindGroup on the page's thread.
++        state.pushConstants.resize(pushConstantsSize, 0);
++        if ((renderPass != nullptr) && pass.pushConstantsBound && (pass.pushConstantsSize == pushConstantsSize)) {
++            PushConstantsChunk &passChunk = pushConstantsChunks[pass.pushConstantsChunkIndex];
++            if ((memcmp(passChunk.data.data() + pass.pushConstantsOffset, state.pushConstants.data(), pushConstantsSize) == 0) &&
++                (chunkBindGroup(passChunk) == pass.bindGroups[PushConstantsGroup]))
++            {
++                state.pushConstantsDirty = false;
++                return;
++            }
++        }
++
++        // Every other draw or dispatch gets its own copy of the block in the ring.
 +        const uint32_t slotSize = uint32_t(alignUp(pushConstantsSize, PushConstantsAlignment));
 +        assert(slotSize <= PushConstantsChunkSize);
 +        if ((pushConstantsChunkIndex < pushConstantsChunks.size()) && (pushConstantsChunks[pushConstantsChunkIndex].used + slotSize > PushConstantsChunkSize)) {
@@ -5104,31 +5207,20 @@ index 0000000..b97a8b9
 +            pushConstantsChunks.emplace_back(std::move(chunk));
 +        }
 +
-+        // The binding's size is part of the bind group, so a chunk keeps one group per block size.
 +        PushConstantsChunk &chunk = pushConstantsChunks[pushConstantsChunkIndex];
-+        const uint32_t bindingSize = uint32_t(alignUp(pushConstantsSize, 16));
-+        WebGPUDescriptorSet *sharedSet = (state.layout->descriptorSetCount > PushConstantsGroup) ? state.descriptorSets[PushConstantsGroup] : nullptr;
-+        WGPUBindGroup &chunkGroup = chunk.bindGroups[bindingSize];
-+        if ((sharedSet == nullptr) && (chunkGroup == nullptr)) {
-+            WGPUBindGroupEntry entry = WGPU_BIND_GROUP_ENTRY_INIT;
-+            entry.binding = PushConstantsBinding;
-+            entry.buffer = chunk.buffer;
-+            entry.offset = 0;
-+            entry.size = bindingSize;
-+            WGPUBindGroupDescriptor groupDesc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
-+            groupDesc.layout = device->pushConstantsLayout;
-+            groupDesc.entryCount = 1;
-+            groupDesc.entries = &entry;
-+            chunkGroup = wgpuDeviceCreateBindGroup(device->device, &groupDesc);
-+        }
-+
-+        WGPUBindGroup bindGroup = (sharedSet != nullptr) ? sharedSet->getBindGroupWithPushConstants(chunk.buffer, chunk.id, bindingSize) : chunkGroup;
++        WGPUBindGroup bindGroup = chunkBindGroup(chunk);
 +
 +        const uint32_t offset = chunk.used;
-+        state.pushConstants.resize(pushConstantsSize, 0);
 +        memcpy(chunk.data.data() + offset, state.pushConstants.data(), pushConstantsSize);
 +        chunk.used += slotSize;
 +        setBindGroup(PushConstantsGroup, bindGroup, 1, &offset);
++        if (renderPass != nullptr) {
++            pass.pushConstantsBound = true;
++            pass.pushConstantsChunkIndex = pushConstantsChunkIndex;
++            pass.pushConstantsOffset = offset;
++            pass.pushConstantsSize = pushConstantsSize;
++        }
++
 +        state.pushConstantsDirty = false;
 +    }
 +
@@ -6198,10 +6290,10 @@ index 0000000..b97a8b9
 +};
 diff --git a/plume_webgpu.h b/plume_webgpu.h
 new file mode 100644
-index 0000000..eac8aed
+index 0000000..036241f
 --- /dev/null
 +++ b/plume_webgpu.h
-@@ -0,0 +1,716 @@
+@@ -0,0 +1,721 @@
 +//
 +// plume
 +//
@@ -6719,6 +6811,11 @@ index 0000000..eac8aed
 +        struct PassState {
 +            WGPURenderPipeline pipeline = nullptr;
 +            WGPUBindGroup bindGroups[MaxDescriptorSets] = {};
++            // Where in the ring the push constants bound to PushConstantsGroup are, and how many bytes of them.
++            bool pushConstantsBound = false;
++            uint32_t pushConstantsChunkIndex = 0;
++            uint32_t pushConstantsOffset = 0;
++            uint32_t pushConstantsSize = 0;
 +            uint32_t stencilReference = 0;
 +            bool stencilReferenceSet = false;
 +            RenderVertexBufferView vertexBuffers[MaxVertexBuffers] = {};

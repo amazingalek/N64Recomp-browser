@@ -276,8 +276,16 @@ ab544ca                it, as a console's RSP has long before a load lands; a lo
 plume 77e521e,         timedWaitsEndLate() (plume_web_waits.h) answers false in a build without threads, so plume's
 rt64 be95c2c           examples and plume_webgpu_checks build without -pthread again: sleepUntil() called it there
                        and the build stopped at an undeclared identifier. Pages build with -pthread, unchanged
-plume f5c47ff,         a hidden page (a tab behind another, minimized: document.hidden) presents nothing, and RT64's
-rt64 1e20ece           pacing counts no presents while it is hidden or for a second after: a swap chain says so
+rt64 cf8beb9,          RT64_RENDER_INDEX_BY_INSTANCE (rt64_raster_params.h, a WGSL build): a raster draw's index is its
+plume 84b785f          first instance, which RasterVS reads as instance_index and hands RasterPS and the dither noise
+                       as a flat varying, and renderIndex stays 0; a render pass binds a push constants block it has
+                       bound already once, with no slot of the ring. renderIndex changed every draw, so each draw cost
+                       the page's thread a setBindGroup and 256 bytes of writeBuffer (Banjo-Tooie throttled in Chrome:
+                       ~1,710 a present). setBindGroup a draw 1.70 to 0.93 on Banjo-Tooie and 1.65 to 0.65 on
+                       Banjo-Kazooie, which throttled 6 times in Chrome presents 52 a second, from 41-45
+                       (docs/findings.md, A page's thread in Chrome, throttled)
+plume 08f9327,         a hidden page (a tab behind another, minimized: document.hidden) presents nothing, and RT64's
+rt64 52ec88f           pacing counts no presents while it is hidden or for a second after: a swap chain says so
                        (isHidden()), and plume holds no present to its cap then. In a hidden tab Chrome calls
                        onSubmittedWorkDone back late, at times by seconds, and the present thread's wait() held the
                        game: Mario Kart 64's and Star Fox 64's sound broke up while hidden, and their dropped presents

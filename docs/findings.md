@@ -246,7 +246,7 @@ Kart 64's page went from 114 presents a second to 60 while hidden, and each try 
 while the tab was still hidden, so it stayed at 60 for 80 s after it came back (Star Fox 64's, 20 s).
 
 So a hidden page presents nothing, and pace() counts no presents while it is hidden or for a second after (plume
-f5c47ff, rt64 1e20ece; the test builds played below carried the same change on main's commits before those). On the
+08f9327, rt64 52ec88f; the test builds played below carried the same change on main's commits before those). On the
 same busy host, Mario Kart 64's test build came up 2,541 short over the 30 s and was back at 60 within 5 s; Star Fox
 64's lost 7,232 in the first 5 s and none after, then 40,328 in one 5 s after it came back. A page's thread still runs
 the game's WebGPU calls, and the game waits for it each frame, so a hidden page on a busy host can still stall: another
@@ -946,6 +946,21 @@ and each costs the page's thread its calls: its own, not the web support's. On t
 (README, Games). The push constants' per-draw bind and 256 bytes are about a tenth of the throttled thread, the one
 part of it shared code could take out.
 
+rt64 cf8beb9 with plume 84b785f takes it out: a raster draw's index is its first instance, so its push constants stay
+the same from draw to draw and plume binds them once a pass (docs/forks.md). Measured with the census on an RTX 2070,
+Chrome 155, at 3840x2000 uncapped, builds of main and of the change from the same game commits (plays.jsonl, sets
+`firstinst-*`):
+
+- Banjo-Tooie, Jinjo Village: `setBindGroup` 1.70 a draw to 0.93, and `writeBuffer` 1.02 KB a draw to 0.72-0.81,
+  throttled 6 times (0.52 to 0.39 unthrottled). Throttled 6 times this host's slower CPU is past what the page can
+  take there: alone on the GPU, main presented 0.0 a second in both its runs and the change 24.8 and 9.5 (4-48 a
+  sample), and beside another throttled page both read 0-0.2.
+- Banjo-Kazooie, its plan's walk in Mumbo's Mountain, throttled 6 times: 710-745 draws a present in every run,
+  `setBindGroup` 1,217-1,231 a present to 475-484, `writeBuffer` 871-917 KB to 577-635, and 41.4 and 45.2 presents
+  a second to 52.2 alone on the GPU (50.9 and 52.5 with a throttled Banjo-Tooie beside it).
+
+What is left a draw is the texture set and the pipeline where they change: RT64's own.
+
 ## Present gaps after Start
 
 What each thread does in a gap over 100 ms with no shader wait, read from a CDP trace of every thread of every
@@ -1065,7 +1080,7 @@ Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
   brought each back.
 - A hidden tab (30 s) in Chrome: the pages presented ~60 a second while hidden, but Star Fox 64's sound came up
   3,000-7,000 frames short every 5 s, and back in front both presented below their rate before (60, then 89 against
-  147; 60 for ~80 s against 114), until plume f5c47ff and rt64 1e20ece (A page in a hidden tab). Firefox played both
+  147; 60 for ~80 s against 114), until plume 08f9327 and rt64 52ec88f (A page in a hidden tab). Firefox played both
   through it unchanged.
 - A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
   against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
