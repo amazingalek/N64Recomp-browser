@@ -2,7 +2,7 @@
 // build dir with the headers a threaded page needs, starts the browser with a profile of its own, and runs a plan's
 // steps on the page.
 //
-// Chrome runs headless (muted, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
+// Chrome runs headless (muted or with no audio output, WebGPU on, one CSS pixel a pixel unless scale says otherwise) and is driven over the DevTools protocol: its input
 // events are trusted, and the ROM goes to the file chooser the page opens. Headless Chrome draws to no display, so its
 // presents never go through the desktop's compositor or wait for the display; with headed it runs in a window of its own,
 // moved off the desktop as Firefox's is below, with its throttling of hidden windows off, which presents as a player's
@@ -425,7 +425,11 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   if (uncapped) mode.push('--disable-frame-rate-limit');
   if (fallbackAdapter) mode.push('--use-webgpu-adapter=swiftshader');
   const size = onScreen ? ['--start-maximized'] : [`--force-device-scale-factor=${scale}`, `--window-size=${width},${height}`];
-  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', '--mute-audio',
+  // Muted, nothing reaches a speaker, but the page's sound is zeroes, so Chrome reads its tab as silent and lowers a
+  // hidden one's process to the background priority it spares a tab that plays sound. --disable-audio-output in
+  // chromeFlags plays it to no device instead, which Chrome still hears, so it replaces --mute-audio.
+  const mute = chromeFlags.includes('--disable-audio-output') ? [] : ['--mute-audio'];
+  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', ...mute,
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...chromeFlags, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {

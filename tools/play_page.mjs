@@ -49,8 +49,9 @@
 // compared only with runs that set the same ones.
 // --chrome-flag (Chrome only, repeated for more) starts Chrome with one more switch of its own, after the tool's:
 // --disable-renderer-backgrounding keeps a hidden tab's renderer process at its usual priority, as Chrome does a tab
-// that plays sound (docs/findings.md, A page in a hidden tab). A run records its flags and is compared only with runs
-// that set the same ones.
+// that plays sound (docs/findings.md, A page in a hidden tab), and --disable-audio-output plays the page's sound to no
+// device in place of muting it (page_driver.mjs), so Chrome still hears a tab that plays sound and treats it as it
+// does a player's. A run records its flags and is compared only with runs that set the same ones.
 // --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
