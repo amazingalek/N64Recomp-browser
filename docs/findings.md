@@ -246,14 +246,15 @@ Kart 64's page went from 114 presents a second to 60 while hidden, and each try 
 while the tab was still hidden, so it stayed at 60 for 80 s after it came back (Star Fox 64's, 20 s).
 
 So a hidden page presents nothing, and pace() counts no presents while it is hidden or for a second after (plume
-1c7b759, rt64 b6d6a95). On the same busy host, Mario Kart 64's test build came up 2,541 short over the 30 s and was
-back at 60 within 5 s; Star Fox 64's lost 7,232 in the first 5 s and none after, then 40,328 in one 5 s after it came
-back. A page's thread still runs the game's WebGPU calls, and the game waits for it each frame, so a hidden page on a
-busy host can still stall: another Mario Kart 64 run lost 149,016 in one 5 s while hidden, and another Star Fox 64 run
-came back presenting 25-31 a second for the 30 s it was played after, its presents done 60-650 ms late with the GPU
-9-21% busy and 7.5 of its 8 GB in use by other pages (Pages' build under the same load came back at 60). On an idle host neither build loses anything: Pages' kept 60 presents a second while
-hidden, and with a preload that times animation frames at 240 a second both came back at 221-225. Firefox 158 plays
-through it either way, its sound never short.
+f5c47ff, rt64 1e20ece; the test builds played below carried the same change on main's commits before those). On the
+same busy host, Mario Kart 64's test build came up 2,541 short over the 30 s and was back at 60 within 5 s; Star Fox
+64's lost 7,232 in the first 5 s and none after, then 40,328 in one 5 s after it came back. A page's thread still runs
+the game's WebGPU calls, and the game waits for it each frame, so a hidden page on a busy host can still stall: another
+Mario Kart 64 run lost 149,016 in one 5 s while hidden, and another Star Fox 64 run came back presenting 25-31 a
+second for the 30 s it was played after, its presents done 60-650 ms late with the GPU 9-21% busy and 7.5 of its 8 GB
+in use by other pages (Pages' build under the same load came back at 60). On an idle host neither build loses
+anything: Pages' kept 60 presents a second while hidden, and with a preload that times animation frames at 240 a
+second both came back at 221-225. Firefox 158 plays through it either way, its sound never short.
 
 ## A host that holds Chrome's presents
 
@@ -1064,7 +1065,8 @@ Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
   brought each back.
 - A hidden tab (30 s) in Chrome: the pages presented ~60 a second while hidden, but Star Fox 64's sound came up
   3,000-7,000 frames short every 5 s, and back in front both presented below their rate before (60, then 89 against
-  147; 60 for ~80 s against 114). Firefox played both through it unchanged.
+  147; 60 for ~80 s against 114), until plume f5c47ff and rt64 1e20ece (A page in a hidden tab). Firefox played both
+  through it unchanged.
 - A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
   against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
 
