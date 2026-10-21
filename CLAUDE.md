@@ -85,8 +85,8 @@ branches only: upstream's others are deleted when it is made.
   runtime's own interfaces, as every recomp does.
 - CI (`.github/workflows/ci.yml`) builds every library of a page with Emscripten from the forks, checks every WGSL
   shader, the plume device thread and hlslpp's wasm SIMD backend, and checks that `patches/` match the forks and apply
-  to every recomp commit in `patches/pins.txt` and over DKR-R-web's, CBFD-Recompiled-web's and
-  JetForceGemini-Recomp-web's own patches. It builds no page (that needs a game), so anything that changes what a page
+  to every recomp commit in `patches/pins.txt` and over DKR-R-web's, CBFD-Recompiled-web's,
+  JetForceGemini-Recomp-web's, Snap64Recomp-web's and rush2recompiled-web's own patches. It builds no page (that needs a game), so anything that changes what a page
   runs is built and played before it lands. A change to only `*.md`, `plays.jsonl`, `site/` and the tools that play,
   serve, read and publish pages runs only the `changes` job.
 

@@ -92,7 +92,9 @@ Firefox's waits.
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream
 has them, and `tools/publish_pages.sh` runs the fork's `tools/web_patch.sh` too; the three files that leaves out are out
-of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. rt64-web
+of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. Its
+changes to those three are the web's as the commit the script names (`MERGED_FROM`) has it, and what the web has
+changed in them since is merged in by `apply.cmake --since`, as Snap64's are. rt64-web
 03b9dcc and d5121c9 keep rt64's web includes off the lines Conker's rt64 patch adds to; a new web include goes where a
 game's patch adds none, or the next retest's Conker build stops on it. N64ModernRuntime 6456ba6 keeps the VI thread's
 frame wait off the lines Conker's runtime patch moves its retrace count to, and CI's `cbfd-patches` job applies the
@@ -224,8 +226,11 @@ before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs i
 PR's checkout, against DKR-R-web's main. A conflict there is settled in DKR-R-web (the skip list, `patches/web/`), as
 v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web 8a2ac6b), or by keeping the web's lines off DKR-R's in the
 fork. Where both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
-frame and workload queue), its `patches/web/<project>.patch` makes the web's change, so a change here to one of them
-reaches its page only once that patch makes it too (rt64 0560318's decal bounds did). N64ModernRuntime's
+frame and workload queue), its `patches/web/<project>.patch` makes the web's change, merged from the commit
+`scripts/build_web.sh` names (`web_merged_from`), and what the web has changed in them since is merged in by
+`apply.cmake --since`. Before it named one, a change here to those files reached the page only once that patch made it
+too: rt64 0560318's decal bounds did, but the workload queue went without the offscreen passes, the pipeline warm-up
+and the capped interpolated targets, and the runtime read the ROM 1 KB at a time, until v0.82.0. N64ModernRuntime's
 `mesgqueue.cpp` takes DKR-R's alone, without the web's held messages (66539ab): DKR-R's own
 `runtime-deferred-events.patch` does the same, a blocked external message kept in a list of its own until a receive
 frees its queue, and is staged over that file at configure time. rt64-web 0a9fcb6 keeps the web's
@@ -246,7 +251,9 @@ readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` pa
 both change the same lines (`patches/web/files.txt`, 17 of rt64's and 6 of the runtime's), whose web change is its
 `patches/web/<project>.patch`, merged by hand. Its `tools/build_web.sh` then takes what N64Recomp-browser has changed in
 those files since that merge (`apply.cmake --since`, README), and stops only where that meets the port's own lines:
-that is merged into its patch by hand. On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
+that is merged into its patch by hand. CI's `snap-patches` job runs its `tools/build_web.sh --patches` (that step, no
+ROM) with the PR's checkout, against its main, so a web change that meets the port's lines, in a file left out or one
+that isn't yet, is red in the PR that makes it and is merged into `patches/web` there (a new file added to `files.txt`). On v0.70.0 rt64-web had changed 9 of the then 13 files since its patch was written, which
 the build had left out with nothing said. Two of that merge's choices: in `rt64_vi.cpp` frames of uneven VIs
 interpolate at the fastest (rt64 179adb8) and the port's last measured rate is what's left, in place of 0; in
 `RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
@@ -265,7 +272,8 @@ the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched
 `lib/N64Recomp-browser` pins. Its `tools/build_web.sh` applies Rush 2's patches first, then `apply.cmake` project by
 project, but for the files where both change the same lines (`web/patches/files.txt`: 5 of rt64's, the runtime's
 `events.cpp`, 2 of RecompFrontend's), whose web change is its `web/patches/<project>.patch`, merged by hand, and what N64Recomp-browser
-has changed in them since is merged in by `apply.cmake --since`, as Snap64's is. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
+has changed in them since is merged in by `apply.cmake --since`, as Snap64's is, and CI's `rush2-patches` job runs its
+`tools/build_web.sh --patches` on each PR as `snap-patches` does Snap64's. One of them applies as is but names what the port renamed (`ui_mod_menu.cpp`), so it is listed too. Two of
 the merge's choices: Rush 2's generated mipmaps and texels of a region of a larger image are read through the web's draw
 texture slots (`sampleTileTextureGrad()`, `loadTileTexture()`), and `RasterPS.hlsl`'s coverage output (`SV_Coverage`)
 is left out of a page's shaders, since naga takes no sample mask output and the page draws one sample a pixel. Its
