@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web bf96a62e720a8623218d76f8c8202d2ef6c5c963
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 6c97d69ce75788df34ab7fe29dedc755ccddb24a
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
