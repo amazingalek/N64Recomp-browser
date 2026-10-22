@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web c224b4fc63183180c3eb9180b079feae4fc428a4
+rt64: https://github.com/amazingalek/rt64-web 47d43be36126d29f53b79b980b14201d2ac9603a
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1861,7 +1861,7 @@ index 6051f4e..f719325 100644
          // Dump memory contents into a file if the process is active.
          if (!state->dumpingTexturesDirectory.empty()) {
 diff --git a/src/hle/rt64_rsp.cpp b/src/hle/rt64_rsp.cpp
-index 1da2550..38b11ad 100644
+index 1da2550..bea4135 100644
 --- a/src/hle/rt64_rsp.cpp
 +++ b/src/hle/rt64_rsp.cpp
 @@ -1128,9 +1128,28 @@ namespace RT64 {
@@ -1894,7 +1894,7 @@ index 1da2550..38b11ad 100644
              const hlslpp::float3 U = posScreen[globalIndices[1]] - posScreen[globalIndices[0]];
              const hlslpp::float3 V = posScreen[globalIndices[2]] - posScreen[globalIndices[0]];
              const hlslpp::float3 N = hlslpp::cross(V, U);
-@@ -1138,16 +1157,29 @@ namespace RT64 {
+@@ -1138,11 +1157,19 @@ namespace RT64 {
          }
  
          const FixedRect &scissorRect = state->rdp->scissorRectStack[state->rdp->scissorStackSize - 1];
@@ -1909,27 +1909,13 @@ index 1da2550..38b11ad 100644
          if (visibleTri && !scissorRect.isNull()) {
              fbPair.scissorRect.merge(scissorRect);
  
-             FixedRect drawRect;
+-            FixedRect drawRect;
 -            for (int i = 0; i < 3; i++) {
--                const hlslpp::float3 &v = posScreen[globalIndices[i]];
--                drawRect.ulx = std::min(drawRect.ulx, int32_t(v[0] * 4.0f));
--                drawRect.uly = std::min(drawRect.uly, int32_t(v[1] * 4.0f));
--                drawRect.lrx = std::max(drawRect.lrx, int32_t(hlslpp::ceil(v.x).x * 4.0f));
--                drawRect.lry = std::max(drawRect.lry, int32_t(hlslpp::ceil(v.y).x * 4.0f));
-+            if (unprojectable) {
-+                drawRect = scissorRect;
-+            }
-+            else {
-+                for (int i = 0; i < 3; i++) {
-+                    const hlslpp::float3 &v = posScreen[globalIndices[i]];
-+                    drawRect.ulx = std::min(drawRect.ulx, int32_t(v[0] * 4.0f));
-+                    drawRect.uly = std::min(drawRect.uly, int32_t(v[1] * 4.0f));
-+                    drawRect.lrx = std::max(drawRect.lrx, int32_t(hlslpp::ceil(v.x).x * 4.0f));
-+                    drawRect.lry = std::max(drawRect.lry, int32_t(hlslpp::ceil(v.y).x * 4.0f));
-+                }
-             }
- 
-             const interop::RSPViewport &viewport = viewportStack[viewportStackSize - 1];
++            FixedRect drawRect = unprojectable ? scissorRect : FixedRect();
++            for (int i = 0; (i < 3) && !unprojectable; i++) {
+                 const hlslpp::float3 &v = posScreen[globalIndices[i]];
+                 drawRect.ulx = std::min(drawRect.ulx, int32_t(v[0] * 4.0f));
+                 drawRect.uly = std::min(drawRect.uly, int32_t(v[1] * 4.0f));
 diff --git a/src/hle/rt64_shared_queue_resources.h b/src/hle/rt64_shared_queue_resources.h
 index 8858dac..933b80e 100644
 --- a/src/hle/rt64_shared_queue_resources.h
