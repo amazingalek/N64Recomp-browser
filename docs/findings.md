@@ -1223,6 +1223,26 @@ froze, and only a restart brought it back. A device lost in a browser
 costs only its page (Faults); one lost through `/dev/dxg` costs the host and everything on it, so a desktop build
 under WSL runs on lavapipe (CLAUDE.md, Playing a page).
 
+## Firefox slow to start
+
+On some stretches of an afternoon, every Firefox play on one host (an RTX 2070, other cards' pages beside it) took 50
+to 540 s to open, while Chrome plays in the same hours opened at once, and quieter stretches opened in 4-7 s. Host load
+didn't decide it: one slow open was on a host 13% busy. Firefox 158's debugging port answered in 1-26 s every time; what
+waited was BiDi's `session.new`, which answers only once the browser fires `browser-idle-startup-tasks-finished`, after
+the first window's delayed startup and every startup idle task has run. A Gecko startup profile of a 245 s open on
+about:blank shows the window ready at 80 s, the idle tasks run in batches 35-80 s apart (SafeBrowsing.init only when
+its 5 s timeout forced it), and every thread profiled, the GPU process's included, idle in its event loop between
+them, while the profile's first sync of remote settings ran from 35 s to about 200 s: dozens of collections and
+tracking-protection lists from Mozilla's servers, thousands of IndexedDB writes. The remote agent sets
+`services.settings.server` to a dummy so that remote settings stay off the network, but a release build ignores the
+pref unless `MOZ_REMOTE_SETTINGS_DEVTOOLS` is 1 in its environment. Headless (no window, no GPU) on fresh profiles,
+`session.new` answered at 158 s and 29 s without it and 13.5 s and 1.7 s with it; windowed in the same slow stretch,
+at 72 s and 182 s with it and not within 8 minutes without. An hour later, with the host 32-49% busy, every windowed
+start took 3-5 s with or without it. `page_driver.mjs` starts Firefox with it set. What still slowed the windowed
+starts with it set is not known. In the slow stretches, Firefox on about:blank also didn't exit within 30 s of
+`browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of the browser's
+own process as in A page that stops answering.
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
