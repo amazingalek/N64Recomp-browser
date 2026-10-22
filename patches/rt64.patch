@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 1fcc9a2d81afebff536ff419450f6343de7507dc
+rt64: https://github.com/amazingalek/rt64-web 51c3fddd499476dfb7bd52e8565091cbfe361d9b
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2161,10 +2161,24 @@ index 7a8c13b..8bb8b0a 100644
          void setExtendedRDRAM(bool isExtended);
          void setTexcoordWrapPoint(int16_t wrapU, int16_t wrapV);
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
-index a870166..05625cc 100644
+index a870166..97a5d4b 100644
 --- a/src/hle/rt64_vi.cpp
 +++ b/src/hle/rt64_vi.cpp
-@@ -162,13 +162,22 @@ namespace RT64 {
+@@ -93,6 +93,13 @@ namespace RT64 {
+     }
+ 
+     hlslpp::uint2 VI::fbSize() const {
++        // A vertical region that ends where or before it starts shows no lines, so it gives no size, as a blank VI
++        // doesn't. Estimated from it, the height wrapped round to billions of lines, and the aspect ratio near 0 that
++        // gave made every target drawn while it was the screen's VI as wide as a target can be (MaxDimension).
++        if (vRegion.vEnd <= vRegion.vStart) {
++            return hlslpp::uint2(0, 0);
++        }
++
+         hlslpp::uint2 size = { width, 0 };
+         
+         // In interlaced without deflickering, the stride of the framebuffer is usually double of 
+@@ -162,13 +169,22 @@ namespace RT64 {
      }
  
      uint32_t VIHistory::logicalRateFromFactors() {
