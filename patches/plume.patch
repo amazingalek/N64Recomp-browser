@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 6cb5d38206b7c6fdc7d2e32c8852b1a22d5c4f03
+plume: https://github.com/amazingalek/plume-web 45f09eed9bcdd9e1f78e758b31a2fbf0a49258f5
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2740,10 +2740,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..8448d7a
+index 0000000..3aa96f8
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,148 @@
 +//
 +// plume
 +//
@@ -2821,10 +2821,13 @@ index 0000000..8448d7a
 +        }
 +
 +        waits.lateSeconds = ((waits.secondLateWaits * 2) > waits.secondWaits) ? (waits.lateSeconds + 1) : 0;
++        // TEST ONLY: each second logged, and ?timed-waits-late-seconds=<n> the seconds in a row (0, never).
++        static const int testSeconds = MAIN_THREAD_EM_ASM_INT({ const v = new URLSearchParams(location.search).get('timed-waits-late-seconds'); return v === null ? 10 : parseInt(v, 10); });
++        fprintf(stderr, "plume test: a second's judged waits: %u of %u late, %u seconds in a row\n", waits.secondLateWaits, waits.secondWaits, waits.lateSeconds);
 +        waits.secondStart = now;
 +        waits.secondWaits = 0;
 +        waits.secondLateWaits = 0;
-+        if (waits.lateSeconds >= 10) {
++        if ((testSeconds > 0) && (waits.lateSeconds >= (uint32_t)testSeconds)) {
 +            waits.late = true;
 +            fprintf(stderr, "plume: most timed waits on a thread of this page ended over 4 ms late for 10 s, so waits off the page's thread are woken or spun from now on, not timed\n");
 +        }
