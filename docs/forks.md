@@ -298,4 +298,8 @@ rt64 5249040, e696b69  the workload thread reads no GPU profiler timestamps on E
                        tab)
 N64Recomp df17690      an op with $zero as its destination (lw $zero, ...) written (void)(<value>): done, nothing assigned
                        ("0 = MEM_W(...)" didn't compile)
+N64ModernRuntime       recomp::Configuration's window handle and callbacks are value-initialized ({}), on a desktop
+723db86                build too: a main.cpp writing "recomp::Configuration cfg;" left the handle holding what was on
+                       the stack, create_window went uncalled and RT64 took it as its window (a Linux desktop build
+                       segfaulted at start in SDL_GetWindowDisplayIndex)
 ```
