@@ -313,10 +313,10 @@ graphics as they are but for the sky's clouds and water, raw RDP triangles RT64 
 which RSPRecomp swaps in where the code DMAs it, and the program drops whole audio frames, never part of one, when
 more than 100 ms is queued. Its build, `tools/build_decomp.sh` (the decompilation checked against the ROM, the
 relink, the list and the symbols) then `tools/build_web.sh`, runs Docker images of its own, so `publish_pages.sh`
-runs it on the build host and not in rush-2049-recomp's image. Its list is 695 shaders, 276 pipelines: the boot (38)
+runs it on the build host and not in rush-2049-recomp's image. Its list is 702 shaders, 278 pipelines: the boot (42)
 and a section a solo mission (21), recorded by `tools/record_shaders.sh`, where `patches/shader_survey.c` starts each
-mission as mission select's Accept does, plus 67 the plans' plays, a minute in each mission and a route
-through 12 of them missed afterwards. Its docs/building.md and docs/web.md have the rest.
+mission as mission select's Accept does, plus 74 the plans' plays, the publish's boot check, a minute in each
+mission and a route through 12 of them missed afterwards. Its docs/building.md and docs/web.md have the rest.
 
 ## The games' own frame rates
 
