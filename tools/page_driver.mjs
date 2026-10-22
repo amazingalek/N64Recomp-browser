@@ -677,28 +677,28 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
+  // BiDi's session.new answers only once the browser's startup idle tasks have run, and on a fresh profile they wait
+  // behind its first sync of remote settings from Mozilla's servers (dozens of collections into IndexedDB). The remote
+  // agent points remote settings at a dummy server (services.settings.server) so that they stay off the network, but a
+  // release Firefox ignores that pref unless MOZ_REMOTE_SETTINGS_DEVTOOLS is 1. Without it session.new took 30 s to over
+  // 8 minutes on some hosts, which ran smoke plays out of their turns; with it a headless start answered in 2-14 s
+  // (docs/findings.md, Firefox slow to start).
   const proc = spawnHeld(affinity, browserExecutable('firefox', executable), ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
-    { stdio: 'ignore' });
-  const T0 = Date.now(); const T = () => ((Date.now() - T0) / 1000).toFixed(1); const tries = [];
+    { stdio: 'ignore', env: { ...process.env, MOZ_REMOTE_SETTINGS_DEVTOOLS: '1' } });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
-    const t = Date.now();
     try {
       send = await connect(`ws://127.0.0.1:${port}/session`, (m) => {
         if (m.method === 'log.entryAdded') line(m.params.type === 'javascript' ? 'exception: ' + m.params.text : m.params.text);
       });
-    } catch (e) { tries.push(Date.now() - t + ':' + e.message.slice(0, 40)); await sleep(200); }
+    } catch { await sleep(200); }
   }
-  line(`PROBE answered at ${T()} s after ${tries.length} tries: ${tries.slice(0, 3).join(' | ')} ... ${tries.slice(-2).join(' | ')}`);
   if (!send) throw new Error('Firefox never answered on its debugging port');
   await send('session.new', { capabilities: {} });
-  line(`PROBE session at ${T()} s`);
   await send('session.subscribe', { events: ['log.entryAdded'] });
   const context = (await send('browsingContext.getTree', {})).result.contexts[0].context;
-  line(`PROBE tree at ${T()} s`);
   if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, onScreen ? 0 : width, height)) line('page_driver: Firefox window not moved');
-  line(`PROBE moved at ${T()} s`);
   if (!onScreen) {
     const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: scale });
     if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
