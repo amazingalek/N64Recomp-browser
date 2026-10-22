@@ -298,4 +298,8 @@ rt64 5249040, e696b69  the workload thread reads no GPU profiler timestamps on E
                        tab)
 N64Recomp df17690      an op with $zero as its destination (lw $zero, ...) written (void)(<value>): done, nothing assigned
                        ("0 = MEM_W(...)" didn't compile)
+RecompFrontend 75e5f85 on a page the file picker's input is held until the picker is answered (frontend/file_picker.cpp
+                       too): Chrome holds an open picker's input only weakly, so a GC while it was open (6 s after
+                       Load ROM on Conker's launcher) took it, the file went nowhere, and every Load ROM after was
+                       ignored until a reload. A headless play's ROM was lost so once in about 20 plays
 ```
