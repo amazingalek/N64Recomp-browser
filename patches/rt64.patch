@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 33e87a94488b7701c4d0728fa85b23b79704b31b
+rt64: https://github.com/amazingalek/rt64-web cbe51a50147b7a6f0a61d61868a0e67123046f77
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -396,6 +396,29 @@ index 1450565..047ddd9 100644
  // Disable SIMD on GCC due to UB when compiling with optimizations.
  
  #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+diff --git a/src/common/rt64_math.cpp b/src/common/rt64_math.cpp
+index c20fb51..098ee3c 100644
+--- a/src/common/rt64_math.cpp
++++ b/src/common/rt64_math.cpp
+@@ -52,7 +52,17 @@ namespace RT64 {
+         v[2][2] = -vp[2][3];
+         v[3][2] = -vp[3][3];
+ 
+-        p[2][2] = vp[0][2] / v[0][2];
++        // From the row where the view's Z axis is largest: it is a unit vector, so that row's is at least 1/sqrt(3).
++        // Row 0's alone is near zero for a camera looking along the world's Z, and in a fixed-point matrix the ratio
++        // of two such small values was a different depth range every frame, or 0/0 and no decomposition at all.
++        int zRow = 0;
++        for (int i = 1; i < 3; i++) {
++            if (fabsf(v[i][2]) > fabsf(v[zRow][2])) {
++                zRow = i;
++            }
++        }
++
++        p[2][2] = vp[zRow][2] / v[zRow][2];
+         p[3][2] = vp[3][2] - p[2][2] * v[3][2];
+ 
+         p[0][0] = sqrtf(sqr(vp[0][0]) + sqr(vp[1][0]) + sqr(vp[2][0]));
 diff --git a/src/common/rt64_thread.cpp b/src/common/rt64_thread.cpp
 index c4b080b..a7de6b4 100644
 --- a/src/common/rt64_thread.cpp
@@ -2112,10 +2135,24 @@ index 7a8c13b..8bb8b0a 100644
          void setExtendedRDRAM(bool isExtended);
          void setTexcoordWrapPoint(int16_t wrapU, int16_t wrapV);
 diff --git a/src/hle/rt64_vi.cpp b/src/hle/rt64_vi.cpp
-index a870166..05625cc 100644
+index a870166..97a5d4b 100644
 --- a/src/hle/rt64_vi.cpp
 +++ b/src/hle/rt64_vi.cpp
-@@ -162,13 +162,22 @@ namespace RT64 {
+@@ -93,6 +93,13 @@ namespace RT64 {
+     }
+ 
+     hlslpp::uint2 VI::fbSize() const {
++        // A vertical region that ends where or before it starts shows no lines, so it gives no size, as a blank VI
++        // doesn't. Estimated from it, the height wrapped round to billions of lines, and the aspect ratio near 0 that
++        // gave made every target drawn while it was the screen's VI as wide as a target can be (MaxDimension).
++        if (vRegion.vEnd <= vRegion.vStart) {
++            return hlslpp::uint2(0, 0);
++        }
++
+         hlslpp::uint2 size = { width, 0 };
+         
+         // In interlaced without deflickering, the stride of the framebuffer is usually double of 
+@@ -162,13 +169,22 @@ namespace RT64 {
      }
  
      uint32_t VIHistory::logicalRateFromFactors() {
