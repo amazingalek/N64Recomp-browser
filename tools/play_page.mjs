@@ -20,6 +20,8 @@
 // page_driver.mjs says how each browser is driven. --size is the viewport in CSS pixels, one a pixel, which the plan's
 // clicks are in (1256x645, as record_shaders.mjs's; the stand-in for a laptop's integrated graphics is 3840x2000). At
 // another size a click goes where recompui puts the same spot (page_driver.mjs). --query is added to the page's URL.
+// --browser is the browser's executable where page_driver.mjs finds none (browserExecutable): without one there, the
+// tool says so and exits 1 before it serves or starts anything, and writes no --json.
 // --headed runs Chrome in a window off the desktop, as a player's Chrome presents, instead of headless (page_driver.mjs;
 // Firefox is always in a window). --on-screen runs either browser maximized on the desktop at its own scale, as a
 // player's window is and Windows composites it, for a laptop's runs (page_driver.mjs says what off the desktop
@@ -154,7 +156,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import { firefoxUncappedRate, missingPlanFiles, open, option, serve, sleep } from './page_driver.mjs';
+import { browserExecutable, firefoxUncappedRate, missingPlanFiles, open, option, serve, sleep } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
 const headed = args.includes('--headed');
@@ -226,6 +228,7 @@ if (args.length !== 4 || !['chrome', 'firefox'].includes(args[0])) {
   process.exit(1);
 }
 const [browser, where, rom, planFile] = args;
+try { browserExecutable(browser, executable); } catch (error) { console.error(`${error.message}: give its executable with --browser`); process.exit(1); }
 const uncappedAs = uncapped && browser === 'firefox' ? firefoxUncappedRate : uncapped;
 if (Object.keys(firefoxPrefs).length && browser !== 'firefox') { console.error('--firefox-pref is Firefox only'); process.exit(1); }
 if (chromeFlags.length && browser !== 'chrome') { console.error('--chrome-flag is Chrome only'); process.exit(1); }

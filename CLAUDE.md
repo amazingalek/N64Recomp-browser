@@ -228,5 +228,7 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   flight, for Banjo held at 30 in Firefox on a laptop's screen: each paced as often, the GPU 94-100% busy at 60.
 - The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.
+- A list started with the list before's render-to-RAM late copy still pending, for Perfect Dark at 30 in its
+  levels: it drew 30 either way, its main thread waiting for a controller sample (`joy_debug_joy`), not for the copy.
 - Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
   silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.

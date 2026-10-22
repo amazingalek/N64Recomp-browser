@@ -352,6 +352,28 @@ It came back from 12:19 UTC that day. Pokémon Snap's page (Snap64Recomp-web on 
 minutes, and Mario Kart 64's page, 358* in its row, read 171. Firefox read Snap at 203-206 throughout. Snap's Chrome
 cell is its 11:54 run, and Star Fox 64's 173*, from Pages at 12:28-12:31, was played in that state.
 
+## Pokémon Snap's timed waits in Firefox
+
+Pokémon Snap's page served locally presented 73.9 and 75.6 a second in Firefox 158 in two retests' smoke plays
+(v0.82.0, v0.85.0; uncapped at 3840x2000 on an RTX 5080, a fresh profile), from the first sample to the last, as many
+as its animation frames, frame gaps 15 ms (the system timer's tick), the GPU 7-14% busy (37-57% in the first, beside
+Rush 2049's plays); from Pages after publishing it presented 206-208, and every other game's build 182-293. Each was a
+shared turn with another card's page playing beside it (Rush 2049's in Chrome and Firefox, Perfect Dark's in Firefox).
+Played again in whole turns, Pages' own v0.85.0 bytes (2026-10-22, plays.jsonl's twelve lines that name the card on
+Snap local vs Pages), the local server wasn't it, nor was the page's name: served locally as Snap64Recomp.html 226, 96,
+328, 227 and 222, as index.html 330 and 209; from Pages 227, 226, 211, 225 and 226. What told them apart is plume's
+`timedWaitsEndLate()`, measured once as the page starts from the shortest of three waits of 100 us: every play in
+which it found them late (its console line says so) and spun presented 209-227, and the three in which one came in
+under its 4 ms and it kept timed waits presented 330, 328 and 96 (the 96 at the animation frames' 108, frame gaps p50
+10 ms). Firefox's waits there are neither on time nor on the tick: `tools/wait_probe.js` read the shortest of three
+waits each second at 0.4-16 ms, a median of 5-8 ms, through every play, served locally or from Pages alike. So the
+start's shortest of three passes 4 ms about a third of the time: locally in 3 of 7 plays, and from Pages, where it
+read 4.5-5.5 ms, in none of 5. That one measure picks whether the page's waits are timed or woken and spun (docs/forks.md,
+plume cabe1ac), so a page that judged them on time plays fastest while they are and can fall to about its animation
+frames' rate when they aren't. Why only Snap's plays have shown the fall isn't known: its port paces and presents its
+frames in RT64 code of its own (docs/game-forks.md). A Firefox number for Snap is read beside its console's plume
+line, and only spun plays are compared until plume judges waits by more than one start.
+
 ## Uncapped in Firefox
 
 `layout.frame_rate` 0, which `play_page.mjs --uncapped` gave Firefox until it gave 360, makes Firefox's animation frames
@@ -1290,3 +1312,15 @@ What CLAUDE.md's Ruled out rests on.
   with plume bf417cf it paced to 30 in every default-prefs Firefox run, as before, and what decided 60 against 30 was
   what each present cost the GPU in Firefox's compositing, Windows' compositor included, and with DWM at 0% Banjo
   was paced to 30 all the same (A laptop, measured).
+- A list started with the list before's late copy still pending (render to RAM's late copy landing at a VI once the
+  GPU has it, or before the list after next, the readback buffers it waits on kept through the next list's history),
+  for Perfect Dark's page held at 30 in its levels: with its prebuilt list the page draws Defection at 29-31 frames a
+  second either way, in every play, uncapped (presents 269 and 281 a second against 300 and 283) and capped at headless
+  Chrome's ~174 animation frames a second (75 and 73 against 74 and 76), interleaved, its regular plan at 1256x645, an
+  RTX 5080, an idle host (`tools/frame_lengths.js` on `g_Vars.lvframe60`, set `pd-late2` in plays.jsonl). A Chrome
+  trace of the change's build over 30 s of Defection, uncapped: RT64's Gfx thread waits for a list 90% of the time,
+  `send_dl` 8%, the copy's readback 3%; the game's main thread spends all of it in `main_tick > joy_debug_joy`, half in
+  `joy_disable_cyclic_polling` and half in `joy_enable_cyclic_polling`, each waiting in `osRecvMesg` for the scheduler's
+  next retrace: a tick that finds no controller sample newer than the last one restarts the polling and takes two VIs
+  (Perfect Dark's docs/web.md says so of its menus). Its desktop build draws its levels at 30 too. The Gfx thread's 85%
+  in the late copy's wait came from a play without the prebuilt list.
