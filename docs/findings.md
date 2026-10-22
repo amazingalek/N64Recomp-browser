@@ -263,6 +263,10 @@ an idle host with an RTX 5080 neither showed: Perfect Dark played clean in both 
 Firefox answered `getTree` twice a second for 2 minutes in 250 ms or less. So the page's late console lines there
 (100 s), and the 15 s with no answer that ends the run, are the browser's, and such a run says nothing about the
 page. A `--gecko-profile` dump goes through that same process, so it comes only once the process answers again.
+With Firefox started with `MOZ_REMOTE_SETTINGS_DEVTOOLS=1` (page_driver.mjs), Perfect Dark's regular plan from Pages
+played 4 of 4 clean through Defection on that host (3840x2000 uncapped, 4-14% busy as each shared turn began, no other
+turn running): 0 WebGPU errors, 0 exceptions, every command answered. Its list had the 3 shaders by then, so none was
+built in line with the device there.
 
 ## Two pages at once
 
