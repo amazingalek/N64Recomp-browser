@@ -38,6 +38,22 @@ shaders (25, 10, 70, 60, 21, 24 and 73 KB the most), their mix changing with the
 16 s walk, and the time a present stayed within that range from 50 s to 128 s: no part of the walk costs more and
 nothing builds up. So Dam's GPU frame is RT64's own, as the others are; on the laptop below Chrome draws it at 60.
 
+Super Mario 64's Bob-omb Battlefield at 3840x2000 (the page from Pages, main c74c267, its regular plan, headless Chrome
+155 and Firefox 158 uncapped on an RTX 2070, an idle host): Auto draws 9 times its 240 lines, 4148x2160. 1.7-1.9 ms of
+GPU passes a present in Chrome, 6 passes: the scene at 4148x2160 (210-240 draws, 1.5-1.7 ms), its depth clear (0.04),
+two compute passes (0.01), one 3840x2000 draw into the canvas (0.16), and ~34 buffer copies and a copy of the canvas,
+untimed. Its draws a present by fragment shader: 9 KB ~60, 10 KB ~55, 13 KB ~45, 3 KB ~35, 11 KB ~27. With every
+scene draw left out (`?probe-skip=3,4,9,10,11,12,13`) the passes took 0.22 ms in Chrome and 0.28 in Firefox, Chrome's
+presents a second went 336 → 359 (the 360 cap) and nvidia-smi's GPU 86% → 38% busy, Firefox's 284 → 354 and 92% →
+57%. So its GPU frame in both browsers is RT64's own pixel shaders at Auto's rounded-up size, as the others are, and
+Firefox's lower rate in the level is those draws costing its GPU more. Its threads, in Chrome traces of a build linked
+with `--profiling-funcs` (capped at 1920x945, uncapped at 3840x2000): the page's main thread, plume's device thread,
+28% busy capped and 58% uncapped, nearly all of it WebGPU calls; RT64's display list and workload threads and the
+sound's aspMain each under 10%; the game's own threads waiting on their messages. A trace puts a wait inlined into a
+thread's loop down to the loop itself (`timer_thread` and RT64's idle texture streaming threads at 100%), so a share
+there is not CPU time: untraced, the capped page took 0.8-1.2 cores (plays.jsonl). Nothing in either is the web's or
+the game's own to make cheaper.
+
 ## Memory
 
 Read as docs/playing.md says. Rush 2049's page from Pages, 10 minutes of its attract demo, Firefox 158 on an
