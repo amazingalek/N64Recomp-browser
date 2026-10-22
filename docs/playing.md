@@ -92,7 +92,9 @@ retest.
 Each play takes its own turn in the machine's GPU queue (CLAUDE.md, Playing a page). A smoke play is a shared turn,
 beside others' shared turns, with a short limit (about 10 minutes); an A/B's play and a soak are each a whole turn, the
 GPU to themselves, with a limit that fits the plan. So a queue that serves the shortest limit first can put a smoke
-play ahead of a soak.
+play ahead of a soak. A shared turn's presents a second aren't its page's: another card's page can be playing beside
+it (both of Snap's slow smoke plays in docs/findings.md, Pokémon Snap's timed waits in Firefox), so a smoke play is
+read for crashes, WebGPU errors and exceptions, and a page's number to compare comes from a whole turn.
 
 A card queues one series at a time (an `ab_pages.mjs` run, or a game's smoke plays) and stops a series at its first
 failed play: the cause is fixed, then the series is played again, rather than its other plays queued behind a failure.
