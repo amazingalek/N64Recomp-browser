@@ -46,11 +46,10 @@ the game forks take no PRs: a change is a commit pushed to the fork's `main` as 
 (`forks.txt` here, a game fork's submodule). `rush-2049-recomp` is the one game repo that works by PRs: moving its
 `lib/N64Recomp-browser` or publishing its page is a PR there.
 
-Branches don't outlive their work: every one of these repos deletes a PR's branch when it merges ("Automatically
-delete head branches", on in each, a new fork included), and a branch pushed to a fork to hold work not on `main` yet
-(`web-wip`, `wip/<topic>`, a game fork's `fix/<topic>` offered to its game's repo) is deleted by the work that lands or
-drops it. A fork keeps `main`, `gh-pages` and those
-branches only: upstream's others are deleted when it is made.
+Branches don't outlive their work: every one of these repos deletes a PR's branch when it merges ("Automatically delete
+head branches", on in each, a new fork included), and a branch pushed to a fork to hold work not on `main` yet
+(`web-wip`, `wip/<topic>`, a game fork's `fix/<topic>` offered upstream) is deleted by the work that lands or drops it.
+A fork keeps `main`, `gh-pages` and those branches only: upstream's others are deleted when it is made.
 
 ## Rules
 
@@ -66,7 +65,8 @@ branches only: upstream's others are deleted when it is made.
   runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame rates), and
   GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for weapons,
   keys for reload and crouch), since a page is played with keyboard and mouse: all of it in GoldenEye64Recomp-web's own
-  code and none in the forks, on its `mouse` branch until it has been played by hand.
+  code and none in the forks, on its `mouse` branch until it has been played by hand, and offered to podulator's,
+  ported onto its own input (docs/game-forks.md, GoldenEye's part).
 - Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and resolution
   Auto, in every game fork and new port, whatever its recomp's desktop build defaults to (README, The recomp's own
   code). A page held to its game's own rate reads that rate uncapped whatever a change costs or saves (DKR-R 29.8-30.0,
@@ -79,8 +79,8 @@ branches only: upstream's others are deleted when it is made.
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
   A game's own repo is decided case by case: a game fork offers it only what it takes, said to be AI-written
-  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too and the keyboard and mouse, never the
-  web code, each from a branch of its own played on podulator's desktop build, as docs/game-forks.md says).
+  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too, the keyboard and mouse and a Windows
+  build, each from a branch of its own on podulator's `main` and played on that desktop build, without the web code).
 - A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
   the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it

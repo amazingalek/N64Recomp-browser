@@ -77,8 +77,15 @@ the patched checkouts are the forks' trees file for file; its desktop build need
 ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s.
 GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
 matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
-colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, a fix for
-podulator's too (below). A wait that polls memory or the
+colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing. podulator's takes
+AI-written changes, and is offered fixes for bugs its desktop build has too, the keyboard and mouse and a Windows build,
+each a pull request of its own, and nothing of the web. A fix is made in the fork's `main` first, as any other, then
+ported to a branch `fix/<topic>` of the fork cut from podulator's `main`: written against podulator's code, input and
+pinned RT64 (whose `gEXMatrixGroup` takes 14 arguments to rt64-web's 17, so a commit of `main`'s seldom builds there as
+it is), built natively with the other open `fix/` branches merged in, played on that desktop build, and offered from
+that branch. Once one is merged there, the fork's next merge of podulator's `main` meets the change twice and keeps
+`main`'s. The branch is deleted then, or when its pull request is dropped, by hand: a base repo's setting deletes only
+its own head branches, not a fork's. A wait that polls memory or the
 clock without an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
 calls a second found this one. A game's `get_frames_remaining` must match how its audio manager reads osAiGetLength.
 With render to RAM's copy a list late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was
@@ -91,17 +98,6 @@ osTvType, osRomBase and osMemSize at 0x80000300. Its README and BUILDING.md, and
 `patches/shader_survey.c` and `src/rt64_shaders.txt`, have the rest: the TLBFREE ROM, what the native build needs the
 patches for and the renamed functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list
 and how it was recorded, Firefox's waits.
-
-What GoldenEye64Recomp-web offers podulator's, which takes AI-written fixes for bugs its desktop build has too and the
-keyboard and mouse, is each a branch of the fork's, `fix/<topic>`, cut from podulator's main, built and played by hand on
-its desktop build, and opened from there as a pull request saying it is AI-written. It is written on podulator's tree,
-not picked from the fork's main: that main is the web support besides, and podulator's pins its own RT64, whose
-`gEXMatrixGroup` takes 14 arguments to the forks' 17, so a commit of the fork's main can apply there and not build. The
-keyboard and mouse are RecompFrontend's input on the fork and podulator's own input code there, so their branch is a
-port of the `mouse` branch, not its commits, and is played natively before it is offered, the page's plays telling
-nothing of it. The fork's main merges the branch (never a cherry-pick), what differs between the two RT64s resolved in
-the merge, so its next merge of podulator's main finds the same commits; the branch is deleted when podulator's merges
-or drops the pull request.
 
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream
