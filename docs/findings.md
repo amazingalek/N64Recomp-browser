@@ -404,6 +404,32 @@ It came back from 12:19 UTC that day. Pokémon Snap's page (Snap64Recomp-web on 
 minutes, and Mario Kart 64's page, 358* in its row, read 171. Firefox read Snap at 203-206 throughout. Snap's Chrome
 cell is its 11:54 run, and Star Fox 64's 173*, from Pages at 12:28-12:31, was played in that state.
 
+## A present's sleep in Chrome
+
+Perfect Dark's page with its steady rate (perfect-dark-recomp 4005efd) presented about half its display's frames in
+Chrome on a 240 Hz display, capped (2026-10-22/23, an RTX 5080 on an idle host, the regular plan, whole GPU
+turns, plays.jsonl's set pd-sleep and the probe builds' lines): 111.6 and 116.7 a second over the play, at 60 for half
+of it, frame gaps p99 20-21 ms. `?present-stats` put the drops in the present thread's sleep, 5-30 ms past its slots,
+and pace() took them for a GPU falling behind and paced down; each retry 10-120 s later fell back. Chrome's timed waits
+are judged on time, so plume's sleepUntil waited 0.1 ms for a frame, judged it, and handed the rest to RT64's
+`Timer::preciseSleepUntil`, steps of `sleep_for(100 us)`. A probe build split the lateness: the judged wait ended 0.0 ms
+past its slot every time, and the longest 100 us step reached 16 ms (the system timer's tick) now and then. A
+build that spun the whole sleep on the clock instead woke no step over 0.3 ms late and presented a median of 159
+where the base read 60, at a core's cost for as long as the sleep.
+
+So where waits are on time the sleep is plume's own (docs/forks.md, plume e16e003): it waits on the frame futex while
+the next animation frame comes more than 2 ms before the slot, woken by each frame, and spins on the clock from the
+last, no more than a frame and 2 ms. Interleaved with the base in the same minutes it presented 211.9 and 213.1 a
+second against 111.6 and 116.7, Defection 210-228 against 108-131, frame gaps p99 17.2 and 18.1 ms against 20.3 and
+21.2, no present thread's sleep over 4 ms late against 7 and 9, with no WebGPU error and no sound running short. Its
+first 30 s (the boot and the menus) read 55-60 in both, as the game draws them. Firefox takes the late waits' path
+either way (220.7 with it, 198 without, within its noise). The drops left in Chrome are the presents in flight: wait()
+8-18 ms, the GPU's work-done reported 12-14 ms after it in Defection. Mario Kart 64's page (MarioKart64Recomp-web
+de022ae, its regular plan, plays.jsonl's set mk64-sleep, the same host minutes later, Chrome's animation frames at 174 a
+second that hour) presented 167.9 and 168.5 a second with it against 153.9 and 155.3, frame gaps p99 14.9 and 15.0 ms
+against 17.8 and 18.5, none of the present thread's sleeps over 4 ms past their slots against 15 and 29, and no sound
+running short against 151 samples in one; Firefox 67.2 against 65.9, no WebGPU error in either.
+
 ## Pokémon Snap's timed waits in Firefox
 
 Pokémon Snap's page served locally presented 73.9 and 75.6 a second in Firefox 158 in two retests' smoke plays
