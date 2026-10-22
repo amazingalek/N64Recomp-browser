@@ -55,7 +55,8 @@
 // (docs/findings.md, A page in a hidden tab). A run records its flags and is compared only with runs that set the same
 // ones.
 // --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
-// CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file, to open in
+// CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file (a run that
+// failed in its play too, a page that stopped answering among them, once the browser's own process answers), to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
 // --chrome-trace (Chrome only) records a Chrome trace over the play, every thread's JavaScript and wasm stacks sampled
@@ -680,6 +681,12 @@ try {
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
+  // A run that failed in its play has its profile too. The browser's own process writes it, so where that process is
+  // what stopped answering (docs/findings.md, A page that stops answering) it comes once that process answers again.
+  if (geckoProfileFile && playing) {
+    await page.geckoProfile.dump(geckoProfileFile).then(() => log(`gecko profile written to ${geckoProfileFile}`),
+      (e) => log(`no gecko profile: ${e.message}`));
+  }
   // A run that failed before the play still records the viewport it had, on screen the window's, not --size.
   viewport ??= await page.viewport().catch(() => null);
   if (!recordFile && !jsonFile) await finish(1);
