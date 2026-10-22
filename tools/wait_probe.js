@@ -4,9 +4,9 @@
 //
 //   waitprobe <ms>
 //
-// plume's timedWaitsEndLate() and N64ModernRuntime's VI thread measure the same thing once, as the page starts, and pick
-// how their threads wait by it (late past 4 ms), so a host on which this changes during a play reads it here and not on
-// the page's own console. It costs the page nothing a run can see (Star Fox 64 in Chrome 155, 346.6 presents a second
+// plume's timedWaitsEndLate() and N64ModernRuntime's VI thread measure the same thing as the page starts and pick how
+// their threads wait by it (late past 4 ms), then judge their own waits as it plays, but only from on time to late, so a
+// host whose waits come on time again during a play reads it here and not on the page's own console. It costs the page nothing a run can see (Star Fox 64 in Chrome 155, 346.6 presents a second
 // without it, 348.2 and 350.8 with it). Only a cross-origin isolated document starts it: the page's own, after
 // coi_serviceworker.js's reload.
 if (self.crossOriginIsolated && !self.__waitProbe) {
