@@ -1290,3 +1290,15 @@ What CLAUDE.md's Ruled out rests on.
   with plume bf417cf it paced to 30 in every default-prefs Firefox run, as before, and what decided 60 against 30 was
   what each present cost the GPU in Firefox's compositing, Windows' compositor included, and with DWM at 0% Banjo
   was paced to 30 all the same (A laptop, measured).
+- A list started with the list before's late copy still pending (render to RAM's late copy landing at a VI once the
+  GPU has it, or before the list after next, the readback buffers it waits on kept through the next list's history),
+  for Perfect Dark's page held at 30 in its levels: with its prebuilt list the page draws Defection at 29-31 frames a
+  second either way, in every play, uncapped (presents 269 and 281 a second against 300 and 283) and capped at headless
+  Chrome's ~174 animation frames a second (75 and 73 against 74 and 76), interleaved, its regular plan at 1256x645, an
+  RTX 5080, an idle host (`tools/frame_lengths.js` on `g_Vars.lvframe60`, set `pd-late2` in plays.jsonl). A Chrome
+  trace of the change's build over 30 s of Defection, uncapped: RT64's Gfx thread waits for a list 90% of the time,
+  `send_dl` 8%, the copy's readback 3%; the game's main thread spends all of it in `main_tick > joy_debug_joy`, half in
+  `joy_disable_cyclic_polling` and half in `joy_enable_cyclic_polling`, each waiting in `osRecvMesg` for the scheduler's
+  next retrace: a tick that finds no controller sample newer than the last one restarts the polling and takes two VIs
+  (Perfect Dark's docs/web.md says so of its menus). Its desktop build draws its levels at 30 too. The Gfx thread's 85%
+  in the late copy's wait came from a play without the prebuilt list.
