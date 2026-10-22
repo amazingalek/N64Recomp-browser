@@ -102,7 +102,7 @@ of 16384 a side, past the device's 8192. Neither caused the other:
 - RDRAM doesn't run into the heap past the console's 8 MB: N64ModernRuntime-0003 allocates the whole `mem_size`, 512
   MB, only without the guard region above it. What leaves it is an address a desktop build's guard pages would stop:
   KSEG1 (0xA0000000 up, RDRAM + 512 MB, right after it) or KUSEG, which wasm32's 32-bit pointers wrap to anywhere in
-  the heap.
+  the heap. A sound buffer given by its KSEG1 address no longer does (N64ModernRuntime 059e4fe).
 - A texture past the device's limit leaves nothing wrong on the CPU's side: plume logs WebGPU's errors, and the
   failed texture is still a handle. The same page in headless Chrome at 7000x1201 failed an 8394-wide target every
   frame for 25 s, ~2,700 errors, and played on at 60.
