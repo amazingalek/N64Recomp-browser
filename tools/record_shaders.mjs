@@ -35,7 +35,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { open, option, serve } from './page_driver.mjs';
+import { browserExecutable, open, option, serve } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
 const portOption = option(args, '--port', null);
@@ -51,6 +51,7 @@ if (args.length !== 4) {
   process.exit(1);
 }
 const [planFile, buildDir, rom, outFile] = args;
+try { browserExecutable('chrome', chrome); } catch (error) { console.error(`${error.message}: give its executable with --chrome`); process.exit(1); }
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
 const t0 = Date.now();
 const log = (text) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}] ${text}`);
