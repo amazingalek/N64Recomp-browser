@@ -121,13 +121,26 @@ export const serve = (dir, port = 0) => new Promise((resolve, reject) => {
   server.listen(port, '127.0.0.1', () => resolve(server));
 });
 
-// Chrome on Windows is in Program Files since Chrome 155, Program Files (x86) before.
-const defaultExecutable = {
-  chrome: process.platform === 'win32'
-    ? ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe']
-      .find((p) => fs.existsSync(p)) ?? 'chrome.exe'
-    : 'google-chrome',
-  firefox: process.platform === 'win32' ? 'C:/Program Files/Mozilla Firefox/firefox.exe' : 'firefox',
+// Where each browser is when no executable is given. On Windows, the first of its installs there is: Program Files (Chrome
+// since Chrome 155, Program Files (x86) before), then %LOCALAPPDATA%, where either's installer puts it when it installs
+// for one user only; elsewhere, its name on the PATH. An install anywhere else is given (play_page's --browser).
+const localAppData = process.env.LOCALAPPDATA?.replaceAll('\\', '/');
+const installs = process.platform === 'win32' ? {
+  chrome: ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    ...(localAppData ? [`${localAppData}/Google/Chrome/Application/chrome.exe`] : [])],
+  firefox: ['C:/Program Files/Mozilla Firefox/firefox.exe', ...(localAppData ? [`${localAppData}/Mozilla Firefox/firefox.exe`] : [])],
+} : { chrome: ['google-chrome'], firefox: ['firefox'] };
+
+// The executable open() starts for browser: the one given, else the first install above (a name on the PATH is taken as
+// it is). None there throws "Firefox not found at <paths>", which the tools check before they start anything, so a
+// missing browser says so rather than failing as a play with no summary (the spawn's ENOENT).
+export const browserExecutable = (browser, executable) => {
+  const name = { chrome: 'Chrome', firefox: 'Firefox' }[browser];
+  if (!name) throw new Error(`no browser ${browser}: chrome or firefox`);
+  const paths = executable ? [executable] : installs[browser];
+  const found = paths.find((p) => !/[\\/]/.test(p) || fs.existsSync(p));
+  if (!found) throw new Error(`${name} not found at ${paths.join(', ')}`);
+  return found;
 };
 
 // A WebSocket client of text messages (RFC 6455), resolving once open: send(text), and the caller's
@@ -518,7 +531,7 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
   // hidden one's process to the background priority it spares a tab that plays sound. --disable-audio-output in
   // chromeFlags plays it to no device instead, which Chrome still hears, so it replaces --mute-audio.
   const mute = chromeFlags.includes('--disable-audio-output') ? [] : ['--mute-audio'];
-  const proc = spawnHeld(affinity, executable ?? defaultExecutable.chrome, [...mode, ...size, '--enable-unsafe-webgpu', ...mute,
+  const proc = spawnHeld(affinity, browserExecutable('chrome', executable), [...mode, ...size, '--enable-unsafe-webgpu', ...mute,
     '--no-first-run', '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...chromeFlags, 'about:blank'], { stdio: 'ignore' });
   if (headed && !onScreen && process.platform === 'win32' && !await moveWindow('chrome.exe', profile, width, height)) {
@@ -664,7 +677,7 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const proc = spawnHeld(affinity, executable ?? defaultExecutable.firefox, ['-no-remote', '-profile', profile,
+  const proc = spawnHeld(affinity, browserExecutable('firefox', executable), ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
     { stdio: 'ignore' });
   let send = null;
