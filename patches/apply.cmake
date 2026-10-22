@@ -33,9 +33,11 @@
 
 set(N64RECOMP_BROWSER_PATCHES_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
-# A hash of a checkout's changes to its files (under <sub>, in a repository it shares).
+# A hash of a checkout's changes to its files (under <sub>, in a repository it shares), but not its submodules': one
+# patched after it (rt64's plume and hlslpp) shows up "-dirty" and would change what its stamp holds.
 function(_n64recomp_browser_changes top sub out)
-    execute_process(COMMAND git diff HEAD --binary -- "./${sub}" WORKING_DIRECTORY "${top}" OUTPUT_VARIABLE diff)
+    execute_process(COMMAND git diff HEAD --binary --ignore-submodules=all -- "./${sub}" WORKING_DIRECTORY "${top}"
+        OUTPUT_VARIABLE diff)
     string(SHA1 hash "${diff}")
     set(${out} ${hash} PARENT_SCOPE)
 endfunction()
