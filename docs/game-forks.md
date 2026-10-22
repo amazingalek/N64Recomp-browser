@@ -297,10 +297,32 @@ title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web
 menus by the front end's screen and the track select's entry in RDRAM. Its docs/BUILDING.md (The web page) and the
 header of `tools/build_web.sh` has the rest.
 
+`amazingalek/perfect-dark-recomp` is Perfect Dark (USA rev 1), not a fork but this project's own recomp, as Rush 2049's
+is (GPL-3.0), made from the game's MIT decompilation. It is on upstream's rt64, N64ModernRuntime and RecompFrontend at
+the commits GoldenEye's are on (`patches/pins.txt`), patched by the N64Recomp-browser tag its `lib/N64Recomp-browser`
+pins, and carries no patches of its own to them, so CI has no job for it. Perfect Dark runs its lib segment at
+0x70001050 and its game code at 0x7f000000 behind the TLB, where N64Recomp's memory macros index RDRAM by address -
+0x80000000, so the decompilation is relinked without the TLB (`tools/relink.ld.patch`), each segment where it already
+sits in an 8 MB console's RDRAM (lib at 0x80001050, game at 0x80220000, where the game's own 8 MB path unzips it), and
+the recompiler reads its code from that relink. None of the relink is in git: at run time the game's own inflate
+unpacks the player's ROM, and the relocation list, `syms/relocs.txt` (6,482 words, found by linking at two bases),
+shifts the pointers outside `.text`, after which RDRAM is the relink byte for byte outside `.text`. Backing the 0x7f
+addresses as Conker's page does was ruled out: it needs RDRAM plus 0xFF000000, past wasm32's 4 GB. RT64 draws its
+graphics as they are but for the sky's clouds and water, raw RDP triangles RT64 drops, which `patches/sky.c` draws as
+3D triangles as GoldenEye's recomp does. Its audio microcode is Rare's `aspMain` with an MP3 decoder overlaid on it,
+which RSPRecomp swaps in where the code DMAs it, and the program drops whole audio frames, never part of one, when
+more than 100 ms is queued. Its build, `tools/build_decomp.sh` (the decompilation checked against the ROM, the
+relink, the list and the symbols) then `tools/build_web.sh`, runs Docker images of its own, so `publish_pages.sh`
+runs it on the build host and not in rush-2049-recomp's image. Its list is 668 shaders, 271 pipelines: the boot (38)
+and a section a solo mission (21), recorded by `tools/record_shaders.sh`, where `patches/shader_survey.c` starts each
+mission as mission select's Accept does, plus 39 the plans' plays and a minute in each mission missed afterwards. Its
+docs/building.md and docs/web.md have the rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
-game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
+game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Perfect Dark up to 60 (as the game ticks at most
+once a VI; its controller reads held it to 30 on a fast CPU, which its `patches/frame_rate.c` undoes), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
 cartridge's for the other nine: Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30

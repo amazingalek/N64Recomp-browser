@@ -129,7 +129,7 @@
 //
 // --record appends the run to a file of runs, one JSON line each, a run that fails too (with "failed"): this repo's
 // plays.jsonl, the history of how each game's page plays. --game is publish_pages.sh's name for the game (rush, ge,
-// mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2), --build what the page was built from (a tag of this repo, or Pages),
+// mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2, pd), --build what the page was built from (a tag of this repo, or Pages),
 // and --note anything that makes the run unlike a player's visit (a preload, a test build, another page beside it). A
 // run's conditions are fields of their own, for a script to read without parsing the note: --set an id shared by the runs
 // of one interleaved set (the page Pages serves and a new build, played in turn), --role which side of it the run is
@@ -204,7 +204,7 @@ for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
 const chromeFlags = [];
 for (let flag; (flag = option(args, '--chrome-flag', null)) !== null;) chromeFlags.push(flag);
 if (recordFile && !/^[a-z0-9]+$/.test(game ?? '')) {
-  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2 (publish_pages.sh\'s names)');
+  console.error('--record needs --game <name>: rush, ge, mm, banjo, cbfd, dk64, wr, pw, bt, mk64, sf64, oot, dkr, jfg, snap, rush2, pd (publish_pages.sh\'s names)');
   process.exit(1);
 }
 if (role !== null && (!['baseline', 'candidate'].includes(role) || set === null)) {
