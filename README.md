@@ -346,14 +346,18 @@ amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU roundi
                                                                   declares every function the C calls; a mod
                                                                   recompiled to C ahead of time; functions a mod
                                                                   replaces or hooks, redirected at their entry;
-                                                                  tail calls as wasm tail calls
+                                                                  tail calls as wasm tail calls; a division by
+                                                                  zero gives the VR4300's results
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
                                                                   without a guard region; built-in mods linked
                                                                   in, their replacements and hooks as redirects;
                                                                   OSThread's context past libultra's thprof on
                                                                   a 32-bit host; game timers on time where a
                                                                   page's timed waits end late (Firefox on
-                                                                  Windows); a ROM read in 4 MB pieces
+                                                                  Windows); a ROM read in 4 MB pieces; no exit
+                                                                  on a Status write, no thread put in a queue
+                                                                  twice, a sound buffer's KSEG1 address read
+                                                                  through KSEG0's
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker on a thread of its own, render
                                                                   to RAM as an option and its copy a display
@@ -363,11 +367,12 @@ amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the W
 ```
 
 rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` at hlslpp-web, and
-N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
+N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every web
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
 of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
 `RenderSwapChain::isWaitReady()` (always true but on WebGPU) and `waitOnCaller()` (always false but on WebGPU), which
-change nothing there. Each commit's message says what it does and why.
+change nothing there, and fixes to bugs a desktop build has too (a crash, a hang, a wrong frame), which docs/forks.md
+says are "on every build". Each commit's message says what it does and why.
 
 `patches/` holds each fork as one patch, everything its `main` adds to the upstream commit it is on, so a recomp can
 take the web support without moving its submodules to the forks (Using it in a recomp).

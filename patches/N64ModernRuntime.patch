@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 1ff690a09929f31ba5785bc4188eeeb13bad0924
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web da1769ea517de07a4bb47f614369b361231c3a07
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -537,7 +537,7 @@ index 43509ba..71ee4d9 100644
              recomp::do_rom_read(rdram, rdram_address, physical_addr, size);
  
 diff --git a/librecomp/src/recomp.cpp b/librecomp/src/recomp.cpp
-index ea1c49b..7dda401 100644
+index ea1c49b..b15267c 100644
 --- a/librecomp/src/recomp.cpp
 +++ b/librecomp/src/recomp.cpp
 @@ -32,6 +32,12 @@
@@ -613,6 +613,23 @@ index ea1c49b..7dda401 100644
  }
  
  bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
+@@ -442,13 +479,9 @@ extern "C" void cop0_status_write(recomp_context* ctx, gpr value) {
+         changed &= ~(uint32_t)StatusReg::FR;
+     }
+ 
+-    // If any other bits were changed, assert false as they're not handled currently
+-    if (changed) {
+-        printf("Unhandled status register bits changed: 0x%08X\n", changed);
+-        assert(false);
+-        exit(EXIT_FAILURE);
+-    }
+-    
++    // The other bits (the interrupt mask, CU0-CU3, KSU, EXL, ERL) change nothing for recompiled code, which takes no
++    // interrupts or exceptions and always has its FPU: they're stored for cop0_status_read, as the CPU keeps them.
++
+     // Update the status register in the context
+     ctx->status_reg = new_sr;
+ }
 diff --git a/librecomp/src/sp.cpp b/librecomp/src/sp.cpp
 index ae0f44f..2376c76 100644
 --- a/librecomp/src/sp.cpp
@@ -725,6 +742,39 @@ index 46aea61..da24a61 100644
  #include <cassert>
  #include <stdexcept>
  #include <span>
+diff --git a/ultramodern/src/audio.cpp b/ultramodern/src/audio.cpp
+index 3198be0..212234e 100644
+--- a/ultramodern/src/audio.cpp
++++ b/ultramodern/src/audio.cpp
+@@ -1,6 +1,7 @@
+ #include "ultramodern/ultra64.h"
+ #include "ultramodern/ultramodern.hpp"
+ #include <cassert>
++#include <cstdio>
+ 
+ static uint32_t sample_rate = 48000;
+ 
+@@ -26,6 +27,20 @@ void ultramodern::queue_audio_buffer(RDRAM_ARG PTR(int16_t) audio_data_, uint32_
+     // Ensure that the byte count is an integer multiple of samples.
+     assert((byte_count & 1) == 0);
+ 
++    // A game may give its buffer's uncached address (KSEG1, from 0xA0000000), which TO_PTR would put 512 MB past
++    // RDRAM: it's read through the cached one (KSEG0) for the same memory. A buffer that doesn't lie in RDRAM's 8 MB
++    // isn't played, as reading it would read past RDRAM (into another allocation on a page, which has no guard region).
++    const uint32_t rdram_address = uint32_t(audio_data_) & 0x1FFFFFFF;
++    if ((uint32_t(audio_data_) & 0xC0000000) != 0x80000000 || rdram_address > 0x800000 || byte_count > 0x800000 - rdram_address) {
++        static bool reported = false;
++        if (!reported) {
++            reported = true;
++            fprintf(stderr, "ultramodern: a sound buffer outside RDRAM (0x%08X, %u bytes) isn't played\n", uint32_t(audio_data_), byte_count);
++        }
++        return;
++    }
++    audio_data_ = PTR(int16_t)(rdram_address | 0x80000000);
++
+     // Calculate the number of samples from the number of bytes.
+     uint32_t sample_count = byte_count / sizeof(int16_t);
+ 
 diff --git a/ultramodern/src/displaylists.cpp b/ultramodern/src/displaylists.cpp
 new file mode 100644
 index 0000000..be6c588
@@ -1090,10 +1140,36 @@ index 9944a02..b7a1a2a 100644
  extern "C" void osCreateMesgQueue(RDRAM_ARG PTR(OSMesgQueue) mq_, PTR(OSMesg) msg, s32 count) {
      OSMesgQueue *mq = TO_PTR(OSMesgQueue, mq_);
 diff --git a/ultramodern/src/threadqueue.cpp b/ultramodern/src/threadqueue.cpp
-index f9c0fa1..f522697 100644
+index f9c0fa1..fb774ec 100644
 --- a/ultramodern/src/threadqueue.cpp
 +++ b/ultramodern/src/threadqueue.cpp
-@@ -41,16 +41,22 @@ PTR(OSThread) ultramodern::thread_queue_pop(RDRAM_ARG PTR(PTR(OSThread)) queue_)
+@@ -1,4 +1,5 @@
+ #include <cassert>
++#include <cstdio>
+ 
+ #include "ultramodern/ultramodern.hpp"
+ 
+@@ -14,6 +15,19 @@ static PTR(OSThread)* queue_to_ptr(RDRAM_ARG PTR(PTR(OSThread)) queue) {
+ void ultramodern::thread_queue_insert(RDRAM_ARG PTR(PTR(OSThread)) queue_, PTR(OSThread) toadd_) {
+     PTR(OSThread)* cur = queue_to_ptr(PASS_RDRAM queue_);
+     OSThread* toadd = TO_PTR(OSThread, toadd_); 
++    // A thread already in the queue isn't put in again: that links it to itself, and every later walk of the queue
++    // goes round for good, which hangs the game. osStartThread on a thread that isn't stopped does it without
++    // ULTRAMODERN_LIBULTRA_THREAD_STOP; anything else that does is said once, so it can be found.
++    for (PTR(OSThread) queued = *cur; queued != NULLPTR; queued = TO_PTR(OSThread, queued)->next) {
++        if (queued == toadd_) {
++            static bool reported = false;
++            if (!reported) {
++                reported = true;
++                fprintf(stderr, "ultramodern: thread %d was put in a queue it was in already\n", toadd->id);
++            }
++            return;
++        }
++    }
+     debug_printf("[Thread Queue] Inserting thread %d into queue 0x%08X\n", toadd->id, (uintptr_t)queue_);
+     while (*cur && TO_PTR(OSThread, *cur)->priority > toadd->priority) {
+         cur = &TO_PTR(OSThread, *cur)->next;
+@@ -41,16 +55,22 @@ PTR(OSThread) ultramodern::thread_queue_pop(RDRAM_ARG PTR(PTR(OSThread)) queue_)
  }
  
  bool ultramodern::thread_queue_remove(RDRAM_ARG PTR(PTR(OSThread)) queue_, PTR(OSThread) t_) {
