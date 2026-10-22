@@ -81,8 +81,11 @@ colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT6
 offered to podulator's, which takes AI-written fixes for bugs its desktop build has too. It draws a room seen through a
 portal, and the props and guards in it, clipped to the portal's box on screen, and the walls around a portal don't hide
 what is behind them: its `patches/widescreen.c` had made every one of those clips the whole screen, which drew Frigate's
-bridge consoles and guards on the bridge's outer wall, blinking as the game toggled them on screen. Its
-`bgScissorCurrentPlayerView` now keeps a box's edges inside the 4:3 view. A wait that polls memory or the clock without
+bridge consoles and guards on the bridge's outer wall, blinking as the game toggled them on screen, and a building over
+Surface's tree wall. RT64 widens a projection only if its draws' scissors together span the screen, and the game loads
+its projection for every room, so its `bgScissorCurrentPlayerView` gives a room cut narrower than the screen one empty
+triangle under the whole screen's scissor first, and its box in the widened projection's terms; a box kept to the 4:3
+view drew those rooms 4:3, leaving strips of sky at a 16:9 view's edges (Dam's mountain). A wait that polls memory or the clock without
 an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
 calls a second found this one. A game's `get_frames_remaining` must match how its audio manager reads osAiGetLength.
 With render to RAM's copy a list late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was
