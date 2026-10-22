@@ -54,9 +54,9 @@
 // hears a tab that plays sound and keeps it at a player's priority when it is hidden, which --fault hidden needs
 // (docs/findings.md, A page in a hidden tab). A run records its flags and is compared only with runs that set the same
 // ones.
-// --gecko-profile (Firefox only) runs the Gecko profiler from the page's boot to the end of the play, every process and the GPU process's
-// CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file (a run that
-// failed in its play too, a page that stopped answering among them, which still has its threads' stacks), to open in
+// --gecko-profile (Firefox only) runs the Gecko profiler from the page's boot to the end of the play, every process
+// and the GPU process's CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to
+// the file, or as soon as the page stops answering (at its boot, in its play or after it), to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
 // below that, which changes how Firefox's waits end (docs/playing.md, Uncapped, and the browsers' clocks).
 // --chrome-trace (Chrome only) records a Chrome trace over the play, every thread's JavaScript and wasm stacks sampled
@@ -195,6 +195,16 @@ const role = option(args, '--role', null);
 const hostReadingOption = option(args, '--host-reading', null);
 const preloadFile = option(args, '--preload', null);
 const geckoProfileFile = option(args, '--gecko-profile', null);
+// Written once: after the play and the memory report that follows it, or as the page stops answering, which a page can
+// do as it boots, in its play or after it; the browser's own process still answers then, and the profile has the
+// stopped page's threads.
+let profiling = false;
+const dumpProfile = async () => {
+  if (!profiling) return;
+  profiling = false;
+  await page.geckoProfile.dump(geckoProfileFile).then(() => log(`gecko profile written to ${geckoProfileFile}`),
+    (e) => log(`no gecko profile: ${e.message}`));
+};
 const chromeTraceFile = option(args, '--chrome-trace', null);
 const firefoxPrefs = {};
 for (let pref; (pref = option(args, '--firefox-pref', null)) !== null;) {
@@ -575,6 +585,7 @@ const sample = async () => {
     if (error.unanswered) {
       const report = await threadReport();
       if (report) log(`the browser's processes as the page stopped answering:\n${report}`);
+      await dumpProfile();
       const mains = report?.split('\n').pop();
       page.stop(`the page stopped answering: ${error.message}${mains?.startsWith('main threads:') ? ` (${mains})` : ''}`);
     }
@@ -656,7 +667,6 @@ const boot = async () => {
   return { loaded: tenths(loaded), firstPresent: first ? tenths((first - from) / 1000) : null };
 };
 let firstBoot = null;
-let profiling = false;
 try {
   // From the page's boot: a page that stops answering can stop before its play, as it boots or loads its game.
   if (geckoProfileFile) { await page.geckoProfile.start(); profiling = true; }
@@ -677,17 +687,13 @@ try {
   await page.run(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play, steps);
   await sample();
   playing = false;
-  if (profiling) { profiling = false; await page.geckoProfile.dump(geckoProfileFile); }
   if (chromeTraceFile) await page.chromeTrace.stop(path.resolve(chromeTraceFile));
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
+  await dumpProfile();
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
-  // A page that stopped answering is what a profile is for: the browser's own process still answers, and writes it.
-  if (profiling) {
-    await page.geckoProfile.dump(geckoProfileFile).then(() => log(`gecko profile written to ${geckoProfileFile}`),
-      (e) => log(`no gecko profile: ${e.message}`));
-  }
+  await dumpProfile();
   // A run that failed before the play still records the viewport it had, on screen the window's, not --size.
   viewport ??= await page.viewport().catch(() => null);
   if (!recordFile && !jsonFile) await finish(1);
