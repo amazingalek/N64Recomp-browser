@@ -93,6 +93,9 @@ fi
 "${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll"
 "${git[@]}" commit -q -F - <<< "${subject:-The web page}${lines:+$'\n\n'$lines}"
 "${git[@]}" push -q -f "$url" gh-pages
+# A first push of gh-pages to a public repo can switch Pages on by itself in the seconds between the check and the
+# POST, which then answers 409 "already enabled": so a refused POST is checked again.
 gh api "repos/$repo/pages" > /dev/null 2>&1 ||
-    gh api -X POST "repos/$repo/pages" -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null
+    gh api -X POST "repos/$repo/pages" -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null 2>&1 ||
+    gh api "repos/$repo/pages" > /dev/null
 echo "pushed gh-pages: https://${repo%%/*}.github.io/${repo#*/}/${folder:+$folder/} $([ -n "$drop" ] && echo "is gone" || echo "serves it") in a minute or two"
