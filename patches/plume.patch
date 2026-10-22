@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 803781eb6834658aaf6172a6594c1039d3e9de0e
+plume: https://github.com/amazingalek/plume-web dd3b530c37d9cc409a262e7746aa63edf472ffbc
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2740,10 +2740,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..56bae5f
+index 0000000..c2f1374
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,120 @@
 +//
 +// plume
 +//
@@ -2757,6 +2757,10 @@ index 0000000..56bae5f
 +// 2004): a sleep of 100 us from a page's thread took 15.6 ms there on a laptop, and 2 ms in Chrome. A futex wake still
 +// comes at once.
 +//
++// It can change as a page plays: in Firefox 158 on a desktop the same page's waits ended 140 ms past their time in its
++// launcher and 0.1 ms past it once its game ran, or stayed late all through, play to play. So it is judged again from
++// the waits a page's threads make as it plays (timedWaitEnded()), not only once.
++//
 +
 +#pragma once
 +
@@ -2764,21 +2768,69 @@ index 0000000..56bae5f
 +
 +#include <algorithm>
 +#include <atomic>
++#include <cerrno>
 +#include <cstdint>
 +#include <cstdio>
 +
-+#include <emscripten/em_asm.h>
 +#include <emscripten/emscripten.h>
 +#include <emscripten/threading.h>
 +
 +namespace plume {
-+    // Measured once, by the first thread other than the page's to ask: three waits of 100 us, late if the shortest took
-+    // more than 4 ms. False on the page's thread until then, which can't wait.
++    // The judgement, from the last 16 timed waits judged: a bit set for each that ended more than 4 ms past its time.
++    // Until a wait is judged, all 16 bits are what the first thread other than the page's to ask measured: three waits of
++    // 100 us, late if the shortest took more than 4 ms.
++    struct WebTimedWaits {
++        std::atomic<uint32_t> lateBits = 0;
++        std::atomic<bool> measured = false;
++        std::atomic<bool> late = false;
++    };
++
++    inline WebTimedWaits &webTimedWaits() {
++        static WebTimedWaits waits;
++        return waits;
++    }
++
++    // A timed wait that ended overMs past its time, judged: waits are late once 8 of the last 16 ended more than 4 ms
++    // past theirs, and on time again once none of them did. A page's speed can hang on either way, so the judgement
++    // turns where the waits do, and holds on a few odd ones.
++    inline void timedWaitEnded(double overMs) {
++        WebTimedWaits &waits = webTimedWaits();
++        uint32_t bits = waits.lateBits;
++        uint32_t next;
++        do {
++            next = ((bits << 1) | ((overMs > 4.0) ? 1U : 0U)) & 0xFFFFU;
++        } while (!waits.lateBits.compare_exchange_weak(bits, next));
++
++        const int lateCount = __builtin_popcount(next);
++        const bool late = waits.late;
++        if (!late && (lateCount >= 8)) {
++            waits.late = true;
++            fprintf(stderr, "plume: %d of the last 16 timed waits on a thread of this page ended over 4 ms late, so waits off the page's thread are woken or spun, not timed\n", lateCount);
++        }
++        else if (late && (lateCount == 0)) {
++            waits.late = false;
++            fprintf(stderr, "plume: the last 16 timed waits on a thread of this page ended on time, so waits off the page's thread are timed again\n");
++        }
++    }
++
++    inline bool timedWaitsEndLate();
++
++    // Waits up to 100 us on a futex for a wake or the time and judges the wait if it ended on the time: a wake that
++    // ends it sooner says nothing of the timer. So a thread that would wait on that futex anyway (for a frame) loses
++    // nothing to it, and one that would sleep anyway loses no more than its own sleep would have. Off the page's thread.
++    inline void judgeTimedWait(volatile void *futex, uint32_t value) {
++        timedWaitsEndLate(); // The first judgement, measured.
++        const double start = emscripten_get_now();
++        if (emscripten_futex_wait(futex, value, 0.1) == -ETIMEDOUT) {
++            timedWaitEnded(emscripten_get_now() - start - 0.1);
++        }
++    }
++
++    // False on the page's thread until a thread other than the page's has asked, which the page's thread can't.
 +    inline bool timedWaitsEndLate() {
-+        static std::atomic<int> state = 0; // 0 not measured, 1 on time, 2 late.
-+        int measured = state;
-+        if ((measured != 0) || emscripten_is_main_browser_thread()) {
-+            return measured == 2;
++        WebTimedWaits &waits = webTimedWaits();
++        if (waits.measured || emscripten_is_main_browser_thread()) {
++            return waits.late;
 +        }
 +
 +        static uint32_t futex = 0;
@@ -2789,19 +2841,16 @@ index 0000000..56bae5f
 +            shortest = std::min(shortest, emscripten_get_now() - start);
 +        }
 +
-+        measured = (shortest > 4.0) ? 2 : 1;
-+        // DIAGNOSTIC: ?timed-waits-late=0|1 forces the choice.
-+        const int forced = MAIN_THREAD_EM_ASM_INT({ const v = new URLSearchParams(location.search).get('timed-waits-late'); return v === null ? -1 : parseInt(v, 10); });
-+        if (forced >= 0) {
-+            measured = (forced > 0) ? 2 : 1;
-+        }
-+        fprintf(stderr, "plume diag: shortest of three 100 us waits %.1f ms, forced %d, waits judged %s\n", shortest, forced, (measured == 2) ? "late" : "on time");
-+        int unmeasured = 0;
-+        if (state.compare_exchange_strong(unmeasured, measured) && (measured == 2)) {
-+            fprintf(stderr, "plume: a timed wait of 100 us on a thread of this page takes %.1f ms, so waits off the page's thread are woken or spun, not timed\n", shortest);
++        bool unmeasured = false;
++        if (waits.measured.compare_exchange_strong(unmeasured, true)) {
++            waits.lateBits = (shortest > 4.0) ? 0xFFFFU : 0U;
++            waits.late = (shortest > 4.0);
++            if (shortest > 4.0) {
++                fprintf(stderr, "plume: a timed wait of 100 us on a thread of this page takes %.1f ms, so waits off the page's thread are woken or spun, not timed\n", shortest);
++            }
 +        }
 +
-+        return state == 2;
++        return waits.late;
 +    }
 +};
 +
@@ -2817,10 +2866,10 @@ index 0000000..56bae5f
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..b82aa73
+index 0000000..3972a7d
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3474 @@
+@@ -0,0 +1,3488 @@
 +//
 +// plume
 +//
@@ -4590,12 +4639,26 @@ index 0000000..b82aa73
 +    // timing, and on a timer only until the time itself, for a page whose frames have stopped (hidden). Elsewhere it
 +    // returns false and the caller sleeps as before: in Chrome on a laptop's Intel graphics, presents on the animation
 +    // frames made the GPU busier and the gaps between frames longer than RT64's own sleeps.
++    // Which of the two each sleep is goes by the page's timed waits as it plays, judged from a first wait of up to 100 us
++    // for a frame here (judgeTimedWait()): the present thread's sleeps are what a page's presents hang on. Pokemon Snap's
++    // page in Firefox 158 (uncapped, RTX 5080), held to RT64's sleeps, woke 140 ms past its slots in the launcher and
++    // 0.1 ms past them once the game ran, presenting 308-330 a second, but in 1 play of 4 they stayed late all through and
++    // it presented 94; on the animation frames it presented 217-232. The one measure as the page started took the
++    // launcher's waits for the game's.
 +    bool WebGPUSwapChain::sleepUntil(std::chrono::steady_clock::time_point time) {
-+        if (emscripten_is_main_browser_thread() || !timedWaitsEndLate()) {
++        if (emscripten_is_main_browser_thread()) {
 +            return false;
 +        }
 +
 +        const double endMs = emscripten_get_now() + std::chrono::duration<double, std::milli>(time - std::chrono::steady_clock::now()).count();
++        if ((endMs - emscripten_get_now()) > 0.5) {
++            judgeTimedWait(&frameTimer->frameSerial, frameTimer->frameSerial);
++        }
++
++        if (!timedWaitsEndLate()) {
++            return false;
++        }
++
 +        const double fromMs = endMs - frameTimer->frameMs / 2.0;
 +        for (;;) {
 +            const uint32_t serial = frameTimer->frameSerial;
