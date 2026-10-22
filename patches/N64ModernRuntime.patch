@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 6c97d69ce75788df34ab7fe29dedc755ccddb24a
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 6c7e5151760a0ea9b83ecc56d3cedc43813941ea
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -822,10 +822,10 @@ index 0000000..be6c588
 +
 +#endif
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..f237092 100644
+index 2f1cfb5..57cf09a 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -175,6 +175,98 @@ uint64_t total_vis = 0;
+@@ -175,6 +175,106 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -834,6 +834,7 @@ index 2f1cfb5..f237092 100644
 +#include <algorithm>
 +#include <climits>
 +#include <cstdio>
++#include <emscripten/em_asm.h>
 +#include <emscripten/emscripten.h>
 +#include <emscripten/html5.h>
 +#include <emscripten/proxying.h>
@@ -863,7 +864,14 @@ index 2f1cfb5..f237092 100644
 +                shortest = std::min(shortest, emscripten_get_now() - start);
 +            }
 +
-+            return shortest > 4.0;
++            bool late = shortest > 4.0;
++            // DIAGNOSTIC: ?vi-waits-late=0|1 forces the choice.
++            const int forced = MAIN_THREAD_EM_ASM_INT({ const v = new URLSearchParams(location.search).get('vi-waits-late'); return v === null ? -1 : parseInt(v, 10); });
++            if (forced >= 0) {
++                late = forced > 0;
++            }
++            fprintf(stderr, "ultramodern diag: shortest of three 100 us waits %.1f ms, forced %d, VI waits judged %s\n", shortest, forced, late ? "late" : "on time");
++            return late;
 +        }();
 +
 +        return late;
@@ -924,7 +932,7 @@ index 2f1cfb5..f237092 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +296,25 @@ void vi_thread_func() {
+@@ -204,10 +304,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
