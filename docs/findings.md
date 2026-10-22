@@ -204,6 +204,21 @@ than grows. Presents hold all through, about 350 a second in Chrome and 180-200 
 its heap (-sALLOW_MEMORY_GROWTH, in its own link options); heap_probe.js reads its length too, but Conker's soaks ran
 before it could find that page's sbrk, so its heap's curve is still unread.
 
+Perfect Dark's mission targets reach 1854x960 where its passes draw 1286x660 (2.1x the pixels) through RT64's own
+code, the desktop build's included. Measured at 1256x645 on rt64-web d19fdcc with every `RenderTarget::resize` logged
+with its caller: the page's regular plan in headless Chrome, and the Windows desktop build in a 1256x645 window on an
+RTX 5080 desktop (Auto, Framerate Display, Expand, Defection started from the file menu as the plan starts it).
+Framerate Display draws a game frame's in-between frames into colour targets of their own (`interpolatedColorTargets`),
+a few shared by every frame and only ever grown, and the menus' 576x480 frames at Auto's 3.2188x2 make them 1854x960.
+In a mission an in-between frame puts one in place of the displayed framebuffer's target
+(`RenderTargetManager::setOverride`), so getTargetsFromPair's max() with it grows the pass's depth target to
+1854x960, and the same max() then grows every colour target drawn with that depth target: on the page two depth
+targets and four colour targets in Defection's first seconds, on the desktop one and four. Neither the web's
+`matchColorToDepthTargets` nor the tile copy grows one. The desktop logs that same chain with MSAA off, as a page has
+it (WebGPU has no sample positions); with its default MSAA 2x it doesn't, since there RT64 resolves each in-between
+frame into its target instead of drawing into it, and the mission's targets stay 1286x660. So the page keeps them as
+RT64 sizes them.
+
 ## A page that stops answering
 
 Firefox drops play_page's connection at its 4,098th message when page_driver.mjs speaks WebSocket with Node's own
