@@ -424,7 +424,11 @@ second against 111.6 and 116.7, Defection 210-228 against 108-131, frame gaps p9
 21.2, no present thread's sleep over 4 ms late against 7 and 9, with no WebGPU error and no sound running short. Its
 first 30 s (the boot and the menus) read 55-60 in both, as the game draws them. Firefox takes the late waits' path
 either way (220.7 with it, 198 without, within its noise). The drops left in Chrome are the presents in flight: wait()
-8-18 ms, the GPU's work-done reported 12-14 ms after it in Defection.
+8-18 ms, the GPU's work-done reported 12-14 ms after it in Defection. Mario Kart 64's page (MarioKart64Recomp-web
+de022ae, its regular plan, plays.jsonl's set mk64-sleep, the same host minutes later, Chrome's animation frames at 174 a
+second that hour) presented 167.9 and 168.5 a second with it against 153.9 and 155.3, frame gaps p99 14.9 and 15.0 ms
+against 17.8 and 18.5, none of the present thread's sleeps over 4 ms past their slots against 15 and 29, and no sound
+running short against 151 samples in one; Firefox 67.2 against 65.9, no WebGPU error in either.
 
 ## Pokémon Snap's timed waits in Firefox
 
