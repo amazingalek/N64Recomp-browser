@@ -680,19 +680,25 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
   const proc = spawnHeld(affinity, browserExecutable('firefox', executable), ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
     { stdio: 'ignore' });
+  const T0 = Date.now(); const T = () => ((Date.now() - T0) / 1000).toFixed(1); const tries = [];
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
+    const t = Date.now();
     try {
       send = await connect(`ws://127.0.0.1:${port}/session`, (m) => {
         if (m.method === 'log.entryAdded') line(m.params.type === 'javascript' ? 'exception: ' + m.params.text : m.params.text);
       });
-    } catch { await sleep(200); }
+    } catch (e) { tries.push(Date.now() - t + ':' + e.message.slice(0, 40)); await sleep(200); }
   }
+  line(`PROBE answered at ${T()} s after ${tries.length} tries: ${tries.slice(0, 3).join(' | ')} ... ${tries.slice(-2).join(' | ')}`);
   if (!send) throw new Error('Firefox never answered on its debugging port');
   await send('session.new', { capabilities: {} });
+  line(`PROBE session at ${T()} s`);
   await send('session.subscribe', { events: ['log.entryAdded'] });
   const context = (await send('browsingContext.getTree', {})).result.contexts[0].context;
+  line(`PROBE tree at ${T()} s`);
   if (process.platform === 'win32' && !await moveWindow('firefox.exe', profile, onScreen ? 0 : width, height)) line('page_driver: Firefox window not moved');
+  line(`PROBE moved at ${T()} s`);
   if (!onScreen) {
     const viewport = await send('browsingContext.setViewport', { context, viewport: { width, height }, devicePixelRatio: scale });
     if (viewport.error) line(`page_driver: viewport not set: ${viewport.message ?? viewport.error}`);
