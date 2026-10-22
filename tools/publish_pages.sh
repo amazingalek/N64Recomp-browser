@@ -9,7 +9,8 @@
 #    Docker image, a copy per name, one shared ccache): Rush 2049's is the copy named publish, as its own
 #    tools/publish_page.sh has it, and a fork's is pages-<game>, synced from a clone of it kept here in $PAGES_CACHE
 #    (~/.cache/n64recomp-pages) with no files checked out.
-# 2. Builds the page there by the fork's BUILDING.md steps (Rush 2049's: remote_build.sh build).
+# 2. Builds the page there by the fork's BUILDING.md steps (Rush 2049's: remote_build.sh build), in that image, or on
+#    the host itself for a repo whose scripts run images of their own (Perfect Dark's: the decomp's, then the web's).
 # 3. Hashes the files the page serves (.html, .js, .wasm, .data, coi_serviceworker.js) as git does and compares them
 #    with the blobs on the repo's gh-pages. A commit builds the same bytes in any copy (frontend/build_speed.cmake, once
 #    the game's N64Recomp-browser pin has it: before, a ccache hit could carry another checkout's path in), so
@@ -92,6 +93,7 @@ jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-b
 dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
 snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
 rush2  amazingalek/rush2recompiled-web            Rush2Recompiled      build-web
+pd     amazingalek/perfect-dark-recomp            PerfectDarkRecompiled build/web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -317,6 +319,14 @@ build_rush2() {
     # (build-web-prep/web-patched).
     bash tools/build_web.sh ../rom.z64 > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
+# Runs on the host (on_host): both scripts start Docker images of their own. The decomp's build checks the ROM, and
+# makes the relink and syms/ the recompilation is made from (incremental after the first run).
+build_pd() {
+    bash tools/build_decomp.sh ../rom.z64 "$BUILD_CPUS" > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+    git diff --quiet syms || { echo "tools/build_decomp.sh changed syms/: main's are not this ROM's"; exit 1; }
+    bash tools/build_web.sh "$BUILD_CPUS" >> ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+on_host=" pd "
 
 # --- Here ---
 
@@ -361,9 +371,15 @@ for g in "${selected[@]}"; do
         rom="${ROMS:?set ROMS to the folder holding <game>.z64}/$g.z64"
         have="$(ssh -o BatchMode=yes "$BUILD_HOST" "sha1sum rush2049/$copy/rom.z64 2> /dev/null || true")"  # remote_build.sh's base
         [[ "$have" == "$(sha1sum < "$rom" | cut -c1-40) "* ]] || scp -q "$rom" "$BUILD_HOST:rush2049/$copy/rom.z64"
-        if ! bash "$remote_build" -n $copy run "set -euo pipefail; trap 'echo \"failed: \$BASH_COMMAND\" >&2' ERR; $(declare -f exclude browser_at unpatch patched keep_times n64recomp web build_$g); exclude;
-            ${browser:+browser_at $browser;} unpatch; build_$g; patched" \
-            > "$work/$g.log" 2>&1; then
+        script="set -euo pipefail; trap 'echo \"failed: \$BASH_COMMAND\" >&2' ERR; $(declare -f exclude browser_at unpatch patched keep_times n64recomp web build_$g); exclude;
+            ${browser:+browser_at $browser;} unpatch; build_$g; patched"
+        if [[ $on_host == *" $g "* ]]; then
+            # In the copy as remote_build.sh's run is, holding its lock, but outside its image.
+            run=(ssh -o BatchMode=yes "$BUILD_HOST" "cd ~/rush2049/$copy/repo && BUILD_CPUS=${BUILD_CPUS:-12} exec flock ../.lock bash -c $(printf %q "$script")")
+        else
+            run=(bash "$remote_build" -n $copy run "$script")
+        fi
+        if ! "${run[@]}" > "$work/$g.log" 2>&1; then
             echo "   build failed:"; tail -20 "$work/$g.log"; failed+=("$g"); continue
         fi
     fi
