@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web b52641014edbba93b692f8c54bc6043752628c6e
+plume: https://github.com/amazingalek/plume-web 6cb5d38206b7c6fdc7d2e32c8852b1a22d5c4f03
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2740,10 +2740,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..e75882e
+index 0000000..8448d7a
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,145 @@
 +//
 +// plume
 +//
@@ -2772,6 +2772,7 @@ index 0000000..e75882e
 +#include <cstdint>
 +#include <cstdio>
 +
++#include <emscripten/em_asm.h>
 +#include <emscripten/emscripten.h>
 +#include <emscripten/threading.h>
 +
@@ -2797,9 +2798,10 @@ index 0000000..e75882e
 +    }
 +
 +    // A timed wait in use, on the one thread that judges them, that ended overMs past its time. Waits judged on time turn
-+    // late once most of the waits judged in each of 5 seconds in a row ended more than 4 ms past their time, and stay
-+    // late. Only seconds in a row: a page's waits in Firefox can end late for a few seconds as it starts and on time from
-+    // then on, which is when timed waits are a page's fastest. Never back to on time: judged by waits of their own
++    // late once most of the waits judged in each of 10 seconds in a row ended more than 4 ms past their time, and stay
++    // late. Only seconds in a row, and 10 of them: a page's waits in Firefox can end late for its first seconds (Pokemon
++    // Snap's for 1-3 s past the slots, the VI thread's for more than 5) and on time from then on, which is when timed
++    // waits are a page's fastest. Never back to on time: judged by waits of their own
 +    // instead (woken or spun), a page's timed waits were never seen on time again, while ones kept up came back on time.
 +    inline void timedWaitEnded(double overMs) {
 +        WebTimedWaits &waits = webTimedWaits();
@@ -2822,9 +2824,9 @@ index 0000000..e75882e
 +        waits.secondStart = now;
 +        waits.secondWaits = 0;
 +        waits.secondLateWaits = 0;
-+        if (waits.lateSeconds >= 5) {
++        if (waits.lateSeconds >= 10) {
 +            waits.late = true;
-+            fprintf(stderr, "plume: most timed waits on a thread of this page ended over 4 ms late for 5 s, so waits off the page's thread are woken or spun from now on, not timed\n");
++            fprintf(stderr, "plume: most timed waits on a thread of this page ended over 4 ms late for 10 s, so waits off the page's thread are woken or spun from now on, not timed\n");
 +        }
 +    }
 +
@@ -2861,6 +2863,12 @@ index 0000000..e75882e
 +        bool notMeasuring = false;
 +        if (waits.measuring.compare_exchange_strong(notMeasuring, true)) {
 +            waits.late = (shortest > 4.0);
++            // TEST ONLY: ?timed-waits-start-on-time judges the start on time, whatever it measured.
++            if (MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('timed-waits-start-on-time') ? 1 : 0; })) {
++                fprintf(stderr, "plume test: the start measured %.1f ms, judged on time by the query\n", shortest);
++                shortest = 0.0;
++                waits.late = false;
++            }
 +            waits.measured = true;
 +            if (shortest > 4.0) {
 +                fprintf(stderr, "plume: a timed wait of 100 us on a thread of this page takes %.1f ms, so waits off the page's thread are woken or spun, not timed\n", shortest);

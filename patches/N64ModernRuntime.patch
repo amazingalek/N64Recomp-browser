@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 76d03da411db444baaad45a45e40f50de1c14744
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 0a4305a9b118a0f8fca7e444916e5c30ad954b8f
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -822,10 +822,10 @@ index 0000000..be6c588
 +
 +#endif
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..c52873a 100644
+index 2f1cfb5..e917acf 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -175,6 +175,143 @@ uint64_t total_vis = 0;
+@@ -175,6 +175,149 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -835,6 +835,7 @@ index 2f1cfb5..c52873a 100644
 +#include <cerrno>
 +#include <climits>
 +#include <cstdio>
++#include <emscripten/em_asm.h>
 +#include <emscripten/emscripten.h>
 +#include <emscripten/html5.h>
 +#include <emscripten/proxying.h>
@@ -869,6 +870,11 @@ index 2f1cfb5..c52873a 100644
 +            }
 +
 +            vi_late = shortest > 4.0;
++            // TEST ONLY: ?timed-waits-start-on-time judges the start on time, whatever it measured.
++            if (MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('timed-waits-start-on-time') ? 1 : 0; })) {
++                fprintf(stderr, "ultramodern test: the start measured %.1f ms, judged on time by the query\n", shortest);
++                vi_late = false;
++            }
 +            return true;
 +        }();
 +
@@ -876,7 +882,7 @@ index 2f1cfb5..c52873a 100644
 +    }
 +
 +    // A timed wait of the VI thread's that ended over_ms past its time: waits judged on time turn late once most of those
-+    // in each of 5 seconds in a row ended more than 4 ms past their time, and stay late, as plume's timedWaitEnded()
++    // in each of 10 seconds in a row ended more than 4 ms past their time, and stay late, as plume's timedWaitEnded()
 +    // judges the present thread's.
 +    void vi_wait_ended(double over_ms) {
 +        static double second_start = 0.0;
@@ -898,9 +904,9 @@ index 2f1cfb5..c52873a 100644
 +        second_start = now;
 +        second_waits = 0;
 +        second_late_waits = 0;
-+        if (late_seconds >= 5) {
++        if (late_seconds >= 10) {
 +            vi_late = true;
-+            fprintf(stderr, "ultramodern: most of the VI thread's timed waits ended over 4 ms late for 5 s, so VIs come on the browser's animation frames from now on\n");
++            fprintf(stderr, "ultramodern: most of the VI thread's timed waits ended over 4 ms late for 10 s, so VIs come on the browser's animation frames from now on\n");
 +        }
 +    }
 +
@@ -969,7 +975,7 @@ index 2f1cfb5..c52873a 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +341,25 @@ void vi_thread_func() {
+@@ -204,10 +347,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
