@@ -230,5 +230,7 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.
 - A list started with the list before's render-to-RAM late copy still pending, for Perfect Dark at 30 in its
   levels: it drew 30 either way, its main thread waiting for a controller sample (`joy_debug_joy`), not for the copy.
+- Judging a page's timed waits both ways as it plays (back to timed once they end on time): judged from the frame
+  waits it turned several times a second, and tries before each frame wait cost a sixth and never saw them on time.
 - Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
   silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.
