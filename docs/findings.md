@@ -1196,6 +1196,17 @@ Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
 - A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
   against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
 
+## A desktop build on WSL's GPU
+
+Mesa's Dozen (Vulkan over D3D12) gives a Docker container in WSL2 the Windows host's GPU through `/dev/dxg`; a game
+fork's Linux harness can take it to play its desktop build headless faster than lavapipe does. On an RTX 5080 a
+Perfect Dark desktop play under Dozen, a sweep through a mission, lost its device (`vkWaitForFences`
+`VK_ERROR_DEVICE_LOST`). Its process stayed in uninterruptible sleep in the driver and its container could not be
+removed; on Windows `nvidia-smi` hung from then on, and so did `wsl --shutdown`. Within the half hour the whole host
+froze, and only a restart brought it back. A device lost in a browser
+costs only its page (Faults); one lost through `/dev/dxg` costs the host and everything on it, so a desktop build
+under WSL runs on lavapipe (CLAUDE.md, Playing a page).
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
