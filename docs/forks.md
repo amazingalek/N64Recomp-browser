@@ -314,4 +314,8 @@ rt64 cbe51a5           a VI whose vertical region ends before it starts gives no
                        every target drawn that frame was 16384 wide and stayed so (Perfect Dark's one such frame as its
                        menus start: then each mission's targets, 16384x960, through matchColorToDepthTargets). Its
                        regular plan in headless Chrome at 1256x645: widest target 1854, GPU memory 2598 MiB, not 4134
+rt64 d19fdcc           WebGPU: a dummy depth target for each color target size, for the passes that draw no depth
+                       framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
+                       target, grew each to the biggest any had been (Perfect Dark's 320x1 mission targets, 1286x3,
+                       drawn at its 576-wide menus' 1854x960)
 ```
