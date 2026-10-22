@@ -309,4 +309,23 @@ N64ModernRuntime       100 us for a frame and judge that wait, and once most of 
                        Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
                        4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
                        (docs/findings.md, Pokémon Snap's timed waits in Firefox)
+rt64 2292159           a projection holding the camera split into view and perspective by the row where the view's Z
+                       axis is largest, not row 0's alone, on every build: for a camera looking along the world's Z
+                       that ratio of two fixed-point values near zero gave each frame another depth range, and a frame
+                       interpolated between two lost what was far away (Perfect Dark's Air Base at its start, every
+                       mountain gone to the clear colour in 1-5 of 30 shots, 0 of 180 with it)
+rt64 cbe51a5           a VI whose vertical region ends before it starts gives no frame size, as a blank VI, on every
+                       build: its height wrapped round to 4294967040 lines, Expand's horizontal scale to 14520022, and
+                       every target drawn that frame was 16384 wide and stayed so (Perfect Dark's one such frame as its
+                       menus start: then each mission's targets, 16384x960, through matchColorToDepthTargets). Its
+                       regular plan in headless Chrome at 1256x645: widest target 1854, GPU memory 2598 MiB, not 4134
+rt64 51c3fdd           RT64_FREE_DISCARDED_TARGETS (on with Emscripten): the render targets of a framebuffer discarded,
+                       its RAM overwritten by the CPU, are set aside, given back to a draw that asks for them again and
+                       freed once none has in WORKLOAD_QUEUE_SIZE * 32 workloads. RT64 kept a target for every
+                       framebuffer address a game drew to: Perfect Dark's, at each mission's own addresses, grew
+                       Chrome's GPU process from 1.4 to 4.76 GB over six missions, and to 2.17 GB with this
+rt64 d19fdcc           WebGPU: a dummy depth target for each color target size, for the passes that draw no depth
+                       framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
+                       target, grew each to the biggest any had been (Perfect Dark's 320x1 mission targets, 1286x3,
+                       drawn at its 576-wide menus' 1854x960)
 ```

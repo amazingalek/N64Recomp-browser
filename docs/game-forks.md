@@ -71,23 +71,33 @@ list's sections and Firefox's waits, the ROM.
 GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
 cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
 `GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
-place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to
-go back to: its submodules are at the commits the forks are built on
-(`patches/patches.txt`, a row each in `pins.txt`), and the patched checkouts are the forks' trees file for file; its
-desktop build needs the patched N64Recomp too (9aabea3, ec0748e). Its patches' call to `yield_self_1ms`, whose signature
-isn't a native's, trapped the page after ~20 s. A wait that polls memory or the clock without an OS call starves every
-other game thread on any recomp, as its `patches/fps.c` did; a trace of the count calls a second found this one. A
-game's `get_frames_remaining` must match how its audio manager reads osAiGetLength. With render to RAM's copy a list
-late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was pending. Every level adds dozens
-of shaders (26 combiners, but many render modes: palette textures, fog, depth). Without the boot section, a cold visit
-built 13 shaders behind the intro, which fell to ~15 frames a second. In Chrome 155 headless (RTX 2070) the menus took
-2.5 s cold, Dam 6.6 s cold and 4.5 s on a later visit: boot and Dam alone are ~9.4 MB of Chrome's 6 MB cache. To reach a
-level from a fresh save by hand, mark the earlier ones completed in RAM: `saves` (data_dump.toml) holds 0x60-byte
-folders whose 10-bit times start at byte 0x12, and RDRAM is found in the heap by osTvType, osRomBase and osMemSize at
-0x80000300. Its README and BUILDING.md, and the headers of `patches/fps.c`, `patches/shader_survey.c` and
-`src/rt64_shaders.txt`, have the rest: the TLBFREE ROM, what the native build needs the patches for and the renamed
-functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list and how it was recorded,
-Firefox's waits.
+place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to go
+back to: its submodules are at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), and
+the patched checkouts are the forks' trees file for file; its desktop build needs the patched N64Recomp too (9aabea3,
+ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s.
+GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
+matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
+colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, and is the fix
+offered to podulator's, which takes AI-written fixes for bugs its desktop build has too. It draws a room seen through a
+portal, and the props and guards in it, clipped to the portal's box on screen, and the walls around a portal don't hide
+what is behind them: its `patches/widescreen.c` had made every one of those clips the whole screen, which drew Frigate's
+bridge consoles and guards on the bridge's outer wall, blinking as the game toggled them on screen, and a building over
+Surface's tree wall. RT64 widens a projection only if its draws' scissors together span the screen, and the game loads
+its projection for every room, so its `bgScissorCurrentPlayerView` gives a room cut narrower than the screen one empty
+triangle under the whole screen's scissor first, and its box in the widened projection's terms; a box kept to the 4:3
+view drew those rooms 4:3, leaving strips of sky at a 16:9 view's edges (Dam's mountain). A wait that polls memory or the clock without
+an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
+calls a second found this one. A game's `get_frames_remaining` must match how its audio manager reads osAiGetLength.
+With render to RAM's copy a list late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was
+pending. Every level adds dozens of shaders (26 combiners, but many render modes: palette textures, fog, depth). Without
+the boot section, a cold visit built 13 shaders behind the intro, which fell to ~15 frames a second. In Chrome 155
+headless (RTX 2070) the menus took 2.5 s cold, Dam 6.6 s cold and 4.5 s on a later visit: boot and Dam alone are ~9.4 MB
+of Chrome's 6 MB cache. To reach a level from a fresh save by hand, mark the earlier ones completed in RAM: `saves`
+(data_dump.toml) holds 0x60-byte folders whose 10-bit times start at byte 0x12, and RDRAM is found in the heap by
+osTvType, osRomBase and osMemSize at 0x80000300. Its README and BUILDING.md, and the headers of `patches/fps.c`,
+`patches/shader_survey.c` and `src/rt64_shaders.txt`, have the rest: the TLBFREE ROM, what the native build needs the
+patches for and the renamed functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list
+and how it was recorded, Firefox's waits.
 
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream
@@ -287,10 +297,32 @@ title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web
 menus by the front end's screen and the track select's entry in RDRAM. Its docs/BUILDING.md (The web page) and the
 header of `tools/build_web.sh` has the rest.
 
+`amazingalek/perfect-dark-recomp` is Perfect Dark (USA rev 1), not a fork but this project's own recomp, as Rush 2049's
+is (GPL-3.0), made from the game's MIT decompilation. It is on upstream's rt64, N64ModernRuntime and RecompFrontend at
+the commits GoldenEye's are on (`patches/pins.txt`), patched by the N64Recomp-browser tag its `lib/N64Recomp-browser`
+pins, and carries no patches of its own to them, so CI has no job for it. Perfect Dark runs its lib segment at
+0x70001050 and its game code at 0x7f000000 behind the TLB, where N64Recomp's memory macros index RDRAM by address -
+0x80000000, so the decompilation is relinked without the TLB (`tools/relink.ld.patch`), each segment where it already
+sits in an 8 MB console's RDRAM (lib at 0x80001050, game at 0x80220000, where the game's own 8 MB path unzips it), and
+the recompiler reads its code from that relink. None of the relink is in git: at run time the game's own inflate
+unpacks the player's ROM, and the relocation list, `syms/relocs.txt` (6,482 words, found by linking at two bases),
+shifts the pointers outside `.text`, after which RDRAM is the relink byte for byte outside `.text`. Backing the 0x7f
+addresses as Conker's page does was ruled out: it needs RDRAM plus 0xFF000000, past wasm32's 4 GB. RT64 draws its
+graphics as they are but for the sky's clouds and water, raw RDP triangles RT64 drops, which `patches/sky.c` draws as
+3D triangles as GoldenEye's recomp does. Its audio microcode is Rare's `aspMain` with an MP3 decoder overlaid on it,
+which RSPRecomp swaps in where the code DMAs it, and the program drops whole audio frames, never part of one, when
+more than 100 ms is queued. Its build, `tools/build_decomp.sh` (the decompilation checked against the ROM, the
+relink, the list and the symbols) then `tools/build_web.sh`, runs Docker images of its own, so `publish_pages.sh`
+runs it on the build host and not in rush-2049-recomp's image. Its list is 668 shaders, 271 pipelines: the boot (38)
+and a section a solo mission (21), recorded by `tools/record_shaders.sh`, where `patches/shader_survey.c` starts each
+mission as mission select's Accept does, plus 39 the plans' plays and a minute in each mission missed afterwards. Its
+docs/building.md and docs/web.md have the rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
-game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Pilotwings 64 60 (a variable timestep), Diddy Kong
+game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Perfect Dark up to 60 (as the game ticks at most
+once a VI; its controller reads held it to 30 on a fast CPU, which its `patches/frame_rate.c` undoes), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
 cartridge's for the other nine: Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30

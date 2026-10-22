@@ -144,17 +144,20 @@
   // browser keeps the locked cursor in place by moving it back, and takes each move back out of the motion it reports
   // (Firefox's coalesced pointer events show them): a move counted against the wrong position is a jump, the likeliest
   // cause of GoldenEye's view turning all at once, now and then, in fast turns (running, strafing and turning). A
-  // browser that has no raw counts (NotSupportedError) gets the lock without them. In a block, since the program's
-  // script has a global function of the same name.
+  // browser that has no raw counts (NotSupportedError) gets the lock without them. A browser may refuse the lock (no
+  // click before it, too soon after Escape, a headless one) and the game plays on without it, so a refusal is logged:
+  // Emscripten drops the promise, and unhandled it was an uncaught exception on the page. It still rejects for a
+  // caller that awaits it. In a block, since the program's script has a global function of the same name.
   {
     const requestPointerLock = Element.prototype.requestPointerLock;
     if (requestPointerLock) {
       Element.prototype.requestPointerLock = function (options) {
-        const locked = requestPointerLock.call(this, { unadjustedMovement: true, ...options });
-        return locked?.catch((e) => {
+        const locked = requestPointerLock.call(this, { unadjustedMovement: true, ...options })?.catch((e) => {
           if (e.name !== 'NotSupportedError') throw e;
           return requestPointerLock.call(this, options);
-        }) ?? locked;
+        });
+        locked?.catch((e) => console.log(`pointer lock refused: ${e.name}: ${e.message}`));
+        return locked;
       };
     }
   }

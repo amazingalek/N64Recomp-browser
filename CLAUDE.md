@@ -77,6 +77,8 @@ branches only: upstream's others are deleted when it is made.
   no AI-made contribution and no AI talking to its maintainers). Each fork's README opens with a banner, and its GitHub
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
+  A game's own repo is decided case by case: a game fork offers it only what it takes, said to be AI-written
+  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too, without the web or mouse code).
 - A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
   the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it
@@ -98,8 +100,9 @@ hlslpp-web; N64ModernRuntime-web's `N64Recomp` is N64Recomp-web. Notes name a ch
 `rt64-0010`) or by fork and commit (`rt64 c89ced0`): `docs/forks.md` has every one, a line each, and a change pushed to
 a fork gets its row there in the PR that moves `forks.txt` onto it.
 
-Six options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
-fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64 179adb8), `ULTRAMODERN_LIBULTRA_THREAD_STOP`
+Seven options are off on a desktop build, on with Emscripten, and settable natively: `RT64_FLIPPED_RECT_HIGH_RES` (rt64
+fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64 179adb8), `RT64_FREE_DISCARDED_TARGETS` (rt64
+51c3fdd), `ULTRAMODERN_LIBULTRA_THREAD_STOP`
 (N64ModernRuntime 0df8334), `ULTRAMODERN_HOLD_BLOCKED_MESSAGES` (N64ModernRuntime 66539ab) and
 `ULTRAMODERN_LOADS_WAIT_FOR_DISPLAY_LISTS` (N64ModernRuntime bf96a62).
 
@@ -189,6 +192,9 @@ of this in the same work, as docs/playing.md says:
   doesn't (docs/findings.md, Behind CLAUDE.md's rules).
 - A plan reaches a level as a player does and plays a minute or more in its levels, its holds on the game's own clock;
   a plan that ends on black is the plan's fault until a direct warp there draws black too (docs/playing.md, Plans).
+- A game's desktop build never runs on the GPU from inside WSL2 (Mesa's Dozen over `/dev/dxg`): a device lost there
+  wedged the Windows host's GPU driver and froze the whole machine until a restart (docs/findings.md, A desktop build
+  on WSL's GPU). Under WSL or Docker it runs on lavapipe, on the CPU; on the GPU only natively, or as its page.
 
 ## Ruled out, so don't retry
 
@@ -232,5 +238,7 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   levels: it drew 30 either way, its main thread waiting for a controller sample (`joy_debug_joy`), not for the copy.
 - Judging a page's timed waits both ways as it plays (back to timed once they end on time): judged from the frame
   waits it turned several times a second, and tries before each frame wait cost a sixth and never saw them on time.
+- A missed shader built in line with the device in Firefox as what stops Perfect Dark's page answering at
+  Defection: the page kept drawing, and it was Firefox's own process that answered every BiDi command late.
 - Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
   silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.

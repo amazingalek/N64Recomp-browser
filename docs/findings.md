@@ -231,7 +231,23 @@ preload, `--play 25`, at 3840x2000), 1-2 s after a section of prebuilt shaders b
 GoldenEye's two had reached their first shader wait at 91-165 s, where its page reaches it in 21-34 s. The next plays didn't: Mario Kart's two,
 and GoldenEye's page from Pages (v0.80.0) in eight with the fork's whole plan through Dam's load and a minute on foot,
 three on the busy RTX 2070 host and five on an idle host with an RTX 5080, no WebGPU errors, exceptions or misses. A
-run that stops there again is replayed with `--gecko-profile`, which records which of Firefox's threads holds the page.
+run that stops with the browser's main thread idle is the browser's, not the page's (below).
+
+Perfect Dark's page "stopped answering" the same way in Firefox 158 on the RTX 2070 host, 30-56% busy beside other
+cards' pages, about one play in four of its regular plan, from Pages and from a build: once ~45 s into Defection,
+after its section's 56 prebuilt shaders and the 3 its list misses there, and three times as it booted, before its
+first console line reached play_page (GoldenEye's page, from Pages and a build, too, 34-60 s after Firefox opened).
+The page was not held. At the stop its tab's main thread idled in its event loop, the game's threads sat in ordinary
+futex waits, the GPU process was still encoding the page's render passes, and no crash dump was written. What stopped
+answering was the browser's own process, over WebDriver BiDi, its main thread idle (0.00-0.02 cores, waiting):
+`browsingContext.getTree`, which never reaches a page, went 10-16 s unanswered, and `session.status`, which never
+leaves the Remote Agent, took 3.5-14 s. Every command play_page had given up on was answered 11-37 s late. Between
+those stretches, evaluates in the page and in the browser's chrome context answered in 4-74 ms. On the same host,
+Firefox's own start on a fresh profile waited minutes in idle stretches like these before `session.new` answered. On
+an idle host with an RTX 5080 neither showed: Perfect Dark played clean in both browsers, and a fresh headless
+Firefox answered `getTree` twice a second for 2 minutes in 250 ms or less. So the page's late console lines there
+(100 s), and the 15 s with no answer that ends the run, are the browser's, and such a run says nothing about the
+page. A `--gecko-profile` dump goes through that same process, so it comes only once the process answers again.
 
 ## Two pages at once
 
@@ -1196,6 +1212,37 @@ Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
 - A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
   against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
 
+## A desktop build on WSL's GPU
+
+Mesa's Dozen (Vulkan over D3D12) gives a Docker container in WSL2 the Windows host's GPU through `/dev/dxg`; a game
+fork's Linux harness can take it to play its desktop build headless faster than lavapipe does. On an RTX 5080 a
+Perfect Dark desktop play under Dozen, a sweep through a mission, lost its device (`vkWaitForFences`
+`VK_ERROR_DEVICE_LOST`). Its process stayed in uninterruptible sleep in the driver and its container could not be
+removed; on Windows `nvidia-smi` hung from then on, and so did `wsl --shutdown`. Within the half hour the whole host
+froze, and only a restart brought it back. A device lost in a browser
+costs only its page (Faults); one lost through `/dev/dxg` costs the host and everything on it, so a desktop build
+under WSL runs on lavapipe (CLAUDE.md, Playing a page).
+
+## Firefox slow to start
+
+On some stretches of an afternoon, every Firefox play on one host (an RTX 2070, other cards' pages beside it) took 50
+to 540 s to open, while Chrome plays in the same hours opened at once, and quieter stretches opened in 4-7 s. Host load
+didn't decide it: one slow open was on a host 13% busy. Firefox 158's debugging port answered in 1-26 s every time; what
+waited was BiDi's `session.new`, which answers only once the browser fires `browser-idle-startup-tasks-finished`, after
+the first window's delayed startup and every startup idle task has run. A Gecko startup profile of a 245 s open on
+about:blank shows the window ready at 80 s, the idle tasks run in batches 35-80 s apart (SafeBrowsing.init only when
+its 5 s timeout forced it), and every thread profiled, the GPU process's included, idle in its event loop between
+them, while the profile's first sync of remote settings ran from 35 s to about 200 s: dozens of collections and
+tracking-protection lists from Mozilla's servers, thousands of IndexedDB writes. The remote agent sets
+`services.settings.server` to a dummy so that remote settings stay off the network, but a release build ignores the
+pref unless `MOZ_REMOTE_SETTINGS_DEVTOOLS` is 1 in its environment. Headless (no window, no GPU) on fresh profiles,
+`session.new` answered at 158 s and 29 s without it and 13.5 s and 1.7 s with it; windowed in the same slow stretch,
+at 72 s and 182 s with it and not within 8 minutes without. An hour later, with the host 32-49% busy, every windowed
+start took 3-5 s with or without it. `page_driver.mjs` starts Firefox with it set. What still slowed the windowed
+starts with it set is not known. In the slow stretches, Firefox on about:blank also didn't exit within 30 s of
+`browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of the browser's
+own process as in A page that stops answering.
+
 ## Behind CLAUDE.md's rules
 
 The measurements behind rules CLAUDE.md and the other docs state without them.
@@ -1344,3 +1391,6 @@ What CLAUDE.md's Ruled out rests on.
   next retrace: a tick that finds no controller sample newer than the last one restarts the polling and takes two VIs
   (Perfect Dark's docs/web.md says so of its menus). Its desktop build draws its levels at 30 too. The Gfx thread's 85%
   in the late copy's wait came from a play without the prebuilt list.
+- A missed shader built in line with the device in Firefox as what stops Perfect Dark's page answering at Defection
+  (A page that stops answering): the page kept drawing through the stop, and Firefox's own process answered every
+  BiDi command 11-37 s late, `browsingContext.getTree` and `session.status` too, which never reach the page.
