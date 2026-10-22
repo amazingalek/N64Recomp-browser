@@ -204,6 +204,21 @@ than grows. Presents hold all through, about 350 a second in Chrome and 180-200 
 its heap (-sALLOW_MEMORY_GROWTH, in its own link options); heap_probe.js reads its length too, but Conker's soaks ran
 before it could find that page's sbrk, so its heap's curve is still unread.
 
+Perfect Dark's mission targets reach 1854x960 where its passes draw 1286x660 (2.1x the pixels) through RT64's own
+code, the desktop build's included. Measured at 1256x645 on rt64-web d19fdcc with every `RenderTarget::resize` logged
+with its caller: the page's regular plan in headless Chrome, and the Windows desktop build in a 1256x645 window on an
+RTX 5080 desktop (Auto, Framerate Display, Expand, Defection started from the file menu as the plan starts it).
+Framerate Display draws a game frame's in-between frames into colour targets of their own (`interpolatedColorTargets`),
+a few shared by every frame and only ever grown, and the menus' 576x480 frames at Auto's 3.2188x2 make them 1854x960.
+In a mission an in-between frame puts one in place of the displayed framebuffer's target
+(`RenderTargetManager::setOverride`), so getTargetsFromPair's max() with it grows the pass's depth target to
+1854x960, and the same max() then grows every colour target drawn with that depth target: on the page two depth
+targets and four colour targets in Defection's first seconds, on the desktop one and four. Neither the web's
+`matchColorToDepthTargets` nor the tile copy grows one. The desktop logs that same chain with MSAA off, as a page has
+it (WebGPU has no sample positions); with its default MSAA 2x it doesn't, since there RT64 resolves each in-between
+frame into its target instead of drawing into it, and the mission's targets stay 1286x660. So the page keeps them as
+RT64 sizes them.
+
 ## A page that stops answering
 
 Firefox drops play_page's connection at its 4,098th message when page_driver.mjs speaks WebSocket with Node's own
@@ -248,6 +263,10 @@ an idle host with an RTX 5080 neither showed: Perfect Dark played clean in both 
 Firefox answered `getTree` twice a second for 2 minutes in 250 ms or less. So the page's late console lines there
 (100 s), and the 15 s with no answer that ends the run, are the browser's, and such a run says nothing about the
 page. A `--gecko-profile` dump goes through that same process, so it comes only once the process answers again.
+With Firefox started with `MOZ_REMOTE_SETTINGS_DEVTOOLS=1` (page_driver.mjs), Perfect Dark's regular plan from Pages
+played 4 of 4 clean through Defection on that host (3840x2000 uncapped, 4-14% busy as each shared turn began, no other
+turn running): 0 WebGPU errors, 0 exceptions, every command answered. Its list had the 3 shaders by then, so none was
+built in line with the device there.
 
 ## Two pages at once
 
@@ -1242,6 +1261,17 @@ start took 3-5 s with or without it. `page_driver.mjs` starts Firefox with it se
 starts with it set is not known. In the slow stretches, Firefox on about:blank also didn't exit within 30 s of
 `browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of the browser's
 own process as in A page that stops answering.
+
+None of these slows it alone. A display that has turned itself off (card sessions keep a host awake but not its
+display): on an idle host with an RTX 5080, with Windows reporting the console display off
+(`GUID_CONSOLE_DISPLAY_STATE` 0) before and after each start, six windowed starts on fresh profiles on about:blank,
+uncapped, answered `session.new` in 1.9 s, the page visible and drawing ~80 animation frames a second, and exited
+0.35 s after `browser.close`, three with Firefox's window occlusion tracking (which counts every window hidden while
+the display is off) and three with it off, as fast as with the display on (2.5 s). The refresh rate, with the display
+still off: at `layout.frame_rate` 1000, 360 (page_driver's uncapped, a frame shorter than the 3 ms `idle_period.min`
+an idle task needs) and -1, starts took 2.05-2.26 s. Windows shell integration: with the taskbar's jump lists and
+previews, the default-browser check and the upgrade page off in the profile, starts on the RTX 2070 host opened in
+1.9-4.8 s in quiet stretches and at 383 s in a slow one.
 
 ## Behind CLAUDE.md's rules
 
