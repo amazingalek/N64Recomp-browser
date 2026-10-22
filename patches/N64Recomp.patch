@@ -1,4 +1,4 @@
-N64Recomp: https://github.com/amazingalek/N64Recomp-web df1769000cdfd568a44c5a2c4b9f27c344c3a70d
+N64Recomp: https://github.com/amazingalek/N64Recomp-web 46395bbfe442efcc61d87017bfc684a2b3c8d930
 on upstream 81213c1831fab2521a6a5459c67b63437d67e253 (tools/export_patches.sh)
 
 diff --git a/LiveRecomp/live_generator.cpp b/LiveRecomp/live_generator.cpp
@@ -451,7 +451,7 @@ index 9eaaa30..4564ec7 100644
  
              if (cur_jtbl.got_offset.has_value() && got_ram_addr.has_value()) {
 diff --git a/src/cgenerator.cpp b/src/cgenerator.cpp
-index 94f85c5..60265c6 100644
+index 94f85c5..7456db8 100644
 --- a/src/cgenerator.cpp
 +++ b/src/cgenerator.cpp
 @@ -85,6 +85,16 @@ static std::string gpr_to_string(int gpr_index) {
@@ -529,7 +529,7 @@ index 94f85c5..60265c6 100644
  }
  
  void N64Recomp::CGenerator::emit_cop0_status_write(int reg) const {
-@@ -502,7 +531,7 @@ void N64Recomp::CGenerator::emit_cop0_status_write(int reg) const {
+@@ -502,13 +531,16 @@ void N64Recomp::CGenerator::emit_cop0_status_write(int reg) const {
  }
  
  void N64Recomp::CGenerator::emit_cop1_cs_read(int reg) const {
@@ -538,7 +538,37 @@ index 94f85c5..60265c6 100644
  }
  
  void N64Recomp::CGenerator::emit_cop1_cs_write(int reg) const {
-@@ -569,7 +598,7 @@ void N64Recomp::CGenerator::process_binary_op(const BinaryOp& op, const Instruct
+     fmt::print(output_file, "set_cop1_cs({});\n", gpr_to_string(reg));
+ }
+ 
++// A division by zero doesn't trap on the VR4300: the quotient is -1 (1 for a signed division of a negative dividend)
++// and the remainder is the dividend. Code that divides without checking its divisor gets those, so the divisions are
++// written to give them, where dividing by zero on the host would trap (in wasm, and on x86 natively).
+ void N64Recomp::CGenerator::emit_muldiv(InstrId instr_id, int reg1, int reg2) const {
+     switch (instr_id) {
+         case InstrId::cpu_mult:
+@@ -525,16 +557,16 @@ void N64Recomp::CGenerator::emit_muldiv(InstrId instr_id, int reg1, int reg2) co
+             break;
+         case InstrId::cpu_div:
+             // Cast to 64-bits before division to prevent artihmetic exception for s32(0x80000000) / -1
+-            fmt::print(output_file, "lo = S32(S64(S32({0})) / S64(S32({1}))); hi = S32(S64(S32({0})) % S64(S32({1})));\n", gpr_to_string(reg1), gpr_to_string(reg2));
++            fmt::print(output_file, "if (S32({1}) == 0) {{ lo = S32({0}) >= 0 ? -1 : 1; hi = S32({0}); }} else {{ lo = S32(S64(S32({0})) / S64(S32({1}))); hi = S32(S64(S32({0})) % S64(S32({1}))); }}\n", gpr_to_string(reg1), gpr_to_string(reg2));
+             break;
+         case InstrId::cpu_ddiv:
+-            fmt::print(output_file, "DDIV(S64({}), S64({}), &lo, &hi);\n", gpr_to_string(reg1), gpr_to_string(reg2));
++            fmt::print(output_file, "if (S64({1}) == 0) {{ lo = S64({0}) >= 0 ? -1 : 1; hi = {0}; }} else DDIV(S64({0}), S64({1}), &lo, &hi);\n", gpr_to_string(reg1), gpr_to_string(reg2));
+             break;
+         case InstrId::cpu_divu:
+-            fmt::print(output_file, "lo = S32(U32({0}) / U32({1})); hi = S32(U32({0}) % U32({1}));\n", gpr_to_string(reg1), gpr_to_string(reg2));
++            fmt::print(output_file, "if (U32({1}) == 0) {{ lo = S32(0xFFFFFFFF); hi = S32({0}); }} else {{ lo = S32(U32({0}) / U32({1})); hi = S32(U32({0}) % U32({1})); }}\n", gpr_to_string(reg1), gpr_to_string(reg2));
+             break;
+         case InstrId::cpu_ddivu:
+-            fmt::print(output_file, "DDIVU(U64({}), U64({}), &lo, &hi);\n", gpr_to_string(reg1), gpr_to_string(reg2));
++            fmt::print(output_file, "if (U64({1}) == 0) {{ lo = -1; hi = {0}; }} else DDIVU(U64({0}), U64({1}), &lo, &hi);\n", gpr_to_string(reg1), gpr_to_string(reg2));
+             break;
+         default:
+             assert(false);
+@@ -569,7 +601,7 @@ void N64Recomp::CGenerator::process_binary_op(const BinaryOp& op, const Instruct
      thread_local std::string expression{};
      get_operand_string(op.output, UnaryOpType::None, ctx, output);
      get_binary_expr_string(op.type, op.operands, ctx, output, expression);
@@ -547,7 +577,7 @@ index 94f85c5..60265c6 100644
  }
  
  void N64Recomp::CGenerator::process_unary_op(const UnaryOp& op, const InstructionContext& ctx) const {
-@@ -579,7 +608,7 @@ void N64Recomp::CGenerator::process_unary_op(const UnaryOp& op, const Instructio
+@@ -579,7 +611,7 @@ void N64Recomp::CGenerator::process_unary_op(const UnaryOp& op, const Instructio
      thread_local std::string input{};
      get_operand_string(op.output, UnaryOpType::None, ctx, output);
      get_operand_string(op.input, op.operation, ctx, input);
