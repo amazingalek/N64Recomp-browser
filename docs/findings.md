@@ -1267,7 +1267,7 @@ keep a host awake but not its display): on an idle host with an RTX 5080, with W
 off (`GUID_CONSOLE_DISPLAY_STATE` 0) before and after each start, six windowed starts on fresh profiles on about:blank,
 uncapped, answered `session.new` in 1.9 s, the page visible and drawing ~80 animation frames a second, and exited
 0.35 s after `browser.close`, three with Firefox's window occlusion tracking (which counts every window hidden while
-the display is off) and three with it off, as fast as with the display on (2.5 s). And Windows shell integration: with
+the display is off) and three with it off, as fast as with the display on (2.5 s). Nor did the refresh rate there: at `layout.frame_rate` 1000, 360 (page_driver's uncapped, a frame shorter than the 3 ms `idle_period.min` that idle tasks need) and -1, starts took 2.05-2.26 s. And Windows shell integration: with
 the taskbar's jump lists and previews, the default-browser check and the upgrade page off in the profile, starts on
 the RTX 2070 host opened in 1.9-4.8 s in quiet stretches and at 383 s in a slow one.
 
