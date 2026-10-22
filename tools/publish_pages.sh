@@ -103,11 +103,15 @@ if [[ -n "$ref" ]]; then
     [[ -n "${PAGES_COPY:-}" ]] || { echo "--ref builds in copies of its own: set PAGES_COPY"; exit 1; }
 fi
 # base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, fetched from origin when the clone lacks it.
+# The fetch goes to a ref of this run's own, not FETCH_HEAD: the clone is shared, and another run's fetch in the same
+# seconds (a publish of main) rewrites FETCH_HEAD, which built that main in place of the --ref.
 base() {
     [[ -n "$ref" ]] || { git -C "$1" rev-parse origin/main; return; }
     git -C "$1" rev-parse -q --verify "$ref^{commit}" && return
-    git -C "$1" fetch -q origin "$ref" || { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
-    git -C "$1" rev-parse FETCH_HEAD
+    local own="refs/publish-pages/ref-$$"
+    git -C "$1" fetch -q origin "+$ref:$own" || { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
+    git -C "$1" rev-parse "$own^{commit}"
+    git -C "$1" update-ref -d "$own"
 }
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---

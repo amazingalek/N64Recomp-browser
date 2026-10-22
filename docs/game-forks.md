@@ -78,8 +78,12 @@ ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native'
 GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
 matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
 colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, and is the fix
-offered to podulator's, which takes AI-written fixes for bugs its desktop build has too. A wait that polls memory or the
-clock without an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
+offered to podulator's, which takes AI-written fixes for bugs its desktop build has too. It draws a room seen through a
+portal, and the props and guards in it, clipped to the portal's box on screen, and the walls around a portal don't hide
+what is behind them: its `patches/widescreen.c` had made every one of those clips the whole screen, which drew Frigate's
+bridge consoles and guards on the bridge's outer wall, blinking as the game toggled them on screen. Its
+`bgScissorCurrentPlayerView` now keeps a box's edges inside the 4:3 view. A wait that polls memory or the clock without
+an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
 calls a second found this one. A game's `get_frames_remaining` must match how its audio manager reads osAiGetLength.
 With render to RAM's copy a list late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was
 pending. Every level adds dozens of shaders (26 combiners, but many render modes: palette textures, fog, depth). Without
