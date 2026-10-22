@@ -314,6 +314,11 @@ rt64 2292159           a projection holding the camera split into view and persp
                        that ratio of two fixed-point values near zero gave each frame another depth range, and a frame
                        interpolated between two lost what was far away (Perfect Dark's Air Base at its start, every
                        mountain gone to the clear colour in 1-5 of 30 shots, 0 of 180 with it)
+rt64 cbe51a5           a VI whose vertical region ends before it starts gives no frame size, as a blank VI, on every
+                       build: its height wrapped round to 4294967040 lines, Expand's horizontal scale to 14520022, and
+                       every target drawn that frame was 16384 wide and stayed so (Perfect Dark's one such frame as its
+                       menus start: then each mission's targets, 16384x960, through matchColorToDepthTargets). Its
+                       regular plan in headless Chrome at 1256x645: widest target 1854, GPU memory 2598 MiB, not 4134
 rt64 51c3fdd           RT64_FREE_DISCARDED_TARGETS (on with Emscripten): the render targets of a framebuffer discarded,
                        its RAM overwritten by the CPU, are set aside, given back to a draw that asks for them again and
                        freed once none has in WORKLOAD_QUEUE_SIZE * 32 workloads. RT64 kept a target for every
