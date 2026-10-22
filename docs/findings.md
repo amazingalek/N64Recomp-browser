@@ -343,8 +343,9 @@ what held them, though nothing says whether it had. Firefox 158 read what it rea
 What the host was doing then isn't known: Chrome's version was the same, and no other session held the GPU. So a Chrome
 run uncapped well below a game's other runs on that host, its presents no more than its animation frames, is played
 again before it is read as the page's, with `tools/wait_probe.js` to say whether its timed waits ended late. plume's
-`timedWaitsEndLate()` and the VI thread's measure them once as a page starts, so a host whose waits turn late after that
-shows only in the probe.
+`timedWaitsEndLate()` and the VI thread's judge them as a page starts and from their own waits as it plays, but only one
+way, from on time to late (Pokémon Snap's timed waits in Firefox), so a host whose waits come on time again shows only
+in the probe.
 
 It came back from 12:19 UTC that day. Pokémon Snap's page (Snap64Recomp-web on v0.70.0) presented 358 a second at
 11:54, held by the uncapped 360. From 12:19 to 12:45 it read 68 (71.6 animation frames), then 172 and, from Pages, 174
@@ -368,11 +369,24 @@ under its 4 ms and it kept timed waits presented 330, 328 and 96 (the 96 at the 
 10 ms). Firefox's waits there are neither on time nor on the tick: `tools/wait_probe.js` read the shortest of three
 waits each second at 0.4-16 ms, a median of 5-8 ms, through every play, served locally or from Pages alike. So the
 start's shortest of three passes 4 ms about a third of the time: locally in 3 of 7 plays, and from Pages, where it
-read 4.5-5.5 ms, in none of 5. That one measure picks whether the page's waits are timed or woken and spun (docs/forks.md,
-plume cabe1ac), so a page that judged them on time plays fastest while they are and can fall to about its animation
-frames' rate when they aren't. Why only Snap's plays have shown the fall isn't known: its port paces and presents its
-frames in RT64 code of its own (docs/game-forks.md). A Firefox number for Snap is read beside its console's plume
-line, and only spun plays are compared until plume judges waits by more than one start.
+read 4.5-5.5 ms, in none of 5. That measure picks whether the page's waits are timed or woken and spun (docs/forks.md, plume
+cabe1ac), so a page that judged them on time plays fastest while they are and can fall to about its animation frames'
+rate when they aren't.
+
+A test build forcing each choice (2026-10-22, `?present-stats`, plays.jsonl's lines naming the card on timed waits
+judged as a page plays, whole turns) showed the fall is timed waits that stayed late. Held to timed waits Snap's page
+presented 308, 311, 330 and 94: RT64's sleeps ended 140 ms past their slots for 1-3 s as its game booted and 0.1 ms
+past them after, but in the 94 66-117 ms past them all through. Held to the animation frames it presented 217-232.
+Later that morning, held to timed waits from a start judged on time and each second's waits logged, the present
+thread's ended late for 5-6 s as the game booted, then on time, and late again from its menus (24-28 s) or its level
+(51 s) to the end of every play: 172-176 a second in 6 plays, Star Fox 64's late all through at 183-184 in 2, and the VI
+thread's late in every second of every play. So both judge their waits again as the page plays, one way: while they
+are judged on time, each first sleep is a 100 us wait for a frame, judged, and once most of those in each of 10 seconds
+in a row ended over 4 ms late, waits are woken and spun for the rest of the play (docs/forks.md, plume PLUMESHA). The
+same plays turned at 21-63 s and presented 206-218, and on spun waits from the start 206-216; 5 s in a row also took the
+boot's stretch. Why only Snap's plays have shown the fall to 94 isn't known: its port paces and presents its frames in
+RT64 code of its own (docs/game-forks.md). A Firefox number for Snap is read beside its console's plume and ultramodern
+lines.
 
 ## Uncapped in Firefox
 
@@ -1312,6 +1326,12 @@ What CLAUDE.md's Ruled out rests on.
   with plume bf417cf it paced to 30 in every default-prefs Firefox run, as before, and what decided 60 against 30 was
   what each present cost the GPU in Firefox's compositing, Windows' compositor included, and with DWM at 0% Banjo
   was paced to 30 all the same (A laptop, measured).
+- Judging a page's timed waits both ways as it plays, or by more than the waits a timed wait would make anyway, for
+  Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080): judged from every wait plume made (8 of the last 16 late,
+  then none), it saw the frames' longer waits on time and RT64's short ones late, turned several times a second, and
+  presented at the frames' 225; a 100 us try before every frame wait while judged late, to see them come back, cost a
+  sixth (Snap's and Star Fox 64's pages 183 a second, 207-232 on the frames) and never saw one on time (Pokémon Snap's
+  timed waits in Firefox).
 - A list started with the list before's late copy still pending (render to RAM's late copy landing at a VI once the
   GPU has it, or before the list after next, the readback buffers it waits on kept through the next list's history),
   for Perfect Dark's page held at 30 in its levels: with its prebuilt list the page draws Defection at 29-31 frames a
