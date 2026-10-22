@@ -1210,6 +1210,16 @@ So what decides the last frame's guess is the order of the frames where 10-27% t
 that shows it, as above): a play there with the preload, read by the simulator. Runs mostly of 3 frames or more make a
 test build worth trying, to look at the motion; runs mostly of one put the guess in Ruled out beside the most common.
 
+A game that gives RT64 each frame's own rate (`gEXSetRefreshRate`) makes the last frame's guess at no lag, and on a
+display above the game's rate it costs more than a held frame: Perfect Dark's page did, at 60 with a frame of 2 VIs
+now and then (perfect-dark-recomp's docs/web.md, Frame rate). Each such frame got two VIs of presents and lost half
+when the next came a VI later, and pace() counted the drops as the GPU falling behind and paced to a multiple of the
+latest rate, flipping between 30, 60 and 120 about 130 times a play; on an RTX 5080 desktop's 240 Hz screen it held
+Defection at 61-62 presents a second in Chrome and 55-67 in Firefox, the game at 42-52 there. Given the fastest of
+the last three frames' rate instead, as RT64 guesses from the VIs, the same tree drew 116-117 in Chrome and 216-219 in
+Firefox, the game at 58 in both (whole GPU turns, an idle host, interleaved; plays.jsonl, set `pd-fps`). Chrome's 120
+there is the slot sleeps' (headless Chrome's pages pace to 114-120 on that screen).
+
 ## Faults
 
 `play_page.mjs --fault resize,hidden,audio,device,reload` (its header), played from Pages on an RTX 5080 (headless
