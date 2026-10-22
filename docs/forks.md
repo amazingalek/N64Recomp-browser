@@ -350,14 +350,18 @@ rt64 47d43be           a texture scroll is placed between frames only while stea
                        slid back (Pokémon Snap's port's 4810bf6 and 60623fa)
 N64Recomp 46395bb      div, divu, ddiv and ddivu by zero give the VR4300's results (quotient -1, or 1 for a negative
                        signed dividend; remainder the dividend), on every build: a bare / and % trapped, in wasm and
-                       on x86. The lines Conker's own N64Recomp patch writes, so it takes them by a three-way merge
+                       on x86. The lines Conker's own N64Recomp patch writes, so it takes them by a three-way merge;
+                       its pin moving onto this drops that hunk (recomp/n64recomp.patch, cgenerator.cpp)
 N64ModernRuntime       a Status write that changes a bit cop0_status_write doesn't handle (CU1, the interrupt mask)
-0425eb8                stores it, on every build: it called exit(), which ended the page (Banjo-Tooie's boot sets CU1)
+0425eb8                stores it, on every build: it called exit(), which ended the page (Banjo-Tooie's boot sets CU1).
+                       Banjo-Tooie's own patch writes the same lines; its pin moving onto this drops that hunk
 N64ModernRuntime       thread_queue_insert leaves a thread that is in the queue already where it is, and says so once,
 9d3e57a                on every build: a second insert linked it to itself and hung the game. The causes known are
-                       fixed on a page already (osStartThread on a thread not stopped, upstream's thread_queue_remove)
+                       fixed on a page already (osStartThread on a thread not stopped, upstream's thread_queue_remove).
+                       Banjo-Tooie's own patch guards thread_queue_insert and schedule_running_thread its way; its pin
+                       moving onto this drops them
 N64ModernRuntime       queue_audio_buffer reads a buffer given by its KSEG1 address through KSEG0's, and plays none
 059e4fe                that doesn't lie in RDRAM's 8 MB, on every build: TO_PTR put KSEG1's 512 MB past RDRAM, the
                        guard region natively and whatever lies there on a page. In ultramodern, off ai.cpp's lines,
-                       which Jet Force Gemini's own patch converts its way
+                       which Jet Force Gemini's own patch converts its way; its pin moving onto this drops that
 ```
