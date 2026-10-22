@@ -65,7 +65,7 @@ branches only: upstream's others are deleted when it is made.
   runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame rates), and
   GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for weapons,
   keys for reload and crouch), since a page is played with keyboard and mouse: all of it in GoldenEye64Recomp-web's own
-  code and none in the forks, on its `mouse` branch until it has been played by hand.
+  code and none in the forks.
 - Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and resolution
   Auto, in every game fork and new port, whatever its recomp's desktop build defaults to (README, The recomp's own
   code). A page held to its game's own rate reads that rate uncapped whatever a change costs or saves (DKR-R 29.8-30.0,
