@@ -238,5 +238,7 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   levels: it drew 30 either way, its main thread waiting for a controller sample (`joy_debug_joy`), not for the copy.
 - Judging a page's timed waits both ways as it plays (back to timed once they end on time): judged from the frame
   waits it turned several times a second, and tries before each frame wait cost a sixth and never saw them on time.
+- A missed shader built in line with the device in Firefox as what stops Perfect Dark's page answering at
+  Defection: the page kept drawing, and it was Firefox's own process that answered every BiDi command late.
 - Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
   silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.
