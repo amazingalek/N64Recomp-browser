@@ -314,4 +314,8 @@ rt64 2292159           a projection holding the camera split into view and persp
                        that ratio of two fixed-point values near zero gave each frame another depth range, and a frame
                        interpolated between two lost what was far away (Perfect Dark's Air Base at its start, every
                        mountain gone to the clear colour in 1-5 of 30 shots, 0 of 180 with it)
+rt64 d19fdcc           WebGPU: a dummy depth target for each color target size, for the passes that draw no depth
+                       framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
+                       target, grew each to the biggest any had been (Perfect Dark's 320x1 mission targets, 1286x3,
+                       drawn at its 576-wide menus' 1854x960)
 ```
