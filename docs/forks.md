@@ -314,4 +314,8 @@ rt64 51c3fdd           RT64_FREE_DISCARDED_TARGETS (on with Emscripten): the ren
                        freed once none has in WORKLOAD_QUEUE_SIZE * 32 workloads. RT64 kept a target for every
                        framebuffer address a game drew to: Perfect Dark's, at each mission's own addresses, grew
                        Chrome's GPU process from 1.4 to 4.76 GB over six missions, and to 2.17 GB with this
+rt64 d19fdcc           WebGPU: a dummy depth target for each color target size, for the passes that draw no depth
+                       framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
+                       target, grew each to the biggest any had been (Perfect Dark's 320x1 mission targets, 1286x3,
+                       drawn at its 576-wide menus' 1854x960)
 ```
