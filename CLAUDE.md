@@ -77,6 +77,8 @@ branches only: upstream's others are deleted when it is made.
   no AI-made contribution and no AI talking to its maintainers). Each fork's README opens with a banner, and its GitHub
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
+  A game's own repo is decided case by case: a game fork offers it only what it takes, said to be AI-written
+  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too, without the web or mouse code).
 - A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
   the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it
@@ -228,5 +230,9 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   flight, for Banjo held at 30 in Firefox on a laptop's screen: each paced as often, the GPU 94-100% busy at 60.
 - The most common of a game's last frames' VIs as RT64_UNEVEN_FRAME_RATES's guess at a frame's length: late at both
   ends of a slow stretch, at no stretch's length does it judder less than the fastest of three.
+- A list started with the list before's render-to-RAM late copy still pending, for Perfect Dark at 30 in its
+  levels: it drew 30 either way, its main thread waiting for a controller sample (`joy_debug_joy`), not for the copy.
+- Judging a page's timed waits both ways as it plays (back to timed once they end on time): judged from the frame
+  waits it turned several times a second, and tries before each frame wait cost a sixth and never saw them on time.
 - Skipping or batching the device thread's round trips to keep a hidden page's game running in Chrome: Chrome idles a
   silent hidden tab's process (a muted test's too), and the trips were a small part of the time its game lost.

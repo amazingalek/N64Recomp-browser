@@ -71,23 +71,26 @@ list's sections and Firefox's waits, the ROM.
 GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
 cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
 `GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
-place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to
-go back to: its submodules are at the commits the forks are built on
-(`patches/patches.txt`, a row each in `pins.txt`), and the patched checkouts are the forks' trees file for file; its
-desktop build needs the patched N64Recomp too (9aabea3, ec0748e). Its patches' call to `yield_self_1ms`, whose signature
-isn't a native's, trapped the page after ~20 s. A wait that polls memory or the clock without an OS call starves every
-other game thread on any recomp, as its `patches/fps.c` did; a trace of the count calls a second found this one. A
-game's `get_frames_remaining` must match how its audio manager reads osAiGetLength. With render to RAM's copy a list
-late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was pending. Every level adds dozens
-of shaders (26 combiners, but many render modes: palette textures, fog, depth). Without the boot section, a cold visit
-built 13 shaders behind the intro, which fell to ~15 frames a second. In Chrome 155 headless (RTX 2070) the menus took
-2.5 s cold, Dam 6.6 s cold and 4.5 s on a later visit: boot and Dam alone are ~9.4 MB of Chrome's 6 MB cache. To reach a
-level from a fresh save by hand, mark the earlier ones completed in RAM: `saves` (data_dump.toml) holds 0x60-byte
-folders whose 10-bit times start at byte 0x12, and RDRAM is found in the heap by osTvType, osRomBase and osMemSize at
-0x80000300. Its README and BUILDING.md, and the headers of `patches/fps.c`, `patches/shader_survey.c` and
-`src/rt64_shaders.txt`, have the rest: the TLBFREE ROM, what the native build needs the patches for and the renamed
-functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list and how it was recorded,
-Firefox's waits.
+place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to go
+back to: its submodules are at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), and
+the patched checkouts are the forks' trees file for file; its desktop build needs the patched N64Recomp too (9aabea3,
+ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s.
+GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
+matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
+colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, and is the fix
+offered to podulator's, which takes AI-written fixes for bugs its desktop build has too. A wait that polls memory or the
+clock without an OS call starves every other game thread on any recomp, as its `patches/fps.c` did; a trace of the count
+calls a second found this one. A game's `get_frames_remaining` must match how its audio manager reads osAiGetLength.
+With render to RAM's copy a list late, through its whole shader plan its CPU never wrote to a framebuffer whose copy was
+pending. Every level adds dozens of shaders (26 combiners, but many render modes: palette textures, fog, depth). Without
+the boot section, a cold visit built 13 shaders behind the intro, which fell to ~15 frames a second. In Chrome 155
+headless (RTX 2070) the menus took 2.5 s cold, Dam 6.6 s cold and 4.5 s on a later visit: boot and Dam alone are ~9.4 MB
+of Chrome's 6 MB cache. To reach a level from a fresh save by hand, mark the earlier ones completed in RAM: `saves`
+(data_dump.toml) holds 0x60-byte folders whose 10-bit times start at byte 0x12, and RDRAM is found in the heap by
+osTvType, osRomBase and osMemSize at 0x80000300. Its README and BUILDING.md, and the headers of `patches/fps.c`,
+`patches/shader_survey.c` and `src/rt64_shaders.txt`, have the rest: the TLBFREE ROM, what the native build needs the
+patches for and the renamed functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list
+and how it was recorded, Firefox's waits.
 
 `amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream

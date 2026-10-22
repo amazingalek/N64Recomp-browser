@@ -10,7 +10,8 @@
 // there, as publish_page.sh puts it up), the build one publish_pages.sh left: its dir if the plan's page is in it,
 // else its <name>.html (a plan whose page is index.html, which only Pages has). --pages-build is what Pages' page was
 // built from (its tag), --build the build's (the new tag); both go into --record's lines as play_page's --build.
-// --firefox is Firefox's executable where it isn't page_driver.mjs's default (play_page's --browser).
+// --firefox is Firefox's executable where page_driver.mjs finds none (play_page's --browser). A browser the run needs that
+// isn't there ends it before any play, exit 1, rather than as plays with no summary and a verdict on them.
 //
 // Each play is one play_page.mjs run of the plan, uncapped at --size (3840x2000, the stand-in's) on a fresh profile.
 // The A/B: Chrome Pages, build, then build, Pages unless the first pair is clearly within the noise (the build run
@@ -44,7 +45,7 @@ import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { missingPlanFiles, option } from './page_driver.mjs';
+import { browserExecutable, missingPlanFiles, option } from './page_driver.mjs';
 
 const args = process.argv.slice(2);
 const dash = args.indexOf('--');
@@ -67,6 +68,10 @@ if (args.length !== 5 || !pagesBuild || !build) {
 }
 const [game, pagesUrl, buildPath, rom, planFile] = args.map((a, i) => (i >= 2 && !/^https?:/.test(a) ? path.resolve(a) : a));
 const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
+try { smoke ? browserExecutable('firefox', firefox) : browserExecutable('chrome'); } catch (error) {
+  console.error(`${error.message}${smoke ? ': give its executable with --firefox' : ''}`);
+  process.exit(1);
+}
 if (missingPlanFiles(plan, planFile).length) {
   console.error(`the plan's evalFile steps name files that aren't there: ${missingPlanFiles(plan, planFile).join(', ')}`);
   process.exit(1);

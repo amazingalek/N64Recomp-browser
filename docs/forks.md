@@ -169,7 +169,7 @@ rt64 9e6830d, c89ced0  on a page each interpolated frame's present takes the slo
 rt64 254dee3           a framebuffer the CPU changed counted on the CPU, not by a GPU readback (Pilotwings 64's screen
                        changes)
 plume cabe1ac          where a timed wait on a page's thread ends late (Firefox on Windows: on the system timer's 15.6
-rt64 2e93be2           ms tick; plume_web_waits.h measures it once), the waits a page's speed hangs on are woken or
+rt64 2e93be2           ms tick; plume_web_waits.h judges it), the waits a page's speed hangs on are woken or
 N64ModernRuntime       spun, not timed: plume_device_thread answers a READBACK buffer's waiters when its data arrives
 1f46855                (in every browser) and a waiter spins out its millisecond, RT64's present thread waits for the
                        animation frame nearest a present's slot instead of sleeping 100 us at a time, and the runtime's
@@ -298,4 +298,15 @@ rt64 5249040, e696b69  the workload thread reads no GPU profiler timestamps on E
                        tab)
 N64Recomp df17690      an op with $zero as its destination (lw $zero, ...) written (void)(<value>): done, nothing assigned
                        ("0 = MEM_W(...)" didn't compile)
+RecompFrontend 75e5f85 on a page the file picker's input is held until the picker is answered (frontend/file_picker.cpp
+                       too): Chrome holds an open picker's input only weakly, so a GC while it was open (6 s after
+                       Load ROM on Conker's launcher) took it, the file went nowhere, and every Load ROM after was
+                       ignored until a reload. A headless play's ROM was lost so once in about 20 plays
+plume d554411,         a page's timed waits judged late as it plays, not only as it starts: while they're judged on
+rt64 33e87a9,          time, RT64's present thread (sleepUntil()) and the VI thread (vi_sleep_until()) first wait up to
+N64ModernRuntime       100 us for a frame and judge that wait, and once most of those in each of 10 seconds in a row
+1ff690a                ended more than 4 ms late, presents and VIs go on the animation frames for the rest of the play.
+                       Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
+                       4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
+                       (docs/findings.md, Pokémon Snap's timed waits in Firefox)
 ```
