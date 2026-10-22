@@ -36,6 +36,7 @@ and both browsers get it.
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-22, v0.85.0 |
 | Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/amazingalek/rush2recompiled-web) | [play](https://amazingalek.github.io/rush2recompiled-web/) | not yet | not yet | 2026-10-22, v0.85.0 |
 | Perfect Dark | this project's own recomp | [perfect-dark-recomp](https://github.com/amazingalek/perfect-dark-recomp) | [play](https://amazingalek.github.io/perfect-dark-recomp/) | not yet | not yet | 2026-10-22, v0.85.0 |
+| Super Mario 64 | this project's own recomp | [super-mario-64-recomp](https://github.com/amazingalek/super-mario-64-recomp) | [play](https://amazingalek.github.io/super-mario-64-recomp/) | 354* | 348* | 2026-10-22, v0.86.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
