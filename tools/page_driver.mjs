@@ -63,6 +63,9 @@
 // wait: its click hit Load ROM, the game never started and the run failed later at 'RDRAM not found'. So a rom step
 // ends once a file the ROM's size is in the page's file system outside /tmp (where the picker puts what is picked),
 // polled for up to romStoredMs, and says how long that took; with none by then it says so and goes on as before.
+// Chrome holds an open picker's input only weakly, and a page whose picker held it no better (one built before
+// RecompFrontend-web's and frontend/file_picker.cpp's fix) lost it to a GC within seconds now and then: the file went
+// nowhere, no copy came, and the run failed a minute later at 'RDRAM not found'. In Chrome the step says so and fails.
 //
 // page.stop(reason) ends a run where it is: the step it is in is left (a clock wait included, which on a game that has
 // stopped waits out its whole 5 times and 30 s), no step after it starts, and run() throws reason, as a step that failed
@@ -592,8 +595,9 @@ const openChrome = async ({ profile, port, width, height, executable, rom, prelo
         if (tries === 3) throw new Error('no file chooser opened');
         line('page_driver: no file chooser 10 s after Load ROM: pressing it again');
       }
-      await send('DOM.setFileInputFiles', { files: [path.resolve(rom)], backendNodeId: fileChooser.backendNodeId });
+      const given = await send('DOM.setFileInputFiles', { files: [path.resolve(rom)], backendNodeId: fileChooser.backendNodeId });
       await send('Page.setInterceptFileChooserDialog', { enabled: false });
+      if (given.error) throw new Error(`the ROM never reached the page's file input (${given.error.message}): a GC took it`);
     },
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'),
     resize: (w, h) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile: false }),
