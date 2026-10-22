@@ -309,4 +309,8 @@ N64ModernRuntime       100 us for a frame and judge that wait, and once most of 
                        Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
                        4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
                        (docs/findings.md, Pokémon Snap's timed waits in Firefox)
+rt64 750fbdc           WebGPU: a dummy depth target for each color target size, for the passes that draw no depth
+                       framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
+                       target, grew each to the biggest any had been (Perfect Dark's 1286x660 mission targets drawn at
+                       its 576-wide menus' 1854x960)
 ```
