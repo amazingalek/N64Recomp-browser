@@ -364,4 +364,10 @@ N64ModernRuntime       queue_audio_buffer reads a buffer given by its KSEG1 addr
 059e4fe                that doesn't lie in RDRAM's 8 MB, on every build: TO_PTR put KSEG1's 512 MB past RDRAM, the
                        guard region natively and whatever lies there on a page. In ultramodern, off ai.cpp's lines,
                        which Jet Force Gemini's own patch converts its way; its pin moving onto this drops that
+plume e16e003,         WebGPU: where a page's timed waits are judged on time (Chrome), a present's sleep to its slot
+rt64 0e971b5           is plume's: woken by each animation frame before the slot and spun on the clock from the last,
+                       no more than a frame and 2 ms. RT64's own 100 us sleeps there now and then took a tick, up to
+                       16 ms, and woke a present 5-30 ms past its slot, and its pacing took the drops for a GPU falling
+                       behind: Perfect Dark's page on a 240 Hz display presented 112-117 a second in Chrome, at 60 for
+                       half a play, and 212-213 with this (docs/findings.md, A present's sleep in Chrome)
 ```

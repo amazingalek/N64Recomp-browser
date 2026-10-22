@@ -1,4 +1,4 @@
-rt64: https://github.com/amazingalek/rt64-web 47d43be36126d29f53b79b980b14201d2ac9603a
+rt64: https://github.com/amazingalek/rt64-web 0e971b573df8c8f46a3a3737aea2a69046995367
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -1334,7 +1334,7 @@ index dccaa87..aeae7a6 100644
                      func(state, &dl);
                  }
 diff --git a/src/hle/rt64_present_queue.cpp b/src/hle/rt64_present_queue.cpp
-index 3227ab1..1bcf109 100644
+index 3227ab1..ad46c52 100644
 --- a/src/hle/rt64_present_queue.cpp
 +++ b/src/hle/rt64_present_queue.cpp
 @@ -7,6 +7,10 @@
@@ -1426,7 +1426,7 @@ index 3227ab1..1bcf109 100644
              if (lockedWorkloadMutex) {
                  ext.sharedResources->workloadMutex.unlock();
                  lockedWorkloadMutex = false;
-@@ -391,15 +421,49 @@ namespace RT64 {
+@@ -391,15 +421,51 @@ namespace RT64 {
              if (presentFrame && swapChainValid) {
                  // Wait until the approximate time the next present should be at the current intended rate.
                  if ((presentTimestamp != Timestamp()) && (targetRate > 0) && (targetRate > viOriginalRate)) {
@@ -1436,7 +1436,9 @@ index 3227ab1..1bcf109 100644
 +                    // to the page's thread) isn't added to every period. In Chrome the pages of games below the
 +                    // display's rate presented every 18 ms, 55.6 a second, where those at its rate, which never sleep
 +                    // here, presented 60. A present a whole period past its slot or more starts the slots from itself.
-+                    // Where the swap chain learns of the display's frames as they come (WebGPU), the wait ends on one.
++                    // Where the swap chain learns of the display's frames as they come (WebGPU), it sleeps: until a
++                    // frame where timed waits end late, else until the slot, woken by the frames and spun from the last
++                    // (plume-web e16e003: this thread's 100 us sleeps in Chrome now and then took a tick).
 +                    const auto presentPeriod = std::chrono::nanoseconds(1'000'000'000 / targetRate);
 +                    if ((presentSlot == Timestamp()) || ((presentTimestamp - presentSlot) >= presentPeriod)) {
 +                        presentSlot = presentTimestamp;
@@ -1476,7 +1478,7 @@ index 3227ab1..1bcf109 100644
                  swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);
                  presentProfiler.logAndRestart();
              }
-@@ -416,6 +480,194 @@ namespace RT64 {
+@@ -416,6 +482,194 @@ namespace RT64 {
          ext.sharedResources->interpolatedCondition.notify_all();
      }
  
@@ -1671,7 +1673,7 @@ index 3227ab1..1bcf109 100644
      void PresentQueue::notifyPresentId(const Present &present) {
          {
              std::scoped_lock<std::mutex> cursorLock(presentIdMutex);
-@@ -450,8 +702,10 @@ namespace RT64 {
+@@ -450,8 +704,10 @@ namespace RT64 {
          const bool displayTiming = ext.device->getCapabilities().displayTiming;
          bool swapChainValid = !ext.swapChain->needsResize();
          while (presentThreadRunning) {
@@ -1682,7 +1684,7 @@ index 3227ab1..1bcf109 100644
                  cursorCondition.wait(cursorLock, [&]() {
                      return (writeCursor != threadCursor) || !presentThreadRunning;
                  });
-@@ -463,6 +717,22 @@ namespace RT64 {
+@@ -463,6 +719,22 @@ namespace RT64 {
                  }
              }
  
@@ -1705,7 +1707,7 @@ index 3227ab1..1bcf109 100644
              if (processCursor >= 0) {
                  std::unique_lock<std::mutex> threadLock(threadMutex);
                  const bool needsResize = ext.swapChain->needsResize() || !swapChainValid;
-@@ -503,13 +773,26 @@ namespace RT64 {
+@@ -503,13 +775,26 @@ namespace RT64 {
  
                  skipPresent = skipPresent || ext.swapChain->isEmpty();
  
