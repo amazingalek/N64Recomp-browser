@@ -677,9 +677,15 @@ const openFirefox = async ({ profile, port, width, height, executable, rom, prel
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, 'layout.frame_rate': uncapped ? firefoxUncappedRate : -1, ...firefoxPrefs };
   fs.writeFileSync(path.join(profile, 'user.js'),
     Object.entries(prefs).map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
+  // BiDi's session.new answers only once the browser's startup idle tasks have run, and on a fresh profile they wait
+  // behind its first sync of remote settings from Mozilla's servers (dozens of collections into IndexedDB). The remote
+  // agent points remote settings at a dummy server (services.settings.server) so that they stay off the network, but a
+  // release Firefox ignores that pref unless MOZ_REMOTE_SETTINGS_DEVTOOLS is 1. Without it session.new took 30 s to over
+  // 8 minutes on some hosts, which ran smoke plays out of their turns; with it a headless start answered in 2-14 s
+  // (docs/findings.md, Firefox slow to start).
   const proc = spawnHeld(affinity, browserExecutable('firefox', executable), ['-no-remote', '-profile', profile,
     '--remote-debugging-port', String(port), '--remote-allow-system-access', 'about:blank'],
-    { stdio: 'ignore' });
+    { stdio: 'ignore', env: { ...process.env, MOZ_REMOTE_SETTINGS_DEVTOOLS: '1' } });
   let send = null;
   for (let i = 0; i < 150 && !send; i++) {
     try {
