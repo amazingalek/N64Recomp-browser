@@ -309,16 +309,6 @@ N64ModernRuntime       100 us for a frame and judge that wait, and once most of 
                        Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
                        4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
                        (docs/findings.md, Pokémon Snap's timed waits in Firefox)
-rt64 2292159           a projection holding the camera split into view and perspective by the row where the view's Z
-                       axis is largest, not row 0's alone, on every build: for a camera looking along the world's Z
-                       that ratio of two fixed-point values near zero gave each frame another depth range, and a frame
-                       interpolated between two lost what was far away (Perfect Dark's Air Base at its start, every
-                       mountain gone to the clear colour in 1-5 of 30 shots, 0 of 180 with it)
-rt64 cbe51a5           a VI whose vertical region ends where or before it starts gives no frame size, as a blank VI
-                       doesn't, on every build: its height wrapped round to billions of lines, and the aspect ratio
-                       near 0 made every target drawn that frame 16384 wide (MaxDimension), and targets only grow
-                       (Perfect Dark's frame into its menus' 576-wide hi-res mode: each mission's targets 16384 x 960;
-                       with it none wider than 1854 at 1256x645)
 rt64 51c3fdd           RT64_FREE_DISCARDED_TARGETS (on with Emscripten): the render targets of a framebuffer discarded,
                        its RAM overwritten by the CPU, are set aside, given back to a draw that asks for them again and
                        freed once none has in WORKLOAD_QUEUE_SIZE * 32 workloads. RT64 kept a target for every
