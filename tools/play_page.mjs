@@ -54,7 +54,7 @@
 // hears a tab that plays sound and keeps it at a player's priority when it is hidden, which --fault hidden needs
 // (docs/findings.md, A page in a hidden tab). A run records its flags and is compared only with runs that set the same
 // ones.
-// --gecko-profile (Firefox only) runs the Gecko profiler over the play, every process and the GPU process's
+// --gecko-profile (Firefox only) runs the Gecko profiler from the page's boot to the end of the play, every process and the GPU process's
 // CanvasRenderer thread among them (page_driver.mjs's geckoProfile), and writes the profile to the file (a run that
 // failed in its play too, a page that stopped answering among them, which still has its threads' stacks), to open in
 // profiler.firefox.com, which symbolicates it. It samples every 10 ms: the profiler asks Windows for 1 ms timers
@@ -656,7 +656,10 @@ const boot = async () => {
   return { loaded: tenths(loaded), firstPresent: first ? tenths((first - from) / 1000) : null };
 };
 let firstBoot = null;
+let profiling = false;
 try {
+  // From the page's boot: a page that stops answering can stop before its play, as it boots or loads its game.
+  if (geckoProfileFile) { await page.geckoProfile.start(); profiling = true; }
   firstBoot = await boot();
   await page.run([...(freshProfile ? (plan.setup ?? []) : []), ...(plan.start ?? [])], steps);
   audioBefore = last?.audio ?? null;
@@ -666,7 +669,6 @@ try {
   // it has passed, and none from before the play comes into them.
   if (memoryBefore) await sleep(500);
   await page.evaluate('window.__gaps = []; undefined').catch(() => {});
-  if (geckoProfileFile) await page.geckoProfile.start();
   if (chromeTraceFile) await page.chromeTrace.start();
   playing = true;
   hostBefore = hostTimes();
@@ -675,14 +677,14 @@ try {
   await page.run(shotFile ? [...play, ['shot', path.resolve(shotFile)]] : play, steps);
   await sample();
   playing = false;
-  if (geckoProfileFile) await page.geckoProfile.dump(geckoProfileFile);
+  if (profiling) { profiling = false; await page.geckoProfile.dump(geckoProfileFile); }
   if (chromeTraceFile) await page.chromeTrace.stop(path.resolve(chromeTraceFile));
   memoryAfter = page.gpuProcessMemory ? await page.gpuProcessMemory().catch(() => null) : null;
 } catch (error) {
   log(`failed: ${error.message}`);
   failure = error.message;
   // A page that stopped answering is what a profile is for: the browser's own process still answers, and writes it.
-  if (geckoProfileFile && playing) {
+  if (profiling) {
     await page.geckoProfile.dump(geckoProfileFile).then(() => log(`gecko profile written to ${geckoProfileFile}`),
       (e) => log(`no gecko profile: ${e.message}`));
   }
