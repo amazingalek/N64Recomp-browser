@@ -1310,9 +1310,28 @@ pref unless `MOZ_REMOTE_SETTINGS_DEVTOOLS` is 1 in its environment. Headless (no
 `session.new` answered at 158 s and 29 s without it and 13.5 s and 1.7 s with it; windowed in the same slow stretch,
 at 72 s and 182 s with it and not within 8 minutes without. An hour later, with the host 32-49% busy, every windowed
 start took 3-5 s with or without it. `page_driver.mjs` starts Firefox with it set. What still slowed the windowed
-starts with it set is not known. In the slow stretches, Firefox on about:blank also didn't exit within 30 s of
-`browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of the browser's
-own process as in A page that stops answering.
+starts with it set is Windows' window manager (below). In the slow stretches, Firefox on about:blank also didn't exit
+within 30 s of `browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of
+the browser's own process as in A page that stops answering.
+
+What the idle browser waits on is win32k, Windows' window manager in the kernel. On the RTX 2070 host, 64 windowed
+starts on fresh profiles on about:blank with the variable set, one every 4-5 minutes over five hours of an evening,
+each a shared turn: 63 answered `session.new` in 2.3-4.0 s and exited 0.5-1.8 s after `browser.close`, and one
+answered at 45 s, gave its startup profile 60 s later and exited 87 s after `browser.close` (a busy host, 39-47%, its
+turn started 49 s into another card's Firefox play; starts beside that play 2 minutes later, beside Chrome plays and
+beside a build were fast). Its profile runs a fast start's steps, stretched: the first startup idle tasks at 9.7 s
+(2.1 s in a fast start), the rest at 30-45 s, the prelaunched content and utility processes at 30-45 s (2.3 s). Every
+thread of every process sat in its wait, the parent's main thread using 2.5 s of CPU in 50 s, and timers fired on time
+(a median 1 ms late), but the event a timer posts to the main thread waited a median 1-3.6 s to run in the first 16
+s, and 0.1-0.3 s after (14-23 ms in fast starts). The parent's main thread spent 33 s of the 50 inside
+`NtUserPeekMessage` (Gecko's native event loop, through MSCTF's text services hook) and 11 s inside `NtUserPostMessage`
+(the call it wakes itself with), with no CPU, and 0.2 s in `MsgWaitForMultipleObjectsEx`, its ordinary idle wait. In a
+fast start the main thread spends 0.1 s in all of them. Both calls return at once unless win32k holds them, and its
+lock is one for the whole desktop, so what slows the start holds every windowed process on the host, not anything of
+Firefox's own. The network was idle meanwhile: the socket process's poll waited 75 s with no socket open. (The
+parent's own network log was overwritten by a short Firefox process started 12 s after it exited with the same
+`MOZ_LOG_FILE`, which only the slow start did.) Which process holds win32k then takes an ETW trace of the slow stretch,
+whose context switches name the thread that readies Firefox's.
 
 None of these slows it alone. A display that has turned itself off (card sessions keep a host awake but not its
 display): on an idle host with an RTX 5080, with Windows reporting the console display off
