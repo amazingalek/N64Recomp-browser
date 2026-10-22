@@ -336,6 +336,35 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$rush2/lib/N64Recomp-browser"
           bash "$rush2/tools/build_web.sh" --patches
 
+  # Super Mario 64's own changes over the patches (super-mario-64-recomp, its main): its CMakeLists.txt applies its
+  # runtime-patches/<project>-<n>-*.patch to its upstream submodules after patches/apply.cmake, and they change files
+  # the patches change too (RecompFrontend's renderer). Each project a patch is for is patched here as there, and the
+  # game's patches go on top. Red on a PR means one stopped applying: it is made again over the new patches in the
+  # game's repo, in that PR's work.
+  sm64-patches:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: super-mario-64-recomp's apply over them
+        run: |
+          sm64="$RUNNER_TEMP/sm64"
+          git clone -q --depth 1 https://github.com/amazingalek/super-mario-64-recomp "$sm64"
+          git -C "$sm64" log -1 --format='super-mario-64-recomp %h %s'
+          for patch in $(ls "$sm64"/runtime-patches/*.patch | sort); do
+            project=$(basename "$patch" | sed 's/-[0-9]*-.*//')
+            if [ ! -e "$sm64/lib/$project/.git" ]; then
+              git -C "$sm64" -c protocol.version=2 submodule update -q --init --depth 1 "lib/$project"
+              cmake -P patches/apply.cmake "$project" "$sm64/lib/$project"
+            fi
+            git -C "$sm64/lib/$project" apply --whitespace=nowarn "$patch"
+            echo "$(basename "$patch") applies"
+          done
+
   # Every library a page is made of, built with Emscripten (tests/build/CMakeLists.txt): from the forks, and from
   # Banjo-Kazooie's own upstream commits with the patches in.
   emscripten:
@@ -418,7 +447,7 @@ jobs:
   # GITHUB_TOKEN starts no workflow: this run, on the same commit, is its CI.
   tag:
     needs: [changes, plume-device-thread, hlslpp-wasm, wgsl, patches, dkr-patches, cbfd-patches, jfg-patches, snap-patches,
-      rush2-patches, emscripten]
+      rush2-patches, sm64-patches, emscripten]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
