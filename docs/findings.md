@@ -382,7 +382,7 @@ thread's ended late for 5-6 s as the game booted, then on time, and late again f
 (51 s) to the end of every play: 172-176 a second in 6 plays, Star Fox 64's late all through at 183-184 in 2, and the VI
 thread's late in every second of every play. So both judge their waits again as the page plays, one way: while they
 are judged on time, each first sleep is a 100 us wait for a frame, judged, and once most of those in each of 10 seconds
-in a row ended over 4 ms late, waits are woken and spun for the rest of the play (docs/forks.md, plume PLUMESHA). The
+in a row ended over 4 ms late, waits are woken and spun for the rest of the play (docs/forks.md, plume d554411). The
 same plays turned at 21-63 s and presented 206-218, and on spun waits from the start 206-216; 5 s in a row also took the
 boot's stretch. Why only Snap's plays have shown the fall to 94 isn't known: its port paces and presents its frames in
 RT64 code of its own (docs/game-forks.md). A Firefox number for Snap is read beside its console's plume and ultramodern

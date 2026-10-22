@@ -302,10 +302,10 @@ RecompFrontend 75e5f85 on a page the file picker's input is held until the picke
                        too): Chrome holds an open picker's input only weakly, so a GC while it was open (6 s after
                        Load ROM on Conker's launcher) took it, the file went nowhere, and every Load ROM after was
                        ignored until a reload. A headless play's ROM was lost so once in about 20 plays
-plume PLUMESHA,         a page's timed waits judged late as it plays, not only as it starts: while they're judged on
-rt64 RT64SHA,          time, RT64's present thread (sleepUntil()) and the VI thread (vi_sleep_until()) first wait up to
+plume d554411,         a page's timed waits judged late as it plays, not only as it starts: while they're judged on
+rt64 33e87a9,          time, RT64's present thread (sleepUntil()) and the VI thread (vi_sleep_until()) first wait up to
 N64ModernRuntime       100 us for a frame and judge that wait, and once most of those in each of 10 seconds in a row
-NMRSHA                ended more than 4 ms late, presents and VIs go on the animation frames for the rest of the play.
+1ff690a                ended more than 4 ms late, presents and VIs go on the animation frames for the rest of the play.
                        Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
                        4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
                        (docs/findings.md, Pokémon Snap's timed waits in Firefox)
