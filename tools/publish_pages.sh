@@ -10,7 +10,8 @@
 #    tools/publish_page.sh has it, and a fork's is pages-<game>, synced from a clone of it kept here in $PAGES_CACHE
 #    (~/.cache/n64recomp-pages) with no files checked out.
 # 2. Builds the page there by the fork's BUILDING.md steps (Rush 2049's: remote_build.sh build), in that image, or on
-#    the host itself for a repo whose scripts run images of their own (Perfect Dark's: the decomp's, then the web's).
+#    the host itself for a repo whose scripts run images of their own (Perfect Dark's: the decomp's, then the web's;
+#    Super Mario 64's: the web's).
 # 3. Hashes the files the page serves (.html, .js, .wasm, .data, coi_serviceworker.js) as git does and compares them
 #    with the blobs on the repo's gh-pages. A commit builds the same bytes in any copy (frontend/build_speed.cmake, once
 #    the game's N64Recomp-browser pin has it: before, a ccache hit could carry another checkout's path in), so
@@ -94,6 +95,7 @@ dkr    amazingalek/DKR-R-web                      DKR-R                build-web
 snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
 rush2  amazingalek/rush2recompiled-web            Rush2Recompiled      build-web
 pd     amazingalek/perfect-dark-recomp            PerfectDarkRecompiled build/web
+sm64   amazingalek/super-mario-64-recomp          SuperMario64Recompiled build/web
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -326,7 +328,13 @@ build_pd() {
     git diff --quiet syms || { echo "tools/build_decomp.sh changed syms/: main's are not this ROM's"; exit 1; }
     bash tools/build_web.sh "$BUILD_CPUS" >> ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
 }
-on_host=" pd "
+# Its tools/build_web.sh recompiles from roms/sm64.us.z64 (the syms/ are in git) and builds the page, in its own image.
+build_sm64() {
+    mkdir -p roms
+    cmp -s ../rom.z64 roms/sm64.us.z64 || cp ../rom.z64 roms/sm64.us.z64
+    bash tools/build_web.sh "$BUILD_CPUS" > ../build.log 2>&1 || { tail -20 ../build.log; exit 1; }
+}
+on_host=" pd sm64 "
 
 # --- Here ---
 

@@ -328,4 +328,36 @@ rt64 d19fdcc           WebGPU: a dummy depth target for each color target size, 
                        framebuffer, freed 120 workloads after its last pass; one shared dummy, matched to every color
                        target, grew each to the biggest any had been (Perfect Dark's 320x1 mission targets, 1286x3,
                        drawn at its 576-wide menus' 1854x960)
+rt64 a9eeacd           the interpolated targets grow under interpolatedMutex, which the present thread indexes them
+                       under, on every build: a resize could move them while it read one (Pokémon Snap's port's fix)
+rt64 a8bfc93           a triangle with a vertex at w <= 0, or projected 4096 pixels out, faces the camera and covers its
+                       scissor in the pass's boxes, on every build: xyz / w put it anywhere, and a pass of only such
+                       triangles had no drawColorRect and wasn't drawn in interpolated frames (Pokémon Snap's port's)
+rt64 a48552c           a pass's framebuffer is at least as tall as the viewports its triangles were drawn through, cut
+                       to their scissors, on every build: an interpolated frame that put them lower than the box
+                       fitted to the game frame lost a band at the bottom. Pokémon Snap's port takes the scissor's
+                       bottom alone, which starts at 8192 lines
+rt64 3879842           fill and copy cycle draws count as undithered for a framebuffer's dithered writeback to RAM, as
+                       hardware draws them, on every build (Pokémon Snap's port's: its z-buffers filled with 0xFFFC)
+rt64 3af6338           the primitive depth is z / 32768, as a triangle's 15-bit z is, not z / 32767, on every build: a
+                       G_ZS_PRIM sprite sat a step deeper (Pokémon Snap's port's: Snorlax's sleep effect at a distance)
+rt64 b1f0c37           a new tile copy's Id comes from a counter that only goes up, not the highest plus one, so one
+                       a workload names from before destroyAllTileCopies names no new copy, on every build (Pokémon
+                       Snap's port's; no game is known to show it)
+rt64 47d43be           a texture scroll is placed between frames only while steady, S and T apart: same way as the last
+                       frame's, 0.4-2.5 times as far, from this frame's start; any other is drawn where the game put it,
+                       on every build. A one-time step slid in a frame late and a scroll that rests every other frame
+                       slid back (Pokémon Snap's port's 4810bf6 and 60623fa)
+N64Recomp 46395bb      div, divu, ddiv and ddivu by zero give the VR4300's results (quotient -1, or 1 for a negative
+                       signed dividend; remainder the dividend), on every build: a bare / and % trapped, in wasm and
+                       on x86. The lines Conker's own N64Recomp patch writes, so it takes them by a three-way merge
+N64ModernRuntime       a Status write that changes a bit cop0_status_write doesn't handle (CU1, the interrupt mask)
+0425eb8                stores it, on every build: it called exit(), which ended the page (Banjo-Tooie's boot sets CU1)
+N64ModernRuntime       thread_queue_insert leaves a thread that is in the queue already where it is, and says so once,
+9d3e57a                on every build: a second insert linked it to itself and hung the game. The causes known are
+                       fixed on a page already (osStartThread on a thread not stopped, upstream's thread_queue_remove)
+N64ModernRuntime       queue_audio_buffer reads a buffer given by its KSEG1 address through KSEG0's, and plays none
+059e4fe                that doesn't lie in RDRAM's 8 MB, on every build: TO_PTR put KSEG1's 512 MB past RDRAM, the
+                       guard region natively and whatever lies there on a page. In ultramodern, off ai.cpp's lines,
+                       which Jet Force Gemini's own patch converts its way
 ```

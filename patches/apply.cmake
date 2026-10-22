@@ -1,8 +1,8 @@
 # The web support as patches on a recomp's own rt64, N64ModernRuntime and RecompFrontend, at whatever upstream commits
 # it pins: the recomp keeps its submodules and adds this repo, and its web build patches their checkouts. Each patch
-# here is what a fork adds to upstream (patches.txt, tools/export_patches.sh). Every change in them is behind
+# here is what a fork adds to upstream (patches.txt, tools/export_patches.sh). Every web change in them is behind
 # __EMSCRIPTEN__ or __wasm__ (or a CMake option on with Emscripten), so a patched checkout still builds the desktop
-# program as upstream does.
+# program as upstream does, but for fixes to bugs the desktop build has too (docs/forks.md, "on every build").
 #
 # Patch them before building N64Recomp from them (the page needs the recompiled code made by the patched one), from
 # the recomp's folder:

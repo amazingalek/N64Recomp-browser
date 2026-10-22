@@ -5,16 +5,17 @@ Web support for N64 static recompilations built on [N64Recomp](https://github.co
 and [RT64](https://github.com/rt64/rt64): the game, its menus and RT64 built with Emscripten into one page that draws
 through WebGPU. It is game-agnostic. A recomp keeps its own submodules at the commits it pins and adds this repo
 beside them, and its web build patches their checkouts (Using it in a recomp). It was written for San Francisco Rush
-2049: Recompiled, this project's own recomp as Perfect Dark's is, and fifteen more recomps build a page with it
-(Games).
+2049: Recompiled, this project's own recomp as Perfect Dark's and Super Mario 64's are, and fifteen more recomps build a
+page with it (Games).
 
 > Written almost entirely by AI (Claude), like the recomp it came from.
 
 ## Games
 
-Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own. Rush 2049 and
-Perfect Dark aside, the games are here to build out and test the web support on more than one game: what one of them or one browser turns
-up is fixed in this repo or the forks unless it really is that game's own, so every game and both browsers get it.
+Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own. Rush 2049, Perfect
+Dark and Super Mario 64 aside, the games are here to build out and test the web support on more than one game: what one
+of them or one browser turns up is fixed in this repo or the forks unless it really is that game's own, so every game
+and both browsers get it.
 
 | Game | Recomp | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|---|
@@ -35,6 +36,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-22, v0.85.0 |
 | Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/amazingalek/rush2recompiled-web) | [play](https://amazingalek.github.io/rush2recompiled-web/) | not yet | not yet | 2026-10-22, v0.85.0 |
 | Perfect Dark | this project's own recomp | [perfect-dark-recomp](https://github.com/amazingalek/perfect-dark-recomp) | [play](https://amazingalek.github.io/perfect-dark-recomp/) | not yet | not yet | 2026-10-22, v0.85.0 |
+| Super Mario 64 | this project's own recomp | [super-mario-64-recomp](https://github.com/amazingalek/super-mario-64-recomp) | [play](https://amazingalek.github.io/super-mario-64-recomp/) | 354* | 348* | 2026-10-22, v0.86.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
@@ -345,14 +347,18 @@ amazingalek/N64Recomp-web                N64Recomp/N64Recomp      the FPU roundi
                                                                   declares every function the C calls; a mod
                                                                   recompiled to C ahead of time; functions a mod
                                                                   replaces or hooks, redirected at their entry;
-                                                                  tail calls as wasm tail calls
+                                                                  tail calls as wasm tail calls; a division by
+                                                                  zero gives the VR4300's results
 amazingalek/N64ModernRuntime-web         N64Recomp/N64ModernRuntime  Emscripten: no live recompiler, RDRAM
                                                                   without a guard region; built-in mods linked
                                                                   in, their replacements and hooks as redirects;
                                                                   OSThread's context past libultra's thprof on
                                                                   a 32-bit host; game timers on time where a
                                                                   page's timed waits end late (Firefox on
-                                                                  Windows); a ROM read in 4 MB pieces
+                                                                  Windows); a ROM read in 4 MB pieces; no exit
+                                                                  on a Status write, no thread put in a queue
+                                                                  twice, a sound buffer's KSEG1 address read
+                                                                  through KSEG0's
 amazingalek/RecompFrontend-web           N64Recomp/RecompFrontend recompui on WebGPU, the canvas as the window,
                                                                   a file picker on a thread of its own, render
                                                                   to RAM as an option and its copy a display
@@ -362,11 +368,12 @@ amazingalek/hlslpp-web                   redorav/hlslpp           fixes to the W
 ```
 
 rt64-web's `src/contrib/plume` points at plume-web and its `src/contrib/hlslpp` at hlslpp-web, and
-N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every
+N64ModernRuntime-web's `N64Recomp` at N64Recomp-web. Every web
 change is behind `__EMSCRIPTEN__` or `__wasm__` (or a CMake option on by default with Emscripten), so a desktop build
 of the forks is the upstream one, but for the declarations N64Recomp-web adds to `funcs.h` and plume-web's
 `RenderSwapChain::isWaitReady()` (always true but on WebGPU) and `waitOnCaller()` (always false but on WebGPU), which
-change nothing there. Each commit's message says what it does and why.
+change nothing there, and fixes to bugs a desktop build has too (a crash, a hang, a wrong frame), which docs/forks.md
+says are "on every build". Each commit's message says what it does and why.
 
 `patches/` holds each fork as one patch, everything its `main` adds to the upstream commit it is on, so a recomp can
 take the web support without moving its submodules to the forks (Using it in a recomp).

@@ -318,6 +318,24 @@ and a section a solo mission (21), recorded by `tools/record_shaders.sh`, where 
 mission as mission select's Accept does, plus 74 the plans' plays, the publish's boot check, a minute in each
 mission and a route through 12 of them missed afterwards. Its docs/building.md and docs/web.md have the rest.
 
+`amazingalek/super-mario-64-recomp` is Super Mario 64 (USA 1.0), not a fork but this project's own recomp, as Rush
+2049's and Perfect Dark's are (GPL-3.0), from the n64decomp/sm64 decompilation's symbols, with RecompFrontend's launcher
+and menus. It is on upstream's rt64, N64ModernRuntime and RecompFrontend at the commits Majora's Mask's are on
+(`patches/pins.txt`), patched by the N64Recomp-browser tag its `lib/N64Recomp-browser` pins, and then by its own
+`runtime-patches/` (RecompFrontend's built-in texture packs, for its Hi-res Font), which change files the patches change
+too, so CI's `sm64-patches` job applies them over the patches on each PR. Its patches (MIPS C against the
+decompilation's headers) tag every matrix for RT64's interpolation, by graph node and object, widen the view, the HUD
+and the sky to the window's shape, and keep a few modern options, each with an Original value; the page keeps them all
+at the desktop's defaults (Hi-res Font Original, Draw Distance High), which cost it nothing measured. Render to RAM is
+off: the game never reads a frame it drew. IDO narrows a char or short argument in the function that takes it, so a
+patch replacing a game function whose caller passes a wider value takes it as a word. Its `tools/build_web.sh` runs a
+Docker image of its own, so `publish_pages.sh` runs it on the build host and not in rush-2049-recomp's image. Its list
+is 189 shaders, 141 pipelines: the boot (the launcher, the logo, the title's Mario head, the file select, 29) and 33
+sections (the castle grounds, the castle's floors, the courtyard, the 15 courses at each act, the secret and Bowser
+stages, the ending), recorded by `tools/record_shaders.sh` and `tools/shader_plan.json`, which warps Mario into each
+from the castle grounds through the survey in `patches/shader_survey.c`. Its README, CLAUDE.md and docs/web.md have the
+rest.
+
 ## The games' own frame rates
 
 A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rules). The game's own rate, set by the
@@ -325,9 +343,9 @@ game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Perfect Dark 
 once a VI; its controller reads held it to 30 on a fast CPU, which its `patches/frame_rate.c` undoes), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
 Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
-cartridge's for the other nine: Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
+cartridge's for the other ten: Super Mario 64 30, Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, Star Fox 64 30 (20 where a scene sets 3 VIs a
-frame), GoldenEye's and Conker's variable. None of the nine has an option to run faster.
+frame), GoldenEye's and Conker's variable. None of the ten has an option to run faster.
 
 A game fork may take a change that runs its game faster when that makes the page play better. Weigh it: logic at 60
 gives lower input lag, motion the game computes rather than RT64 interpolates, and what interpolation misses (some
