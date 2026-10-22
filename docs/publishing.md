@@ -34,7 +34,9 @@ A run on a schedule that takes every change since the last one at once:
   nothing and is left alone. Once the pins of those that played well move, a run without `--browser` builds each main
   again (the same bytes), publishes what differs, boots each from Pages in headless Chrome and lists them, and their
   rows are updated. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
-  builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves.
+  builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves. So does one whose own
+  patches carry a copy of a fix the tag now has (docs/forks.md names it beside the fork's commit): the commit that moves
+  its pin drops the copy, which leaves the shared fix the only one.
 
 ## A critical fix
 
