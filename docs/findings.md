@@ -1240,7 +1240,8 @@ pref unless `MOZ_REMOTE_SETTINGS_DEVTOOLS` is 1 in its environment. Headless (no
 at 72 s and 182 s with it and not within 8 minutes without. An hour later, with the host 32-49% busy, every windowed
 start took 3-5 s with or without it. `page_driver.mjs` starts Firefox with it set. What still slowed the windowed
 starts with it set is not known. In the slow stretches, Firefox on about:blank also didn't exit within 30 s of
-`browser.close`, and in the fast one it did within a second.
+`browser.close`, and in the fast one it did within a second; they are likely the same idle stretches of the browser's
+own process as in A page that stops answering.
 
 ## Behind CLAUDE.md's rules
 
