@@ -309,4 +309,9 @@ N64ModernRuntime       100 us for a frame and judge that wait, and once most of 
                        Pokémon Snap's page in Firefox 158 (uncapped, RTX 5080) on timed waits presented 94 in 1 play of
                        4, and 172-176 in 6 of 6 that turned late at its menus or level; 206-218 with the switch
                        (docs/findings.md, Pokémon Snap's timed waits in Firefox)
+rt64 2292159           a projection holding the camera split into view and perspective by the row where the view's Z
+                       axis is largest, not row 0's alone, on every build: for a camera looking along the world's Z
+                       that ratio of two fixed-point values near zero gave each frame another depth range, and a frame
+                       interpolated between two lost what was far away (Perfect Dark's Air Base at its start, every
+                       mountain gone to the clear colour in 1-5 of 30 shots, 0 of 180 with it)
 ```
