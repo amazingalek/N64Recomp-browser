@@ -48,7 +48,8 @@ the game forks take no PRs: a change is a commit pushed to the fork's `main` as 
 
 Branches don't outlive their work: every one of these repos deletes a PR's branch when it merges ("Automatically
 delete head branches", on in each, a new fork included), and a branch pushed to a fork to hold work not on `main` yet
-(`web-wip`, `wip/<topic>`) is deleted by the work that lands or drops it. A fork keeps `main`, `gh-pages` and those
+(`web-wip`, `wip/<topic>`, a game fork's `fix/<topic>` offered to its game's repo) is deleted by the work that lands or
+drops it. A fork keeps `main`, `gh-pages` and those
 branches only: upstream's others are deleted when it is made.
 
 ## Rules
@@ -78,7 +79,8 @@ branches only: upstream's others are deleted when it is made.
   description with "AI-written fork:", saying it is AI-written, not upstream's, and offered to nobody upstream
   (hlslpp-web's says only the first two: hlslpp has no ban). Keep that true of a new fork and of a game fork's README.
   A game's own repo is decided case by case: a game fork offers it only what it takes, said to be AI-written
-  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too, without the web or mouse code).
+  (GoldenEye64Recomp-web: to podulator's, fixes for bugs its desktop build has too and the keyboard and mouse, never the
+  web code, each from a branch of its own played on podulator's desktop build, as docs/game-forks.md says).
 - A repo without a license is forked, ported and copied from like a licensed one. That is this project's choice, not
   the law's: in law no license leaves every right with its author.
 - No ROMs, ROM-derived assets or extracted game data in git, CI, PRs or pages. A page holds the recompiled code, so it
