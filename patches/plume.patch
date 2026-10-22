@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web 45f09eed9bcdd9e1f78e758b31a2fbf0a49258f5
+plume: https://github.com/amazingalek/plume-web 2a7b54ab6e6272e9e21a2a2b2c2f1f8a9f9c9f33
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2740,10 +2740,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..3aa96f8
+index 0000000..9068f1f
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,138 @@
 +//
 +// plume
 +//
@@ -2772,7 +2772,6 @@ index 0000000..3aa96f8
 +#include <cstdint>
 +#include <cstdio>
 +
-+#include <emscripten/em_asm.h>
 +#include <emscripten/emscripten.h>
 +#include <emscripten/threading.h>
 +
@@ -2821,13 +2820,10 @@ index 0000000..3aa96f8
 +        }
 +
 +        waits.lateSeconds = ((waits.secondLateWaits * 2) > waits.secondWaits) ? (waits.lateSeconds + 1) : 0;
-+        // TEST ONLY: each second logged, and ?timed-waits-late-seconds=<n> the seconds in a row (0, never).
-+        static const int testSeconds = MAIN_THREAD_EM_ASM_INT({ const v = new URLSearchParams(location.search).get('timed-waits-late-seconds'); return v === null ? 10 : parseInt(v, 10); });
-+        fprintf(stderr, "plume test: a second's judged waits: %u of %u late, %u seconds in a row\n", waits.secondLateWaits, waits.secondWaits, waits.lateSeconds);
 +        waits.secondStart = now;
 +        waits.secondWaits = 0;
 +        waits.secondLateWaits = 0;
-+        if ((testSeconds > 0) && (waits.lateSeconds >= (uint32_t)testSeconds)) {
++        if (waits.lateSeconds >= 10) {
 +            waits.late = true;
 +            fprintf(stderr, "plume: most timed waits on a thread of this page ended over 4 ms late for 10 s, so waits off the page's thread are woken or spun from now on, not timed\n");
 +        }
@@ -2866,12 +2862,6 @@ index 0000000..3aa96f8
 +        bool notMeasuring = false;
 +        if (waits.measuring.compare_exchange_strong(notMeasuring, true)) {
 +            waits.late = (shortest > 4.0);
-+            // TEST ONLY: ?timed-waits-start-on-time judges the start on time, whatever it measured.
-+            if (MAIN_THREAD_EM_ASM_INT({ return new URLSearchParams(location.search).has('timed-waits-start-on-time') ? 1 : 0; })) {
-+                fprintf(stderr, "plume test: the start measured %.1f ms, judged on time by the query\n", shortest);
-+                shortest = 0.0;
-+                waits.late = false;
-+            }
 +            waits.measured = true;
 +            if (shortest > 4.0) {
 +                fprintf(stderr, "plume: a timed wait of 100 us on a thread of this page takes %.1f ms, so waits off the page's thread are woken or spun, not timed\n", shortest);
