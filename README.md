@@ -34,6 +34,7 @@ up is fixed in this repo or the forks unless it really is that game's own, so ev
 | Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/amazingalek/JetForceGemini-Recomp-web) | [play](https://amazingalek.github.io/JetForceGemini-Recomp-web/) | 58; 336* | 44; 311* | 2026-10-22, v0.85.0; laptop 2026-10-18, v0.63.0 |
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/amazingalek/Snap64Recomp-web) | [play](https://amazingalek.github.io/Snap64Recomp-web/) | 358* | 206* | 2026-10-22, v0.85.0 |
 | Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/amazingalek/rush2recompiled-web) | [play](https://amazingalek.github.io/rush2recompiled-web/) | not yet | not yet | 2026-10-22, v0.85.0 |
+| Perfect Dark | this project's own recomp | [perfect-dark-recomp](https://github.com/amazingalek/perfect-dark-recomp) | [play](https://amazingalek.github.io/perfect-dark-recomp/) | not yet | not yet | 2026-10-22, v0.85.0 |
 
 Median presents a second after the shader waits on a laptop's Intel UHD, maximized on its screen; * on a stand-in, newer than
 the laptop's: a desktop GPU at 3840x2000, uncapped from v0.47.0 (higher is a cheaper frame, 360 at most), Firefox's
