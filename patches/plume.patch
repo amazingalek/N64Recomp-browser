@@ -1,4 +1,4 @@
-plume: https://github.com/amazingalek/plume-web dd3b530c37d9cc409a262e7746aa63edf472ffbc
+plume: https://github.com/amazingalek/plume-web 07aa300039056b63c37a48cb6854d31e98e7df15
 on upstream d890ac899e505fb30040e037a4037cdeca68f033 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -2740,10 +2740,10 @@ index 9dcfedf..b352bb6 100644
  
 diff --git a/plume_web_waits.h b/plume_web_waits.h
 new file mode 100644
-index 0000000..c2f1374
+index 0000000..ea15af1
 --- /dev/null
 +++ b/plume_web_waits.h
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,122 @@
 +//
 +// plume
 +//
@@ -2815,15 +2815,17 @@ index 0000000..c2f1374
 +
 +    inline bool timedWaitsEndLate();
 +
-+    // Waits up to 100 us on a futex for a wake or the time and judges the wait if it ended on the time: a wake that
-+    // ends it sooner says nothing of the timer. So a thread that would wait on that futex anyway (for a frame) loses
-+    // nothing to it, and one that would sleep anyway loses no more than its own sleep would have. Off the page's thread.
-+    inline void judgeTimedWait(volatile void *futex, uint32_t value) {
++    // emscripten_futex_wait(), judged if it ended on its time: a wake that ends it sooner says nothing of the timer.
++    // Off the page's thread.
++    inline int judgeTimedWait(volatile void *futex, uint32_t value, double maxWaitMs) {
 +        timedWaitsEndLate(); // The first judgement, measured.
 +        const double start = emscripten_get_now();
-+        if (emscripten_futex_wait(futex, value, 0.1) == -ETIMEDOUT) {
-+            timedWaitEnded(emscripten_get_now() - start - 0.1);
++        const int result = emscripten_futex_wait(futex, value, maxWaitMs);
++        if (result == -ETIMEDOUT) {
++            timedWaitEnded(emscripten_get_now() - start - maxWaitMs);
 +        }
++
++        return result;
 +    }
 +
 +    // False on the page's thread until a thread other than the page's has asked, which the page's thread can't.
@@ -2866,10 +2868,10 @@ index 0000000..c2f1374
 +#endif
 diff --git a/plume_webgpu.cpp b/plume_webgpu.cpp
 new file mode 100644
-index 0000000..3972a7d
+index 0000000..d8be325
 --- /dev/null
 +++ b/plume_webgpu.cpp
-@@ -0,0 +1,3488 @@
+@@ -0,0 +1,3490 @@
 +//
 +// plume
 +//
@@ -4639,8 +4641,10 @@ index 0000000..3972a7d
 +    // timing, and on a timer only until the time itself, for a page whose frames have stopped (hidden). Elsewhere it
 +    // returns false and the caller sleeps as before: in Chrome on a laptop's Intel graphics, presents on the animation
 +    // frames made the GPU busier and the gaps between frames longer than RT64's own sleeps.
-+    // Which of the two each sleep is goes by the page's timed waits as it plays, judged from a first wait of up to 100 us
-+    // for a frame here (judgeTimedWait()): the present thread's sleeps are what a page's presents hang on. Pokemon Snap's
++    // Which of the two each sleep is goes by the page's timed waits as it plays, judged from the present thread's own
++    // (judgeTimedWait()): those it makes here while they're judged late, and while they're judged on time a first wait of
++    // up to 100 us for a frame before the caller sleeps, as long as the caller's own first sleep. The present thread's
++    // sleeps are what a page's presents hang on. Pokemon Snap's
 +    // page in Firefox 158 (uncapped, RTX 5080), held to RT64's sleeps, woke 140 ms past its slots in the launcher and
 +    // 0.1 ms past them once the game ran, presenting 308-330 a second, but in 1 play of 4 they stayed late all through and
 +    // it presented 94; on the animation frames it presented 217-232. The one measure as the page started took the
@@ -4651,8 +4655,8 @@ index 0000000..3972a7d
 +        }
 +
 +        const double endMs = emscripten_get_now() + std::chrono::duration<double, std::milli>(time - std::chrono::steady_clock::now()).count();
-+        if ((endMs - emscripten_get_now()) > 0.5) {
-+            judgeTimedWait(&frameTimer->frameSerial, frameTimer->frameSerial);
++        if (!timedWaitsEndLate() && ((endMs - emscripten_get_now()) > 0.5)) {
++            judgeTimedWait(&frameTimer->frameSerial, frameTimer->frameSerial, 0.1);
 +        }
 +
 +        if (!timedWaitsEndLate()) {
@@ -4667,7 +4671,7 @@ index 0000000..3972a7d
 +                return true;
 +            }
 +
-+            emscripten_futex_wait(&frameTimer->frameSerial, serial, endMs - now);
++            judgeTimedWait(&frameTimer->frameSerial, serial, endMs - now);
 +        }
 +    }
 +

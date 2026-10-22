@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 78e859564370a92426c56be0b45be895ded68ea5
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web e52908e3d532a5d5b69e373f339271f0ac73b3ed
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -822,10 +822,10 @@ index 0000000..be6c588
 +
 +#endif
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..e95f5d4 100644
+index 2f1cfb5..5f92f08 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -175,6 +175,131 @@ uint64_t total_vis = 0;
+@@ -175,6 +175,136 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -910,21 +910,26 @@ index 2f1cfb5..e95f5d4 100644
 +        return true;
 +    }
 +
++    // A wait on vi_frame_serial, judged if it ended on its time: a frame's wake that ends it sooner says nothing of the
++    // timer.
++    void vi_judged_wait(uint32_t serial, double max_wait_ms) {
++        const double start = emscripten_get_now();
++        if (emscripten_futex_wait(&vi_frame_serial, serial, max_wait_ms) == -ETIMEDOUT) {
++            vi_wait_ended(emscripten_get_now() - start - max_wait_ms);
++        }
++    }
++
 +    void vi_start_frames(void*) {
 +        emscripten_request_animation_frame_loop(vi_animation_frame, nullptr);
 +    }
 +
 +    // Holds the VI thread until about the given time, ending on the first animation frame to come less than half a VI
 +    // before it, or at the time if none comes by then. False where a timed wait ends on time, and the caller sleeps itself.
-+    // Either way it first waits up to 100 us for a frame and judges that wait if it ended on its time (a frame's wake says
-+    // nothing of the timer): no longer than the VI thread would have waited for a frame or slept anyway.
++    // The waits it makes for frames are judged (vi_judged_wait()), and while timed waits are judged on time a first wait
++    // of up to 100 us for a frame, which is no longer than the caller's own sleep would have taken.
 +    bool vi_sleep_until(const std::chrono::high_resolution_clock::time_point& time_point) {
-+        vi_waits_end_late();
-+        if ((time_point - std::chrono::high_resolution_clock::now()) > std::chrono::microseconds(500)) {
-+            const double start = emscripten_get_now();
-+            if (emscripten_futex_wait(&vi_frame_serial, vi_frame_serial, 0.1) == -ETIMEDOUT) {
-+                vi_wait_ended(emscripten_get_now() - start - 0.1);
-+            }
++        if (!vi_waits_end_late() && ((time_point - std::chrono::high_resolution_clock::now()) > std::chrono::microseconds(500))) {
++            vi_judged_wait(vi_frame_serial, 0.1);
 +        }
 +
 +        if (!vi_waits_end_late()) {
@@ -948,7 +953,7 @@ index 2f1cfb5..e95f5d4 100644
 +            }
 +
 +            serial = current;
-+            emscripten_futex_wait(&vi_frame_serial, serial, end - now);
++            vi_judged_wait(serial, end - now);
 +        }
 +    }
 +}
@@ -957,7 +962,7 @@ index 2f1cfb5..e95f5d4 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +329,25 @@ void vi_thread_func() {
+@@ -204,10 +334,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
