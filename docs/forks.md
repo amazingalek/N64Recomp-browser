@@ -351,19 +351,22 @@ rt64 47d43be           a texture scroll is placed between frames only while stea
 N64Recomp 46395bb      div, divu, ddiv and ddivu by zero give the VR4300's results (quotient -1, or 1 for a negative
                        signed dividend; remainder the dividend), on every build: a bare / and % trapped, in wasm and
                        on x86. The lines Conker's own N64Recomp patch writes, so it takes them by a three-way merge;
-                       its pin moving onto this drops that hunk (recomp/n64recomp.patch, cgenerator.cpp)
+                       its patch keeps them (recomp/n64recomp.patch, cgenerator.cpp): its build.cmd, the native
+                       Windows build, applies no web patch, and its attract mode divides by zero
 N64ModernRuntime       a Status write that changes a bit cop0_status_write doesn't handle (CU1, the interrupt mask)
 0425eb8                stores it, on every build: it called exit(), which ended the page (Banjo-Tooie's boot sets CU1).
-                       Banjo-Tooie's own patch writes the same lines; its pin moving onto this drops that hunk
+                       Banjo-Tooie's own patch writes the same lines, and keeps them: its desktop build applies only
+                       its own patches (tools/setup_deps.py)
 N64ModernRuntime       thread_queue_insert leaves a thread that is in the queue already where it is, and says so once,
 9d3e57a                on every build: a second insert linked it to itself and hung the game. The causes known are
                        fixed on a page already (osStartThread on a thread not stopped, upstream's thread_queue_remove).
-                       Banjo-Tooie's own patch guards thread_queue_insert and schedule_running_thread its way; its pin
-                       moving onto this drops them
+                       Banjo-Tooie's own patch guards thread_queue_insert and schedule_running_thread its way, and
+                       keeps them for its desktop build, which applies no web patch
 N64ModernRuntime       queue_audio_buffer reads a buffer given by its KSEG1 address through KSEG0's, and plays none
 059e4fe                that doesn't lie in RDRAM's 8 MB, on every build: TO_PTR put KSEG1's 512 MB past RDRAM, the
                        guard region natively and whatever lies there on a page. In ultramodern, off ai.cpp's lines,
-                       which Jet Force Gemini's own patch converts its way; its pin moving onto this drops that
+                       which Jet Force Gemini's own web patch converted its way; its pin moving onto v0.93.0 dropped
+                       that (its desktop build has the base project's own conversion)
 plume e16e003,         WebGPU: where a page's timed waits are judged on time (Chrome), a present's sleep to its slot
 rt64 0e971b5           is plume's: woken by each animation frame before the slot and spun on the clock from the last,
                        no more than a frame and 2 ms. RT64's own 100 us sleeps there now and then took a tick, up to

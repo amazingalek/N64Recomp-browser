@@ -36,7 +36,8 @@ A run on a schedule that takes every change since the last one at once:
   rows are updated. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
   builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves. So does one whose own
   patches carry a copy of a fix the tag now has (docs/forks.md names it beside the fork's commit): the commit that moves
-  its pin drops the copy, which leaves the shared fix the only one.
+  its pin drops the copy, which leaves the shared fix the only one, unless a desktop build of the fork applies its own
+  patches and no web patch (Conker's build.cmd, Banjo-Tooie's): the copy stays for that build.
 
 ## A critical fix
 

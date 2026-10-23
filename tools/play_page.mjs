@@ -299,6 +299,10 @@ const onLine = (text) => {
     exceptionAt ??= seconds();
   }
   if (romRefused.test(text)) page.stop(`the page refused the ROM: ${text.split('\n')[0].slice(0, 300)}`);
+  // ultramodern's exit (an RSP task that failed, a function it can't run) ends the game but not the page, which throws
+  // nothing and keeps its last frame: Super Mario 64's v0.93.0 build in Firefox exited at its audio microcode and
+  // summed up as a clean run of 0 presents a second. So it stops the run, which fails with the line.
+  if (/^Exiting with exit status /.test(text)) page.stop(`the game exited: ${text.split('\n')[0].slice(0, 300)}`);
 };
 
 // Presents: every getCurrentTexture call on a WebGPU canvas, and the gap in ms since the one before (taken each sample).
