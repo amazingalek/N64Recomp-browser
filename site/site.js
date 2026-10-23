@@ -157,6 +157,8 @@ document.getElementById('player-close').addEventListener('click', closeGame);
 document.getElementById('player-full').addEventListener('click', () => frame.contentDocument.documentElement.requestFullscreen());
 frame.addEventListener('load', () => frame.focus());
 
+document.getElementById('firefox-note').hidden = !/\bFirefox\//.test(navigator.userAgent);
+
 async function main() {
   const grid = document.getElementById('grid');
   try {

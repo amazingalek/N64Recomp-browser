@@ -22,7 +22,12 @@ h1 { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; font-size: 
 .mark i:nth-child(2) { background: #f6c400; }
 .mark i:nth-child(3) { background: #009e49; }
 .mark i:nth-child(4) { background: #1d6fe0; }
-header p { color: var(--dim); margin: 8px 0; max-width: 800px; }
+header p { color: var(--dim); margin: 8px 0; }
+header .warning {
+  color: #f2d27a; background: rgb(242 184 75 / 0.1); border: 1px solid rgb(242 184 75 / 0.35); border-radius: 8px;
+  padding: 8px 12px;
+}
+header .warning::before { content: "⚠ "; }
 header .tagline { color: var(--text); font-size: 18px; }
 #count { color: var(--dim); }
 

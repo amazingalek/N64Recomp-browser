@@ -1,44 +1,48 @@
 #!/usr/bin/env bash
-# Publishes the games' page (site/) as the owner's GitHub Pages user site, https://<owner>.github.io/, the same origin
-# as every game's page (https://<owner>.github.io/<repo>/), so a game plays in its frame. With the user site on a
-# custom domain (site/CNAME), every game's page moves under it too, and GitHub redirects the old addresses.
-# The page is site/'s files, frontend/coi_serviceworker.js (Pages can't send the cross-origin headers a frame with
-# threads needs) and a .nojekyll, the only commit on the orphan branch gh-pages, force-pushed each time. It reads the
-# Games table from main's README.md each visit, so only a change to site/ needs publishing again. The first time,
-# Pages is switched on for that branch (with gh).
+# Publishes the games' page (site/) at the top of the hub, amazingalek/n64hub's GitHub Pages:
+# https://amazingalek.github.io/n64hub/, or the custom domain its Pages has (n64hub.com). Every game's page is a
+# folder of the hub beside it (tools/publish_page.sh --into <folder>, as tools/publish_pages.sh publishes them), the
+# same origin, so a game plays in the page's frame. The top is site/'s files, frontend/coi_serviceworker.js (Pages
+# can't send the cross-origin headers a frame with threads needs), a .nojekyll, and a CNAME naming the domain once the
+# repo has one; they replace the files at the top of gh-pages and every folder stays. The page reads the Games table
+# from main's README.md each visit, so only a change to site/ needs publishing again.
+# The domain is set once, in the repo's Pages settings, after its DNS points at GitHub Pages: a CNAME published before
+# then would send every game's page to a domain that doesn't serve them. From then on each publish keeps it.
 #
-#   bash tools/publish_site.sh <owner>/<owner>.github.io [--dry-run]
-#
-# site/CNAME, when there is one, names the custom domain. Add it only once the domain's DNS points at GitHub Pages:
-# the moment Pages has a domain, it redirects every game's page there.
+#   bash tools/publish_site.sh [--dry-run]
 set -euo pipefail
-dry_run=false repo=""
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run) dry_run=true ;;
-        *) repo="$arg" ;;
-    esac
-done
-[[ "$repo" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9-]+\.github\.io$ && "${repo%%/*}.github.io" == "${repo#*/}" ]] ||
-    { sed -n '10p' "$0"; exit 1; }
+repo=amazingalek/n64hub
+dry_run=false
+[ "${1:-}" != --dry-run ] || dry_run=true
 root="$(cd "$(dirname "$0")/.." && pwd)"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 cp -r "$root"/site/. "$stage"/
 cp "$root"/frontend/coi_serviceworker.js "$stage"/
-touch "$stage"/.nojekyll
+domain="$(gh api "repos/$repo/pages" --jq ".cname // empty")"
+[ -z "$domain" ] || echo "$domain" > "$stage"/CNAME
 if $dry_run; then
     trap - EXIT
     echo "staged in $stage, nothing pushed"
     exit 0
 fi
 
+url="https://github.com/$repo"
 git=(git -C "$stage")
 "${git[@]}" init -q -b gh-pages
-"${git[@]}" add -A
-"${git[@]}" commit -q -m "The games' page, from $(git -C "$root" rev-parse --abbrev-ref HEAD) $(git -C "$root" rev-parse --short HEAD)"
-"${git[@]}" push -q -f "https://github.com/$repo" gh-pages
-gh api "repos/$repo/pages" > /dev/null 2>&1 ||
-    gh api -X POST "repos/$repo/pages" -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null 2>&1 ||
-    gh api "repos/$repo/pages" > /dev/null
-echo "pushed gh-pages: https://$([ -f "$root/site/CNAME" ] && cat "$root/site/CNAME" || echo "${repo#*/}")/ serves it in a minute or two"
+"${git[@]}" fetch -q "$url" gh-pages
+had="$("${git[@]}" rev-parse FETCH_HEAD)"
+"${git[@]}" read-tree FETCH_HEAD
+{ "${git[@]}" ls-files | grep -v / || true; } | xargs -r "${git[@]}" rm -q -f --cached --
+"${git[@]}" rm -r -q -f --cached --ignore-unmatch -- img
+for f in $(cd "$stage" && find . -path ./.git -prune -o -type f -print | sed 's|^\./||'); do
+    "${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --no-filters "$f"),$f"
+done
+"${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll"
+# The lines naming what each folder was built from stay.
+lines="$("${git[@]}" log -1 --format=%b "$had" | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)"
+subject="The games' page, from $(git -C "$root" rev-parse --abbrev-ref HEAD) $(git -C "$root" rev-parse --short HEAD)"
+"${git[@]}" commit -q -F - <<< "$subject${lines:+$'\n\n'$lines}"
+# Another publish (a game's folder) pushed since the fetch: refused, so run it again.
+"${git[@]}" push -q --force-with-lease="gh-pages:$had" "$url" gh-pages
+echo "pushed gh-pages: $(gh api "repos/$repo/pages" --jq .html_url) serves it in a minute or two"
