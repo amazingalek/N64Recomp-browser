@@ -1382,8 +1382,31 @@ fast start the main thread spends 0.1 s in all of them. Both calls return at onc
 lock is one for the whole desktop, so what slows the start holds every windowed process on the host, not anything of
 Firefox's own. The network was idle meanwhile: the socket process's poll waited 75 s with no socket open. (The
 parent's own network log was overwritten by a short Firefox process started 12 s after it exited with the same
-`MOZ_LOG_FILE`, which only the slow start did.) Which process holds win32k then takes an ETW trace of the slow stretch,
-whose context switches name the thread that readies Firefox's.
+`MOZ_LOG_FILE`, which only the slow start did.)
+
+What held win32k was Windows' Task Manager, open on the desktop, while another Firefox play ran. The lock is win32k's
+UserCrit, and the `Microsoft-Windows-Win32k` ETW provider's Contention keyword (0x10000000) logs every acquire with its
+wait (`ExclusiveUserCrit`, `SharedUserCrit`, `AcquireQpcCounts`) and every release with its hold (`ReleaseUserCrit`,
+`HoldQpcCounts`), with stacks: `xperf -start <name> -on "Microsoft-Windows-Win32k:0x10000000:5:'stack'" -f <etl>`,
+which a member of Performance Log Users can record without admin (the kernel logger's context switches can't), about
+14 MB a second on a busy desktop. On the RTX 2070 host, windowed starts as above, each a shared turn, one every 4.5
+minutes and one as soon as another card's harness Firefox started, with Task Manager open: the 8 started while another
+card's Firefox play ran answered `session.new` in 10.8-147 s and exited 32-40 s after `browser.close`, and the 8 with no
+other harness browser running in 4.6-6.3 s, exiting within 1.2 s. In the trace of a 107 s start, every windowed process
+on the desktop waited for the lock: 97,445 waits of 20 ms or more in 188 s, up to 98 ms each, the start's main thread
+177 s of them in `NtUserPeekMessage` and `NtUserPostMessage` (fast starts wait under 1 ms). Task Manager held it shared
+through every one of those waits and was the last to release it before 83% of them: its UI thread held it shared 160 s
+of the 188 (1.3 s of 16.8 s with no play running), mostly in `NotifyWinEvent`, the accessibility events DirectUI raises
+as its process list lays itself out again (`DUI70!NotifyAccessibilityEvent` under `Element::OnHosted`), the rest in
+`SetTimer` as it paints. Each of those events goes to every WinEvent hook on the desktop, and Firefox's main thread has
+one: half its exclusive acquires are win32k taking the lock back after calling its hook from `NtUserPeekMessage`
+(`xxxClientCallWinEventProc`), and other windowed apps with hooks wait the same way. A console window being written to
+raises the same events, and NVIDIA's driver takes the lock shared at each of a page's presents
+(`GetForegroundWindow`), but neither was last before more than 1.3% of the waits. With Task Manager closed, in the
+same hours: 24 starts with no other play running answered in 3.9-6.8 s but one at 14.6 s and one at 101 s, and the 2
+started beside other cards' plays in 7.5 and 10.4 s, exiting 1.0 and 5.5 s after `browser.close`. None of these slow
+ones waited on win32k: the 101 s start's trace has no wait of 20 ms or more on the whole desktop, its Firefox threads'
+longest 4 ms, so what slows such a start is something else, which this trace doesn't show.
 
 None of these slows it alone. A display that has turned itself off (card sessions keep a host awake but not its
 display): on an idle host with an RTX 5080, with Windows reporting the console display off
