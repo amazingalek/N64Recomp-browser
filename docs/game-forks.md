@@ -206,7 +206,10 @@ as the list's plan starts them. Its README, BUILDING.md and the headers of those
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
 N64Recomp-browser's `frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's. Upstream shapes its
-window to the launcher and to the game's aspect; the page leaves the window alone. The game reads the keyboard once a
+window to the launcher and to the game's aspect; the page leaves the window alone. A page opens in widescreen (Aspect
+ratio at Expand to the window, the HUD within 16:9; the desktop build opens in the console's 4:3), and a page's
+settings saved in 4:3 move to it once. A room drawn over a 4:3 picture (Link's house, the castle grounds) stays 4:3,
+on the desktop too. The game reads the keyboard once a
 frame at its 20 a second, so a script holds a key 150-300 ms. Its list, `src/rt64_shaders.txt`, is 564 descriptions in
 24 sections, the boot 69. Its survey clears a new file's opening cutscene at the file select's hand-over, since clearing
 it mid-cutscene hung the game on a black screen, and warps as a child or an adult by the play state's `linkAgeOnLoad`,
@@ -275,7 +278,7 @@ the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.sh`, `web
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
 
-`n64hub/Snap64Recomp-web` is Snap64 Recomp, Pokémon Snap (US), on its port's own forks of rt64, plume and
+`n64hub/Snap64Recomp-web` is Snap64 Recomp (1.1.5), Pokémon Snap (US), on its port's own forks of rt64, plume and
 N64ModernRuntime (their `snap64` branches), the one game fork whose rt64 isn't upstream's: ~8,000 lines of the port's
 in RT64 (each object's identity for interpolation, its frame pacing and presentation, Photo Detail's framebuffer
 readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` patches them, but for the files where
@@ -290,7 +293,9 @@ interpolate at the fastest (rt64 179adb8) and the port's last measured rate is w
 `RasterPS.hlsl` a decal pipeline with `DECAL_DEPTH_BOUNDS` writes the web's bound as its depth (rt64 0560318), and
 every other the port's depth. HAL's object manager runs each object on a thread that stops itself, which the libultra
 thread stop ignored a start of (N64ModernRuntime-web 6515ea8). Render to RAM keeps the exact copy: the game scores a
-photo from the frame it has just drawn and finds the viewfinder's focus dot in it, and a play shows no kept writes.
+photo from the frame it has just drawn and finds the viewfinder's focus dot in it, and a play shows no kept writes. It
+opens widescreen, RT64's Expand in a course as the desktop's Widescreen setting draws it (off on the desktop):
+the setting is on with Emscripten, and a page's settings saved before, whose Off no player chose, are turned on once.
 Its list is 199 shaders, the boot and 9 sections (the menus, a section a course, the report screens), recorded by
 code but for three Firefox plays missed: `web/survey.cpp` starts a course from the main menu and `web/shader_survey.js`
 rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
