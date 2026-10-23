@@ -30,6 +30,10 @@ This repo, the forks and the game forks are public. Write for a stranger, in the
 contributor's machine, servers, host names, paths or accounts, no person's name, no history of renames or "until
 <date>", nothing about where ROMs are kept. Beside a measurement, the host is "an idle host" or "a busy host".
 
+Markdown here and in those repos is wrapped by hand, so a wrapped line never starts with `+ `, `- `, `* `, `> `, `#`
+or a number and `.` or `)` (`1. `, `15) `): Markdown reads it as a list item, a quote or a heading in the middle of the
+sentence. Keep that word on the line above.
+
 ## How work lands
 
 A change here is one PR on this repo. It merges once CI is green and what it changes has been played (Changing it).
