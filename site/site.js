@@ -57,7 +57,7 @@ function tile(game, index) {
     el('div', { className: 'body' },
       el('div', { className: 'head' },
         el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
-      el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp))));
+      el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp, game.repo))));
 }
 
 // A title card's text: "The Legend of Zelda: Majora's Mask" as the series, small, over "Majora's Mask".
@@ -66,10 +66,11 @@ function titleCard(name) {
   return title ? [el('small', { textContent: series }), title] : [name];
 }
 
-// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp".
-function credit(cell) {
+// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp"; a cell without a
+// link ("this project's own recomp") links the game's repo.
+function credit(cell, repo) {
   const m = cell.match(/^\[(.*?)\]\((.*?)\)(.*)$/);
-  if (!m) return [cell ? cell[0].toUpperCase() + cell.slice(1) : ''];
+  if (!m) return cell ? [el('a', { href: repo, textContent: cell[0].toUpperCase() + cell.slice(1) })] : [];
   return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3]];
 }
 
