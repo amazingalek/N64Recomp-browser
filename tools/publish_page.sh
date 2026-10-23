@@ -19,7 +19,8 @@
 # once it is done with. Each publish starts from the gh-pages it replaces: main's page replaces the files at the top
 # and keeps every folder, a test page replaces its folder and keeps the rest. The commit's subject names what main's
 # page was built from ("The web page, built from main <sha>", which is what `git log -1 origin/gh-pages` reads), and
-# a line in its body each test page's ("<dir>/: built from <branch> <sha>").
+# a line in its body each test page's ("<dir>/: built from <branch> <sha>"). The hub (tools/publish_site.sh) is the
+# same: its top is the games' page, and each game's page is published into a folder of it with --into.
 set -euo pipefail
 dry_run=false into="" drop=""
 args=()
@@ -63,10 +64,11 @@ have=0
 git ls-remote -q --exit-code "$url" refs/heads/gh-pages > /dev/null || have=$?
 case $have in
     0) "${git[@]}" fetch -q "$url" gh-pages
+       lease=(--force-with-lease="gh-pages:$("${git[@]}" rev-parse FETCH_HEAD)")
        "${git[@]}" read-tree FETCH_HEAD
-       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 '^The web page' || true)"
+       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" || true)"
        lines="$("${git[@]}" log -1 --format=%b FETCH_HEAD | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)" ;;
-    2) subject="" lines="" ;;
+    2) subject="" lines="" lease=(-f) ;;
     *) exit $have ;;
 esac
 [ -z "$drop" ] || "${git[@]}" ls-files --error-unmatch "$drop" > /dev/null 2>&1 ||
@@ -92,7 +94,9 @@ if [ -z "$drop" ]; then
 fi
 "${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll"
 "${git[@]}" commit -q -F - <<< "${subject:-The web page}${lines:+$'\n\n'$lines}"
-"${git[@]}" push -q -f "$url" gh-pages
+# Another publish to this gh-pages (a page in another of its folders, the hub's page) pushed since the fetch: refused,
+# so run it again.
+"${git[@]}" push -q "${lease[@]}" "$url" gh-pages
 # A first push of gh-pages to a public repo can switch Pages on by itself in the seconds between the check and the
 # POST, which then answers 409 "already enabled": so a refused POST is checked again.
 gh api "repos/$repo/pages" > /dev/null 2>&1 ||

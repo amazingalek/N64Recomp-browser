@@ -1,7 +1,7 @@
 // Reads the Games table from main's README.md and draws a tile a game; Play opens the game's page in a frame.
 //
-// The frame: every game's page is on this page's origin (<owner>.github.io/<repo>/), so it can play here, but threads
-// need it cross-origin isolated, and a frame is only that inside a page that is (this one, by its
+// The frame: every game's page is a folder beside this one in the hub (tools/publish_site.sh), so it can play here,
+// but threads need it cross-origin isolated, and a frame is only that inside a page that is (this one, by its
 // coi_serviceworker.js). A game's page gets its headers from its own coi_serviceworker.js, which on a first visit
 // registers and then reloads it; inside this page that first load has no headers yet, so the frame would be refused.
 // So Play registers the game's worker for its folder first, and the frame's first load is already isolated.
@@ -73,10 +73,12 @@ function credit(cell) {
   return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3]];
 }
 
-// A page on Pages is played from this origin: the same one on Pages, tools/serve_site.mjs's when served locally.
-const PAGES = 'https://amazingalek.github.io/';
+// A game's page in the hub, at either of its addresses, is played from the folder beside this page: the same one on
+// Pages, tools/serve_site.mjs's when served locally.
+const HUBS = ['https://amazingalek.github.io/n64hub/', 'https://n64hub.com/'];
 function localPage(page) {
-  return page.startsWith(PAGES) ? new URL(page.slice(PAGES.length - 1), location.href).href : page;
+  const hub = HUBS.find((h) => page.startsWith(h));
+  return hub ? new URL(page.slice(hub.length), location.href).href : page;
 }
 
 // The game's folder on this origin, or null when its page is elsewhere (it then opens in its own tab).
@@ -157,7 +159,21 @@ document.getElementById('player-close').addEventListener('click', closeGame);
 document.getElementById('player-full').addEventListener('click', () => frame.contentDocument.documentElement.requestFullscreen());
 frame.addEventListener('load', () => frame.focus());
 
-document.getElementById('firefox-note').hidden = !/\bFirefox\//.test(navigator.userAgent);
+// Firefox on built-in graphics holds every game to 30-45 (its compositor), so those players get the header's warning:
+// an Intel chip's graphics but its Arc cards (A770, B580; a Core Ultra's own "Arc Graphics" is built in), or AMD's
+// "Radeon Graphics" or "Radeon 780M" in a laptop chip but its RX cards. The GPU is WebGL's renderer, which Firefox gives
+// rounded ("Intel(R) HD Graphics, or similar"), or not at all with fingerprinting resisted, and then there is no warning.
+function builtInGraphics(renderer) {
+  if (/intel/i.test(renderer)) return !/arc\S*\s+[ab]\d{3}/i.test(renderer);
+  return /radeon/i.test(renderer) && !/\brx\b|\bpro\b/i.test(renderer) && /graphics|vega|\d{3}m\b/i.test(renderer);
+}
+function webglRenderer() {
+  const gl = document.createElement('canvas').getContext('webgl');
+  const info = gl?.getExtension('WEBGL_debug_renderer_info');
+  return (info && gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) || '';
+}
+document.getElementById('firefox-note').hidden = !/\bFirefox\//.test(navigator.userAgent)
+  || !builtInGraphics(webglRenderer());
 
 async function main() {
   const grid = document.getElementById('grid');
