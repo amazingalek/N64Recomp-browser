@@ -3,13 +3,13 @@
 # the hub (tools/moved_page.html): it sends a player on, and one who played there moves their saves first. It replaces
 # the files at the top of the repo's gh-pages, the old page and its service worker, and keeps every folder (a test page,
 # tools/publish_page.sh --into). Run once the hub is at its domain, so the saves move once: published while the hub is
-# at <owner>.github.io/n64hub/, they would move to an address that moves again.
+# at n64hub.github.io, they would move to an address that moves again.
 #
 #   bash tools/publish_moved.sh <owner/repo> <hub folder> "<game>" [--dry-run]
 #
 # e.g. bash tools/publish_moved.sh amazingalek/BanjoRecomp-web banjo-kazooie "Banjo-Kazooie"
 set -euo pipefail
-hub=amazingalek/n64hub
+hub=n64hub/n64hub.github.io
 dry_run=false
 args=()
 for a in "$@"; do

@@ -262,7 +262,7 @@ collapse) shows on a desktop as `shader missed:` lines.
 click plays (the game's page in a frame), and under it a link to the game's repo and the Recomp credit; the art
 names the game, so no line does. It shows no frame rates: every game plays smoothly but in Firefox on a laptop's
 built-in graphics, so only there does the header warn (`site.js`), and it links the README for the numbers; a retest
-that finds otherwise changes that warning. It is the top of the hub, amazingalek/n64hub's GitHub Pages, whose folders
+that finds otherwise changes that warning. It is the top of the hub, the n64hub org's GitHub Pages site (n64hub/n64hub.github.io), whose folders
 are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
 a change to `site/` merges, and a change to the Games table needs no publish. Its `import.html` takes a player's saves
 from a game's old address (site/import.js). Served locally by `tools/serve_site.mjs`. Keep
@@ -278,6 +278,6 @@ it current in the same work as what changes it:
   logo 640 wide with its transparency, an icon 256. `site.js`'s `ART` says how the tile shows it (cover, cover
   unnamed, logo, icon); without one a tile shows a title card, which needs nothing. Clear `sessionStorage` between
   two game pages in one tab, or the second can show the isolation notice (`coi_serviceworker.js`'s reload flag).
-- `node tools/serve_site.mjs` serves it at `http://localhost:8742/n64hub/` and passes every other path to
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/` and passes every other path to
   GitHub Pages. `site.js` says how the frame stays cross-origin isolated, why it is navigated by `location.replace`
   (Back returns to the grid) and why fullscreen is the game page's own document.

@@ -54,7 +54,7 @@ A fork's rt64 older than 7910126 needs a fresh build dir when it moves: an incre
 
 ## Building and publishing a page
 
-Each game's page is a folder of the hub, amazingalek/n64hub's GitHub Pages (`https://amazingalek.github.io/n64hub/<folder>/`,
+Each game's page is a folder of the hub, the n64hub org's GitHub Pages site (`https://n64hub.github.io/<folder>/`,
 its domain once it has one), beside the games' page at its top, so they are one origin and a game plays in that page's
 frame. Its Page cell in the README links it. It is built from main
 with its shader list by its BUILDING.md on Linux, in rush-2049-recomp's Docker image (its `tools/docker/Dockerfile`,
@@ -62,7 +62,7 @@ which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks 
 `EM_CACHE` set to a mounted folder, since emsdk's environment resets it (a new one needs
 `$EM_CACHE/sysroot/lib/pkgconfig` made first, or `embuilder` fails writing `sdl2.pc`).
 
-`tools/publish_page.sh <build dir> <name> amazingalek/n64hub "main <sha>" --into <folder>` publishes one;
+`tools/publish_page.sh <build dir> <name> n64hub/n64hub.github.io "main <sha>" --into <folder>` publishes one;
 `tools/publish_pages.sh` does it for every game, or the ones it is given, each into its folder (its list). The hub's
 last commit names, a line each, the main each folder was built from (`<folder>/: built from main <sha>
 (amazingalek/<fork>)`, in `git log -1 --format=%b` of its gh-pages). A game's old address, its fork's own Pages,

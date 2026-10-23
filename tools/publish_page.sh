@@ -102,4 +102,4 @@ fi
 gh api "repos/$repo/pages" > /dev/null 2>&1 ||
     gh api -X POST "repos/$repo/pages" -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null 2>&1 ||
     gh api "repos/$repo/pages" > /dev/null
-echo "pushed gh-pages: https://${repo%%/*}.github.io/${repo#*/}/${folder:+$folder/} $([ -n "$drop" ] && echo "is gone" || echo "serves it") in a minute or two"
+echo "pushed gh-pages: $(gh api "repos/$repo/pages" --jq .html_url)${folder:+$folder/} $([ -n "$drop" ] && echo "is gone" || echo "serves it") in a minute or two"

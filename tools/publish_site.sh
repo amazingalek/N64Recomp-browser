@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publishes the games' page (site/) at the top of the hub, amazingalek/n64hub's GitHub Pages:
-# https://amazingalek.github.io/n64hub/, or the custom domain its Pages has (n64hub.com). Every game's page is a
+# Publishes the games' page (site/) at the top of the hub, the n64hub org's own GitHub Pages site
+# (n64hub/n64hub.github.io): https://n64hub.github.io/, or the custom domain its Pages has (n64hub.com). Every game's page is a
 # folder of the hub beside it (tools/publish_page.sh --into <folder>, as tools/publish_pages.sh publishes them), the
 # same origin, so a game plays in the page's frame. The top is site/'s files, frontend/coi_serviceworker.js (Pages
 # can't send the cross-origin headers a frame with threads needs), a .nojekyll, and a CNAME naming the domain once the
@@ -11,7 +11,7 @@
 #
 #   bash tools/publish_site.sh [--dry-run]
 set -euo pipefail
-repo=amazingalek/n64hub
+repo=n64hub/n64hub.github.io
 dry_run=false
 [ "${1:-}" != --dry-run ] || dry_run=true
 root="$(cd "$(dirname "$0")/.." && pwd)"

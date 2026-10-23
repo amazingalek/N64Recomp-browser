@@ -77,7 +77,7 @@ cache="${PAGES_CACHE:-$HOME/.cache/n64recomp-pages}"
 node="${NODE:-node}"
 # The hub every page is published in, a folder each (the list below), and its address: its custom domain once it has
 # one.
-hub=amazingalek/n64hub
+hub=n64hub/n64hub.github.io
 hub_url="$(gh api "repos/$hub/pages" --jq .html_url)"
 
 # <game> <repo> <page name> <build dir> <hub folder>, the build dir relative to the repo's root, the folder the page

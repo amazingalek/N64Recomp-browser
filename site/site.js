@@ -94,7 +94,7 @@ function credit(cell, repo) {
 
 // A game's page in the hub, at either of its addresses, is played from the folder beside this page: the same one on
 // Pages, tools/serve_site.mjs's when served locally.
-const HUBS = ['https://amazingalek.github.io/n64hub/', 'https://n64hub.com/'];
+const HUBS = ['https://n64hub.github.io/', 'https://n64hub.com/'];
 function localPage(page) {
   const hub = HUBS.find((h) => page.startsWith(h));
   return hub ? new URL(page.slice(hub.length), location.href).href : page;
