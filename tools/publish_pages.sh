@@ -114,16 +114,21 @@ if [[ -n "$ref" ]]; then
     [[ ${#args[@]} -eq 2 ]] || { echo "--ref builds one game's commit: name the game"; exit 1; }
     [[ -n "${PAGES_COPY:-}" ]] || { echo "--ref builds in copies of its own: set PAGES_COPY"; exit 1; }
 fi
-# base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, fetched from origin when the clone lacks it.
-# The fetch goes to a ref of this run's own, not FETCH_HEAD: the clone is shared, and another run's fetch in the same
-# seconds (a publish of main) rewrites FETCH_HEAD, which built that main in place of the --ref.
+# base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, from origin first and from the clone only
+# when origin gives none (a commit fetched into it by hand). The clone's own branches are as it was cloned, never
+# updated, so `--ref main` read first from the clone built the fork's first commit. The fetch goes to a ref of this
+# run's own, not FETCH_HEAD: the clone is shared, and another run's fetch in the same seconds (a publish of main)
+# rewrites FETCH_HEAD, which built that main in place of the --ref.
 base() {
     [[ -n "$ref" ]] || { git -C "$1" rev-parse origin/main; return; }
-    git -C "$1" rev-parse -q --verify "$ref^{commit}" && return
     local own="refs/publish-pages/ref-$$"
-    git -C "$1" fetch -q origin "+$ref:$own" || { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
-    git -C "$1" rev-parse "$own^{commit}"
-    git -C "$1" update-ref -d "$own"
+    if git -C "$1" fetch -q origin "+$ref:$own" 2> /dev/null; then
+        git -C "$1" rev-parse "$own^{commit}"
+        git -C "$1" update-ref -d "$own"
+        return
+    fi
+    git -C "$1" rev-parse -q --verify "$ref^{commit}" ||
+        { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
 }
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---
