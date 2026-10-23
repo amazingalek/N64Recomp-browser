@@ -188,7 +188,6 @@ async function main() {
   const title = (g) => g.name.replace(/^The /, '');
   const sorted = [...games].sort((a, b) => title(a).localeCompare(title(b)));
   grid.replaceChildren(...sorted.map((g, i) => tile(g, i)));
-  document.getElementById('count').textContent = `${games.length} games`;
   const game = gameFromHash();
   if (game && window.crossOriginIsolated) openGame(game, false);  // not before coi_serviceworker.js's reload
 }
