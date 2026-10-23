@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/n64hub/N64ModernRuntime-web 0ec6c51a744141581bb64ba767963d1b556db600
+N64ModernRuntime: https://github.com/n64hub/N64ModernRuntime-web bbd6bb7781cd39719bca2cde7047d4cd2ebdfa7c
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -35,6 +35,19 @@ index b1b50cb..f5b4170 100644
      // We need a place in rdram to hold the PI handles, so pick an address in extended rdram
      constexpr int32_t cart_handle = 0x80800000;
      constexpr int32_t drive_handle = (int32_t)(cart_handle + sizeof(OSPiHandle));
+diff --git a/librecomp/include/librecomp/game.hpp b/librecomp/include/librecomp/game.hpp
+index 8b1b9bc..63ba925 100644
+--- a/librecomp/include/librecomp/game.hpp
++++ b/librecomp/include/librecomp/game.hpp
+@@ -105,7 +105,7 @@ namespace recomp {
+     /// 
+     struct Configuration {
+         Version project_version;
+-        ultramodern::renderer::WindowHandle window_handle;
++        ultramodern::renderer::WindowHandle window_handle{};
+         recomp::rsp::callbacks_t rsp_callbacks;
+         ultramodern::renderer::callbacks_t renderer_callbacks;
+         ultramodern::audio_callbacks_t audio_callbacks;
 diff --git a/librecomp/include/librecomp/mods.hpp b/librecomp/include/librecomp/mods.hpp
 index 37556bd..9380157 100644
 --- a/librecomp/include/librecomp/mods.hpp

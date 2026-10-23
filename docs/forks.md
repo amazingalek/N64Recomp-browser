@@ -386,4 +386,7 @@ N64ModernRuntime       ULTRAMODERN_RSP_TASKS_COPIED: an RSP task other than grap
                        command list and the rest of the next one Super Mario 64 wrote into the same buffer two VIs on,
                        and its page exited at aspMain's jump table, in 2 of 7 plays (docs/findings.md, A late audio
                        task)
+N64ModernRuntime       recomp::Configuration's window_handle is value-initialised, on every build: a game's main
+bbd6bb7                declares its Configuration without an initialiser and never sets the handle, a bare SDL_Window*
+                       on Linux and a page, and recomp::start makes the window only when the handle is empty
 ```
