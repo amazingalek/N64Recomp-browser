@@ -15,7 +15,8 @@ page with it (Games).
 Each game's repo builds its page with this repo; a page holds no ROM, the player loads their own. Rush 2049, Perfect
 Dark and Super Mario 64 aside, the games are here to build out and test the web support on more than one game: what one
 of them or one browser turns up is fixed in this repo or the forks unless it really is that game's own, so every game
-and both browsers get it.
+and both browsers get it. Those three are this project's own recomps, and each also has releases of its desktop build
+for Windows and Linux on its repo's Releases page.
 
 | Game | Recomp | Repo | Page | Intel UHD, Chrome | Intel UHD, Firefox | Played |
 |---|---|---|---|---|---|---|
