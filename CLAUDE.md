@@ -47,8 +47,8 @@ any game.
 
 The forks (`rt64-web`, `plume-web`, `hlslpp-web`, `N64ModernRuntime-web`, `N64Recomp-web`, `RecompFrontend-web`) and
 the game forks take no PRs: a change is a commit pushed to the fork's `main` as a fast-forward, pinned by its SHA
-(`forks.txt` here, a game fork's submodule). `rush-2049-recomp` is the one game repo that works by PRs: moving its
-`lib/N64Recomp-browser` or publishing its page is a PR there.
+(`forks.txt` here, a game fork's submodule). This project's own recomps, `rush-2049-recomp`, `perfect-dark-recomp` and
+`super-mario-64-recomp`, work by PRs: moving one's `lib/N64Recomp-browser` is a PR there.
 
 Branches don't outlive their work: every one of these repos deletes a PR's branch when it merges ("Automatically
 delete head branches", on in each, a new fork included), and a branch pushed to a fork to hold work not on `main` yet
@@ -144,11 +144,12 @@ the last one at once (docs/publishing.md): it builds each game's page on the new
 changed (each once in Firefox for crashes and errors, and an A/B in Chrome against the page Pages serves on two or three
 games that stand for the rest when the tag can move speed), and only a page that boots with no WebGPU errors and plays
 no worse than Pages moves its fork onto the tag, is published and gets its row updated. One that plays worse stays on
-Pages as it was and has work filed. Rush 2049 is retested in the same work; its pin moves by
-a PR on its repo, even to a tag that left its page's bytes alone.
+Pages as it was and has work filed. Rush 2049, Perfect Dark and Super Mario 64 are retested in the same work, never
+filed for later: each one's pin moves by a PR on its repo that the retest opens and merges, Rush 2049's even to a tag
+that left its page's bytes alone.
 
 A critical fix doesn't wait for the retest: a fix for a page on Pages that crashes, never boots, loses its WebGPU
-device or can't be played moves the pins of the games it fixes (Rush 2049's by a PR), builds, plays in Chrome and
+device or can't be played moves the pins of the games it fixes (this project's own recomps' by a PR), builds, plays in Chrome and
 Firefox and publishes each, and updates their rows, in the same work. A bug only main has waits for the retest; once
 the retest publishes it, its fix is critical.
 
