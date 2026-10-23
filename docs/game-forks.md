@@ -250,11 +250,12 @@ needed N64ModernRuntime 66539ab (the game leaves a controller message blocked fo
 waited behind it for the next retrace). With the RSP's completion once the frame was drawn, behind the interpolated
 frames' work, the page at 60 ran 130,000-260,000 sound frames short over the plan uncapped (headless Chrome 155,
 3840x2000, RTX 2070), and with it moved 14,600-25,500, against 9,700-16,300 on the page before v1.2.2 at the game's own
-pacing in the same minutes: the rest where the GPU is busiest, the game thread waiting for RT64 to reach its list behind
-2-3 others. Its BUILDING.md and the headers of `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and
-`src/rt64_shaders.txt` have the rest: how his code and patches are built into a page, the recompile without call
-tracking, render to RAM kept exact and why, the game running on from the list's last full sync, the scheduler hook, the
-frame rates, the shader list and its survey.
+pacing in the same minutes: the rest where the GPU is busiest, the game thread waiting for RT64 to reach its list
+behind 2-3 others: the scheduler's, so no sound task starts meanwhile, whichever other game threads run (letting them
+run measured no better). Its BUILDING.md and the headers of `tools/build_web.sh`, `tools/shader_survey.js`,
+`tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how his code and patches are built into a page, the
+recompile without call tracking, render to RAM kept exact and why, the game running on from the list's last full sync,
+the scheduler hook, the frame rates, the shader list and its survey.
 
 `n64hub/DKR-R-web` is DKR-R (MIT, 1.0.8 and its main to d94b05f), on a runtime and a launcher of its own (ImGui, no
 RecompFrontend). `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry
