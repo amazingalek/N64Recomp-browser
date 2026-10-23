@@ -30,8 +30,7 @@ header .warning {
 header .warning::before { content: "⚠ "; }
 header .tagline { color: var(--text); font-size: 18px; }
 header .rom { color: var(--dim); font-size: 16px; }
-/* The source link at the end of the name's row, on a row of its own when they don't fit. */
-header .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 24px; }
+/* The source link ends the credits whole, on the next line when it doesn't fit. */
 header .source { white-space: nowrap; }
 
 main { max-width: 1200px; margin: 0 auto; padding: 12px 24px 32px; }
