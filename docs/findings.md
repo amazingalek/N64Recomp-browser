@@ -1164,7 +1164,9 @@ time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "lap
   16 and 24), the TMEM runs alone 112-149, and Chrome 155 303-347 against 172-225, the cutscene's shots alike and no
   WebGPU errors (plays.jsonl, sets `pd-tilecopy-u1-*` and `pd-tilecopy-u2-*` of 2026-10-23, the page built
   from perfect-dark-recomp main 036ed94). The textures alive and the TMEM textures made and destroyed stay as they
-  were.
+  were. The A/B against Pages (\`ab_pages.mjs\`, Chrome uncapped at 3840x2000, a play from the file menu to Joanna's
+  control) read 208 presents a second for Pages' page and 331 for the build, its p99 gap 29 ms against 10, and
+  Banjo-Tooie's regular plan, which makes tile copies too, 357 against 358, both at the 360 cap.
 
 ## A page's thread in Chrome, throttled
 
