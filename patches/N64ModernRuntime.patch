@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web da1769ea517de07a4bb47f614369b361231c3a07
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 0ec6c51a744141581bb64ba767963d1b556db600
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -126,6 +126,45 @@ index 37556bd..9380157 100644
          void register_deprecated_mod(const std::string& mod_id, DeprecationStatus deprecation_status, const Version &maximum_version);
          void scan_mods();
          void close_mods();
+diff --git a/librecomp/include/librecomp/rsp.hpp b/librecomp/include/librecomp/rsp.hpp
+index 748558c..075a601 100644
+--- a/librecomp/include/librecomp/rsp.hpp
++++ b/librecomp/include/librecomp/rsp.hpp
+@@ -6,6 +6,7 @@
+ #include "rsp_vu.hpp"
+ #include "recomp.h"
+ #include "ultramodern/ultra64.h"
++#include "ultramodern/rsp.hpp"
+ 
+ // TODO: Move these to recomp namespace?
+ 
+@@ -98,8 +99,11 @@ static inline void dma_rdram_to_dmem(uint8_t* rdram, uint32_t dmem_addr, uint32_
+     rd_len += 1; // Read length is inclusive
+     dram_addr &= 0xFFFFF8;
+     assert(dmem_addr + rd_len <= 0x1000);
++    // The running task's data as the game submitted it, where ultramodern runs the task from a copy (its rsp.hpp)
++    const ultramodern::rsp::SubmittedData& data = ultramodern::rsp::submitted_data;
+     for (uint32_t i = 0; i < rd_len; i++) {
+-        RSP_MEM_B(i, dmem_addr) = MEM_B(0, (int64_t)(int32_t)(dram_addr + i + 0x80000000));
++        const uint32_t data_offset = dram_addr + i - data.address;
++        RSP_MEM_B(i, dmem_addr) = data_offset < data.size ? data.bytes[data_offset ^ 3] : MEM_B(0, (int64_t)(int32_t)(dram_addr + i + 0x80000000));
+     }
+ }
+ 
+@@ -107,8 +111,13 @@ static inline void dma_dmem_to_rdram(uint8_t* rdram, uint32_t dmem_addr, uint32_
+     wr_len += 1; // Write length is inclusive
+     dram_addr &= 0xFFFFF8;
+     assert(dmem_addr + wr_len <= 0x1000);
++    const ultramodern::rsp::SubmittedData& data = ultramodern::rsp::submitted_data;
+     for (uint32_t i = 0; i < wr_len; i++) {
+         MEM_B(0, (int64_t)(int32_t)(dram_addr + i + 0x80000000)) = RSP_MEM_B(i, dmem_addr);
++        const uint32_t data_offset = dram_addr + i - data.address;
++        if (data_offset < data.size) {
++            data.bytes[data_offset ^ 3] = RSP_MEM_B(i, dmem_addr);
++        }
+     }
+ }
+ 
 diff --git a/librecomp/src/config.cpp b/librecomp/src/config.cpp
 index 6bc03fd..04894fb 100644
 --- a/librecomp/src/config.cpp
@@ -631,7 +670,7 @@ index ea1c49b..b15267c 100644
      ctx->status_reg = new_sr;
  }
 diff --git a/librecomp/src/sp.cpp b/librecomp/src/sp.cpp
-index ae0f44f..2376c76 100644
+index ae0f44f..97d8e7e 100644
 --- a/librecomp/src/sp.cpp
 +++ b/librecomp/src/sp.cpp
 @@ -14,6 +14,8 @@ extern "C" void osSpTaskStartGo_recomp(uint8_t* rdram, recomp_context* ctx) {
@@ -643,11 +682,20 @@ index ae0f44f..2376c76 100644
      } else if (task->t.type == M_AUDTASK) {
          //printf("[sp] Audio task: %08X\n", (uint32_t)ctx->r4);
      }
+@@ -33,6 +35,8 @@ extern "C" void osSpTaskStartGo_recomp(uint8_t* rdram, recomp_context* ctx) {
+         dump_file.write(ram_unswapped.get(), ram_size);
+         dump_frame = false;
+     }
++    // Copied as it starts, where ultramodern runs an RSP task from a copy (its rsp.hpp)
++    ultramodern::rsp::task_submitted(rdram, ctx->r4);
+     ultramodern::submit_rsp_task(rdram, ctx->r4);
+ }
+ 
 diff --git a/ultramodern/CMakeLists.txt b/ultramodern/CMakeLists.txt
-index 5593172..e1e782f 100644
+index 5593172..c129230 100644
 --- a/ultramodern/CMakeLists.txt
 +++ b/ultramodern/CMakeLists.txt
-@@ -39,3 +39,24 @@ target_compile_options(ultramodern PRIVATE
+@@ -39,3 +39,31 @@ target_compile_options(ultramodern PRIVATE
  if (WIN32)
      add_compile_definitions(NOMINMAX)
  endif()
@@ -664,6 +712,13 @@ index 5593172..e1e782f 100644
 +option(ULTRAMODERN_HOLD_BLOCKED_MESSAGES "A blocked external message held in a list, not requeued (always on with Emscripten)" OFF)
 +if (ULTRAMODERN_HOLD_BLOCKED_MESSAGES OR EMSCRIPTEN)
 +    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_HOLD_BLOCKED_MESSAGES=1)
++endif()
++
++# An RSP task other than graphics runs from a copy of its OSTask and its data, taken as the game submits it
++# (src/rsp.cpp, task_submitted).
++option(ULTRAMODERN_RSP_TASKS_COPIED "An RSP task other than graphics runs from a copy of what the game submitted (always on with Emscripten)" OFF)
++if (ULTRAMODERN_RSP_TASKS_COPIED OR EMSCRIPTEN)
++    target_compile_definitions(ultramodern PRIVATE ULTRAMODERN_RSP_TASKS_COPIED=1)
 +endif()
 +
 +# A load from ROM onto display list commands the renderer may not have read yet waits until it has (src/displaylists.cpp).
@@ -714,6 +769,31 @@ index d60c4ec..c543624 100644
          using WindowHandle = SDL_Window*;
  #elif defined(__APPLE__)
          struct WindowHandle {
+diff --git a/ultramodern/include/ultramodern/rsp.hpp b/ultramodern/include/ultramodern/rsp.hpp
+index dda1b08..79ae6d5 100644
+--- a/ultramodern/include/ultramodern/rsp.hpp
++++ b/ultramodern/include/ultramodern/rsp.hpp
+@@ -23,6 +23,20 @@ namespace ultramodern {
+ 
+         void set_callbacks(const callbacks_t& callbacks);
+ 
++        // Where ULTRAMODERN_RSP_TASKS_COPIED is on, copies an RSP task other than graphics, its OSTask and data, as the
++        // game starts it (librecomp's osSpTaskStartGo), and run_task runs the task from the copy (rsp.cpp says why).
++        void task_submitted(RDRAM_ARG PTR(OSTask) task);
++
++        // The data of the task the RSP is running (its OSTask's data_ptr and data_size) as the game submitted it, where
++        // the task runs from a copy (task_submitted): an RSP DMA from RDRAM reads the copy wherever it covers and a DMA
++        // to RDRAM writes it too (librecomp's rsp.hpp). Its size is 0 otherwise.
++        struct SubmittedData {
++            uint32_t address; // physical, a multiple of 8
++            uint32_t size; // a multiple of 8
++            uint8_t* bytes; // laid out as RDRAM holds them
++        };
++        extern SubmittedData submitted_data;
++
+         void init();
+         bool run_task(RDRAM_ARG const OSTask* task);
+     };
 diff --git a/ultramodern/include/ultramodern/ultra64.h b/ultramodern/include/ultramodern/ultra64.h
 index 31eb106..50e8244 100644
 --- a/ultramodern/include/ultramodern/ultra64.h
@@ -1139,6 +1219,106 @@ index 9944a02..b7a1a2a 100644
  
  extern "C" void osCreateMesgQueue(RDRAM_ARG PTR(OSMesgQueue) mq_, PTR(OSMesg) msg, s32 count) {
      OSMesgQueue *mq = TO_PTR(OSMesgQueue, mq_);
+diff --git a/ultramodern/src/rsp.cpp b/ultramodern/src/rsp.cpp
+index 1594304..c575717 100644
+--- a/ultramodern/src/rsp.cpp
++++ b/ultramodern/src/rsp.cpp
+@@ -3,8 +3,17 @@
+ 
+ #include "ultramodern/rsp.hpp"
+ 
++#if ULTRAMODERN_RSP_TASKS_COPIED
++#include <iterator>
++#include <memory>
++#include <mutex>
++#include <vector>
++#endif
++
+ static ultramodern::rsp::callbacks_t rsp_callbacks {};
+ 
++ultramodern::rsp::SubmittedData ultramodern::rsp::submitted_data {};
++
+ void ultramodern::rsp::set_callbacks(const callbacks_t& callbacks) {
+     rsp_callbacks = callbacks;
+ }
+@@ -15,8 +24,77 @@ void ultramodern::rsp::init() {
+     }
+ }
+ 
++#if ULTRAMODERN_RSP_TASKS_COPIED
++// An RSP task as the game submitted it: its OSTask and the RDRAM its data_ptr and data_size give (an audio task's
++// command list), copied as the game starts it (task_submitted). A task the page runs late would read them after the game
++// had written over them: a game expects its audio task done within the VI it starts in, as the RSP does it, and Super
++// Mario 64's sound thread writes the next list but one into the same buffer and OSTask two VIs after the last, whether
++// the task has run or not. Started late and still reading its list in chunks, the task read the start of one list and
++// the rest of the next, whose commands wrote over aspMain's jump table in DMEM: it exited at an unhandled jump target.
++// With the copy, a task runs on a whole list however late it runs.
++struct SubmittedTask {
++    const OSTask* original;
++    OSTask task;
++    uint32_t data_address;
++    std::vector<uint8_t> data;
++};
++
++// The newest copy for each OSTask the game started a task with, the eight it used last. A task run late takes the
++// newest copy of its OSTask, as it would have read the newest list from RDRAM: one that never runs (a runtime may
++// complete a task unrun) leaves nothing behind, and a task whose copy is gone runs from RDRAM as before.
++static struct {
++    std::mutex mutex;
++    std::shared_ptr<const SubmittedTask> tasks[8];
++    size_t next = 0;
++} submitted_tasks;
++#endif
++
++void ultramodern::rsp::task_submitted(RDRAM_ARG PTR(OSTask) task_) {
++#if ULTRAMODERN_RSP_TASKS_COPIED
++    const OSTask* task = TO_PTR(OSTask, task_);
++    // A graphics task's OSTask goes to the renderer as a copy already (events.cpp, SpTaskAction)
++    if (task->t.type == M_GFXTASK) {
++        return;
++    }
++    // Its data in whole 8-byte units, as an RSP DMA reads them
++    auto copy = std::make_shared<SubmittedTask>(SubmittedTask{ task, *task, 0, {} });
++    const uint32_t data_start = task->t.data_ptr & 0xFFFFF8;
++    const uint32_t data_end = ((task->t.data_ptr & 0xFFFFFF) + task->t.data_size + 7) & ~7u;
++    if (task->t.data_size != 0 && data_end <= 0x800000) {
++        copy->data_address = data_start;
++        copy->data.assign(rdram + data_start, rdram + data_end);
++    }
++    std::lock_guard lock{ submitted_tasks.mutex };
++    for (std::shared_ptr<const SubmittedTask>& submitted : submitted_tasks.tasks) {
++        if (submitted != nullptr && submitted->original == task) {
++            submitted = std::move(copy);
++            return;
++        }
++    }
++    submitted_tasks.tasks[submitted_tasks.next] = std::move(copy);
++    submitted_tasks.next = (submitted_tasks.next + 1) % std::size(submitted_tasks.tasks);
++#endif
++}
++
+ bool ultramodern::rsp::run_task(RDRAM_ARG const OSTask* task) {
+     assert(rsp_callbacks.run_task != nullptr);
+ 
++#if ULTRAMODERN_RSP_TASKS_COPIED
++    std::shared_ptr<const SubmittedTask> copy;
++    {
++        std::lock_guard lock{ submitted_tasks.mutex };
++        for (const std::shared_ptr<const SubmittedTask>& submitted : submitted_tasks.tasks) {
++            if (submitted != nullptr && submitted->original == task) {
++                copy = submitted;
++            }
++        }
++    }
++    if (copy != nullptr) {
++        submitted_data = { copy->data_address, static_cast<uint32_t>(copy->data.size()), const_cast<uint8_t*>(copy->data.data()) };
++        const bool ran = rsp_callbacks.run_task(PASS_RDRAM &copy->task);
++        submitted_data = {};
++        return ran;
++    }
++#endif
+     return rsp_callbacks.run_task(PASS_RDRAM task);
+ }
 diff --git a/ultramodern/src/threadqueue.cpp b/ultramodern/src/threadqueue.cpp
 index f9c0fa1..fb774ec 100644
 --- a/ultramodern/src/threadqueue.cpp
