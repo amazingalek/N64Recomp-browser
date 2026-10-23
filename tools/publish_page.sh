@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# Publishes a recomp's built page on GitHub Pages, https://<owner>.github.io/<repo>/: the build dir's <name>.html as
-# index.html, with its .js, .wasm, .data and coi_serviceworker.js (Pages can't send the cross-origin headers threads
-# need, so the service worker sets them after one reload), and a .nojekyll so Pages serves the files as they are.
+# Publishes a recomp's built page on GitHub Pages, at the repo's Pages address (https://<owner>.github.io/<repo>/, or
+# its custom domain, as the hub's https://n64hub.com/; it prints the one `gh api repos/<owner/repo>/pages` gives): the
+# build dir's <name>.html as index.html, with its .js, .wasm, .data and coi_serviceworker.js (Pages can't send the
+# cross-origin headers threads need, so the service worker sets them after one reload), and a .nojekyll so Pages
+# serves the files as they are.
 # They go in as the only commit on the orphan branch gh-pages, force-pushed each time, so the repo keeps one copy of
 # the page rather than every one published. The first time, Pages is switched on for that branch (with gh).
 #
 #   bash tools/publish_page.sh <build dir> <name> <owner/repo> [<what it was built from>] [--into <dir>] [--dry-run]
 #   bash tools/publish_page.sh --drop <dir> <owner/repo>
 #
-# e.g. bash lib/N64Recomp-browser/tools/publish_page.sh build-web BanjoRecompiled n64hub/BanjoRecomp-web "main $(git rev-parse --short HEAD)"
+# e.g. bash lib/N64Recomp-browser/tools/publish_page.sh build-web BanjoRecompiled n64hub/n64hub.github.io \
+#          "main $(git rev-parse --short HEAD)" --into banjo-kazooie
 # A page holds the recompiled code, so it is built from the ROM wherever that is (CI has none) and published from
 # there, or copied to a machine with push access first: the script needs only the build's files. Check that the .data
 # holds no game data: it is what the page preloads (assets, a controller database), never the ROM or anything
 # extracted from it. --dry-run stages the page in <build dir>/page and pushes nothing.
 #
 # A test page (a branch's build, played by hand before it lands) is a folder of its own beside main's page:
-# --into <dir> publishes the build there, at https://<owner>.github.io/<repo>/<dir>/, and --drop <dir> takes it off
+# --into <dir> publishes the build there, at <that address>/<dir>/, and --drop <dir> takes it off
 # once it is done with. Each publish starts from the gh-pages it replaces: main's page replaces the files at the top
 # and keeps every folder, a test page replaces its folder and keeps the rest. The commit's subject names what main's
 # page was built from ("The web page, built from main <sha>", which is what `git log -1 origin/gh-pages` reads), and
