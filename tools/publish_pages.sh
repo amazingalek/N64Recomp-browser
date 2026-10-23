@@ -3,6 +3,7 @@
 # published from Pages: the deploy after a change that reaches the pages, so no page is left behind main.
 #
 #   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit>] [--ref <commit>]
+#       [-- <queue command>...]
 #
 # For each game in the list below (all of them unless named):
 # 1. Syncs its repo's origin/main to a copy kept on $BUILD_HOST, with rush-2049-recomp's tools/remote_build.sh (its
@@ -21,7 +22,10 @@
 #    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, DKR-R's web/): launcher, ROM, Start Game,
 #    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (docs/playing.md,
 #    Uncapped, and the browsers' clocks), which has to present frames with no WebGPU error. Each run goes into
-#    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows.
+#    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows. A queue command after -- goes in
+#    front of each boot's play_page.mjs, as ab_pages.mjs's does, so the boot takes its turn in the machine's GPU queue
+#    (CLAUDE.md, Playing a page): a shared turn with a short limit, like a smoke play (docs/playing.md, What a change
+#    plays). Without one it plays at once, beside whatever else holds the GPU, and its presents a second read that.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
@@ -57,9 +61,10 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 dry_run=false browser="" ref=""
-args=()
+args=() queue=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
+    --) shift; queue=("$@"); break ;;
     --dry-run) dry_run=true ;;
     --browser) browser="$2" dry_run=true; shift ;;
     --ref) ref="$2" dry_run=true; shift ;;
@@ -67,7 +72,7 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
-[[ ${#args[@]} -ge 1 ]] || { sed -n 5p "$0"; exit 1; }
+[[ ${#args[@]} -ge 1 ]] || { sed -n 5,6p "$0"; exit 1; }
 # A remote gives a commit only by its whole SHA: an abbreviated one failed to fetch, and the build kept the old pin.
 [[ ! $browser =~ ^[0-9a-f]{4,39}$ ]] || browser="$(git -C "$here/.." rev-parse --verify "$browser^{commit}")"
 rush="$(cd "${args[0]}" && pwd)"
@@ -428,8 +433,8 @@ for g in "${published[@]}"; do
     git -C "$clone" archive origin/main $(git -C "$clone" ls-tree --name-only origin/main tools web) | tar xf - -C "$work/$g-tools"
     plan="$work/$g-tools/tools/shader_plan.json"
     [[ -f "$plan" ]] || plan="$work/$g-tools/web/shader_plan.json"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 \
-        --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
+    "${queue[@]}" "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped \
+        --size 3840x2000 --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true
     result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
