@@ -221,35 +221,40 @@ file loads is under a second. Its BUILDING.md and the headers of `web/page.cmake
 the canvas and dp scaling, the first run's defaults), render to RAM kept exact for the pause background, the shader list
 and its survey, the warps.
 
-`n64hub/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled. Its upstream's base recomp has its own frontend
-(an RmlUi launcher and menus, no RecompFrontend); on the page (`patches/web/dkr.patch`) it plays rumble through the
-Gamepad API and keeps the dummy frame out of RDRAM as RecompFrontend 75fe596 does. The game binds draw buffers the
-workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. Its
-`patches/web/rt64.patch` is the base's own renderer (F3DDKR, its bloom and SSAO, the shader cache's pause), so it can't
-move into rt64-web, and it goes on top of the web's: CI's `jfg-patches` job runs its `tools/build_web.sh --patches`
-(the whole patch step, no ROM) with the PR's checkout, so a change here to the lines it touches is red in its own PR
-and is settled there, by rebasing the fork's patch or keeping the web's lines off its. The base's runtime holds the game thread that submits a display list until the graphics thread has drawn it; upstream's
-never waits there. Its list, `src/rt64_shaders.txt`, is 210 descriptions in 16 sections, the boot 36
-and a planet 20-86 descriptions each. The early release took the sound short over its play plan (the first room of every
-planet in 160 s, headless Chrome 155) from 250,000-300,000 frames to 13,000-14,000. The page's Framerate is Display
-(`patches/web/dkr.patch` sets the base's `rr_default`, Original, to Display with Emscripten, and moves a page's settings
-saved before graphics config version 6 to Display once). In play it interpolated only now and then, in Firefox, until
-rt64 179adb8: the game draws its shadows' render targets in a display list of its own before each frame's, which RT64
-took for a frame, so the frame after it matched nothing and was never interpolated, and its frames take 2 and 3 VIs on a
-page, which upstream's original rate needs equal. With it the plan uncapped presents ~274 a second in Chrome 155 and
-~209 in Firefox 158 where it presented ~20 (3840x2000, RTX 2070). Its scheduler starts an audio task only once the
-graphics task has left the RSP, and the RSP's completion came once RT64 had drawn the list and copied it to RAM, behind
-the interpolated frames' work: over the plan Firefox 158 lost ~259,000 sound frames at the display's rate and 25-27% of
-them uncapped. The page sends the RSP's completion at the list's last full sync, and the RDP's once the list is drawn,
-which needed N64ModernRuntime 66539ab: the game leaves a controller message blocked for good, and the RDP's completion,
-alone now, waited behind it for the next retrace. With the RSP's completion moved, Firefox lost 0-28,000 at the display's
-rate; with the held list too, headless Chrome 155 uncapped 0-200 against 13,000-27,000, and Firefox uncapped 2% against
-25-27% (7-8% in test builds that traced each frame), the game thread still waiting ~40 ms a game frame for the RDP's completion, whose exact copy waits behind the
-interpolated frames there. Its BUILDING.md and the headers of
-`tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and `src/rt64_shaders.txt` have the rest: how the
-base and its patches are built into a page, the recompile without call tracking, render to RAM kept exact and why, the
-game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
-its survey.
+`n64hub/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled, VibinToast's, and merges his releases (v1.2.2):
+his launcher (RmlUi, no RecompFrontend), options, profiles and renderer are the fork's. His `lib/` pins his forks of
+rt64, N64ModernRuntime and N64Recomp; the page's are upstream's at the commits N64Recomp-browser patches, with the web
+support and then his changes made again for those commits on top (`patches/web/rt64.patch`: F3DDKR, Dinosaur Planet's
+and the game's own changes, bloom, SSAO, fog, the vignette and the soft shadows, over the newer imgui and implot his
+rt64 pins; `patches/web/N64ModernRuntime.patch`; `patches/web/N64Recomp.patch`), and `patches/web/dkr.patch` is the
+page's code in his (the canvas, the menus' WGSL shaders, sound on the browser's audio thread, the file picker, rumble
+through the Gamepad API, the dummy frame kept out of RDRAM as RecompFrontend 75fe596 does), all applied in a clone of
+the checkout by `tools/build_web.sh`. The game binds draw buffers the workload hasn't made before the first one does,
+which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. Its `rt64.patch` is his renderer, so it can't move into
+rt64-web, and it goes on top of the web's: CI's `jfg-patches` job runs its `tools/build_web.sh --patches` (the whole
+patch step, no ROM) with the PR's checkout, so a change here to the lines it touches is red in its own PR and is
+settled there, by rebasing the fork's patch or keeping the web's lines off its. Its list, `src/rt64_shaders.txt`, is
+727 descriptions in 16 sections, the boot 40 and a planet 20-86 descriptions each.
+
+The page opens widescreen, at Game Frame Rate 60 and with Frame Interpolation at Monitor, where his desktop build opens
+4:3 at the game's own pacing without Frame Interpolation, and moves a page's settings saved before it did to those once
+(`page_defaults` in its options file). RT64 interpolates in play since rt64 179adb8: the game draws its shadows' render
+targets in a display list of its own before each frame's, which RT64 took for a frame, so the frame after it matched
+nothing and was never interpolated, and its frames take 2 and 3 VIs on a page, which upstream's original rate needs
+equal. His runtime holds the game thread that submits a display list until the graphics thread has drawn it (upstream's
+never waits there), which held the whole game through render to RAM's exact copy; the page lets it go at the list's last
+full sync (from the play plan's 250,000-300,000 sound frames short to 13,000-14,000). Its scheduler starts a sound task
+only once the graphics task has left the RSP, yielding the graphics task, which the runtime answers with its completion:
+the page sends the RSP's completion at the list's last full sync too, and the RDP's once the frame is drawn, which
+needed N64ModernRuntime 66539ab (the game leaves a controller message blocked for good, and the RDP's completion, alone,
+waited behind it for the next retrace). With the RSP's completion once the frame was drawn, behind the interpolated
+frames' work, the page at 60 ran 130,000-260,000 sound frames short over the plan uncapped (headless Chrome 155,
+3840x2000, RTX 2070), and with it moved 14,600-25,500, against 9,700-16,300 on the page before v1.2.2 at the game's own
+pacing in the same minutes: the rest where the GPU is busiest, the game thread waiting for RT64 to reach its list behind
+2-3 others. Its BUILDING.md and the headers of `tools/build_web.sh`, `tools/shader_survey.js`, `tools/make_plans.py` and
+`src/rt64_shaders.txt` have the rest: how his code and patches are built into a page, the recompile without call
+tracking, render to RAM kept exact and why, the game running on from the list's last full sync, the scheduler hook, the
+frame rates, the shader list and its survey.
 
 `n64hub/DKR-R-web` is DKR-R (MIT, 1.0.8 and its main to d94b05f), on a runtime and a launcher of its own (ImGui, no
 RecompFrontend). `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry
@@ -367,7 +372,8 @@ A page presents at the display's rate whatever its game runs at (CLAUDE.md, Rule
 game forks' code: Rush 2049 60 (its Game Frame Rate, Original 30), Perfect Dark up to 60 (as the game ticks at most
 once a VI; its controller reads held it to 30 on a fast CPU, which its `patches/frame_rate.c` undoes), Pilotwings 64 60 (a variable timestep), Diddy Kong
 Racing 30 (DKR-R's Accurate profile, the desktop's default, holds RT64 at Original; the page plays Modern), Jet Force
-Gemini 30 dropping to 20 when a frame runs long (its Frame Rate setting, Original by default; 20 on a page), and the
+Gemini 30 dropping to 20 when a frame runs long, or 60 (its Game Frame Rate, 60 on a page: 54-59 at the display's 60
+and 18-30 uncapped at 3840x2000, against 29 and 17-19 at the game's own pacing), and the
 cartridge's for the other ten: Super Mario 64 30, Rush 2 30, Majora's Mask 20, Banjo-Kazooie 20-30, Donkey Kong 64 30, Banjo-Tooie 30
 (Terrydactyland 12, Hailfire Peaks 10), Wave Race 64 20 in races, Star Fox 64 30 (20 where a scene sets 3 VIs a
 frame), GoldenEye's and Conker's variable. None of the ten has an option to run faster.
