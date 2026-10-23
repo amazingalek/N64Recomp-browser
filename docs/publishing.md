@@ -54,8 +54,8 @@ A fork's rt64 older than 7910126 needs a fresh build dir when it moves: an incre
 
 ## Building and publishing a page
 
-Each game's page is a folder of the hub, the n64hub org's GitHub Pages site (`https://n64hub.github.io/<folder>/`,
-its domain once it has one), beside the games' page at its top, so they are one origin and a game plays in that page's
+Each game's page is a folder of the hub, the n64hub org's GitHub Pages site (n64hub/n64hub.github.io, at
+`https://n64hub.com/<folder>/`), beside the games' page at its top, so they are one origin and a game plays in that page's
 frame. Its Page cell in the README links it. It is built from main
 with its shader list by its BUILDING.md on Linux, in rush-2049-recomp's Docker image (its `tools/docker/Dockerfile`,
 which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks goes into that Dockerfile), with
