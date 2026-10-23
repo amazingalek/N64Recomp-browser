@@ -373,4 +373,10 @@ rt64 0e971b5           is plume's: woken by each animation frame before the slot
                        16 ms, and woke a present 5-30 ms past its slot, and its pacing took the drops for a GPU falling
                        behind: Perfect Dark's page on a 240 Hz display presented 112-117 a second in Chrome, at 60 for
                        half a play, and 212-213 with this (docs/findings.md, A present's sleep in Chrome)
+plume 9728862,         WebGPU: that sleep spins from a frame 0.5 ms before the slot, not 2 ms, and present-stats says
+rt64 505e43e           how many ms a second it spun: a core's time wherever the display is faster than the game, it
+                       fell from 635-646 to 462-483 a second for Mario Kart 64's page in Chrome at 174 animation frames
+                       a second and from 405-412 to 304-310 for Perfect Dark's, at the same presents a second. A timed
+                       wait can't take its place there: a tenth of Chrome's ended 4-16 ms late (docs/findings.md, A
+                       present's sleep in Chrome)
 ```
