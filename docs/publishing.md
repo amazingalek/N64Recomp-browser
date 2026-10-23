@@ -24,16 +24,23 @@ A run on a schedule that takes every change since the last one at once:
   N64Recomp-browser onto the tag (a commit to the fork's `main`), is published and gets its row updated. One that plays
   worse stays on Pages as it was, its fork on its last tag, and has work filed. So a fork's `main` is what its page was
   built from, and `git log <played>..<built>` here lists what a page took since it was last played.
-- Rush 2049 is retested in the same work, built, played, recorded and its row updated the same way; only its pin moves
-  differently, by a PR on its repo that moves `lib/N64Recomp-browser` to the tag, which builds the same bytes, runs the
-  desktop game and publishes the page once it merges. Its pin moves even to a tag that left its page's bytes alone,
-  since its desktop build can take something from it. A critical fix that plays every game takes it along the same way.
-- `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>`, run where the ROMs are, builds every game's main,
-  Rush 2049's too, with N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
-  files differ from what Pages serves: those are played, from the builds it leaves; one with the same bytes took
-  nothing and is left alone. Once the pins of those that played well move, a run without `--browser` builds each main
-  again (the same bytes), publishes what differs, boots each from Pages in headless Chrome and lists them, and their
-  rows are updated. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
+- Rush 2049, Perfect Dark and Super Mario 64, this project's own recomps, are retested in the same work, built,
+  played, recorded and their rows updated the same way, never filed for later; only their pins move differently, by a
+  PR on each one's repo that moves `lib/N64Recomp-browser` to the tag and builds the same bytes, which the retest
+  merges before it publishes the page. Rush 2049's PR also runs the desktop game, and its pin moves even to a tag that
+  left its page's bytes alone, since its desktop build can take something from it. A critical fix that plays every game takes it along the same way.
+- `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag> --keep <dir>`, run where the ROMs are, builds
+  every game's main, Rush 2049's too, with N64Recomp-browser moved to the tag (in the build host's copy only), names
+  the pages whose files differ from what Pages serves and copies each of those builds into `<dir>/<game>` as it
+  finishes; one with the same bytes took nothing and is left alone. Those are played from `<dir>`, and nothing waits
+  for anything it doesn't need: the smoke plays follow the builds one game behind (a play is a GPU turn beside a
+  build's CPU, a build doesn't measure), the stand-in games' A/B goes first, since its verdict gates every pin, and
+  once it reads no worse each game's pin moves as soon as its own smoke play is clean, and
+  `tools/publish_pages.sh <rush-2049-recomp checkout> <game> --played <dir>` publishes the files that were played,
+  with no second build (it checks the moved main is the built one with only the pin moved) and boots it from Pages in
+  headless Chrome, in a whole turn of its own between the next game's plays, and its row is updated. Every play,
+  the boots included, takes its turn in the same queue, so one page plays at a time on the machine (CLAUDE.md,
+  Playing a page). A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
   builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves. So does one whose own
   patches carry a copy of a fix the tag now has (docs/forks.md names it beside the fork's commit): the commit that moves
   its pin drops the copy, which leaves the shared fix the only one, unless a desktop build of the fork applies its own
@@ -42,7 +49,7 @@ A run on a schedule that takes every change since the last one at once:
 ## A critical fix
 
 A fix for a page on Pages that crashes, never boots, loses its WebGPU device or can't be played moves the pins of the
-games it fixes (Rush 2049's by a PR), builds, plays in Chrome and Firefox and publishes each, and updates their rows,
+games it fixes (this project's own recomps' by a PR), builds, plays in Chrome and Firefox and publishes each, and updates their rows,
 in the same work; the others take it in the retest.
 
 A change only a desktop build compiles (code outside the WGSL build, rt64 7734fe4) reaches Rush 2049's desktop build
