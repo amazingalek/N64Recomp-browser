@@ -77,7 +77,8 @@ needs (its README, What differs from podulator's main):
   Crouch inputs and postBlendNoiseNegative, `debug_logging` and the const game ids his launcher passes), which its
   `lib-patches/apply.cmake` applies before N64Recomp-browser's patches. `tools/publish_pages.sh` runs it, and the
   fork's build scripts do before they build N64Recomp from `lib/N64ModernRuntime/N64Recomp`. Its desktop build needs
-  the patched N64Recomp too (9aabea3, ec0748e).
+  the patched N64Recomp too (9aabea3, ec0748e). Upstream RT64 names its Linux DXC `dxc-linux`, where his copy has a
+  `dxc` too.
 - The page's code, behind `__EMSCRIPTEN__`: no file dialogs or Exit, the canvas as the window, `audio_output.h`, render
   to RAM's late copy, the page's own game id (`ge007.n64.us`, under which browsers keep players' ROMs and saves), and a
   0% Mouse Sensitivity from an earlier page loading as 50%.
@@ -85,8 +86,10 @@ needs (its README, What differs from podulator's main):
   `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s), `fps.c`'s waits yield,
   `get_frames_remaining` leaves out the buffer queued last, `dump.toml` gives `cosf` the size that takes in `sinf` (his
   `tools_weaken_patched.py` repairs the code after, which the page's build doesn't run), the C library's names renamed,
-  and `syms.ld`'s comments as `/* */`, which ld.lld reads.
-- The shader list, its recording (`patches/shader_survey.c`, `tools/`) and the play plans.
+  `syms.ld`'s comments as `/* */`, which ld.lld reads, and his launcher remembering a ROM picked in it (the runtime's
+  `is_rom_valid` knows only the one stored at start, so Start game stayed Select ROM until a restart).
+- The shader list, its recording (`patches/shader_survey.c`, `tools/`) and the play plans, which press Enter on his
+  launcher's first item at its bottom right, until the game has started (a ROM given takes the focus).
 
 His sky and water are drawn as vertex triangles where cblock85's filled the screen with the fog colour (RT64 has no
 raw RDP triangles).
