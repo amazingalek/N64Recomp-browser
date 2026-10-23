@@ -1,8 +1,8 @@
 // Cross-origin isolation for a host that can't set response headers (GitHub Pages). A page with threads needs
 // SharedArrayBuffer, which a browser only gives a page served with Cross-Origin-Opener-Policy: same-origin and
 // Cross-Origin-Embedder-Policy: require-corp. Loaded by the page (shell.html) as a script, this registers itself as the
-// page's service worker and reloads the page once; as the service worker, it adds the two headers to every response
-// it passes on. A server that sends the headers itself makes the page isolated already, and this does nothing.
+// page's service worker and reloads the page once; as the service worker, it adds the two headers to the responses
+// it passes on (below). A server that sends the headers itself makes the page isolated already, and this does nothing.
 // The same idea as gzuidhof/coi-serviceworker, written anew.
 //
 // The headers only matter on a document and a worker's script (COOP and COEP) and on a file from another origin
