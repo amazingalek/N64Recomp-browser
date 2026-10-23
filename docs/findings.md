@@ -1309,6 +1309,31 @@ Fox 64 mid-Corneria, each fault in turn in one visit, every run in plays.jsonl:
 - A reload over a warm cache and service worker: the plan's load steps (to "Device Name" and 6 s more) took 6.4 s
   against 7.7-8.8 s cold, and the first present came 0.4-0.6 s after the navigation against 1.8-3.1 s.
 
+## A late audio task
+
+Super Mario 64's page exited now and then in Firefox at aspMain's dispatch ("Unhandled jump target 0x128F in microcode
+aspMain_run", then "RSP ucode 2 exited unexpectedly" and "Failed to execute task type: 2"): 2 of 7 plays in Bob-omb
+Battlefield on an RTX 5080, Pages' v0.86.0 at 132.8 s and a v0.93.0 build at 151.6 s (target 0x015D; plays.jsonl sets
+sm64-v0.93.0-sm64-smoke and sm64-v0.93.0-sm64-rep). The target is the halfword aspMain reads from its jump table at
+DMEM 0x10 by the command's opcode, and no opcode reads either value from the table the ROM loads there: the table had
+been written over during the task.
+
+The game's sound thread builds an audio command list each VI into one of two buffers, its OSTask beside it, and
+dispatches it without waiting: the scheduler starts it at the next VI, and two VIs after the last the same buffer and
+OSTask are written again whether the task has run or not (the decomp's comment: the RSP "is now expected to be
+finished"). A page's task thread was given the OSTask as a pointer and read the list from RDRAM as it ran, in 0x140-byte
+chunks. The desktop build shows what a late task does, with the task thread held 15-45 ms before every seventh task and
+every fifth chunk of a list read up to 15 ms late: lists changed under 175 of 556 tasks, and the 556th exited the same
+way (target 0xFFFFFE4D). Held 20-60 ms before the run alone, 1,028 of 7,200 tasks ran on a list written over before
+they started and none exited: a whole later list is a sound one, a list half one and half the next isn't.
+`ULTRAMODERN_RSP_TASKS_COPIED` (N64ModernRuntime 7491845) runs the task from a copy of its OSTask and list taken as the
+game submits it: under the same holds the desktop build ran 15,000 tasks without an exit.
+
+On an idle RTX 2070 host a probe build's audio tasks started at most 23.8 ms after their submit in Firefox (about 600
+tasks each 10 s), the graphics tasks' SP completions came within 0.6 ms of theirs, and no list changed: tasks that
+late are a busy host's. Firefox there stopped answering the driver 62-267 s into each of 8 plays of this page (A page
+that stops answering), so the page's own exit wasn't played on it.
+
 ## A desktop build on WSL's GPU
 
 Mesa's Dozen (Vulkan over D3D12) gives a Docker container in WSL2 the Windows host's GPU through `/dev/dxg`; a game
