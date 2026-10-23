@@ -1,4 +1,4 @@
-N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web 7491845a1343a26b55156129624d2d10091ce299
+N64ModernRuntime: https://github.com/amazingalek/N64ModernRuntime-web eda90dd913ee2698a7375abb592f40c6a51a3cd2
 on upstream 589bbf018a3e6d3646ddf7de1e7919f1b7e99bb1 (tools/export_patches.sh)
 
 diff --git a/librecomp/CMakeLists.txt b/librecomp/CMakeLists.txt
@@ -939,53 +939,103 @@ index 0000000..be6c588
 +
 +#endif
 diff --git a/ultramodern/src/events.cpp b/ultramodern/src/events.cpp
-index 2f1cfb5..86a1681 100644
+index 2f1cfb5..59bd245 100644
 --- a/ultramodern/src/events.cpp
 +++ b/ultramodern/src/events.cpp
-@@ -8,6 +8,8 @@
- #include <mutex>
- #include <queue>
- #include <cstring>
-+#include <memory>
-+#include <vector>
+@@ -41,6 +41,40 @@ struct DummyWorkloadAction {
  
- #include "blockingconcurrentqueue.h"
- 
-@@ -28,6 +30,24 @@ struct SpTaskAction {
-     OSTask task;
- };
+ using Action = std::variant<SpTaskAction, ScreenUpdateAction, UpdateConfigAction, DummyWorkloadAction>;
  
 +#if ULTRAMODERN_RSP_TASKS_COPIED
++#include <memory>
++#include <vector>
++
 +// An RSP task as the game submitted it: its OSTask and the RDRAM its data_ptr and data_size give (an audio task's
-+// command list), copied in submit_rsp_task. A task the page runs late would read them after the game had written over
-+// them: a game expects its audio task done within the VI it starts in, as the RSP does it, and Super Mario 64's sound
-+// thread writes the next list but one into the same buffer and OSTask two VIs after the last, whether the task has run
-+// or not. Started late and still reading its list in chunks, the task read the start of one list and the rest of the
-+// next, whose commands wrote over aspMain's jump table in DMEM: it exited at an unhandled jump target. With the copy, a
-+// task runs on what it was given however late it runs.
++// command list), copied as submit_rsp_task queues it. A task the page runs late would read them after the game had
++// written over them: a game expects its audio task done within the VI it starts in, as the RSP does it, and Super Mario
++// 64's sound thread writes the next list but one into the same buffer and OSTask two VIs after the last, whether the
++// task has run or not. Started late and still reading its list in chunks, the task read the start of one list and the
++// rest of the next, whose commands wrote over aspMain's jump table in DMEM: it exited at an unhandled jump target. With
++// the copy, a task runs on what it was given however late it runs.
 +struct SpTaskCopy {
 +    OSTask task;
 +    uint32_t data_address;
 +    std::vector<uint8_t> data;
 +};
-+using SpTaskQueued = SpTaskCopy*;
++
++// The RSP task queue: copies each task as it is queued and gives the task thread the copy's OSTask, whose data its RSP
++// DMAs read (ultramodern::rsp::submitted_data) until it takes the next. try_dequeue only takes a task out, for a
++// thread that empties the queue: the copy it gives stays until the next one it takes.
++class SpTaskQueue {
++public:
++    void enqueue(OSTask* task);
++    void wait_dequeue(OSTask*& task);
++    bool try_dequeue(OSTask*& task);
++private:
++    moodycamel::BlockingConcurrentQueue<SpTaskCopy*> queue;
++    std::unique_ptr<SpTaskCopy> running;
++    std::unique_ptr<SpTaskCopy> taken;
++};
 +#else
-+using SpTaskQueued = OSTask*;
++using SpTaskQueue = moodycamel::BlockingConcurrentQueue<OSTask*>;
 +#endif
 +
- struct ScreenUpdateAction {
-     ultramodern::renderer::ViRegs regs;
- };
-@@ -133,7 +153,7 @@ static struct {
+ struct ViState {
+     const OSViMode* mode;
+     PTR(void) framebuffer;
+@@ -133,10 +167,50 @@ static struct {
      std::mutex message_mutex;
      uint8_t* rdram;
      moodycamel::BlockingConcurrentQueue<Action> action_queue{};
 -    moodycamel::BlockingConcurrentQueue<OSTask*> sp_task_queue{};
-+    moodycamel::BlockingConcurrentQueue<SpTaskQueued> sp_task_queue{};
++    SpTaskQueue sp_task_queue{};
      moodycamel::ConcurrentQueue<OSThread*> deleted_threads{};
  } events_context{};
  
-@@ -175,6 +195,143 @@ uint64_t total_vis = 0;
++#if ULTRAMODERN_RSP_TASKS_COPIED
++void SpTaskQueue::enqueue(OSTask* task) {
++    // A null task, the task thread's signal to exit, goes as it is
++    SpTaskCopy* copy = nullptr;
++    if (task != nullptr) {
++        // Its data in whole 8-byte units, as an RSP DMA reads them
++        uint8_t* rdram = events_context.rdram;
++        copy = new SpTaskCopy{ *task, 0, {} };
++        const uint32_t data_start = task->t.data_ptr & 0xFFFFF8;
++        const uint32_t data_end = ((task->t.data_ptr & 0xFFFFFF) + task->t.data_size + 7) & ~7u;
++        if (task->t.data_size != 0 && data_end <= 0x800000) {
++            copy->data_address = data_start;
++            copy->data.assign(rdram + data_start, rdram + data_end);
++        }
++    }
++    queue.enqueue(copy);
++}
++
++void SpTaskQueue::wait_dequeue(OSTask*& task) {
++    SpTaskCopy* copy;
++    queue.wait_dequeue(copy);
++    running.reset(copy);
++    ultramodern::rsp::submitted_data = {};
++    if (copy != nullptr) {
++        ultramodern::rsp::submitted_data = { copy->data_address, static_cast<uint32_t>(copy->data.size()), copy->data.data() };
++    }
++    task = copy != nullptr ? &copy->task : nullptr;
++}
++
++bool SpTaskQueue::try_dequeue(OSTask*& task) {
++    SpTaskCopy* copy;
++    if (!queue.try_dequeue(copy)) {
++        return false;
++    }
++    taken.reset(copy);
++    task = copy != nullptr ? &copy->task : nullptr;
++    return true;
++}
++#endif
++
+ ultramodern::renderer::ViRegs* ultramodern::renderer::get_vi_regs() {
+     return &events_context.vi.update_screen_regs;
+ }
+@@ -175,6 +249,143 @@ uint64_t total_vis = 0;
  
  
  extern std::atomic_bool exited;
@@ -1129,7 +1179,7 @@ index 2f1cfb5..86a1681 100644
  extern moodycamel::LightweightSemaphore graphics_shutdown_ready;
  
  void set_dummy_vi(bool odd);
-@@ -204,10 +361,25 @@ void vi_thread_func() {
+@@ -204,10 +415,25 @@ void vi_thread_func() {
              // printf("Skipping the next VI wait\n");
              next = std::chrono::high_resolution_clock::now();
          }
@@ -1155,56 +1205,6 @@ index 2f1cfb5..86a1681 100644
          if (new_total_vis > total_vis + 1) {
              //printf("Skipped % " PRId64 " frames in VI interupt thread!\n", new_total_vis - total_vis - 1);
          }
-@@ -276,14 +448,25 @@ void task_thread_func(uint8_t* rdram, moodycamel::LightweightSemaphore* thread_r
- 
-     while (true) {
-         // Wait until an RSP task has been sent
--        OSTask* task;
--        events_context.sp_task_queue.wait_dequeue(task);
-+        SpTaskQueued queued;
-+        events_context.sp_task_queue.wait_dequeue(queued);
- 
--        if (task == nullptr) {
-+        if (queued == nullptr) {
-             return;
-         }
- 
--        if (!ultramodern::rsp::run_task(PASS_RDRAM task)) {
-+#if ULTRAMODERN_RSP_TASKS_COPIED
-+        std::unique_ptr<SpTaskCopy> copy{ queued };
-+        const OSTask* task = &copy->task;
-+        ultramodern::rsp::submitted_data = { copy->data_address, static_cast<uint32_t>(copy->data.size()), copy->data.data() };
-+        const bool ran = ultramodern::rsp::run_task(PASS_RDRAM task);
-+        ultramodern::rsp::submitted_data = {};
-+#else
-+        const OSTask* task = queued;
-+        const bool ran = ultramodern::rsp::run_task(PASS_RDRAM task);
-+#endif
-+
-+        if (!ran) {
-             fprintf(stderr, "Failed to execute task type: %" PRIu32 "\n", task->t.type);
-             ULTRAMODERN_QUICK_EXIT();
-         }
-@@ -566,7 +749,19 @@ void ultramodern::submit_rsp_task(RDRAM_ARG PTR(OSTask) task_) {
-     }
-     // Set all other tasks as the RSP task
-     else {
-+#if ULTRAMODERN_RSP_TASKS_COPIED
-+        // Copied as the game submits it (SpTaskCopy), its data in whole 8-byte units as an RSP DMA reads them
-+        SpTaskCopy* copy = new SpTaskCopy{ *task, 0, {} };
-+        const uint32_t data_start = task->t.data_ptr & 0xFFFFF8;
-+        const uint32_t data_end = ((task->t.data_ptr & 0xFFFFFF) + task->t.data_size + 7) & ~7u;
-+        if (task->t.data_size != 0 && data_end <= 0x800000) {
-+            copy->data_address = data_start;
-+            copy->data.assign(rdram + data_start, rdram + data_end);
-+        }
-+        events_context.sp_task_queue.enqueue(copy);
-+#else
-         events_context.sp_task_queue.enqueue(task);
-+#endif
-     }
- }
- 
 diff --git a/ultramodern/src/mesgqueue.cpp b/ultramodern/src/mesgqueue.cpp
 index 9944a02..b7a1a2a 100644
 --- a/ultramodern/src/mesgqueue.cpp
