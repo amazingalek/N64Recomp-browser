@@ -380,8 +380,9 @@ rt64 505e43e           how many ms a second it spun: a core's time wherever the 
                        wait can't take its place there: a tenth of Chrome's ended 4-16 ms late (docs/findings.md, A
                        present's sleep in Chrome)
 N64ModernRuntime       ULTRAMODERN_RSP_TASKS_COPIED: an RSP task other than graphics runs from a copy of its OSTask and
-eda90dd                the RDRAM its data_ptr and data_size give, taken as the game submits it, and the RSP's DMAs
-                       read that copy: run late, an audio task read the start of one command list and the rest of the
-                       next one Super Mario 64 wrote into the same buffer two VIs on, and its page exited at aspMain's
-                       jump table, in 2 of 7 plays (docs/findings.md, A late audio task)
+0ec6c51                the RDRAM its data_ptr and data_size give, taken as the game starts it (the newest of each
+                       OSTask's), and the RSP's DMAs read that copy: run late, an audio task read the start of one
+                       command list and the rest of the next one Super Mario 64 wrote into the same buffer two VIs on,
+                       and its page exited at aspMain's jump table, in 2 of 7 plays (docs/findings.md, A late audio
+                       task)
 ```
