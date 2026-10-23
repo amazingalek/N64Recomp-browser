@@ -67,14 +67,32 @@ submodules and the three-way merge, the mod store kept off without curl, the aud
 boot's shaders and its fix, render to RAM's late copy for the Banana Fairy photo and the dummy-frame crash, the shader
 list's sections and Firefox's waits, the ROM.
 
-`n64hub/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. It is a fork of podulator's
-GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
-cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
-`GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
-place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to go
-back to: its submodules are at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), and
-the patched checkouts are the forks' trees file for file; its desktop build needs the patched N64Recomp too (9aabea3,
-ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s.
+`n64hub/GoldenEye64Recomp-web` is GoldenEye 007. It is a fork of podulator's GoldenEye64Recomp, which carries on
+cblock85's and is on RecompFrontend itself, and merges its main: his launcher, settings, input and mouse, quicksaves,
+debug menu, build scripts and release workflow are the fork's. Its diff from his main is the web support and what it
+needs (its README, What differs from podulator's main):
+- `lib/`: his main vendors its RT64, N64ModernRuntime, RecompFrontend and N64Recomp with changes of its own; the fork's
+  are submodules at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), with his
+  changes as `lib-patches/` (RT64's rotation snap and ubershaders-only on every build but the page's, the Reload and
+  Crouch inputs and postBlendNoiseNegative, `debug_logging` and the const game ids his launcher passes), which its
+  `lib-patches/apply.cmake` applies before N64Recomp-browser's patches. `tools/publish_pages.sh` runs it, and the
+  fork's build scripts do before they build N64Recomp from `lib/N64ModernRuntime/N64Recomp`. Its desktop build needs
+  the patched N64Recomp too (9aabea3, ec0748e). Upstream RT64 names its Linux DXC `dxc-linux`, where his copy has a
+  `dxc` too.
+- The page's code, behind `__EMSCRIPTEN__`: no file dialogs or Exit, the canvas as the window, `audio_output.h`, render
+  to RAM's late copy, the page's own game id (`ge007.n64.us`, under which browsers keep players' ROMs and saves), and a
+  0% Mouse Sensitivity from an earlier page loading as 50%.
+- Fixes on every build that his main lacks: the patches yield through `recomp_yield_self_1ms` (a call to
+  `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s), `fps.c`'s waits yield,
+  `get_frames_remaining` leaves out the buffer queued last, `dump.toml` gives `cosf` the size that takes in `sinf` (his
+  `tools_weaken_patched.py` repairs the code after, which the page's build doesn't run), the C library's names renamed,
+  `syms.ld`'s comments as `/* */`, which ld.lld reads, and his launcher remembering a ROM picked in it (the runtime's
+  `is_rom_valid` knows only the one stored at start, so Start game stayed Select ROM until a restart).
+- The shader list, its recording (`patches/shader_survey.c`, `tools/`) and the play plans, which press Enter on his
+  launcher's first item at its bottom right, until the game has started (a ROM given takes the focus).
+
+His sky and water are drawn as vertex triangles where cblock85's filled the screen with the fog colour (RT64 has no
+raw RDP triangles).
 GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
 matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
 colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, and is the fix
@@ -230,28 +248,30 @@ base and its patches are built into a page, the recompile without call tracking,
 game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
 its survey.
 
-`n64hub/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
-`dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
-before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs its `scripts/build_web.sh --patches`
-(DKR-R's patches, `apply.cmake` with its skip list, `patches/web/`, and DKR-R's configure-time stages, no ROM) with the
-PR's checkout, against DKR-R-web's main. A conflict there is settled in DKR-R-web (the skip list, `patches/web/`), as
-v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web 8a2ac6b), or by keeping the web's lines off DKR-R's in the
-fork. Where both change a file (rt64's RasterPS.hlsl, TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game
-frame and workload queue), its `patches/web/<project>.patch` makes the web's change, merged from the commit
-`scripts/build_web.sh` names (`web_merged_from`), and what the web has changed in them since is merged in by
-`apply.cmake --since`. Before it named one, a change here to those files reached the page only once that patch made it
-too: rt64 0560318's decal bounds did, but the workload queue went without the offscreen passes, the pipeline warm-up
-and the capped interpolated targets, and the runtime read the ROM 1 KB at a time, until v0.82.0. N64ModernRuntime's
-`mesgqueue.cpp` takes DKR-R's alone, without the web's held messages (66539ab): DKR-R's own
-`runtime-deferred-events.patch` does the same, a blocked external message kept in a list of its own until a receive
-frees its queue, and is staged over that file at configure time. rt64-web 0a9fcb6 keeps the web's
-lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
-plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's default, holds RT64 at Original
-and 30, and the page has no overlay to pick a profile), with its Match display passed on as RT64's Display, since SDL's
-Emscripten port reports no refresh rate. `record_shaders.mjs --from` goes on with a recording of its list stopped
-partway. The list was recorded in Accurate; in Modern, recorded with `?record-shaders` over the title, the menus,
-Timber's Island and Dino Domain, the game asked for 119 descriptions, all in it but one, which differs from one in it
-only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.sh`, `web/shader_survey.js` and
+`n64hub/DKR-R-web` is DKR-R (MIT, 1.0.8 and its main to d94b05f), on a runtime and a launcher of its own (ImGui, no
+RecompFrontend). `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry
+DKR-R's patches before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs its
+`scripts/build_web.sh --patches` (DKR-R's patches, `apply.cmake` with its skip list, `patches/web/`, and DKR-R's
+configure-time stages, no ROM) with the PR's checkout, against DKR-R-web's main. A conflict there is settled in
+DKR-R-web (the skip list, `patches/web/`), as v0.57.0's held messages in `mesgqueue.cpp` were (DKR-R-web 8a2ac6b), or
+by keeping the web's lines off DKR-R's in the fork. Where both change a file (rt64's RasterPS.hlsl,
+TextureSampler.hlsli, `rt64_raster_params.h`, the shader library, the game frame and workload queue), its
+`patches/web/<project>.patch` makes the web's change, merged from the commit `scripts/build_web.sh` names
+(`web_merged_from`), and what the web has changed in them since is merged in by `apply.cmake --since`. Before it named
+one, a change here to those files reached the page only once that patch made it too: rt64 0560318's decal bounds did,
+but the workload queue went without the offscreen passes, the pipeline warm-up and the capped interpolated targets, and
+the runtime read the ROM 1 KB at a time, until v0.82.0. N64ModernRuntime's `mesgqueue.cpp` takes DKR-R's alone, without
+the web's held messages (66539ab): DKR-R's own `runtime-deferred-events.patch` does the same, a blocked external
+message kept in a list of its own until a receive frees its queue, and is staged over that file at configure time.
+rt64-web 0a9fcb6 keeps the web's lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9
+do for Conker's. It always plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's
+default, holds RT64 at Original and 30, and the page has no overlay to pick a profile), widescreen as Modern is by
+default (a first run's settings would give it the runtime's starting 4:3, which nothing on a page changes), with its
+Match display passed on as RT64's Display, since SDL's Emscripten port reports no refresh rate. DKR-R's updater is left
+out: a page is updated by its site. `record_shaders.mjs --from` goes on with a recording of its list stopped partway.
+The list was recorded in Accurate; in Modern, recorded with `?record-shaders` over the title, the menus, Timber's
+Island and Dino Domain, the game asked for 119 descriptions, all in it but one, which differs from one in it only by
+the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.sh`, `web/shader_survey.js` and
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
 

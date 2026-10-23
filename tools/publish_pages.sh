@@ -191,6 +191,8 @@ web() {
 
 build_ge() {
     [[ -f ge007.tlbfree.z64 ]] || xdelta3 -d -s ../rom.z64 vanilla_to_tlbfree.xdelta ge007.tlbfree.z64
+    # The game's own changes to lib/ (podulator's), with N64Recomp-browser's patches on top.
+    cmake -P lib-patches/apply.cmake lib > /dev/null
     n64recomp N64RecompCLI RSPRecomp
     keep_times RecompiledFuncs rsp -- bash -c './N64Recomp us.toml > /dev/null && ./RSPRecomp aspMain.us.toml > /dev/null'
     web GoldenRecomp
