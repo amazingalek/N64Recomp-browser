@@ -29,12 +29,18 @@ A run on a schedule that takes every change since the last one at once:
   PR on each one's repo that moves `lib/N64Recomp-browser` to the tag and builds the same bytes, which the retest
   merges before it publishes the page. Rush 2049's PR also runs the desktop game, and its pin moves even to a tag that
   left its page's bytes alone, since its desktop build can take something from it. A critical fix that plays every game takes it along the same way.
-- `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag>`, run where the ROMs are, builds every game's main,
-  Rush 2049's too, with N64Recomp-browser moved to the tag (in the build host's copy only), and names the pages whose
-  files differ from what Pages serves: those are played, from the builds it leaves; one with the same bytes took
-  nothing and is left alone. Once the pins of those that played well move, a run without `--browser` builds each main
-  again (the same bytes), publishes what differs, boots each from Pages in headless Chrome and lists them, and their
-  rows are updated. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
+- `tools/publish_pages.sh <rush-2049-recomp checkout> --browser <tag> --keep <dir>`, run where the ROMs are, builds
+  every game's main, Rush 2049's too, with N64Recomp-browser moved to the tag (in the build host's copy only), names
+  the pages whose files differ from what Pages serves and copies each of those builds into `<dir>/<game>` as it
+  finishes; one with the same bytes took nothing and is left alone. Those are played from `<dir>`, and nothing waits
+  for anything it doesn't need: the smoke plays follow the builds one game behind (a play is a GPU turn beside a
+  build's CPU, a build doesn't measure), the stand-in games' A/B goes first, since its verdict gates every pin, and
+  once it reads no worse each game's pin moves as soon as its own smoke play is clean, and
+  `tools/publish_pages.sh <rush-2049-recomp checkout> <game> --played <dir>` publishes the files that were played,
+  with no second build (it checks the moved main is the built one with only the pin moved), boots it from Pages in
+  headless Chrome while the next game plays, and its row is updated. One series plays at a time on the machine
+  (CLAUDE.md, Playing a page): the A/B's whole turns and the smoke plays' shared turns go through the same queue, and
+  the publishes take no play turn of their own beyond their 20-second boot. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
   builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves. So does one whose own
   patches carry a copy of a fix the tag now has (docs/forks.md names it beside the fork's commit): the commit that moves
   its pin drops the copy, which leaves the shared fix the only one, unless a desktop build of the fork applies its own
