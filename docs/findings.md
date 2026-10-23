@@ -430,6 +430,32 @@ second that hour) presented 167.9 and 168.5 a second with it against 153.9 and 1
 against 17.8 and 18.5, none of the present thread's sleeps over 4 ms past their slots against 15 and 29, and no sound
 running short against 151 samples in one; Firefox 67.2 against 65.9, no WebGPU error in either.
 
+Spun from the last frame, the sleep keeps a core busy whenever a page sleeps to its slots, the display faster than its
+game (2026-10-23, Chrome 155 headless on an RTX 5080, an idle host, the regular plans, whole GPU turns; plays.jsonl's
+sets pd-spin-lead, mk64-spin-lead and mk64-spin-lead-60, probe builds that count the spin in present-stats and take
+its lead from the query). Chrome's animation frames ran at 172-175 a second that morning, not 240. Spinning from a frame
+2 ms before the slot, Perfect Dark's page spun 405-412 ms a second (400 in a third play) and Mario Kart 64's 635-646. At
+57 animation frames a second (a preload that runs the page's frames at most every 16.4 ms, a 60 Hz display's, on the
+240 Hz one), Mario Kart 64's, a game of 30 frames a second, spun 493-526, and Perfect Dark's, at the display's rate
+and never sleeping to a slot, 0-5. Spinning from a frame 1 ms before the slot they spun 331-349, 541-542 and 413-414;
+0.5 ms before, Perfect Dark's and Mario Kart 64's 304-310 and 462-483 at 240 Hz, and the build with it 322, 457 and,
+at 57, 376. They presented as many (Perfect Dark 145.7 and 147.6 against 143.4 and 145.3, Mario Kart 64 167.5 and
+167.6 against 167.9 and 167.9, at 57 frames 57.6-57.9 in every play), with the same frame gaps (p99 23-25 ms, 15.0-15.4
+ms), and no sleep woke later for it: the few over 4 ms past their slots (16.5-26.8 ms, one a play at most) came at
+every lead. So the spin starts 0.5 ms before the slot (docs/forks.md, plume 9728862). Firefox, whose waits are judged
+late and which waits on the frames either way, played both builds clean (Perfect Dark 59.2 a second, Mario Kart 64
+80.8, no WebGPU error or exception).
+
+What's left of the spin is the time from the last frame before the slot to the slot, which only a timer could take,
+and Chrome's timed waits off a page's thread don't end on time. A worker of a preload's own timing back-to-back
+Atomics.wait()s of 1.5 ms in Perfect Dark's page from Pages (the same host at 240 Hz, a whole turn) saw 13-58 of each
+second's 170-350 end more than 4 ms late, up to 16 ms, and a median of 1 ms late. In an empty page every timed wait of
+0.1-4 ms ended on the system timer's tick, 11.6-16 ms late. A 1 ms timer kept pending there, a chain of setTimeout(1)s
+on the page's thread, or a worker's chain or setInterval(1), brought the median to 1.0-1.5 ms but left 10-13% over 4 ms
+late (p99 14.6 ms). Chrome's process asks Windows for its finer timer only while it has a short timer of its own
+pending, so a timed wait to just before the slot would wake about one present in ten a tick late, as RT64's own sleeps
+did.
+
 ## Pokémon Snap's timed waits in Firefox
 
 Pokémon Snap's page served locally presented 73.9 and 75.6 a second in Firefox 158 in two retests' smoke plays
@@ -1425,6 +1451,9 @@ What CLAUDE.md's Ruled out rests on.
   Force Gemini (Chrome, Firefox) it would hold 17 and 5 and cut 19 and 11, the most common of five hold 25 and 7 and cut
   29 and 17, where the fastest of three holds 26 and 8 and cuts 9 and 5 (`tools/frame_lengths.mjs`).
 
+- A timed wait to just before a present's slot in Chrome, in place of the spin from the last animation frame: a tenth
+  of a game page's timed waits of 1.5 ms ended 4-16 ms late, and a tenth still did with a 1 ms timer kept pending on
+  the page's thread or a worker's (A present's sleep in Chrome).
 - Presents waiting for the animation frame in every browser: on a laptop's Intel UHD, Chrome 155 headed drew as many
   (Banjo 59.9 against 60.0, Conker 53.9 against 54.0), but the GPU went 71 → 86% busy for Banjo and 63 → 75% for
   Conker, the browser 1.02 → 1.47 and 1.36 → 1.95 cores, and Banjo's gaps over 50 ms 98 → 188 in 90 s (one run each).
