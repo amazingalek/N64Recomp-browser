@@ -1,4 +1,6 @@
-// Reads the Games table from main's README.md and draws a tile a game; Play opens the game's page in a frame.
+// Reads the Games table from main's README.md and draws a tile a game; Play opens the game's page in a frame, or goes
+// to it in this tab where a frame can't play it (below: a page on another origin, or this page not cross-origin
+// isolated because the browser refused its coi_serviceworker.js), never in a new tab: Back returns to the grid.
 //
 // The frame: every game's page is a folder beside this one in the hub (tools/publish_site.sh), so it can play here,
 // but threads need it cross-origin isolated, and a frame is only that inside a page that is (this one, by its
@@ -100,7 +102,7 @@ function localPage(page) {
   return hub ? new URL(page.slice(hub.length), location.href).href : page;
 }
 
-// The game's folder on this origin, or null when its page is elsewhere (it then opens in its own tab).
+// The game's folder on this origin, or null when its page is elsewhere (this tab then goes to it).
 function sameOriginFolder(page) {
   const url = new URL(page, location.href);
   return url.origin === location.origin ? url.pathname.replace(/[^/]*$/, '') : null;
@@ -128,7 +130,7 @@ function showFrame(url) {
 async function openGame(game, push = true) {
   const folder = sameOriginFolder(game.page);
   if (!folder || !window.crossOriginIsolated) {
-    window.open(game.page, '_blank', 'noopener');
+    location.assign(game.page);
     return;
   }
   if (push) history.pushState({ game: game.repoName }, '', '#' + encodeURIComponent(game.repoName));
