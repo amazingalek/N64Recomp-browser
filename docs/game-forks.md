@@ -67,14 +67,29 @@ submodules and the three-way merge, the mod store kept off without curl, the aud
 boot's shaders and its fix, render to RAM's late copy for the Banana Fairy photo and the dummy-frame crash, the shader
 list's sections and Firefox's waits, the ROM.
 
-`n64hub/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. It is a fork of podulator's
-GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
-cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
-`GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
-place (the merge's message says which). Its upstream pins its own runtime and RmlUi, so it has no pins of its own to go
-back to: its submodules are at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), and
-the patched checkouts are the forks' trees file for file; its desktop build needs the patched N64Recomp too (9aabea3,
-ec0748e). Its patches' call to `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s.
+`n64hub/GoldenEye64Recomp-web` is GoldenEye 007. It is a fork of podulator's GoldenEye64Recomp, which carries on
+cblock85's and is on RecompFrontend itself, and merges its main: his launcher, settings, input and mouse, quicksaves,
+debug menu, build scripts and release workflow are the fork's. Its diff from his main is the web support and what it
+needs (its README, What differs from podulator's main):
+- `lib/`: his main vendors its RT64, N64ModernRuntime, RecompFrontend and N64Recomp with changes of its own; the fork's
+  are submodules at the commits the forks are built on (`patches/patches.txt`, a row each in `pins.txt`), with his
+  changes as `lib-patches/` (RT64's rotation snap and ubershaders-only on every build but the page's, the Reload and
+  Crouch inputs and postBlendNoiseNegative, `debug_logging` and the const game ids his launcher passes), which its
+  `lib-patches/apply.cmake` applies before N64Recomp-browser's patches. `tools/publish_pages.sh` runs it, and the
+  fork's build scripts do before they build N64Recomp from `lib/N64ModernRuntime/N64Recomp`. Its desktop build needs
+  the patched N64Recomp too (9aabea3, ec0748e).
+- The page's code, behind `__EMSCRIPTEN__`: no file dialogs or Exit, the canvas as the window, `audio_output.h`, render
+  to RAM's late copy, the page's own game id (`ge007.n64.us`, under which browsers keep players' ROMs and saves), and a
+  0% Mouse Sensitivity from an earlier page loading as 50%.
+- Fixes on every build that his main lacks: the patches yield through `recomp_yield_self_1ms` (a call to
+  `yield_self_1ms`, whose signature isn't a native's, trapped the page after ~20 s), `fps.c`'s waits yield,
+  `get_frames_remaining` leaves out the buffer queued last, `dump.toml` gives `cosf` the size that takes in `sinf` (his
+  `tools_weaken_patched.py` repairs the code after, which the page's build doesn't run), the C library's names renamed,
+  and `syms.ld`'s comments as `/* */`, which ld.lld reads.
+- The shader list, its recording (`patches/shader_survey.c`, `tools/`) and the play plans.
+
+His sky and water are drawn as vertex triangles where cblock85's filled the screen with the fog colour (RT64 has no
+raw RDP triangles).
 GoldenEye draws its world relative to the room the camera is in, so on the frame the camera crosses a room seam every
 matrix jumps, and RT64's frames between that one and the one before drew the world shifted (through a door, the clear
 colour): its `patches/origin_interpolation.c` gives that frame matrix groups RT64 pairs with nothing, and is the fix
