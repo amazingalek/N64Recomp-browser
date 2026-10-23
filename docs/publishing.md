@@ -37,10 +37,10 @@ A run on a schedule that takes every change since the last one at once:
   build's CPU, a build doesn't measure), the stand-in games' A/B goes first, since its verdict gates every pin, and
   once it reads no worse each game's pin moves as soon as its own smoke play is clean, and
   `tools/publish_pages.sh <rush-2049-recomp checkout> <game> --played <dir>` publishes the files that were played,
-  with no second build (it checks the moved main is the built one with only the pin moved), boots it from Pages in
-  headless Chrome while the next game plays, and its row is updated. One series plays at a time on the machine
-  (CLAUDE.md, Playing a page): the A/B's whole turns and the smoke plays' shared turns go through the same queue, and
-  the publishes take no play turn of their own beyond their 20-second boot. A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
+  with no second build (it checks the moved main is the built one with only the pin moved) and boots it from Pages in
+  headless Chrome, in a whole turn of its own between the next game's plays, and its row is updated. Every play,
+  the boots included, takes its turn in the same queue, so one page plays at a time on the machine (CLAUDE.md,
+  Playing a page). A game fork whose own patches have to change with its pin (one that no longer applies on the tag)
   builds that commit with `--ref <commit> --browser <tag>` and plays it before its main moves. So does one whose own
   patches carry a copy of a fix the tag now has (docs/forks.md names it beside the fork's commit): the commit that moves
   its pin drops the copy, which leaves the shared fix the only one, unless a desktop build of the fork applies its own
