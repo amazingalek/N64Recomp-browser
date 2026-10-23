@@ -54,6 +54,8 @@
 # It needs BUILD_HOST (an ssh host with Docker), push access to the game repos and gh signed in, and the ROMs: Rush
 # 2049's in the checkout's roms/ (its README), and each other game's plain dump as $ROMS/<game>.z64 (sha1 in the fork's
 # BUILDING.md), copied to the build host when they differ. NODE is the node that runs play_page.mjs (node unless set).
+# PLAY_QUEUE is a command each boot from Pages runs behind, a GPU queue's turn (CLAUDE.md, Playing a page), so a run
+# that is only publishing (--played) holds no turn while it waits for Pages, and its boot takes a turn of its own.
 # The pages build one after another; each container takes $BUILD_CPUS cores (remote_build.sh).
 #
 # Measured on 2026-10-15, a 32-core host, a container 12 cores, the host otherwise quiet (load 0.5-4): all 9 pages warm,
@@ -455,6 +457,7 @@ done
 # --- Each published page, from Pages ---
 
 played=()
+read -ra queue <<< "${PLAY_QUEUE:-}"
 for g in "${published[@]}"; do
     read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
     url="$hub_url$folder"
@@ -470,7 +473,7 @@ for g in "${published[@]}"; do
     git -C "$clone" archive origin/main $(git -C "$clone" ls-tree --name-only origin/main tools web) | tar xf - -C "$work/$g-tools"
     plan="$work/$g-tools/tools/shader_plan.json"
     [[ -f "$plan" ]] || plan="$work/$g-tools/web/shader_plan.json"
-    "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 \
+    "${queue[@]}" "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 \
         --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true
