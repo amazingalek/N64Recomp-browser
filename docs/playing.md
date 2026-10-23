@@ -258,18 +258,20 @@ collapse) shows on a desktop as `shader missed:` lines.
 
 ## The games page
 
-`site/` is a page of every game in the Games table: a tile each with its launcher's image, its Recomp credit and its
-Chrome and Firefox cells, and Play, which runs the game's page in a frame. It is not published: nothing in this repo,
+`site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card, its Recomp
+credit, its Chrome and Firefox cells split into the laptop's number and the stand-in's, and Play, which runs the
+game's page in a frame. It is not published: nothing in this repo,
 the forks or the game forks links to it and the README doesn't name it; leave it so until that changes. Keep it
 current in the same work as what changes it:
 
 - It reads the table from main's README.md each visit (served locally, the checkout's), finding the columns by header
   (Game, Recomp, Repo, Page, the two with Chrome and Firefox): a column renamed or a cell written another way needs
   `site.js`'s parse to follow.
-- A new game needs its tile's image, `site/img/<repo>.webp` named as its Repo cell: its launcher captured in headless
-  Chrome at 1280x720 without a ROM (the art its recomp ships, nothing of the game's), shrunk to a 640x360 WebP. Clear
+- A new game whose launcher has art of its own (a picture, not RecompFrontend's plain dark one or a settings menu)
+  gets its tile's image, `site/img/<repo>.webp` named as its Repo cell: its launcher captured in headless Chrome at
+  1280x720 without a ROM (the art its recomp ships, nothing of the game's), shrunk to a 640x360 WebP. Clear
   `sessionStorage` between two game pages in one tab, or the second can show the isolation notice
-  (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a colour.
+  (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a title card, which needs nothing.
 - `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path to
   GitHub Pages. `site.js` says how the frame stays cross-origin isolated, why it is navigated by `location.replace`
   (Back returns to the grid) and why fullscreen is the game page's own document.

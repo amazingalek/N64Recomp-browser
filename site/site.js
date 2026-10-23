@@ -40,18 +40,19 @@ function parseGames(markdown) {
   return { games, legend, columns: { chrome: named(/Chrome/, 'Chrome'), firefox: named(/Firefox/, 'Firefox') } };
 }
 
-// A cell is "58", "60*", "20†", "20†; 60*" or words: the first number decides its colour.
-function cellClass(cell) {
-  const n = parseFloat(cell);
-  if (isNaN(n)) return 'none';
-  if (/^[\d.]+†/.test(cell)) return 'own';
-  return n >= 55 ? 'good' : n >= 30 ? 'fair' : 'poor';
+// A cell is "58; 312*", "30†; 269*", "173*" or words: its laptop number and its stand-in's (the one with *), each with
+// what follows it ("10-30† in later worlds"), or undefined.
+function splitCell(cell) {
+  const parts = cell.split(';').map((p) => p.trim()).filter((p) => /^\d/.test(p));
+  const desktop = parts.find((p) => /^[\d.-]+†?\*/.test(p));
+  return { laptop: parts.find((p) => p !== desktop), desktop };
 }
 
-function hue(name) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
+// A laptop's number against the goal of 60; † (the game's own rate) is neither good nor bad.
+function laptopClass(value) {
+  if (/^[\d.-]+†/.test(value)) return 'own';
+  const n = parseFloat(value);
+  return n >= 55 ? 'good' : n >= 30 ? 'fair' : 'poor';
 }
 
 function el(tag, props, ...children) {
@@ -60,25 +61,43 @@ function el(tag, props, ...children) {
   return e;
 }
 
-function tile(game, columns) {
-  const h = hue(game.name);
-  // The numbers only ("60*; 10-30† in later worlds" shows "60*; 10-30†"), the whole cell on hover.
-  const stat = (label, cell) => el('div', { className: 'stat ' + cellClass(cell), title: `${label}: ${cell}` },
-    el('span', { className: 'browser' }, label.replace(/^.*, /, '')),
-    el('span', { className: 'value' }, /^\d/.test(cell) ? cell.replace(/\s+[a-z][a-z ]*$/i, '') : cell));
+function tile(game, columns, index) {
+  // Its colour: the golden angle on from the tile before's, so neighbours never share one.
+  const h = Math.round(index * 137.5) % 360;
+  // A row a machine, a column a browser, the numbers only ("10-30† in later worlds" shows "10-30†"); the cell on hover.
+  const browsers = [[columns.chrome, game.chrome], [columns.firefox, game.firefox]];
+  const value = (label, cell, number, className) => el('span', {
+    className: 'value ' + (number ? className(number) : 'none'), title: `${label}: ${cell}`,
+    textContent: number ? number.replace('*', '').replace(/\s+[a-z][a-z ]*$/i, '') : '–' });
+  const row = (machine, key, className) => [el('span', { className: 'machine', textContent: machine }),
+    ...browsers.map(([label, cell]) => value(label, cell, splitCell(cell)[key], className))];
+  const measured = browsers.some(([, cell]) => /\d/.test(cell));
+  const stats = measured
+    ? el('div', { className: 'stats' }, el('span'), el('span', { className: 'browser', textContent: 'Chrome' }),
+      el('span', { className: 'browser', textContent: 'Firefox' }),
+      ...row('Laptop', 'laptop', laptopClass), ...row('Desktop', 'desktop', () => 'desktop'))
+    : el('p', { className: 'stats unmeasured', textContent: 'Not measured yet' });
   const play = el('button', { className: 'play', type: 'button', textContent: 'Play' });
   play.addEventListener('click', () => openGame(game));
-  // The game's launcher, captured from its page without a ROM (img/, the README's site/ line); a colour without one.
+  // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher is
+  // no art of its own has none, and shows a title card: its name on a colour of its own.
   const art = el('img', { src: `img/${game.repoName}.webp`, alt: '', loading: 'lazy' });
   art.addEventListener('error', () => art.remove());
-  const cover = el('div', { className: 'art', style: `--h:${h}` }, art);
+  const cover = el('div', { className: 'art', style: `--h:${h}` },
+    el('span', { className: 'card-title' }, ...titleCard(game.name)), art);
   cover.addEventListener('click', () => openGame(game));
   return el('article', { className: 'tile' }, cover,
     el('div', { className: 'body' },
       el('div', { className: 'head' },
         el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
       el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp)),
-      el('div', { className: 'stats' }, stat(columns.chrome, game.chrome), stat(columns.firefox, game.firefox))));
+      stats));
+}
+
+// A title card's text: "The Legend of Zelda: Majora's Mask" as the series, small, over "Majora's Mask".
+function titleCard(name) {
+  const [series, title] = name.split(/: (.*)/);
+  return title ? [el('small', { textContent: series }), title] : [name];
 }
 
 // "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp".
@@ -185,8 +204,11 @@ async function main() {
   }
   const title = (g) => g.name.replace(/^The /, '');
   const sorted = [...table.games].sort((a, b) => title(a).localeCompare(title(b)));
-  grid.replaceChildren(...sorted.map((g) => tile(g, table.columns)));
-  document.getElementById('legend').textContent = table.legend;
+  grid.replaceChildren(...sorted.map((g, i) => tile(g, table.columns, i)));
+  document.getElementById('count').textContent = `${table.games.length} games`;
+  document.getElementById('legend').textContent = "Frames a second. Laptop: a laptop's Intel UHD graphics, where the "
+    + 'goal is 60. Desktop: a desktop GPU, uncapped, so higher means more to spare. From the Games table: '
+    + table.legend;
   games = table.games;
   const game = gameFromHash();
   if (game && window.crossOriginIsolated) openGame(game, false);  // not before coi_serviceworker.js's reload
