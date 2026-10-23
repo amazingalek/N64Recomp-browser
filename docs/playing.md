@@ -258,8 +258,8 @@ collapse) shows on a desktop as `shader missed:` lines.
 
 ## The games page
 
-`site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card and Play on
-it, which runs the game's page in a frame, and under it the Recomp credit and a link to the game's repo; the art
+`site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card, which a
+click plays (the game's page in a frame), and under it a link to the game's repo and the Recomp credit; the art
 names the game, so no line does. It shows no frame rates: every game plays smoothly but in Firefox on a laptop's
 built-in graphics, so only there does the header warn (`site.js`), and it links the README for the numbers; a retest
 that finds otherwise changes that warning. It is the top of the hub, amazingalek/n64hub's GitHub Pages, whose folders

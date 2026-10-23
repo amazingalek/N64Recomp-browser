@@ -61,10 +61,11 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 24px 32px; }
   content: "▶"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px;
   background: rgb(0 0 0 / 0.45); opacity: 0; transition: opacity 0.15s;
 }
-.art:hover::after { opacity: 1; }
+.art:hover::after, .art:focus-visible::after { opacity: 1; }
+.art:focus-visible { outline: 2px solid #9cc0ff; outline-offset: -2px; }
 /* The name over art that doesn't show it. */
 .art-name {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 84px 10px 12px; font-size: 20px; font-weight: 800;
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 10px; font-size: 20px; font-weight: 800;
   letter-spacing: -0.02em; background: linear-gradient(transparent, rgb(0 0 0 / 0.7)); text-shadow: 0 2px 8px rgb(0 0 0 / 0.6);
 }
 .body { padding: 8px 10px; flex: 1; }
@@ -73,16 +74,13 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 24px 32px; }
 .recomp { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.4; height: 2.8em; color: var(--dim); overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .recomp a { color: var(--dim); }
-.recomp .port { white-space: nowrap; }
+.recomp .whole { white-space: nowrap; }  /* a name with a hyphen, never broken at it */
 
 button {
   font: inherit; color: var(--text); background: #2a3040; border: 1px solid #3a4152; border-radius: 8px;
   padding: 6px 12px; cursor: pointer;
 }
 button:hover { background: #343b4e; }
-.play { background: #2f6fed; border-color: #2f6fed; font-weight: 700; padding: 3px 14px; font-size: 14px; }
-.play:hover { background: #4a83f2; }
-.art .play { position: absolute; right: 10px; bottom: 10px; z-index: 1; box-shadow: 0 2px 10px rgb(0 0 0 / 0.4); }
 
 .player { position: fixed; inset: 0; background: #000; z-index: 10; }
 .player[hidden] { display: none; }

@@ -44,17 +44,22 @@ function el(tag, props, ...children) {
 function tile(game, index) {
   // Its colour: the golden angle on from the tile before's, so neighbours never share one.
   const h = Math.round(index * 137.5) % 360;
-  const play = el('button', { className: 'play', type: 'button', textContent: 'Play', ariaLabel: 'Play ' + game.name });
   // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher has no
   // art of its own has none, and shows a title card: its name on a colour of its own. The tile has no name line: the
-  // art or the card shows it, and art that doesn't gets the name over it.
+  // art or the card shows it, and art that doesn't gets the name over it. The art is the Play button: a click on it, or
+  // Enter or Space on it, plays.
   const art = el('img', { src: `img/${game.repoName}.webp`, alt: game.name, loading: 'lazy' });
   art.addEventListener('error', () => art.remove());
-  const cover = el('div', { className: 'art', style: `--h:${h}`, title: game.name },
+  const cover = el('div', { className: 'art', style: `--h:${h}`, title: 'Play ' + game.name, role: 'button', tabIndex: 0,
+    ariaLabel: 'Play ' + game.name },
     el('span', { className: 'card-title' }, ...titleCard(game.name)), art);
   if (ART_WITHOUT_NAME.has(game.repoName)) cover.append(el('span', { className: 'art-name', textContent: game.name }));
-  cover.append(play);  // in the art's corner: a click anywhere on the art plays
   cover.addEventListener('click', () => openGame(game));
+  cover.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openGame(game);
+  });
   return el('article', { className: 'tile', ariaLabel: game.name }, cover,
     el('div', { className: 'body' },
       el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp, game.repo))));
@@ -69,13 +74,13 @@ function titleCard(name) {
   return title ? [el('small', { textContent: series }), title] : [name];
 }
 
-// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp · <a>web port</a>",
-// the last the game's repo; a cell without a link ("this project's own recomp") is the link to it.
+// "[Banjo: Recompiled](url) by BanjoRecomp" as "<a>Web port</a>, based on <a>Banjo: Recompiled</a> by BanjoRecomp",
+// the first the game's repo; a cell without a link ("this project's own recomp") is the link to it.
 function credit(cell, repo) {
   const m = cell.match(/^\[(.*?)\]\((.*?)\)(.*)$/);
   if (!m) return cell ? [el('a', { href: repo, textContent: cell[0].toUpperCase() + cell.slice(1) })] : [];
-  return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3] + ' ',
-    el('span', { className: 'port' }, '· ', el('a', { href: repo, textContent: 'web port' }))];
+  return [el('a', { href: repo, textContent: 'Web port' }), ', based on ', el('a', { href: m[2], textContent: m[1] }),
+    ...m[3].split(/(\S*-\S*)/).map((part, i) => i % 2 ? el('span', { className: 'whole', textContent: part }) : part)];
 }
 
 // A game's page in the hub, at either of its addresses, is played from the folder beside this page: the same one on
