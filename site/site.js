@@ -44,16 +44,17 @@ function el(tag, props, ...children) {
 function tile(game, index) {
   // Its colour: the golden angle on from the tile before's, so neighbours never share one.
   const h = Math.round(index * 137.5) % 360;
-  // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher has no
-  // art of its own has none, and shows a title card: its name on a colour of its own. The tile has no name line: the
-  // art or the card shows it, and art that doesn't gets the name over it. The art is the Play button: a click on it, or
-  // Enter or Space on it, plays.
-  const art = el('img', { src: `img/${game.repoName}.webp`, alt: game.name, loading: 'lazy' });
-  art.addEventListener('error', () => art.remove());
-  const cover = el('div', { className: 'art', style: `--h:${h}`, title: 'Play ' + game.name, role: 'button', tabIndex: 0,
-    ariaLabel: 'Play ' + game.name },
-    el('span', { className: 'card-title' }, ...titleCard(game.name)), art);
-  if (ART_WITHOUT_NAME.has(game.repoName)) cover.append(el('span', { className: 'art-name', textContent: game.name }));
+  // The game's art (ART), on a title card, its name on a colour of its own, where the art doesn't name it. The tile has
+  // no name line. The art is the Play button: a click on it, or Enter or Space on it, plays.
+  const kind = ART[game.repoName];
+  const cover = el('div', { className: 'art' + (kind ? ' ' + kind : ''), style: `--h:${h}`, title: 'Play ' + game.name,
+    role: 'button', tabIndex: 0, ariaLabel: 'Play ' + game.name });
+  if (kind) {
+    const art = el('img', { src: `img/${game.repoName}.webp`, alt: game.name, loading: 'lazy' });
+    art.addEventListener('error', () => { art.remove(); cover.className = 'art'; });
+    cover.append(art);
+  }
+  cover.append(el('span', { className: 'card-title' }, ...titleCard(game.name)));
   cover.addEventListener('click', () => openGame(game));
   cover.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -65,8 +66,16 @@ function tile(game, index) {
       el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp, game.repo))));
 }
 
-// The launchers whose art doesn't show the game's name (img/, by the Repo cell).
-const ART_WITHOUT_NAME = new Set(['pilotwings-64-recomp-web', 'wave-race-64-recomp-web']);
+// Each game's art, img/<its Repo cell>.webp (docs/playing.md), by how the tile shows it: "cover" fills the tile and
+// shows the name, "cover unnamed" fills it with the name over it, "logo" shows the name on the tile's colour, "icon"
+// stands beside the title card. A game without one gets the title card alone.
+const ART = {
+  'BanjoRecomp-web': 'cover', 'BanjoTooieRecompiled-web': 'cover', 'Donkey-Kong-64-Recompiled-web': 'cover',
+  'CBFD-Recompiled-web': 'cover', 'DKR-R-web': 'cover',
+  'pilotwings-64-recomp-web': 'cover unnamed', 'wave-race-64-recomp-web': 'cover unnamed',
+  'JetForceGemini-Recomp-web': 'logo', 'Snap64Recomp-web': 'logo', 'rush2recompiled-web': 'logo',
+  'GoldenEye64Recomp-web': 'icon', 'MarioKart64Recomp-web': 'icon', 'Starfox64Recomp-web': 'icon', 'Zelda64Recomp-web': 'icon',
+};
 
 // A title card's text: "The Legend of Zelda: Majora's Mask" as the series, small, over "Majora's Mask".
 function titleCard(name) {
