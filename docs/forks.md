@@ -391,6 +391,9 @@ N64ModernRuntime       on a page the stored ROM is written as <stored>.temp and 
 a0d35b6                that won't open at Start Game goes back to the launcher: Rush 2's launcher checked the stored ROMs
                        while Load ROM's thread wrote one (RecompFrontend 7bbaa3c) and deleted it half-written, in 1 of 7
                        plays, and Start Game then ran the game with no ROM and trapped out of bounds
+N64ModernRuntime       a0d35b6's way back to the launcher only when no ROM is loaded (recomp::is_rom_loaded): Ocarina
+e4c932f                of Time keeps no stored ROM, hands the runtime the player's file with set_rom_contents before
+                       Start Game and finds no stored one every time, and with a0d35b6 its page never started the game
 rt64 dd2fd23,          a triangle covers its scissor only where it crosses the camera plane, on every build: one wholly
 baa3753                behind it draws nothing, and one wholly in front has its box from its vertices held to 8192
                        pixels. a8bfc93 made a pass of triangles behind the camera or off one side a write of its whole
