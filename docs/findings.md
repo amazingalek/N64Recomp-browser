@@ -1553,7 +1553,11 @@ What CLAUDE.md's Ruled out rests on.
   of the 4 controller ports that holds no memory or Game Boy pak, `joy_stop_rumble` stops the joy's cyclic polling,
   stops the port's rumble and starts the polling again. Each stop and each start waits for the scheduler's next retrace
   (`joys_handle_retrace` answers both), so that is 8 retraces whatever the hardware. Missions' gameplay starts no shots,
-  so it doesn't have them.
+  so it doesn't have them. The runtime's motor calls answer at once beside the polling, so perfect-dark-recomp's
+  `patches/paks.c` now stops the rumble without stopping it: in the page built with it, against the page Pages served,
+  Defection's cutscene watched for 60 s had no frame of 7-8 VIs against 17 and 14, and 1 present gap over 100 ms (the
+  mission's load) against 10 and 12 (Chrome 155 headless, RTX 5080, Pages, build, build, Pages in whole GPU turns;
+  `plays.jsonl`, set `pd-cutscene-rumble`).
 - Chrome's list build behind the game: on v0.50.0 it cost Conker's page at 3840x2000 a little (57.0-57.9 presents a
   second against 58.7-58.8 with nothing built behind it, the low after its intro's second scene 50-56 against 58-59),
   and on rt64 c89ced0's present timeline nothing: no present dropped while it built, and the page drew 58.6-60.0 either
