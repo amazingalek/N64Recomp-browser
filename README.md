@@ -33,7 +33,7 @@ for Windows and Linux on its repo's Releases page.
 | Star Fox 64 | [Starfox64Recomp](https://github.com/sonicdcer/Starfox64Recomp) by sonicdcer | [Starfox64Recomp-web](https://github.com/n64hub/Starfox64Recomp-web) | [play](https://n64hub.com/star-fox-64/) | 173* | 201* | 2026-10-23, v0.93.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/n64hub/oot-recompiled-web) | [play](https://n64hub.com/ocarina-of-time/) | 60; 320* | 37; 282* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
 | Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/n64hub/DKR-R-web) | [play](https://n64hub.com/diddy-kong-racing/) | 275* | 217* | 2026-10-23, v0.93.0 |
-| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/n64hub/JetForceGemini-Recomp-web) | [play](https://n64hub.com/jet-force-gemini/) | 58; 351* | 44; 276* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
+| Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/n64hub/JetForceGemini-Recomp-web) | [play](https://n64hub.com/jet-force-gemini/) | 58; 334* | 44; 218* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/n64hub/Snap64Recomp-web) | [play](https://n64hub.com/pokemon-snap/) | 358* | 206* | 2026-10-23, v0.93.0 |
 | Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/n64hub/rush2recompiled-web) | [play](https://n64hub.com/rush-2/) | 114* | 85* | 2026-10-23, v0.97.0 |
 | Perfect Dark | this project's own recomp | [perfect-dark-recomp](https://github.com/n64hub/perfect-dark-recomp) | [play](https://n64hub.com/perfect-dark/) | not yet | not yet | 2026-10-23, v0.93.0 |
@@ -148,9 +148,11 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - A runtime that holds the game thread submitting a display list until the list is drawn holds the whole game through
   render to RAM's readback (ultramodern runs one game thread at a time). Jet Force Gemini's (its base's, not
   N64ModernRuntime's) did, and with the exact copy its page lost 250,000-300,000 sound frames in 160 s.
-  JetForceGemini-Recomp-web lets the game go once RT64 reaches the list's last full sync (the list is all read by
-  then), and sends the RSP's completion there too and the RDP's once the frame is drawn. Running on, a scheduler that
-  counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP (above).
+  JetForceGemini-Recomp-web copies RDRAM as the game submits a list and has RT64 read the list from the copy, so the
+  game goes on and has the RSP's completion at once, and the RDP's once the frame is drawn; render to RAM's copies land
+  in the game's RDRAM and in the copy both (DKR-R-web's runtime reads its lists from a copy too). Running on, a
+  scheduler that counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP
+  (above).
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
