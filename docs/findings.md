@@ -1153,13 +1153,13 @@ time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "lap
   on an RTX 5080, an idle host, 1256x645, the page from N64 Hub (perfect-dark-recomp main afe1faf), plays.jsonl's pd
   runs of 2026-10-23 noted "Area 51 - Infiltration's opening cutscene". The desktop build's rate there isn't measured:
   it reaches the mission only from a game file that has it unlocked.
-  On the web each tile copy is now a texture copy (rt64 6cd02ef): 11-14 passes a present in the cutscene, the
+  On the web each tile copy is now a texture copy (rt64 4e6c52e): 11-14 passes a present in the cutscene, the
   regions ~182 copies of 1286x3 and ~30 of 320x1 at 1256x645. On its own that moved little (uncapped, Firefox 72-135
   against 66-108, Chrome 150-204 against 142-183), and what was left was the uploads: `writeBuffer` wrote 4.0-5.7 MB a
   present there, most of it two upload buffers of 14-16 MB written almost whole every fifth present. That is the TMEM
   pool that stands in for descriptor indexing (rt64-0007): each new texture's 4 KB entry made the upload run from
   the first changed entry to the last, and the cutscene makes ~1,850 TMEM textures a second. Uploading each run of
-  changed entries (rt64 35ef200) cut it to 0.8-1.8 MB a present. With both, uncapped, Firefox 158 presents 147-191 a
+  changed entries (rt64 343d64d) cut it to 0.8-1.8 MB a present. With both, uncapped, Firefox 158 presents 147-191 a
   second in the cutscene against 74-112 (medians 177 and 181 against 93 and 110, gaps over 100 ms 4 and 4 against
   16 and 24), the TMEM runs alone 112-149, and Chrome 155 303-347 against 172-225, the cutscene's shots alike and no
   WebGPU errors (plays.jsonl, sets `pd-tilecopy-u1-*` and `pd-tilecopy-u2-*` of 2026-10-23, the page built

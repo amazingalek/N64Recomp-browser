@@ -390,11 +390,11 @@ N64ModernRuntime       on a page the stored ROM is written as <stored>.temp and 
 a0d35b6                that won't open at Start Game goes back to the launcher: Rush 2's launcher checked the stored ROMs
                        while Load ROM's thread wrote one (RecompFrontend 7bbaa3c) and deleted it half-written, in 1 of 7
                        plays, and Start Game then ran the game with no ROM and trapped out of bounds
-rt64 6cd02ef           on the web a tile copy is a texture copy (copyTextureToTexture), not a draw into a framebuffer of
+rt64 4e6c52e           on the web a tile copy is a texture copy (copyTextureToTexture), not a draw into a framebuffer of
                        its own: Perfect Dark's Area 51 - Infiltration cutscene reads ~210 regions back a present, each a
                        render pass in the browser's CPU, 11-14 passes a present after against 204-226 (docs/findings.md,
                        A framebuffer the game reads back)
-rt64 35ef200           without descriptor indexing the TMEM pool uploads each run of entries that changed (16 apart at
+rt64 343d64d           without descriptor indexing the TMEM pool uploads each run of entries that changed (16 apart at
                        most), not all from the first to the last: in that cutscene it rewrote 14-16 MB pools almost whole
                        every fifth present; with both, it presents 147-191 a second uncapped in Firefox against 74-112
 ```
