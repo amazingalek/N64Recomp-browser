@@ -260,9 +260,10 @@ collapse) shows on a desktop as `shader missed:` lines.
 
 `site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card, its Recomp
 credit, its Chrome and Firefox cells split into the laptop's number and the stand-in's, and Play, which runs the
-game's page in a frame. It is not published: nothing in this repo,
-the forks or the game forks links to it and the README doesn't name it; leave it so until that changes. Keep it
-current in the same work as what changes it:
+game's page in a frame. It is the owner's GitHub Pages user site, https://amazingalek.github.io/, on the same origin as
+every game's page, published by `tools/publish_site.sh` (its header says how) after a change to `site/` merges; a
+change to the Games table needs no publish. Nothing in this repo, the forks or the game forks links to it yet. Keep
+it current in the same work as what changes it:
 
 - It reads the table from main's README.md each visit (served locally, the checkout's), finding the columns by header
   (Game, Recomp, Repo, Page, the two with Chrome and Firefox): a column renamed or a cell written another way needs
