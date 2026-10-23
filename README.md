@@ -403,7 +403,8 @@ take the web support without moving its submodules to the forks (Using it in a r
   branch (its header says how); `publish_site.sh` publishes the games' page (`site/`) at the hub's top. A page holds the recompiled code, so it is built where the ROM is, never in CI. `publish_pages.sh` is the
   deploy after a change: it rebuilds every game's page in the Games table from its main on a build host, publishes
   only those whose files differ from what Pages serves (a commit builds the same bytes in any checkout), and boots
-  each one it published from Pages in headless Chrome. `timer_tick.c`, linked into a test build, makes a desktop's
+  each one it published from Pages in headless Chrome; `play_pages.sh` then plays the pages Pages serves by their
+  regular plans, most often in Firefox, which needs no build, so another machine can do it during a retest. `timer_tick.c`, linked into a test build, makes a desktop's
   timed waits end on Windows' default 15.6 ms tick, as Firefox's do on a laptop. `record_shaders.mjs` records a
   prebuilt shader list by a plan, and `play_page.mjs` plays a page, a build or one on Pages, by the same kind of plan in
   Chrome or Firefox and measures it: presents a second, sound frames short, WebGPU errors, the shader waits, the GPU's
