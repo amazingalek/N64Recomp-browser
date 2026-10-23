@@ -4,12 +4,23 @@
 // page's service worker and reloads the page once; as the service worker, it adds the two headers to every response
 // it passes on. A server that sends the headers itself makes the page isolated already, and this does nothing.
 // The same idea as gzuidhof/coi-serviceworker, written anew.
+//
+// The headers only matter on a document and a worker's script (COOP and COEP) and on a file from another origin
+// (CORP): a file of the page's own origin loads under require-corp as it is. So the browser fetches those itself, and
+// the game's .wasm and .data go straight to the page rather than through a Response made here. Through one, a frame
+// torn down mid-download (the hub's ✕ while the .wasm still came) had Firefox log "Failed to load ''. A ServiceWorker
+// intercepted the request and encountered an unexpected error." for the cut body, with no URL, since a Response made
+// here has none. It cost nothing, the frame was going, but it read like an error.
 if (typeof window === 'undefined') {
   self.addEventListener('install', () => self.skipWaiting());
   self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
   self.addEventListener('fetch', (event) => {
     const request = event.request;
     if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') {
+      return;
+    }
+    if (request.mode !== 'navigate' && !request.destination.endsWith('worker')
+      && new URL(request.url).origin === self.location.origin) {
       return;
     }
     event.respondWith(fetch(request).then((response) => {
