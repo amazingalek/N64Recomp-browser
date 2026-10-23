@@ -258,18 +258,26 @@ collapse) shows on a desktop as `shader missed:` lines.
 
 ## The games page
 
-`site/` is a page of every game in the Games table: a tile each with its launcher's image, its Recomp credit and its
-Chrome and Firefox cells, and Play, which runs the game's page in a frame. It is not published: nothing in this repo,
-the forks or the game forks links to it and the README doesn't name it; leave it so until that changes. Keep it
-current in the same work as what changes it:
+`site/` is a page of every game in the Games table: a tile each with its recomp's art or a title card, which a
+click plays (the game's page in a frame), and under it its credit, a link to the game's repo ("Web port") and the
+recomp it is based on (the Recomp cell); the art names the game, so no line does. The header says what the page is
+and whose the recomps are, and a line under the games that it is written with AI, with the link to this repo. It
+shows no frame rates: every game plays smoothly but in Firefox on a laptop's built-in graphics, so only there does
+the header warn (`site.js`); a retest that finds otherwise changes that warning. It is the top of the hub, the n64hub org's GitHub Pages site (n64hub/n64hub.github.io), whose folders
+are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
+a change to `site/` merges, and a change to the Games table needs no publish. Served locally by `tools/serve_site.mjs`. Keep
+it current in the same work as what changes it:
 
 - It reads the table from main's README.md each visit (served locally, the checkout's), finding the columns by header
-  (Game, Recomp, Repo, Page, the two with Chrome and Firefox): a column renamed or a cell written another way needs
+  (Game, Recomp, Repo, Page): a column renamed or a cell written another way needs
   `site.js`'s parse to follow.
-- A new game needs its tile's image, `site/img/<repo>.webp` named as its Repo cell: its launcher captured in headless
-  Chrome at 1280x720 without a ROM (the art its recomp ships, nothing of the game's), shrunk to a 640x360 WebP. Clear
-  `sessionStorage` between two game pages in one tab, or the second can show the isolation notice
-  (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a colour.
-- `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path to
+- A new game gets its tile's art, `site/img/<repo>.webp` named as its Repo cell, from what its recomp ships and
+  nothing of the game's: the banner or logo its upstream README opens with or its repo's social preview, else its
+  app icon (`icons/512.png`), else its launcher, if that is a picture (not RecompFrontend's plain dark one or a
+  settings menu), captured in headless Chrome at 1280x720 without a ROM. A banner or launcher is a 640x360 WebP, a
+  logo 640 wide with its transparency, an icon 256. `site.js`'s `ART` says how the tile shows it (cover, cover
+  unnamed, logo, icon); without one a tile shows a title card, which needs nothing. Clear `sessionStorage` between
+  two game pages in one tab, or the second can show the isolation notice (`coi_serviceworker.js`'s reload flag).
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/` and passes every other path to
   GitHub Pages. `site.js` says how the frame stays cross-origin isolated, why it is navigated by `location.replace`
   (Back returns to the grid) and why fullscreen is the game page's own document.

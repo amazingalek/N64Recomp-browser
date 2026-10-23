@@ -116,7 +116,7 @@ fe91344), `RT64_OFFSCREEN_WORKLOADS` and `RT64_UNEVEN_FRAME_RATES` (rt64 179adb8
 A game's checkouts hold the web support as uncommitted changes (`patches/apply.cmake`, or the game's own patch script),
 so commit to a fork from a separate clone of it:
 
-1. `git clone https://github.com/amazingalek/<fork>` (its `main`), make the change, and commit it saying what and why.
+1. `git clone https://github.com/n64hub/<fork>` (its `main`), make the change, and commit it saying what and why.
    Try it in a game first by applying the same diff to that game's patched checkout (plume is
    `<rt64>/src/contrib/plume`).
 2. Push it to `main` as a fast-forward, never a force-push: `forks.txt`, its tags and the recomps pin those commits. A
@@ -155,7 +155,7 @@ the retest publishes it, its fix is critical.
 **Publishing** is the deploy; no CI job does it. A retest or critical fix publishes the pages it moves, and a change to
 one game's own repo publishes that game's page right after it lands, unasked. Every page is played before it is
 published and booted from Pages after, so Pages holds only played pages. A page found behind main
-(`git log -1 origin/gh-pages` names the main it was built from) is played and published by whoever finds it. How:
+(the hub's last gh-pages commit names the main each game's folder was built from) is played and published by whoever finds it. How:
 docs/publishing.md.
 
 ## The games table

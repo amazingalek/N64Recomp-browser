@@ -1,4 +1,4 @@
-N64Recomp: https://github.com/amazingalek/N64Recomp-web 46395bbfe442efcc61d87017bfc684a2b3c8d930
+N64Recomp: https://github.com/n64hub/N64Recomp-web 46395bbfe442efcc61d87017bfc684a2b3c8d930
 on upstream 81213c1831fab2521a6a5459c67b63437d67e253 (tools/export_patches.sh)
 
 diff --git a/LiveRecomp/live_generator.cpp b/LiveRecomp/live_generator.cpp

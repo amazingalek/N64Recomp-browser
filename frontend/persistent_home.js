@@ -6,7 +6,7 @@
 // and written back every two seconds and when the page is hidden or closed. Only files that changed since are written.
 // A crash or a closed tab loses at most the last two seconds.
 //
-// IndexedDB belongs to the origin, and every game's page on a host is one origin (<user>.github.io/<repo>/), so each page
+// IndexedDB belongs to the origin, and every game's page on a host is one origin (the hub's folders), so each page
 // keeps HOME in a database of its own, named after its folder on the site. IDBFS names one after the mount point, which
 // made one database of every page's HOME: each boot read every game's files in, ROM copies included, and each write back
 // mirrored the whole folder, so a page in another tab deleted what a second game had stored since it booted. A page whose

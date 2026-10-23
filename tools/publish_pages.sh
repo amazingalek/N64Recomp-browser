@@ -13,10 +13,10 @@
 #    the host itself for a repo whose scripts run images of their own (Perfect Dark's: the decomp's, then the web's;
 #    Super Mario 64's: the web's).
 # 3. Hashes the files the page serves (.html, .js, .wasm, .data, coi_serviceworker.js) as git does and compares them
-#    with the blobs on the repo's gh-pages. A commit builds the same bytes in any copy (frontend/build_speed.cmake, once
-#    the game's N64Recomp-browser pin has it: before, a ccache hit could carry another checkout's path in), so
-#    a page whose code didn't change is left alone, and one built from an older main but the same bytes stays too.
-# 4. Publishes those that differ with tools/publish_page.sh, as "main <sha>".
+#    with the blobs in its folder of the hub's gh-pages (below). A commit builds the same bytes in any copy
+#    (frontend/build_speed.cmake, once the game's N64Recomp-browser pin has it: before, a ccache hit could carry another
+#    checkout's path in), so a page whose code didn't change is left alone, and one built from an older main but the same bytes stays too.
+# 4. Publishes those that differ into their folders of the hub with tools/publish_page.sh --into, as "main <sha>".
 # 5. Waits for Pages to serve the new .js, then boots each published page from Pages in headless Chrome
 #    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, DKR-R's web/): launcher, ROM, Start Game,
 #    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (docs/playing.md,
@@ -75,27 +75,32 @@ remote_build="$rush/tools/remote_build.sh"
 [[ -f "$remote_build" ]] || { echo "$rush is not a rush-2049-recomp checkout"; exit 1; }
 cache="${PAGES_CACHE:-$HOME/.cache/n64recomp-pages}"
 node="${NODE:-node}"
+# The hub every page is published in, a folder each (the list below), and its address: its custom domain once it has
+# one.
+hub=n64hub/n64hub.github.io
+hub_url="$(gh api "repos/$hub/pages" --jq .html_url)"
 
-# <game> <repo> <page name> <build dir>, the build dir relative to the repo's root.
+# <game> <repo> <page name> <build dir> <hub folder>, the build dir relative to the repo's root, the folder the page
+# is published to in the hub (tools/publish_site.sh), the address its Page cell in the README links.
 games="
-rush   amazingalek/rush-2049-recomp               Rush2049Recompiled   build-web
-ge     amazingalek/GoldenEye64Recomp-web          GoldenRecomp         build-web
-mm     amazingalek/Zelda64Recomp-web              Zelda64Recompiled    build-web
-banjo  amazingalek/BanjoRecomp-web                BanjoRecompiled      build-web
-cbfd   amazingalek/CBFD-Recompiled-web            ConkerRecomp         host/build-web
-dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web
-wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web
-pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web
-bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web
-mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web
-sf64   amazingalek/Starfox64Recomp-web            Starfox64Recompiled  build-web
-oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web
-jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web
-dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release
-snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web
-rush2  amazingalek/rush2recompiled-web            Rush2Recompiled      build-web
-pd     amazingalek/perfect-dark-recomp            PerfectDarkRecompiled build/web
-sm64   amazingalek/super-mario-64-recomp          SuperMario64Recompiled build/web
+rush   n64hub/rush-2049-recomp               Rush2049Recompiled   build-web rush-2049
+ge     n64hub/GoldenEye64Recomp-web          GoldenRecomp         build-web goldeneye
+mm     n64hub/Zelda64Recomp-web              Zelda64Recompiled    build-web majoras-mask
+banjo  n64hub/BanjoRecomp-web                BanjoRecompiled      build-web banjo-kazooie
+cbfd   n64hub/CBFD-Recompiled-web            ConkerRecomp         host/build-web conker
+dk64   n64hub/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web donkey-kong-64
+wr     n64hub/wave-race-64-recomp-web        WaveRace64Recomp     build-web wave-race-64
+pw     n64hub/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web pilotwings-64
+bt     n64hub/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web banjo-tooie
+mk64   n64hub/MarioKart64Recomp-web          MarioKart64Recompiled build-web mario-kart-64
+sf64   n64hub/Starfox64Recomp-web            Starfox64Recompiled  build-web star-fox-64
+oot    n64hub/oot-recompiled-web             OoTRecompiled        build-web ocarina-of-time
+jfg    n64hub/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web jet-force-gemini
+dkr    n64hub/DKR-R-web                      DKR-R                build-web/bin/Release diddy-kong-racing
+snap   n64hub/Snap64Recomp-web               Snap64Recomp         build-web pokemon-snap
+rush2  n64hub/rush2recompiled-web            Rush2Recompiled      build-web rush-2
+pd     n64hub/perfect-dark-recomp            PerfectDarkRecompiled build/web perfect-dark
+sm64   n64hub/super-mario-64-recomp          SuperMario64Recompiled build/web super-mario-64
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))
@@ -343,7 +348,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 published=() differ=() failed=()
 for g in "${selected[@]}"; do
-    read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
+    read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
     start=$SECONDS
     echo "== $g: $repo"
     if [[ $g == rush ]]; then
@@ -392,15 +397,15 @@ for g in "${selected[@]}"; do
         fi
     fi
     built="$(bash "$remote_build" -n $copy run "cd $dir && git hash-object $(files $name)" | tr '\n' ' ')"
-    pages="$(gh api "repos/$repo/git/trees/gh-pages" --jq '.tree[] | .path + " " + .sha' 2> /dev/null || true)"
+    pages="$(gh api "repos/$hub/git/trees/gh-pages:$folder" --jq '.tree[] | .path + " " + .sha' 2> /dev/null || true)"
     served=""
     for f in $(files $name); do served+="$(awk -v p="${f/$name.html/index.html}" '$1 == p { print $2 }' <<< "$pages") "; done
-    echo "   $label${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as gh-pages" || echo "differs from gh-pages")"
+    echo "   $label${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as the hub's" || echo "differs from the hub's")"
     [[ "$built" != "$served" ]] || continue
     differ+=("$g")
     $dry_run && continue
     bash "$remote_build" -n $copy get "$dir" "$work/$g"
-    bash "$here/publish_page.sh" "$work/$g" "$name" "$repo" "$label" | sed 's/^/   /'
+    bash "$here/publish_page.sh" "$work/$g" "$name" "$hub" "$label" --into "$folder" | sed 's/^/   /'
     published+=("$g")
 done
 
@@ -408,8 +413,8 @@ done
 
 played=()
 for g in "${published[@]}"; do
-    read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-    url="https://${repo%%/*}.github.io/${repo#*/}"
+    read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
+    url="$hub_url$folder"
     js="$(git hash-object "$work/$g/$name.js")"
     for i in $(seq 60); do
         [[ "$(curl -sf "$url/$name.js" | git hash-object --stdin)" == "$js" ]] && break
@@ -440,7 +445,7 @@ if [[ -n "$browser$ref" ]]; then
     shown=("${differ[@]}")
     [[ -z "$ref" || ${#failed[@]} -gt 0 ]] || shown=("${args[1]}")
     for g in "${shown[@]}"; do
-        read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
+        read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
         echo "  $g: bash $remote_build -n $([[ $g == rush ]] && { [[ -n ${PAGES_COPY:-} ]] && echo "$PAGES_COPY-rush" || echo publish; } || echo "${PAGES_COPY:-pages}-$g") get $dir <dir>"
     done
 fi
@@ -450,8 +455,8 @@ if [[ ${#published[@]} -eq 0 ]]; then
 else
     echo "published, to play in Chrome and Firefox and update in the README's Games table:"
     for g in "${published[@]}"; do
-        read -r _ repo name dir <<< "$(grep "^$g " <<< "$games")"
-        echo "  $g https://${repo%%/*}.github.io/${repo#*/}/ (main $(git -C "$([[ $g == rush ]] && echo "$rush" || echo "$cache/$g")" rev-parse --short origin/main))"
+        read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
+        echo "  $g $hub_url$folder/ (main $(git -C "$([[ $g == rush ]] && echo "$rush" || echo "$cache/$g")" rev-parse --short origin/main))"
     done
 fi
 [[ ${#failed[@]} -eq 0 ]]
