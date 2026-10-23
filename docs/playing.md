@@ -261,9 +261,10 @@ collapse) shows on a desktop as `shader missed:` lines.
 `site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card, its Recomp
 credit and Play, which runs the game's page in a frame. It shows no frame rates: its header says, in a sentence, how
 the games play in Chrome and Firefox (every one smoothly but Firefox on a laptop's built-in graphics), and links the
-README for the numbers; a retest that finds otherwise changes that sentence. It is the owner's GitHub Pages user site, https://amazingalek.github.io/, on the same origin as
-every game's page, published by `tools/publish_site.sh` (its header says how) after a change to `site/` merges; a
-change to the Games table needs no publish. Nothing in this repo, the forks or the game forks links to it yet. Keep
+README for the numbers; a retest that finds otherwise changes that sentence. It is the top of the hub, amazingalek/n64hub's GitHub Pages, whose
+folders are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
+a change to `site/` merges, and a change to the Games table needs no publish. Its `import.html` takes a player's saves
+from a game's old address (site/import.js). Served locally by `tools/serve_site.mjs`. Keep
 it current in the same work as what changes it:
 
 - It reads the table from main's README.md each visit (served locally, the checkout's), finding the columns by header

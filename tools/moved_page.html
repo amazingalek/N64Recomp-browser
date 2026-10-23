@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  A game's old address, once its page is in the hub (tools/publish_moved.sh fills in __GAME__, __PAGE__ and __IMPORT__).
+  A player who never played it here goes straight on to the page. One who did has saves, settings and a ROM here, in
+  this page's IndexedDB (frontend/persistent_home.js), which the new address can't read: Move opens the hub's
+  import.html in a new tab and sends it every file, and it stores them and starts the game (site/import.js). A player
+  who last played before each page had a database of its own has them in the one every page shared, which goes too: the
+  game's page there takes its own folders from it, as it did here. After a move, or "Play without them", the next
+  visit goes straight on.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__GAME__ has moved</title>
+<style>
+  :root { color-scheme: dark; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; background: #0e1016; color: #e7e9ef; display: grid; place-items: center; min-height: 100vh; }
+  main { max-width: 560px; padding: 24px; }
+  h1 { margin: 0 0 8px; font-size: 28px; }
+  p { color: #8d93a5; }
+  a { color: #9cc0ff; }
+  button { font: inherit; font-weight: 700; color: #fff; background: #2f6fed; border: 0; border-radius: 8px; padding: 10px 18px;
+    margin: 8px 8px 0 0; cursor: pointer; }
+  button.plain { background: #2a3040; }
+</style>
+</head>
+<body>
+<main>
+  <h1>__GAME__ has moved</h1>
+  <p>It plays at <a href="__PAGE__">__PAGE__</a> now.</p>
+  <div id="choice" hidden>
+    <p>Your saves and settings for it are in this browser, at this old address. Move them, and play there?</p>
+    <button id="move" type="button">Move my saves</button><button id="skip" class="plain" type="button">Play without them</button>
+  </div>
+  <p id="status"></p>
+</main>
+<script>
+'use strict';
+const PAGE = '__PAGE__', IMPORT = '__IMPORT__';
+const SHARED = '/home/web_user', DATABASE = SHARED + ' ' + location.pathname.replace(/[^/]*$/, ''), STORE = 'FILE_DATA';
+const status = document.getElementById('status');
+const MOVED = 'moved ' + location.pathname;  // localStorage is the origin's, every old page's
+const go = () => location.replace(PAGE);
+
+// Every file of a database of HOME, as [path, IDBFS entry]; none when it was never made.
+async function files(name) {
+  if (indexedDB.databases && !(await indexedDB.databases()).some((d) => d.name === name)) return [];
+  const db = await new Promise((resolve, reject) => {
+    const open = indexedDB.open(name);
+    open.onupgradeneeded = () => open.transaction.abort();  // not there after all
+    open.onsuccess = () => resolve(open.result);
+    open.onerror = () => resolve(null);
+  });
+  if (!db || !db.objectStoreNames.contains(STORE)) return [];
+  const store = db.transaction([STORE]).objectStore(STORE);
+  const [keys, values] = await Promise.all([store.getAllKeys(), store.getAll()].map((r) => new Promise((resolve, reject) => {
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  })));
+  db.close();
+  return keys.map((key, i) => [key, values[i]]);
+}
+
+async function main() {
+  // The old page's service worker (coi_serviceworker.js), still there for a player who played here, sends this page
+  // with Cross-Origin-Opener-Policy, which cuts it off from the new tab: it goes, with any above it, and the page loads
+  // again without it.
+  if (navigator.serviceWorker?.controller) {
+    for (const r of await navigator.serviceWorker.getRegistrations()) {
+      if (location.href.startsWith(r.scope)) await r.unregister();
+    }
+    return location.reload();
+  }
+  if (localStorage.getItem(MOVED)) return go();
+  const home = await files(DATABASE), shared = await files(SHARED);
+  if (![...home, ...shared].some(([, entry]) => entry.contents)) return go();
+  document.getElementById('choice').hidden = false;
+  document.getElementById('skip').addEventListener('click', () => {
+    localStorage.setItem(MOVED, 'skipped');
+    go();
+  });
+  document.getElementById('move').addEventListener('click', () => {
+    const origin = new URL(IMPORT).origin;
+    const tab = window.open(IMPORT, '_blank');
+    if (!tab) {
+      status.textContent = 'The browser blocked the new tab: allow pop-ups for this page and press Move again.';
+      return;
+    }
+    status.textContent = 'Moving…';
+    const silent = setTimeout(() => {
+      status.textContent = 'The new tab never answered. Close it and press Move again.';
+    }, 20000);
+    addEventListener('message', (event) => {
+      if (event.origin !== origin || event.source !== tab) return;
+      clearTimeout(silent);
+      if (event.data?.ready) {
+        tab.postMessage({ files: home, shared }, origin);
+      } else if ('moved' in (event.data || {})) {
+        localStorage.setItem(MOVED, 'moved');
+        document.getElementById('choice').hidden = true;
+        status.textContent = 'Moved. The game is starting in the new tab; you can close this one.';
+      } else if (event.data?.error) {
+        status.textContent = 'The move failed: ' + event.data.error;
+      }
+    });
+  });
+}
+
+main().catch((error) => {
+  status.textContent = 'Your saves here could not be read (' + error + '). ';
+  status.append(Object.assign(document.createElement('a'), { href: PAGE, textContent: 'Play at the new address' }));
+});
+</script>
+</body>
+</html>

@@ -3,6 +3,8 @@
 // Cross-Origin-Embedder-Policy: require-corp. Loaded by the page (shell.html) as a script, this registers itself as the
 // page's service worker and reloads the page once; as the service worker, it adds the two headers to every response
 // it passes on. A server that sends the headers itself makes the page isolated already, and this does nothing.
+// A page asked for with ?coi=off passes as it is: one that talks to the page of another site that opened it, through
+// window.opener, which Cross-Origin-Opener-Policy: same-origin cuts (the hub's import.html, site/import.js).
 // The same idea as gzuidhof/coi-serviceworker, written anew.
 if (typeof window === 'undefined') {
   self.addEventListener('install', () => self.skipWaiting());
@@ -10,6 +12,9 @@ if (typeof window === 'undefined') {
   self.addEventListener('fetch', (event) => {
     const request = event.request;
     if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') {
+      return;
+    }
+    if (request.mode === 'navigate' && new URL(request.url).searchParams.get('coi') === 'off') {
       return;
     }
     event.respondWith(fetch(request).then((response) => {

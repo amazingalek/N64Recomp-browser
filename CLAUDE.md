@@ -151,7 +151,7 @@ the retest publishes it, its fix is critical.
 **Publishing** is the deploy; no CI job does it. A retest or critical fix publishes the pages it moves, and a change to
 one game's own repo publishes that game's page right after it lands, unasked. Every page is played before it is
 published and booted from Pages after, so Pages holds only played pages. A page found behind main
-(`git log -1 origin/gh-pages` names the main it was built from) is played and published by whoever finds it. How:
+(the hub's last gh-pages commit names the main each game's folder was built from) is played and published by whoever finds it. How:
 docs/publishing.md.
 
 ## The games table

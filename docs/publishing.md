@@ -54,19 +54,24 @@ A fork's rt64 older than 7910126 needs a fresh build dir when it moves: an incre
 
 ## Building and publishing a page
 
-Each game fork's page is `https://amazingalek.github.io/<fork>/`, linked from the top of its README, built from main
+Each game's page is a folder of the hub, amazingalek/n64hub's GitHub Pages (`https://amazingalek.github.io/n64hub/<folder>/`,
+its domain once it has one), beside the games' page at its top, so they are one origin and a game plays in that page's
+frame. Its Page cell in the README links it. It is built from main
 with its shader list by its BUILDING.md on Linux, in rush-2049-recomp's Docker image (its `tools/docker/Dockerfile`,
 which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks goes into that Dockerfile), with
 `EM_CACHE` set to a mounted folder, since emsdk's environment resets it (a new one needs
 `$EM_CACHE/sysroot/lib/pkgconfig` made first, or `embuilder` fails writing `sdl2.pc`).
 
-`tools/publish_page.sh <build dir> <name> amazingalek/<fork> "main <sha>"` publishes one (switching Pages on the first
-time); `tools/publish_pages.sh` does it for every game, or the ones it is given. Each page's commit names the main it
-was built from (`git log -1 origin/gh-pages`). A change to one game's own repo is played from a `--dry-run` build of
+`tools/publish_page.sh <build dir> <name> amazingalek/n64hub "main <sha>" --into <folder>` publishes one;
+`tools/publish_pages.sh` does it for every game, or the ones it is given, each into its folder (its list). The hub's
+last commit names, a line each, the main each folder was built from (`<folder>/: built from main <sha>
+(amazingalek/<fork>)`, in `git log -1 --format=%b` of its gh-pages). A game's old address, its fork's own Pages,
+serves `tools/moved_page.html` (`tools/publish_moved.sh`), which sends a player on to the hub and moves their saves
+there. A change to one game's own repo is played from a `--dry-run` build of
 that game, then published by a `tools/publish_pages.sh` run with its name.
 
-A test page, a game fork's branch to be played by hand before it lands, is published beside
-main's page with `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "<branch> <sha>" --into <branch>`, at
+A test page, a game fork's branch to be played by hand before it lands, is published on its fork's own Pages, beside
+the moved page, with `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "<branch> <sha>" --into <branch>`, at
 `https://amazingalek.github.io/<fork>/<branch>/`, and taken off with `--drop <branch>` when the branch lands or is
 dropped. Publishing main's page keeps every folder, and a test page leaves main's page and the other folders alone
 (the script's header says how).

@@ -66,7 +66,7 @@ case $have in
     0) "${git[@]}" fetch -q "$url" gh-pages
        lease=(--force-with-lease="gh-pages:$("${git[@]}" rev-parse FETCH_HEAD)")
        "${git[@]}" read-tree FETCH_HEAD
-       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" || true)"
+       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" -e '^The moved page' || true)"
        lines="$("${git[@]}" log -1 --format=%b FETCH_HEAD | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)" ;;
     2) subject="" lines="" lease=(-f) ;;
     *) exit $have ;;
