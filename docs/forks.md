@@ -386,4 +386,8 @@ N64ModernRuntime       ULTRAMODERN_RSP_TASKS_COPIED: an RSP task other than grap
                        command list and the rest of the next one Super Mario 64 wrote into the same buffer two VIs on,
                        and its page exited at aspMain's jump table, in 2 of 7 plays (docs/findings.md, A late audio
                        task)
+N64ModernRuntime       on a page the stored ROM is written as <stored>.temp and renamed over it whole, and a stored ROM
+a0d35b6                that won't open at Start Game goes back to the launcher: Rush 2's launcher checked the stored ROMs
+                       while Load ROM's thread wrote one (RecompFrontend 7bbaa3c) and deleted it half-written, in 1 of 7
+                       plays, and Start Game then ran the game with no ROM and trapped out of bounds
 ```
