@@ -107,7 +107,8 @@
 // LUID, since a laptop's nvidia-smi GPU 0 can be its idle second GPU): its 3D engines' utilization summed over every
 // process, as Task Manager's, and its dedicated and shared memory (GPU Adapter Memory), with nvidia-smi's GPU 0 beside
 // it (utilization and power); elsewhere nvidia-smi's utilization, power, clock and memory. A summary at the end covers
-// the "play" steps: median presents a second and the range, the gaps between presents, the median animation frames a
+// the "play" steps: median presents a second and the range, the gaps between presents (the longest ten over 100 ms with
+// when each came, to the sample: where a long play stuttered), the median animation frames a
 // second (in Chrome on Windows ~55.6 when the display gives it no vblank, a monitor that is off: then a page that
 // interpolates presents ~55.6 too, and the run says so), frames short, each prebuilt
 // shader wait (RT64's "built in ... the game waiting" lines, Firefox's for the shaders the list missed among them, with
@@ -139,7 +140,8 @@
 // on the host) and building (a build running beside it), any of them and nothing else. A CPU throttle is the run's
 // cpuThrottle and the host's load over the play its host.busy already; the note is for the rest. The line
 // holds the time (UTC), the summary (presents a second: median, 10th percentile, min and max of the samples; the gaps
-// between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms; the animation frames a second),
+// between presents: median, 99th percentile, longest, how many over 50, 100 and 250 ms, and each over 100 ms with when,
+// over100At [{at, ms}], at as a shader miss's; the animation frames a second),
 // each sample's presents, sound short and GPU load, every shader miss ({at, section, shader}, at in seconds since the
 // start, to the sample's 5), the page, the query and the host's processor load over the play.
 //
@@ -786,6 +788,8 @@ const percentile = (values, q) => {
 };
 // Every gap between two presents while playing: the dips a sample's average hides.
 const gaps = during.flatMap((s) => s.gaps ?? []);
+// Each gap over 100 ms and when, to the sample (at, seconds since the start): where in a long play it stuttered.
+const longGaps = during.flatMap((s) => (s.gaps ?? []).filter((g) => g > 100).map((ms) => ({ at: s.at, ms })));
 // The medians of a sample's GPU readings (gpu or nvidia), and which adapter.
 const gpuMedians = (key) => {
   const m = Object.fromEntries(['busy', 'watts', 'mib', 'sharedMib']
@@ -803,7 +807,7 @@ const summary = {
   animationFrames: animationFrames === null ? null : Math.round(animationFrames * 10) / 10,
   frames: gaps.length ? { count: gaps.length, p50Ms: percentile(gaps, 0.5), p99Ms: percentile(gaps, 0.99),
     longestMs: gaps.reduce((m, g) => Math.max(m, g)), over50Ms: gaps.filter((g) => g > 50).length, over100Ms: gaps.filter((g) => g > 100).length,
-    over250Ms: gaps.filter((g) => g > 250).length } : null,
+    over250Ms: gaps.filter((g) => g > 250).length, over100At: longGaps } : null,
   audio: audioAfter ? { played: audioAfter.played - (audioBefore?.played ?? 0), short: audioAfter.short - (audioBefore?.short ?? 0) } : null,
   shaderWaits, shaderMisses: shaderMisses.length, webgpuErrors: playErrors, exceptions: playExceptions,
   gpu: gpuMedians('gpu'), nvidia: gpuMedians('nvidia'),
@@ -820,7 +824,8 @@ const atCeiling = uncapped && summary.presents && summary.presents.median >= 342
 console.log(`  presents/s ${summary.presents ? `${r(summary.presents.median)} (${r(summary.presents.min)}-${r(summary.presents.max)})` : '-'}` +
   (atCeiling ? ', held by the uncapped rate (360), not the page' : ''));
 if (summary.frames) console.log(`  frame gaps p50 ${summary.frames.p50Ms} ms, p99 ${summary.frames.p99Ms} ms, longest ${summary.frames.longestMs} ms, ` +
-  `${summary.frames.over50Ms} over 50 ms, ${summary.frames.over100Ms} over 100, ${summary.frames.over250Ms} over 250`);
+  `${summary.frames.over50Ms} over 50 ms, ${summary.frames.over100Ms} over 100, ${summary.frames.over250Ms} over 250` +
+  (longGaps.length ? `; the longest: ${[...longGaps].sort((a, b) => b.ms - a.ms).slice(0, 10).map((g) => `${g.ms} ms at ${g.at} s`).join(', ')}` : ''));
 if (summary.animationFrames !== null) console.log(`  animation frames/s ${summary.animationFrames}` +
   (noDisplay ? ': the browser had no display to pace it, so a page that interpolates presents as many' : ''));
 console.log(`  audio ${summary.audio ? `${summary.audio.played} frames played, ${summary.audio.short} short` : 'not playing'}`);
