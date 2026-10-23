@@ -130,13 +130,21 @@ jobs:
       - name: naga
         if: steps.naga.outputs.cache-hit != 'true'
         run: cargo install naga-cli --version "$NAGA_VERSION" --locked
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build libsdl2-dev libdbus-1-dev
+      # No apt: the mirror trickles often enough that installing SDL2's and D-Bus's headers took 2-12 minutes in a third
+      # of this job's runs. ninja comes from its own releases, and rt64's configure, which looks for SDL2 and D-Bus
+      # (nativefiledialog's portal) though no shader uses either, gets an empty package of each.
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.31.0"
+          ninjaVersion: "^1.13.0"
       - name: Build the shaders to WGSL
         run: |
-          cmake -S lib/rt64 -B rt64-wgsl -G Ninja -DRT64_WGSL=ON -DRT64_NAGA_EXECUTABLE="$HOME/.cargo/bin/naga" -DNFD_PORTAL=ON
+          stubs="$RUNNER_TEMP/stubs"
+          mkdir -p "$stubs"
+          touch "$stubs/SDL2Config.cmake"
+          printf 'Name: dbus-1\nDescription: stand-in\nVersion: 1.14.10\n' > "$stubs/dbus-1.pc"
+          PKG_CONFIG_PATH="$stubs" cmake -S lib/rt64 -B rt64-wgsl -G Ninja -DRT64_WGSL=ON \
+            -DRT64_NAGA_EXECUTABLE="$HOME/.cargo/bin/naga" -DNFD_PORTAL=ON -DSDL2_DIR="$stubs"
           ninja -C rt64-wgsl $(ninja -C rt64-wgsl -t targets all | grep -E '^[^:]+\.wgsl\.c:' | cut -d: -f1)
           find rt64-wgsl -name '*.wgsl' | wc -l
       # The checker uses Node's own WebSocket (22 and up).
