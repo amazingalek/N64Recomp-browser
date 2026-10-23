@@ -147,9 +147,11 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - A runtime that holds the game thread submitting a display list until the list is drawn holds the whole game through
   render to RAM's readback (ultramodern runs one game thread at a time). Jet Force Gemini's (its base's, not
   N64ModernRuntime's) did, and with the exact copy its page lost 250,000-300,000 sound frames in 160 s.
-  JetForceGemini-Recomp-web lets the game go once RT64 reaches the list's last full sync (the list is all read by
-  then), and sends the RSP's completion there too and the RDP's once the frame is drawn. Running on, a scheduler that
-  counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP (above).
+  JetForceGemini-Recomp-web copies RDRAM as the game submits a list and has RT64 read the list from the copy, so the
+  game goes on and has the RSP's completion at once, and the RDP's once the frame is drawn; render to RAM's copies land
+  in the game's RDRAM and in the copy both (DKR-R-web's runtime reads its lists from a copy too). Running on, a
+  scheduler that counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP
+  (above).
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
   there (its file system lives there), and that thread is WebGPU's too, so each line held the thread that printed it
