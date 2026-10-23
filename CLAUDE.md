@@ -215,6 +215,8 @@ The measurements behind each are in docs/findings.md (Ruled out, measured).
   the time per list stayed. Chrome paces the readback itself.
 - Pilotwings 64's 85-180 ms frame gaps as its screens change as the page's: they are its own music stop and screen
   load, 42-75 ms of them on a console and natively too.
+- Perfect Dark's 133 ms frames in its opening cutscenes as the page's: each shot's start stops and restarts the
+  controllers' polling for each of 4 ports, 8 waits of one retrace each, on its desktop build and a console too.
 - Holding back the list Chrome builds behind the game (a pause after each dropped present, fewer threads): the build
   costs the page little or nothing.
 - Building Firefox's pipelines in parallel from the page: every device and worker's WebGPU goes to one thread of its
