@@ -396,4 +396,11 @@ baa3753                behind it draws nothing, and one wholly in front has its 
                        pixels. a8bfc93 made a pass of triangles behind the camera or off one side a write of its whole
                        framebuffer, and a texture read of it after a new tile copy: ~100 full-screen ones at the title
                        of Banjo-Kazooie, kept, 3.6 GB at 3840x2000 (Firefox: Out of Memory on an 8 GB card)
+rt64 4e6c52e           on the web a tile copy is a texture copy (copyTextureToTexture), not a draw into a framebuffer of
+                       its own: Perfect Dark's Area 51 - Infiltration cutscene reads ~210 regions back a present, each a
+                       render pass in the browser's CPU, 11-14 passes a present after against 204-226 (docs/findings.md,
+                       A framebuffer the game reads back)
+rt64 343d64d           without descriptor indexing the TMEM pool uploads each run of entries that changed (16 apart at
+                       most), not all from the first to the last: in that cutscene it rewrote 14-16 MB pools almost whole
+                       every fifth present; with both, it presents 147-191 a second uncapped in Firefox against 74-112
 ```
