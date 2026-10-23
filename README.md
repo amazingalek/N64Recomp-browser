@@ -106,9 +106,11 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
 - RT64's Framerate at Display and its resolution at Auto by default, so that every page presents at the display's rate
   (60 a second on a 60 Hz display, 144 on a 144 Hz one), RT64 interpolating between the game's frames, and draws at
   the canvas's size, whatever the recomp's desktop build defaults to. RecompFrontend's defaults are those. A recomp
-  with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
-  `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
-  of its own plays that profile on a page (DKR-R's Modern, in its default widescreen). The game's own frame rate setting stays as the game has it.
+  with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's Frame
+  Interpolation, with a page's saved settings moved to it once), and one that interpolates only in a profile of its own plays
+  that profile on a page (DKR-R's Modern, in its default widescreen). The game's own frame rate setting stays as the
+  game has it, but where a faster one plays the page better (Jet Force Gemini's Game Frame Rate 60: docs/game-forks.md,
+  The games' own frame rates).
 - A window made without `SDL_WINDOW_ALLOW_HIGHDPI`, so the canvas stays in CSS pixels. With it, a recomp that makes its
   own window gets a canvas at the device's pixels, which on a laptop at 200% draws four times the pixels and takes every
   click at the wrong spot: Wave Race 64's Load ROM opened nothing there (wave-race-64-recomp-web 9d3f621).
@@ -146,7 +148,7 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   render to RAM's readback (ultramodern runs one game thread at a time). Jet Force Gemini's (its base's, not
   N64ModernRuntime's) did, and with the exact copy its page lost 250,000-300,000 sound frames in 160 s.
   JetForceGemini-Recomp-web lets the game go once RT64 reaches the list's last full sync (the list is all read by
-  then), and sends the RSP's and the RDP's completion once the frame is drawn, as before. Running on, a scheduler that
+  then), and sends the RSP's completion there too and the RDP's once the frame is drawn. Running on, a scheduler that
   counts retraces while a task is current can then take a frame waiting for shaders for a hung RCP (above).
 - Printing from the game's threads is cheap: `frontend/thread_stdio.js` hands each line a thread writes to stdout or
   stderr to the page's console from that thread. Emscripten runs every write on the page's thread and waits for it
