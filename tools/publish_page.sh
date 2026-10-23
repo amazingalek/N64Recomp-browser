@@ -60,19 +60,23 @@ fi
 
 url="https://github.com/$repo"
 git=(git -C "$stage")
-"${git[@]}" init -q -b gh-pages
+# publish_once: a commit on top of what gh-pages holds now, pushed with a lease on it. Called as a condition, where
+# set -e is off, so each step that matters returns on its own failure.
+publish_once() {
+rm -rf "$stage/.git"
+"${git[@]}" init -q -b gh-pages || return 1
 # What gh-pages holds now, unless there is none yet (ls-remote's 2); it is a commit or two, as each publish is an
 # orphan.
 have=0
 git ls-remote -q --exit-code "$url" refs/heads/gh-pages > /dev/null || have=$?
 case $have in
-    0) "${git[@]}" fetch -q "$url" gh-pages
+    0) "${git[@]}" fetch -q "$url" gh-pages || return 1
        lease=(--force-with-lease="gh-pages:$("${git[@]}" rev-parse FETCH_HEAD)")
-       "${git[@]}" read-tree FETCH_HEAD
+       "${git[@]}" read-tree FETCH_HEAD || return 1
        subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" -e ' plays in the hub at /' || true)"
        lines="$("${git[@]}" log -1 --format=%b FETCH_HEAD | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)" ;;
     2) subject="" lines="" lease=(-f) ;;
-    *) exit $have ;;
+    *) return 1 ;;
 esac
 [ -z "$drop" ] || "${git[@]}" ls-files --error-unmatch "$drop" > /dev/null 2>&1 ||
     { echo "gh-pages has no $drop/"; exit 1; }
@@ -87,7 +91,7 @@ fi
 if [ -z "$drop" ]; then
     for f in $(ls -A "$stage" | grep -vx -e .git -e .nojekyll); do
         "${git[@]}" update-index --add --cacheinfo \
-            "100644,$("${git[@]}" hash-object -w --no-filters "$f"),${into:+$into/}$f"  # the files exactly as built
+            "100644,$("${git[@]}" hash-object -w --no-filters "$f"),${into:+$into/}$f" || return 1  # the files exactly as built
     done
     if [ -n "$into" ]; then
         lines="$(printf '%s\n%s' "$lines" "$into/:${from:+ built from $from}" | sed '/^$/d' | sort)"
@@ -95,11 +99,19 @@ if [ -z "$drop" ]; then
         subject="The web page${from:+, built from $from}"
     fi
 fi
-"${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll"
-"${git[@]}" commit -q -F - <<< "${subject:-The web page}${lines:+$'\n\n'$lines}"
-# Another publish to this gh-pages (a page in another of its folders, the hub's page) pushed since the fetch: refused,
-# so run it again.
+"${git[@]}" update-index --add --cacheinfo "100644,$("${git[@]}" hash-object -w --stdin < /dev/null),.nojekyll" || return 1
+"${git[@]}" commit -q -F - <<< "${subject:-The web page}${lines:+$'\n\n'$lines}" || return 1
 "${git[@]}" push -q "${lease[@]}" "$url" gh-pages
+}
+# Another publish to this gh-pages (a page in another of its folders, the hub's page) pushed since the fetch: the lease
+# refuses the push, and it starts again from the gh-pages that publish left, so publishes of several pages can run at
+# once.
+for try in 1 2 3 4 5; do
+    publish_once && break
+    [ $try -lt 5 ] || { echo "gh-pages refused this publish $try times"; exit 1; }
+    echo "gh-pages moved during this publish: again on top of it"
+    sleep $((try * 3))
+done
 # A first push of gh-pages to a public repo can switch Pages on by itself in the seconds between the check and the
 # POST, which then answers 409 "already enabled": so a refused POST is checked again.
 gh api "repos/$repo/pages" > /dev/null 2>&1 ||

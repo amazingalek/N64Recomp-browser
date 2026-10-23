@@ -2,8 +2,8 @@
 # Rebuilds every game's page from its repo's main, publishes the ones whose files changed, and checks each one it
 # published from Pages: the deploy after a change that reaches the pages, so no page is left behind main.
 #
-#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit>] [--ref <commit>]
-#       [-- <queue command>...]
+#   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit> [--keep <dir>]]
+#       [--ref <commit>] [--played <dir>] [-- <queue command>...]
 #
 # For each game in the list below (all of them unless named):
 # 1. Syncs its repo's origin/main to a copy kept on $BUILD_HOST, with rush-2049-recomp's tools/remote_build.sh (its
@@ -45,6 +45,12 @@
 # `git -C $PAGES_CACHE/<game> fetch <local clone> <branch>` (Rush 2049's clone is its checkout), its origin left at
 # GitHub: the build host clones from origin's URL, and the sync sends the commit as a bundle on top of origin/main.
 # Every line names the commit built ("commit <sha>", not "main <sha>").
+# --keep <dir> (with --browser) copies each build that differs into <dir>/<game>, with a file `built` naming the main
+# and the N64Recomp-browser commit it was built from: what the retest plays, which another run's build in the same
+# copy can't overwrite. --played <dir> then publishes those files as they were played, without building again: once a
+# game's pin has moved, its origin/main has to be the built main with only N64Recomp-browser moved to that commit (the
+# same files, so the same bytes), or the game fails and is left alone. That spares the retest a second build of
+# every page (a minute or more each) between its plays and its publish.
 # A copy whose N64Recomp-browser moved since its last build puts the checkouts it patches back first, since
 # apply.cmake can't take a checkout from one version of the patches to another.
 #
@@ -60,7 +66,7 @@
 # ccache), 162 s to built, 6 min 14 s with its publish, the wait for Pages and the boot in headless Chrome.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-dry_run=false browser="" ref=""
+dry_run=false browser="" ref="" keep="" played_dir=""
 args=() queue=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -68,6 +74,8 @@ while [[ $# -gt 0 ]]; do
     --dry-run) dry_run=true ;;
     --browser) browser="$2" dry_run=true; shift ;;
     --ref) ref="$2" dry_run=true; shift ;;
+    --keep) keep="$2"; shift ;;
+    --played) played_dir="$2"; shift ;;
     *) args+=("$1") ;;
     esac
     shift
@@ -75,6 +83,15 @@ done
 [[ ${#args[@]} -ge 1 ]] || { sed -n 5,6p "$0"; exit 1; }
 # A remote gives a commit only by its whole SHA: an abbreviated one failed to fetch, and the build kept the old pin.
 [[ ! $browser =~ ^[0-9a-f]{4,39}$ ]] || browser="$(git -C "$here/.." rev-parse --verify "$browser^{commit}")"
+[[ -z $keep || -n $browser ]] || { echo "--keep keeps a --browser run's builds"; exit 1; }
+[[ -z $played_dir || -z "$browser$ref$keep" ]] || { echo "--played publishes builds already made: no --browser, --ref or --keep"; exit 1; }
+if [[ -n $keep ]]; then
+    mkdir -p "$keep" && keep="$(cd "$keep" && pwd)"
+    browser_sha="$(git -C "$here/.." rev-parse -q --verify "$browser^{commit}" ||
+        git -C "$here/.." ls-remote origin "refs/tags/$browser^{}" | cut -f1)"
+    [[ -n $browser_sha ]] || { echo "no commit $browser here or at origin"; exit 1; }
+fi
+[[ -z $played_dir ]] || played_dir="$(cd "$played_dir" && pwd)"
 rush="$(cd "${args[0]}" && pwd)"
 remote_build="$rush/tools/remote_build.sh"
 [[ -f "$remote_build" ]] || { echo "$rush is not a rush-2049-recomp checkout"; exit 1; }
@@ -356,6 +373,15 @@ on_host=" pd sm64 "
 # --- Here ---
 
 files() { echo "$1.html $1.js $1.wasm $1.data coi_serviceworker.js"; }
+# same_files <clone> <main> <pin> <commit>: whether <commit>'s files are <main>'s with N64Recomp-browser at <pin>,
+# checked in a scratch index, so a merge or a squash of the pin's PR passes too.
+same_files() {
+    local b=lib/N64Recomp-browser
+    [[ -n "$(git -C "$1" ls-tree "$2" $b)" ]] || b=tools/N64Recomp-browser
+    GIT_INDEX_FILE="$work/same.index" git -C "$1" read-tree "$2" &&
+        GIT_INDEX_FILE="$work/same.index" git -C "$1" update-index --cacheinfo "160000,$3,$b" &&
+        [[ "$(GIT_INDEX_FILE="$work/same.index" git -C "$1" write-tree)" == "$(git -C "$1" rev-parse "$4^{tree}")" ]]
+}
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 published=() differ=() failed=()
@@ -387,10 +413,19 @@ for g in "${selected[@]}"; do
         target=$from
     fi
     sha="$(git -C "$clone" rev-parse --short "$from")" label="${ref:+commit $sha}" label="${label:-main $sha}"
-    if ! bash "$remote_build" -C "$clone" -n $copy sync $target > "$work/$g.log" 2>&1; then
+    out="$work/$g"
+    if [[ -n $played_dir ]]; then
+        # --played: the files a --browser --keep run left, if main is the main they were built from with only the pin
+        # moved, which builds the same bytes.
+        out="$played_dir/$g"
+        read -r was pin < "$out/built" 2> /dev/null || { echo "   no $out/built: build it"; failed+=("$g"); continue; }
+        if ! same_files "$clone" "$was" "$pin" "$from"; then
+            echo "   main $sha is not main ${was:0:7} with N64Recomp-browser ${pin:0:7}: build it"; failed+=("$g"); continue
+        fi
+        built="$(cd "$out" && git hash-object $(files $name) | tr '\n' ' ')"
+    elif ! bash "$remote_build" -C "$clone" -n $copy sync $target > "$work/$g.log" 2>&1; then
         echo "   sync failed:"; tail -5 "$work/$g.log"; failed+=("$g"); continue
-    fi
-    if [[ $g == rush ]]; then
+    elif [[ $g == rush ]]; then
         bash "$remote_build" -n $copy build > "$work/$g.log" 2>&1 || { echo "   build failed:"; tail -20 "$work/$g.log"; failed+=("$g"); continue; }
     else
         rom="${ROMS:?set ROMS to the folder holding <game>.z64}/$g.z64"
@@ -408,16 +443,21 @@ for g in "${selected[@]}"; do
             echo "   build failed:"; tail -20 "$work/$g.log"; failed+=("$g"); continue
         fi
     fi
-    built="$(bash "$remote_build" -n $copy run "cd $dir && git hash-object $(files $name)" | tr '\n' ' ')"
+    [[ -n $played_dir ]] || built="$(bash "$remote_build" -n $copy run "cd $dir && git hash-object $(files $name)" | tr '\n' ' ')"
     pages="$(gh api "repos/$hub/git/trees/gh-pages:$folder" --jq '.tree[] | .path + " " + .sha' 2> /dev/null || true)"
     served=""
     for f in $(files $name); do served+="$(awk -v p="${f/$name.html/index.html}" '$1 == p { print $2 }' <<< "$pages") "; done
-    echo "   $label${browser:+ with N64Recomp-browser $browser} built in $((SECONDS - start)) s; $([[ "$built" == "$served" ]] && echo "the same as the hub's" || echo "differs from the hub's")"
+    echo "   $label${browser:+ with N64Recomp-browser $browser} $([[ -n $played_dir ]] && echo "as played" || echo "built in $((SECONDS - start)) s"); $([[ "$built" == "$served" ]] && echo "the same as the hub's" || echo "differs from the hub's")"
     [[ "$built" != "$served" ]] || continue
     differ+=("$g")
+    if [[ -n $keep ]]; then
+        rm -rf "${keep:?}/$g"
+        bash "$remote_build" -n $copy get "$dir" "$keep/$g"
+        echo "$from $browser_sha" > "$keep/$g/built"
+    fi
     $dry_run && continue
-    bash "$remote_build" -n $copy get "$dir" "$work/$g"
-    bash "$here/publish_page.sh" "$work/$g" "$name" "$hub" "$label" --into "$folder" | sed 's/^/   /'
+    [[ -n $played_dir ]] || bash "$remote_build" -n $copy get "$dir" "$out"
+    bash "$here/publish_page.sh" "$out" "$name" "$hub" "$label" --into "$folder" | sed 's/^/   /'
     published+=("$g")
 done
 
@@ -427,7 +467,8 @@ played=()
 for g in "${published[@]}"; do
     read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
     url="$hub_url$folder"
-    js="$(git hash-object "$work/$g/$name.js")"
+    out="$work/$g"; [[ -z $played_dir ]] || out="$played_dir/$g"
+    js="$(git hash-object "$out/$name.js")"
     for i in $(seq 60); do
         [[ "$(curl -sf "$url/$name.js" | git hash-object --stdin)" == "$js" ]] && break
         sleep 10
