@@ -206,7 +206,10 @@ as the list's plan starts them. Its README, BUILDING.md and the headers of those
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
 N64Recomp-browser's `frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's. Upstream shapes its
-window to the launcher and to the game's aspect; the page leaves the window alone. The game reads the keyboard once a
+window to the launcher and to the game's aspect; the page leaves the window alone. A page opens in widescreen (Aspect
+ratio at Expand to the window, the HUD within 16:9; the desktop build opens in the console's 4:3), and a page's
+settings saved in 4:3 move to it once. A room drawn over a 4:3 picture (Link's house, the castle grounds) stays 4:3,
+on the desktop too. The game reads the keyboard once a
 frame at its 20 a second, so a script holds a key 150-300 ms. Its list, `src/rt64_shaders.txt`, is 564 descriptions in
 24 sections, the boot 69. Its survey clears a new file's opening cutscene at the file select's hand-over, since clearing
 it mid-cutscene hung the game on a black screen, and warps as a child or an adult by the play state's `linkAgeOnLoad`,
