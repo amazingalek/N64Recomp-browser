@@ -391,8 +391,8 @@ N64ModernRuntime       on a page the stored ROM is written as <stored>.temp and 
 a0d35b6                that won't open at Start Game goes back to the launcher: Rush 2's launcher checked the stored ROMs
                        while Load ROM's thread wrote one (RecompFrontend 7bbaa3c) and deleted it half-written, in 1 of 7
                        plays, and Start Game then ran the game with no ROM and trapped out of bounds
-rt64 dd2fd23           a triangle covers its scissor only where it crosses the camera plane, on every build: one wholly
-                       behind it draws nothing, and one wholly in front has its box from its vertices held to 8192
+rt64 dd2fd23,          a triangle covers its scissor only where it crosses the camera plane, on every build: one wholly
+baa3753                behind it draws nothing, and one wholly in front has its box from its vertices held to 8192
                        pixels. a8bfc93 made a pass of triangles behind the camera or off one side a write of its whole
                        framebuffer, and a texture read of it after a new tile copy: ~100 full-screen ones at the title
                        of Banjo-Kazooie, kept, 3.6 GB at 3840x2000 (Firefox: Out of Memory on an 8 GB card)
