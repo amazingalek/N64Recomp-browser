@@ -1523,6 +1523,18 @@ What CLAUDE.md's Ruled out rests on.
   descriptor sets, made through the page's thread), and its wait for the count of changed pixels is gone (rt64
   254dee3). Right after the boot's wait in Chrome, on a busy host, gaps of 200-480 ms come with every page thread idle
   and the prebuild threads waiting for Chrome's GPU process; on a quiet host 3 cold runs of 4 had none.
+- Perfect Dark's one frame of 8 VIs (133 ms) every 1-7 s in its missions' opening cutscenes (Defection, Chicago,
+  Infiltration, Skedar Ruins), RT64 holding its last frame through it: the game's own wait, on a console too. Its
+  desktop build on Windows has them, 13 frames of 132-134 ms in the first 60 s of Defection's cutscene (an idle host,
+  RTX 5080, each frame's length read from outside the process). The page has them at the same moments: Chrome 155
+  headless, traced, on a page linked with `--profiling-funcs` (perfect-dark-recomp main on v0.93.0). There the gaps
+  between the frames are 2.4, 1.5, 1.0, 1.5, 1.1 and 7.4 s, as on the desktop. In every one the game's main thread
+  waits from start to end in `joy_disable_cyclic_polling` and `joy_enable_cyclic_polling`, called by
+  `player_start_cutscene2` → `paks_stop(true)` → `joy_stop_rumble` as each of the cutscene's shots starts. For each
+  of the 4 controller ports that holds no memory or Game Boy pak, `joy_stop_rumble` stops the joy's cyclic polling,
+  stops the port's rumble and starts the polling again. Each stop and each start waits for the scheduler's next retrace
+  (`joys_handle_retrace` answers both), so that is 8 retraces whatever the hardware. Missions' gameplay starts no shots,
+  so it doesn't have them.
 - Chrome's list build behind the game: on v0.50.0 it cost Conker's page at 3840x2000 a little (57.0-57.9 presents a
   second against 58.7-58.8 with nothing built behind it, the low after its intro's second scene 50-56 against 58-59),
   and on rt64 c89ced0's present timeline nothing: no present dropped while it built, and the page drew 58.6-60.0 either
