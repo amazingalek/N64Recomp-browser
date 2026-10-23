@@ -3,7 +3,7 @@
 # published from Pages: the deploy after a change that reaches the pages, so no page is left behind main.
 #
 #   bash tools/publish_pages.sh <rush-2049-recomp checkout> [<game>...] [--dry-run | --browser <commit> [--keep <dir>]]
-#     [--ref <commit>] [--played <dir>]
+#       [--ref <commit>] [--played <dir>] [-- <queue command>...]
 #
 # For each game in the list below (all of them unless named):
 # 1. Syncs its repo's origin/main to a copy kept on $BUILD_HOST, with rush-2049-recomp's tools/remote_build.sh (its
@@ -22,7 +22,10 @@
 #    (tools/play_page.mjs) with the game's own shader_plan.json (tools/, DKR-R's web/): launcher, ROM, Start Game,
 #    then 20 s of the game running by itself, uncapped at the stand-in's 3840x2000 as every measured play is (docs/playing.md,
 #    Uncapped, and the browsers' clocks), which has to present frames with no WebGPU error. Each run goes into
-#    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows.
+#    plays.jsonl (play_page.mjs --record), to be committed with the Games table's rows. A queue command after -- goes in
+#    front of each boot's play_page.mjs, as ab_pages.mjs's does, so the boot takes its turn in the machine's GPU queue
+#    (CLAUDE.md, Playing a page): a shared turn with a short limit, like a smoke play (docs/playing.md, What a change
+#    plays). Without one it plays at once, beside whatever else holds the GPU, and its presents a second read that.
 # 6. Prints the pages it published, which are then played in Chrome and Firefox and their cells in the README's Games
 #    table updated (CLAUDE.md, The games table): that needs Firefox in a window.
 # --dry-run stops after 3, saying which pages differ.
@@ -54,8 +57,6 @@
 # It needs BUILD_HOST (an ssh host with Docker), push access to the game repos and gh signed in, and the ROMs: Rush
 # 2049's in the checkout's roms/ (its README), and each other game's plain dump as $ROMS/<game>.z64 (sha1 in the fork's
 # BUILDING.md), copied to the build host when they differ. NODE is the node that runs play_page.mjs (node unless set).
-# PLAY_QUEUE is a command each boot from Pages runs behind, a GPU queue's turn (CLAUDE.md, Playing a page), so a run
-# that is only publishing (--played) holds no turn while it waits for Pages, and its boot takes a turn of its own.
 # The pages build one after another; each container takes $BUILD_CPUS cores (remote_build.sh).
 #
 # Measured on 2026-10-15, a 32-core host, a container 12 cores, the host otherwise quiet (load 0.5-4): all 9 pages warm,
@@ -66,9 +67,10 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 dry_run=false browser="" ref="" keep="" played_dir=""
-args=()
+args=() queue=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
+    --) shift; queue=("$@"); break ;;
     --dry-run) dry_run=true ;;
     --browser) browser="$2" dry_run=true; shift ;;
     --ref) ref="$2" dry_run=true; shift ;;
@@ -129,16 +131,21 @@ if [[ -n "$ref" ]]; then
     [[ ${#args[@]} -eq 2 ]] || { echo "--ref builds one game's commit: name the game"; exit 1; }
     [[ -n "${PAGES_COPY:-}" ]] || { echo "--ref builds in copies of its own: set PAGES_COPY"; exit 1; }
 fi
-# base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, fetched from origin when the clone lacks it.
-# The fetch goes to a ref of this run's own, not FETCH_HEAD: the clone is shared, and another run's fetch in the same
-# seconds (a publish of main) rewrites FETCH_HEAD, which built that main in place of the --ref.
+# base <clone>: the commit to build, as a whole SHA: origin/main, or --ref's, from origin first and from the clone only
+# when origin gives none (a commit fetched into it by hand). The clone's own branches are as it was cloned, never
+# updated, so `--ref main` read first from the clone built the fork's first commit. The fetch goes to a ref of this
+# run's own, not FETCH_HEAD: the clone is shared, and another run's fetch in the same seconds (a publish of main)
+# rewrites FETCH_HEAD, which built that main in place of the --ref.
 base() {
     [[ -n "$ref" ]] || { git -C "$1" rev-parse origin/main; return; }
-    git -C "$1" rev-parse -q --verify "$ref^{commit}" && return
     local own="refs/publish-pages/ref-$$"
-    git -C "$1" fetch -q origin "+$ref:$own" || { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
-    git -C "$1" rev-parse "$own^{commit}"
-    git -C "$1" update-ref -d "$own"
+    if git -C "$1" fetch -q origin "+$ref:$own" 2> /dev/null; then
+        git -C "$1" rev-parse "$own^{commit}"
+        git -C "$1" update-ref -d "$own"
+        return
+    fi
+    git -C "$1" rev-parse -q --verify "$ref^{commit}" ||
+        { echo "$1 has no $ref and origin gives none (a short SHA it never gives)" >&2; return 1; }
 }
 
 # --- What runs in the image, in the copy's repo (the ROM is ../rom.z64) ---
@@ -457,7 +464,6 @@ done
 # --- Each published page, from Pages ---
 
 played=()
-read -ra queue <<< "${PLAY_QUEUE:-}"
 for g in "${published[@]}"; do
     read -r _ repo name dir folder <<< "$(grep "^$g " <<< "$games")"
     url="$hub_url$folder"
@@ -473,8 +479,8 @@ for g in "${published[@]}"; do
     git -C "$clone" archive origin/main $(git -C "$clone" ls-tree --name-only origin/main tools web) | tar xf - -C "$work/$g-tools"
     plan="$work/$g-tools/tools/shader_plan.json"
     [[ -f "$plan" ]] || plan="$work/$g-tools/web/shader_plan.json"
-    "${queue[@]}" "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped --size 3840x2000 \
-        --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
+    "${queue[@]}" "$node" "$here/play_page.mjs" chrome "$url/index.html" "$rom" "$plan" --play 20 --uncapped \
+        --size 3840x2000 --profile "$work/$g-profile" --json "$work/$g.json" --record "$here/../plays.jsonl" --game $g \
         --build "Pages, main $(git -C "$clone" rev-parse --short origin/main)" --note "publish_pages.sh's boot check" \
         > "$work/$g-play.log" 2>&1 || true
     result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
