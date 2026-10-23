@@ -29,10 +29,12 @@ header .warning {
 }
 header .warning::before { content: "⚠ "; }
 header .tagline { color: var(--text); font-size: 18px; }
-/* The source link ends the credits whole, on the next line when it doesn't fit. */
-header .source { white-space: nowrap; }
 
 main { max-width: 1200px; margin: 0 auto; padding: 12px 24px 32px; }
+/* How it is made, under the games. The source link stays whole, on the next line when it doesn't fit. */
+footer { max-width: 1200px; margin: 0 auto; padding: 0 24px 32px; color: var(--dim); font-size: 13px; }
+footer p { margin: 0; padding-top: 14px; border-top: 1px solid var(--line); }
+footer .source { white-space: nowrap; }
 .note { color: var(--dim); }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
