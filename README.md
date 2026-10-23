@@ -31,7 +31,7 @@ and both browsers get it.
 | Mario Kart 64 | [MarioKart64Recomp](https://github.com/sonicdcer/MarioKart64Recomp) by sonicdcer | [MarioKart64Recomp-web](https://github.com/n64hub/MarioKart64Recomp-web) | [play](https://n64hub.com/mario-kart-64/) | 60; 358* | 43; 342* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
 | Star Fox 64 | [Starfox64Recomp](https://github.com/sonicdcer/Starfox64Recomp) by sonicdcer | [Starfox64Recomp-web](https://github.com/n64hub/Starfox64Recomp-web) | [play](https://n64hub.com/star-fox-64/) | 173* | 201* | 2026-10-23, v0.93.0 |
 | The Legend of Zelda: Ocarina of Time | [OoT: Recompiled](https://github.com/JonB-Dev/oot-recompiled) by JonB-Dev | [oot-recompiled-web](https://github.com/n64hub/oot-recompiled-web) | [play](https://n64hub.com/ocarina-of-time/) | 60; 320* | 37; 282* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
-| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/n64hub/DKR-R-web) | [play](https://n64hub.com/diddy-kong-racing/) | 353* | 267* | 2026-10-23, v0.93.0 |
+| Diddy Kong Racing | [DKR-R](https://github.com/ThatGuyMcd/DKR-R) by ThatGuyMcd | [DKR-R-web](https://github.com/n64hub/DKR-R-web) | [play](https://n64hub.com/diddy-kong-racing/) | 275* | 217* | 2026-10-23, v0.93.0 |
 | Jet Force Gemini | [Jet Force Gemini: Recompiled](https://github.com/VibinToast/JetForceGemini-Recomp) by VibinToast | [JetForceGemini-Recomp-web](https://github.com/n64hub/JetForceGemini-Recomp-web) | [play](https://n64hub.com/jet-force-gemini/) | 58; 336* | 44; 311* | 2026-10-23, v0.93.0; laptop 2026-10-18, v0.63.0 |
 | Pokémon Snap | [Snap64Recomp](https://github.com/JackandBeans/Snap64Recomp) by JackandBeans | [Snap64Recomp-web](https://github.com/n64hub/Snap64Recomp-web) | [play](https://n64hub.com/pokemon-snap/) | 358* | 206* | 2026-10-23, v0.93.0 |
 | Rush 2: Extreme Racing USA | [Rush 2 Recompiled](https://github.com/bryantmh/rush2recompiled) by bryantmh | [rush2recompiled-web](https://github.com/n64hub/rush2recompiled-web) | [play](https://n64hub.com/rush-2/) | not yet | not yet | 2026-10-23, v0.93.0 |
@@ -108,7 +108,7 @@ What changes in the game's own code (behind `__EMSCRIPTEN__`) and files:
   the canvas's size, whatever the recomp's desktop build defaults to. RecompFrontend's defaults are those. A recomp
   with settings of its own sets them with Emscripten (Ocarina of Time's `machine_defaults`, Jet Force Gemini's
   `rr_default`, which also moves a page's saved Original to Display once), and one that interpolates only in a profile
-  of its own plays that profile on a page (DKR-R's Modern). The game's own frame rate setting stays as the game has it.
+  of its own plays that profile on a page (DKR-R's Modern, in its default widescreen). The game's own frame rate setting stays as the game has it.
 - A window made without `SDL_WINDOW_ALLOW_HIGHDPI`, so the canvas stays in CSS pixels. With it, a recomp that makes its
   own window gets a canvas at the device's pixels, which on a laptop at 200% draws four times the pixels and takes every
   click at the wrong spot: Wave Race 64's Load ROM opened nothing there (wave-race-64-recomp-web 9d3f621).
