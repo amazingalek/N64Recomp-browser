@@ -333,7 +333,8 @@ rt64 a9eeacd           the interpolated targets grow under interpolatedMutex, wh
                        under, on every build: a resize could move them while it read one (Pokémon Snap's port's fix)
 rt64 a8bfc93           a triangle with a vertex at w <= 0, or projected 4096 pixels out, faces the camera and covers its
                        scissor in the pass's boxes, on every build: xyz / w put it anywhere, and a pass of only such
-                       triangles had no drawColorRect and wasn't drawn in interpolated frames (Pokémon Snap's port's)
+                       triangles had no drawColorRect and wasn't drawn in interpolated frames (Pokémon Snap's port's);
+                       narrowed to a triangle crossing the camera plane by rt64 dd2fd23
 rt64 a48552c           a pass's framebuffer is at least as tall as the viewports its triangles were drawn through, cut
                        to their scissors, on every build: an interpolated frame that put them lower than the box
                        fitted to the game frame lost a band at the bottom. Pokémon Snap's port takes the scissor's
@@ -390,6 +391,11 @@ N64ModernRuntime       on a page the stored ROM is written as <stored>.temp and 
 a0d35b6                that won't open at Start Game goes back to the launcher: Rush 2's launcher checked the stored ROMs
                        while Load ROM's thread wrote one (RecompFrontend 7bbaa3c) and deleted it half-written, in 1 of 7
                        plays, and Start Game then ran the game with no ROM and trapped out of bounds
+rt64 dd2fd23,          a triangle covers its scissor only where it crosses the camera plane, on every build: one wholly
+baa3753                behind it draws nothing, and one wholly in front has its box from its vertices held to 8192
+                       pixels. a8bfc93 made a pass of triangles behind the camera or off one side a write of its whole
+                       framebuffer, and a texture read of it after a new tile copy: ~100 full-screen ones at the title
+                       of Banjo-Kazooie, kept, 3.6 GB at 3840x2000 (Firefox: Out of Memory on an 8 GB card)
 rt64 4e6c52e           on the web a tile copy is a texture copy (copyTextureToTexture), not a draw into a framebuffer of
                        its own: Perfect Dark's Area 51 - Infiltration cutscene reads ~210 regions back a present, each a
                        render pass in the browser's CPU, 11-14 passes a present after against 204-226 (docs/findings.md,
