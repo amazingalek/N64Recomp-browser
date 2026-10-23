@@ -1327,7 +1327,8 @@ every fifth chunk of a list read up to 15 ms late: lists changed under 175 of 55
 way (target 0xFFFFFE4D). Held 20-60 ms before the run alone, 1,028 of 7,200 tasks ran on a list written over before
 they started and none exited: a whole later list is a sound one, a list half one and half the next isn't.
 `ULTRAMODERN_RSP_TASKS_COPIED` (N64ModernRuntime 0ec6c51) runs the task from a copy of its OSTask and list taken as the
-game starts it, the newest its OSTask was given: under the same holds the desktop build ran 15,000 tasks without an exit.
+game starts it, the newest its OSTask was given: under the same holds the desktop build ran 16,200 tasks without an
+exit, 3,416 of them on lists the game wrote over in RDRAM as they ran.
 
 On an idle RTX 2070 host a probe build's audio tasks started at most 23.8 ms after their submit in Firefox (about 600
 tasks each 10 s), the graphics tasks' SP completions came within 0.6 ms of theirs, and no list changed: tasks that
