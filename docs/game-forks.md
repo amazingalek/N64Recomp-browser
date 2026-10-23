@@ -230,7 +230,7 @@ base and its patches are built into a page, the recompile without call tracking,
 game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
 its survey.
 
-`n64hub/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
+`n64hub/DKR-R-web` is DKR-R (MIT, 1.0.8), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
 `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
 before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs its `scripts/build_web.sh --patches`
 (DKR-R's patches, `apply.cmake` with its skip list, `patches/web/`, and DKR-R's configure-time stages, no ROM) with the
@@ -247,8 +247,10 @@ and the capped interpolated targets, and the runtime read the ROM 1 KB at a time
 frees its queue, and is staged over that file at configure time. rt64-web 0a9fcb6 keeps the web's
 lines off those DKR-R's and Jet Force Gemini's patches change, as 03b9dcc and d5121c9 do for Conker's. It always
 plays DKR-R's Modern profile, the only one that interpolates (Accurate, the desktop's default, holds RT64 at Original
-and 30, and the page has no overlay to pick a profile), with its Match display passed on as RT64's Display, since SDL's
-Emscripten port reports no refresh rate. `record_shaders.mjs --from` goes on with a recording of its list stopped
+and 30, and the page has no overlay to pick a profile), widescreen as Modern is by default (a first run's settings
+would give it the runtime's starting 4:3, which nothing on a page changes), with its Match display passed on as RT64's
+Display, since SDL's Emscripten port reports no refresh rate. DKR-R's updater is left out: a page is updated by its
+site. `record_shaders.mjs --from` goes on with a recording of its list stopped
 partway. The list was recorded in Accurate; in Modern, recorded with `?record-shaders` over the title, the menus,
 Timber's Island and Dino Domain, the game asked for 119 descriptions, all in it but one, which differs from one in it
 only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.sh`, `web/shader_survey.js` and
