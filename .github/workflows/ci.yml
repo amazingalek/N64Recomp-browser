@@ -51,7 +51,7 @@ jobs:
           fi
           echo "$files"
           code=false
-          if grep -qvE '\.md$|^tools/(page_driver\.mjs|play_page\.mjs|record_shaders\.mjs|publish_(pages?|site|moved)\.sh|moved_page\.html|serve_site\.mjs|wasm_offset\.mjs)$|^plays\.jsonl$|^site/' <<< "$files"
+          if grep -qvE '\.md$|^tools/(page_driver\.mjs|play_page\.mjs|record_shaders\.mjs|publish_(pages?|site)\.sh|serve_site\.mjs|wasm_offset\.mjs)$|^plays\.jsonl$|^site/' <<< "$files"
           then code=true
           elif [[ "$GITHUB_EVENT_NAME" == push ]]; then
             # The same newest tag as the tag job's, and a tag that can't be found or fetched builds everything.
@@ -225,7 +225,7 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends spirv-tools
       - name: They apply over DKR-R-web's
         run: |
-          git clone -q --depth 1 https://github.com/amazingalek/DKR-R-web "$RUNNER_TEMP/dkr"
+          git clone -q --depth 1 https://github.com/n64hub/DKR-R-web "$RUNNER_TEMP/dkr"
           git -C "$RUNNER_TEMP/dkr" log -1 --format='DKR-R-web %h %s'
           rmdir "$RUNNER_TEMP/dkr/lib/N64Recomp-browser"
           ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/dkr/lib/N64Recomp-browser"
@@ -248,7 +248,7 @@ jobs:
       - name: They apply over CBFD-Recompiled-web's
         run: |
           cbfd="$RUNNER_TEMP/cbfd"
-          git clone -q --depth 1 https://github.com/amazingalek/CBFD-Recompiled-web "$cbfd"
+          git clone -q --depth 1 https://github.com/n64hub/CBFD-Recompiled-web "$cbfd"
           git -C "$cbfd" log -1 --format='CBFD-Recompiled-web %h %s'
           git -C "$cbfd" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 4             tools/N64Recomp tools/N64ModernRuntime tools/rt64 tools/RecompFrontend
           git -C "$cbfd/tools/rt64" -c protocol.version=2 submodule update -q --init --depth 1 src/contrib/plume src/contrib/hlslpp
@@ -277,7 +277,7 @@ jobs:
       - name: JetForceGemini-Recomp-web's apply over them
         run: |
           jfg="$RUNNER_TEMP/jfg"
-          git clone -q --depth 1 https://github.com/amazingalek/JetForceGemini-Recomp-web "$jfg"
+          git clone -q --depth 1 https://github.com/n64hub/JetForceGemini-Recomp-web "$jfg"
           git -C "$jfg" log -1 --format='JetForceGemini-Recomp-web %h %s'
           rmdir "$jfg/lib/N64Recomp-browser"
           ln -s "$GITHUB_WORKSPACE" "$jfg/lib/N64Recomp-browser"
@@ -301,7 +301,7 @@ jobs:
       - name: Snap64Recomp-web's apply over them
         run: |
           snap="$RUNNER_TEMP/snap"
-          git clone -q --depth 1 https://github.com/amazingalek/Snap64Recomp-web "$snap"
+          git clone -q --depth 1 https://github.com/n64hub/Snap64Recomp-web "$snap"
           git -C "$snap" log -1 --format='Snap64Recomp-web %h %s'
           git -C "$snap" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 2 lib/rt64 lib/N64ModernRuntime
           git -C "$snap/lib/rt64" -c protocol.version=2 submodule update -q --init --depth 1 src/contrib/plume src/contrib/hlslpp
@@ -326,7 +326,7 @@ jobs:
       - name: rush2recompiled-web's apply over them
         run: |
           rush2="$RUNNER_TEMP/rush2"
-          git clone -q --depth 1 https://github.com/amazingalek/rush2recompiled-web "$rush2"
+          git clone -q --depth 1 https://github.com/n64hub/rush2recompiled-web "$rush2"
           git -C "$rush2" log -1 --format='rush2recompiled-web %h %s'
           git -C "$rush2" -c protocol.version=2 submodule update -q --init --depth 1 --jobs 3 \
             lib/rt64 lib/N64ModernRuntime lib/RecompFrontend
@@ -353,7 +353,7 @@ jobs:
       - name: super-mario-64-recomp's apply over them
         run: |
           sm64="$RUNNER_TEMP/sm64"
-          git clone -q --depth 1 https://github.com/amazingalek/super-mario-64-recomp "$sm64"
+          git clone -q --depth 1 https://github.com/n64hub/super-mario-64-recomp "$sm64"
           git -C "$sm64" log -1 --format='super-mario-64-recomp %h %s'
           for patch in $(ls "$sm64"/runtime-patches/*.patch | sort); do
             project=$(basename "$patch" | sed 's/-[0-9]*-.*//')

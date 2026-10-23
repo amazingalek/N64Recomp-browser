@@ -65,14 +65,13 @@ which its `tools/remote_build.sh -C <checkout>` builds in; a tool a build lacks 
 `tools/publish_page.sh <build dir> <name> n64hub/n64hub.github.io "main <sha>" --into <folder>` publishes one;
 `tools/publish_pages.sh` does it for every game, or the ones it is given, each into its folder (its list). The hub's
 last commit names, a line each, the main each folder was built from (`<folder>/: built from main <sha>
-(amazingalek/<fork>)`, in `git log -1 --format=%b` of its gh-pages). A game's old address, its fork's own Pages,
-serves `tools/moved_page.html` (`tools/publish_moved.sh`), which sends a player on to the hub and moves their saves
-there. A change to one game's own repo is played from a `--dry-run` build of
+(n64hub/<fork>)`, in `git log -1 --format=%b` of its gh-pages). A game fork's own Pages, at
+`https://n64hub.com/<fork>/` under the org site's domain, is a page that sends a player on to the game's folder. A change to one game's own repo is played from a `--dry-run` build of
 that game, then published by a `tools/publish_pages.sh` run with its name.
 
 A test page, a game fork's branch to be played by hand before it lands, is published on its fork's own Pages, beside
-the moved page, with `tools/publish_page.sh <build dir> <name> amazingalek/<fork> "<branch> <sha>" --into <branch>`, at
-`https://amazingalek.github.io/<fork>/<branch>/`, and taken off with `--drop <branch>` when the branch lands or is
+that page, with `tools/publish_page.sh <build dir> <name> n64hub/<fork> "<branch> <sha>" --into <branch>`, at
+`https://n64hub.com/<fork>/<branch>/`, and taken off with `--drop <branch>` when the branch lands or is
 dropped. Publishing main's page keeps every folder, and a test page leaves main's page and the other folders alone
 (the script's header says how).
 

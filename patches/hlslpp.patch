@@ -1,4 +1,4 @@
-hlslpp: https://github.com/amazingalek/hlslpp-web 568fbc2c2a97c426d81943c4fabbd150f087eb65
+hlslpp: https://github.com/n64hub/hlslpp-web 568fbc2c2a97c426d81943c4fabbd150f087eb65
 on upstream 6f5274c66132e8f951c400103d897582b8f21491 (tools/export_patches.sh)
 
 diff --git a/include/hlsl++/platforms/wasm.h b/include/hlsl++/platforms/wasm.h

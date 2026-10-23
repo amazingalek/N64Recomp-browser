@@ -83,24 +83,24 @@ hub_url="$(gh api "repos/$hub/pages" --jq .html_url)"
 # <game> <repo> <page name> <build dir> <hub folder>, the build dir relative to the repo's root, the folder the page
 # is published to in the hub (tools/publish_site.sh), the address its Page cell in the README links.
 games="
-rush   amazingalek/rush-2049-recomp               Rush2049Recompiled   build-web rush-2049
-ge     amazingalek/GoldenEye64Recomp-web          GoldenRecomp         build-web goldeneye
-mm     amazingalek/Zelda64Recomp-web              Zelda64Recompiled    build-web majoras-mask
-banjo  amazingalek/BanjoRecomp-web                BanjoRecompiled      build-web banjo-kazooie
-cbfd   amazingalek/CBFD-Recompiled-web            ConkerRecomp         host/build-web conker
-dk64   amazingalek/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web donkey-kong-64
-wr     amazingalek/wave-race-64-recomp-web        WaveRace64Recomp     build-web wave-race-64
-pw     amazingalek/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web pilotwings-64
-bt     amazingalek/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web banjo-tooie
-mk64   amazingalek/MarioKart64Recomp-web          MarioKart64Recompiled build-web mario-kart-64
-sf64   amazingalek/Starfox64Recomp-web            Starfox64Recompiled  build-web star-fox-64
-oot    amazingalek/oot-recompiled-web             OoTRecompiled        build-web ocarina-of-time
-jfg    amazingalek/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web jet-force-gemini
-dkr    amazingalek/DKR-R-web                      DKR-R                build-web/bin/Release diddy-kong-racing
-snap   amazingalek/Snap64Recomp-web               Snap64Recomp         build-web pokemon-snap
-rush2  amazingalek/rush2recompiled-web            Rush2Recompiled      build-web rush-2
-pd     amazingalek/perfect-dark-recomp            PerfectDarkRecompiled build/web perfect-dark
-sm64   amazingalek/super-mario-64-recomp          SuperMario64Recompiled build/web super-mario-64
+rush   n64hub/rush-2049-recomp               Rush2049Recompiled   build-web rush-2049
+ge     n64hub/GoldenEye64Recomp-web          GoldenRecomp         build-web goldeneye
+mm     n64hub/Zelda64Recomp-web              Zelda64Recompiled    build-web majoras-mask
+banjo  n64hub/BanjoRecomp-web                BanjoRecompiled      build-web banjo-kazooie
+cbfd   n64hub/CBFD-Recompiled-web            ConkerRecomp         host/build-web conker
+dk64   n64hub/Donkey-Kong-64-Recompiled-web  DK64Recompiled       build-web donkey-kong-64
+wr     n64hub/wave-race-64-recomp-web        WaveRace64Recomp     build-web wave-race-64
+pw     n64hub/pilotwings-64-recomp-web       Pilotwings64Recomp   build-web pilotwings-64
+bt     n64hub/BanjoTooieRecompiled-web       BanjoTooieRecompiled build-web banjo-tooie
+mk64   n64hub/MarioKart64Recomp-web          MarioKart64Recompiled build-web mario-kart-64
+sf64   n64hub/Starfox64Recomp-web            Starfox64Recompiled  build-web star-fox-64
+oot    n64hub/oot-recompiled-web             OoTRecompiled        build-web ocarina-of-time
+jfg    n64hub/JetForceGemini-Recomp-web      JetForceGeminiRecompiled web-build/build-web jet-force-gemini
+dkr    n64hub/DKR-R-web                      DKR-R                build-web/bin/Release diddy-kong-racing
+snap   n64hub/Snap64Recomp-web               Snap64Recomp         build-web pokemon-snap
+rush2  n64hub/rush2recompiled-web            Rush2Recompiled      build-web rush-2
+pd     n64hub/perfect-dark-recomp            PerfectDarkRecompiled build/web perfect-dark
+sm64   n64hub/super-mario-64-recomp          SuperMario64Recompiled build/web super-mario-64
 "
 selected=("${args[@]:1}")
 [[ ${#selected[@]} -gt 0 ]] || selected=($(awk 'NF { print $1 }' <<< "$games"))

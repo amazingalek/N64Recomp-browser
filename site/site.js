@@ -9,7 +9,7 @@
 
 // Served locally (tools/serve_site.mjs), the checkout's own README.md, so a change to the table shows before it lands.
 const README = location.hostname === 'localhost' ? 'README.md'
-  : 'https://raw.githubusercontent.com/amazingalek/N64Recomp-browser/main/README.md';
+  : 'https://raw.githubusercontent.com/n64hub/N64Recomp-browser/main/README.md';
 
 // The table's columns, found by their headers: Game, Recomp (the upstream recomp, "[name](url) by owner"), Repo,
 // Page; the frame rates and Played aren't shown (the page's header says how the games play).

@@ -35,7 +35,7 @@ DK Rap played alike with its boot section on 6, 3, 2 or 1 threads, and waiting f
 frames). With rt64 6734747, cold on an idle host, GoldenEye drew 48-62 through its boot and credits (173k-223k audio
 frames short in 120 s against 525k-1.2M) and Donkey Kong 64 55-56 once its boot's ~3 s of black ended, none short.
 
-`amazingalek/BanjoRecomp-web` is Banjo-Kazooie: Recompiled, the second recomp the web support was tried on. Its runtime
+`n64hub/BanjoRecomp-web` is Banjo-Kazooie: Recompiled, the second recomp the web support was tried on. Its runtime
 is older than the forks', so `recomp::start` takes upstream Banjo's arguments, not a `recomp::Configuration`. It has no
 externs header. What porting it found is in N64Recomp-browser's README. On a fresh profile about 3 minutes of A through
 the opening reached only the dialogue in Banjo's house, so its play plan warps. Its BUILDING.md (The web page) and the
@@ -43,7 +43,7 @@ headers of `CMakeLists.txt`, `tools/warp.js` and `src/rt64_shaders.txt` have the
 and the page built, the shader list's sections and how they were recorded, the play plan and its warps by the game's own
 map change request.
 
-`amazingalek/Zelda64Recomp-web` is Majora's Mask on upstream's `recomp-frontend` branch (draft PR 722, which moves it
+`n64hub/Zelda64Recomp-web` is Majora's Mask on upstream's `recomp-frontend` branch (draft PR 722, which moves it
 onto RecompFrontend). The commits that branch pins for its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend`
 are the forks' bases, so `patches/apply.cmake` applies every patch with `git apply` alone, with no patch of the game's own
 on its submodules. In headless Chrome: launcher, Load ROM, the attract demo, title, file select, the intro, Link walking, the
@@ -52,7 +52,7 @@ play. Its BUILDING.md (The web page) has the rest: the submodules and their patc
 linked in, render to RAM kept on for the Pictograph Box, the ROM to build with and the one the page takes, the shader
 list's sections and how they were recorded.
 
-`amazingalek/Donkey-Kong-64-Recompiled-web` is Donkey Kong 64: Recompiled. In headless Chrome: launcher, Load ROM, the
+`n64hub/Donkey-Kong-64-Recompiled-web` is Donkey Kong 64: Recompiled. In headless Chrome: launcher, Load ROM, the
 DK Rap, a new game through the opening cutscenes, DK walking in his house, the pause menu, sound. Upstream's fork of the
 runtime adds `--game-mode` beside `--game`, and `recomp::Configuration`'s argc and argv, which the page passes. Its
 hooks and patches called C functions whose signatures didn't match the call, which only wasm-ld's `function signature
@@ -67,7 +67,7 @@ submodules and the three-way merge, the mod store kept off without curl, the aud
 boot's shaders and its fix, render to RAM's late copy for the Banana Fairy photo and the dummy-frame crash, the shader
 list's sections and Firefox's waits, the ROM.
 
-`amazingalek/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. It is a fork of podulator's
+`n64hub/GoldenEye64Recomp-web` is GoldenEye 007, moved onto RecompFrontend. It is a fork of podulator's
 GoldenEye64Recomp, which carries on cblock85's, and merges its main: its sky and water drawn as vertex triangles where
 cblock85's filled the screen with the fog colour (RT64 has no raw RDP triangles), and the debug menu only with
 `GE_DEBUG_MENU=1`; the build scripts, input, natives and launcher it changes are left out, RecompFrontend's in their
@@ -99,7 +99,7 @@ osTvType, osRomBase and osMemSize at 0x80000300. Its README and BUILDING.md, and
 patches for and the renamed functions, the sound fixes, render to RAM's late copy with Dam's timings, the shader list
 and how it was recorded, Firefox's waits.
 
-`amazingalek/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
+`n64hub/CBFD-Recompiled-web` is Conker's Bad Fur Day: Recompiled (its CONTRIBUTING.md welcomes AI-assisted work,
 but nothing has been offered to it). Its tools stay upstream's submodules in `tools/`, with `recomp/*.patch` as upstream
 has them, and `tools/publish_pages.sh` runs the fork's `tools/web_patch.sh` too; the three files that leaves out are out
 of apply.cmake's file list, and its `tools/web_timer.patch` does what N64ModernRuntime 1f46855 does upstream's. Its
@@ -124,7 +124,7 @@ crashed. A game's own `target_link_options(<target> PRIVATE -sINITIAL_MEMORY=...
 states, the TLB-mapped pages and the heap, tail calls, sound, render to RAM and its late copy, the shader list's
 sections and how they are recorded, Firefox's fixes.
 
-`amazingalek/wave-race-64-recomp-web` is Wave Race 64: Recompiled. Fast3D draws as it does natively, with no rt64-web
+`n64hub/wave-race-64-recomp-web` is Wave Race 64: Recompiled. Fast3D draws as it does natively, with no rt64-web
 change. Its water renderer's 16 shaders are included as WGSL blobs. Its water patch is the web-patched tree's diff, so
 an rt64-web change beside its lines (rt64 179adb8, 5249040, d19fdcc) stops `git apply` and the patch is made again (applied with fuzz,
 then diffed). Its list is in 13 sections, the menus passed with page_driver's `pressUntil` and the gas held with
@@ -133,7 +133,7 @@ headers of `tools/web_patch.sh`, `tools/patch_rt64_water.py`, `recomp/wr64.toml`
 `src/rt64_shaders.txt` have the rest: how the submodules are patched (apply.cmake, the port's own scripts, the water
 patch), the microcode labels it ignores, render to RAM off and why, the shader list and how it was recorded, plays.
 
-`amazingalek/BanjoTooieRecompiled-web` is Banjo-Tooie: Recompiled. The game writes thprof creating its threads
+`n64hub/BanjoTooieRecompiled-web` is Banjo-Tooie: Recompiled. The game writes thprof creating its threads
 (N64ModernRuntime 2e6aa0a). Upstream ships the Suplexmentary Comic NC font in `assets/`, and the page loads it. Its list
 is 284 descriptions in 11 sections. The word at 0x800459C8 counts 30 a second in every world, not frames
 drawn. The desktop build draws every world but Terrydactyland and Hailfire Peaks at 30. Upstream prints diagnostics of
@@ -145,7 +145,7 @@ thread in Chrome, throttled). Its BUILDING.md and the headers of
 own patches and apply.cmake are layered and the files left out, the recompile with the web-patched N64Recomp, render to
 RAM off and the leak it showed, the shader list and its survey, the frame rates per world and the page's pacing.
 
-`amazingalek/pilotwings-64-recomp-web` is Pilotwings 64: Recompiled. The IDO 5.3 and MIPS binutils its decompilation's
+`n64hub/pilotwings-64-recomp-web` is Pilotwings 64: Recompiled. The IDO 5.3 and MIPS binutils its decompilation's
 ELF is built with are in the Docker image. It is Fast3D, which RT64 draws on WebGPU unchanged. Without render to RAM
 both framebuffers' RDRAM stays stale and equal, so `uvCopyFrameBuf`'s copy changes no byte and RT64's check of a
 framebuffer's RDRAM before each list (`checkRAM`) sees nothing; the title's fade alternates black frames either way, so
@@ -156,7 +156,7 @@ before the first frame, split 7-9 s. Its docs/BUILDING.md (The web page) and the
 decompilation build and the patches, sound, render to RAM off and why, the clock waits, the shader list's sections and
 how it was recorded, the scheduler's timeouts taken out, plays.
 
-`amazingalek/MarioKart64Recomp-web` is MarioKart 64: Recompiled (GPL-3.0), moved onto RecompFrontend as GoldenEye's is.
+`n64hub/MarioKart64Recomp-web` is MarioKart 64: Recompiled (GPL-3.0), moved onto RecompFrontend as GoldenEye's is.
 `patches.h` maps the game's patches onto rt64's newer extended GBI, and the debug natives they call are stubs.
 Upstream's four workflows, native builds without a ROM, are disabled on the fork. Its boot logo draws with no tile,
 which on WebGPU left the pipelines built behind the game without a binding their layout named (rt64 f01c3a6). Its list's
@@ -167,7 +167,7 @@ cup, which no section of the list's plan plays. Its README and BUILDING.md, and 
 Pak, the boot's first display list and its fix, render to RAM kept exact for the jumbotron, the shader list and how it
 was recorded.
 
-`amazingalek/Starfox64Recomp-web` is Starfox 64: Recompiled (US 1.1, Rev A), moved onto RecompFrontend as Mario Kart
+`n64hub/Starfox64Recomp-web` is Starfox 64: Recompiled (US 1.1, Rev A), moved onto RecompFrontend as Mario Kart
 64's is: its `lib/rt64`, `lib/N64ModernRuntime` and `lib/RecompFrontend` are upstream's at the commits the forks are
 built on (a row each in `patches/pins.txt`). Its settings (film grain, the radio box, inverted Y, the volumes) are on
 RecompFrontend's General and Sound tabs; upstream's debug menu and quicksaves stay out. The cartridge is
@@ -184,7 +184,7 @@ it up as Andross's end does. Its `tools/play_plan.json` plays the menus to Corne
 prologue, A picks the planet) and a minute of it; `tools/play_plan_extended.json` goes on to Meteo and Katina, started
 as the list's plan starts them. Its README, BUILDING.md and the headers of those files have the rest.
 
-`amazingalek/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
+`n64hub/oot-recompiled-web` is OoT: Recompiled (GPL-3.0, NTSC-U 1.0), Ocarina of Time on a runtime and an interface
 of its own: no RecompFrontend, its own RmlUi launcher and menus (`src/ui/`). Its `lib/rt64` and `lib/N64ModernRuntime`
 are at Conker's commits, so `pins.txt`'s rows cover them. With no RecompFrontend it has no file picker of its own, so
 N64Recomp-browser's `frontend/file_picker.h` (`n64recomp_browser::pick_files`) opens the browser's. Upstream shapes its
@@ -200,7 +200,7 @@ file loads is under a second. Its BUILDING.md and the headers of `web/page.cmake
 the canvas and dp scaling, the first run's defaults), render to RAM kept exact for the pause background, the shader list
 and its survey, the warps.
 
-`amazingalek/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled. Its upstream's base recomp has its own frontend
+`n64hub/JetForceGemini-Recomp-web` is Jet Force Gemini: Recompiled. Its upstream's base recomp has its own frontend
 (an RmlUi launcher and menus, no RecompFrontend); on the page (`patches/web/dkr.patch`) it plays rumble through the
 Gamepad API and keeps the dummy frame out of RDRAM as RecompFrontend 75fe596 does. The game binds draw buffers the
 workload hasn't made before the first one does, which WebGPU refused until rt64-web f01c3a6 bound a zeroed one. Its
@@ -230,7 +230,7 @@ base and its patches are built into a page, the recompile without call tracking,
 game running on from the list's last full sync, the scheduler hook, the game's 20 frames a second, the shader list and
 its survey.
 
-`amazingalek/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
+`n64hub/DKR-R-web` is DKR-R (MIT, 1.0.6), on a runtime and a launcher of its own (ImGui, no RecompFrontend).
 `dependencies.lock.json` pins rt64 at Banjo's commit and N64ModernRuntime ae1ffbb. Its checkouts carry DKR-R's patches
 before the web's, so `pins.txt` has no row for it: CI's `dkr-patches` job runs its `scripts/build_web.sh --patches`
 (DKR-R's patches, `apply.cmake` with its skip list, `patches/web/`, and DKR-R's configure-time stages, no ROM) with the
@@ -255,7 +255,7 @@ only by the culling bit. Its docs/WEB.md and the headers of `scripts/build_web.s
 `web/rt64_shaders.txt` have the rest: how its patches and the web's are layered, the launcher, sound, input focus,
 render to RAM off, the fixed heap, the shader list and how it is recorded by the game's teleport, the play plan.
 
-`amazingalek/Snap64Recomp-web` is Snap64 Recomp, Pokémon Snap (US), on its port's own forks of rt64, plume and
+`n64hub/Snap64Recomp-web` is Snap64 Recomp, Pokémon Snap (US), on its port's own forks of rt64, plume and
 N64ModernRuntime (their `snap64` branches), the one game fork whose rt64 isn't upstream's: ~8,000 lines of the port's
 in RT64 (each object's identity for interpolation, its frame pacing and presentation, Photo Detail's framebuffer
 readback, the Snap Station's overlay, primitive-depth sprites). `apply.cmake` patches them, but for the files where
@@ -276,7 +276,7 @@ code but for three Firefox plays missed: `web/survey.cpp` starts a course from t
 rides it to its end, taking photos and throwing the items. Its docs/WEB.md and the headers of `tools/build_web.sh`,
 `web/page.cmake` and `web/rt64_shaders.txt` have the rest.
 
-`amazingalek/rush2recompiled-web` is Rush 2 Recompiled, Rush 2: Extreme Racing USA (US), whose repo has no license
+`n64hub/rush2recompiled-web` is Rush 2 Recompiled, Rush 2: Extreme Racing USA (US), whose repo has no license
 (CLAUDE.md, Rules). It is on its own commits of rt64, N64ModernRuntime and RecompFrontend, which its
 `lib/patches/<submodule>.patch` change (3,800 lines on rt64's 41 files: car reflection and ambient occlusion shaders,
 the Variable frame rate's timeline, generated mipmaps, MSAA's coverage), patched by the N64Recomp-browser tag its
@@ -297,7 +297,7 @@ title's demos, a race on each of the 7 tracks, a stunt course), recorded by `web
 menus by the front end's screen and the track select's entry in RDRAM. Its docs/BUILDING.md (The web page) and the
 header of `tools/build_web.sh` has the rest.
 
-`amazingalek/perfect-dark-recomp` is Perfect Dark (USA rev 1), not a fork but this project's own recomp, as Rush 2049's
+`n64hub/perfect-dark-recomp` is Perfect Dark (USA rev 1), not a fork but this project's own recomp, as Rush 2049's
 is (GPL-3.0), made from the game's MIT decompilation. It is on upstream's rt64, N64ModernRuntime and RecompFrontend at
 the commits GoldenEye's are on (`patches/pins.txt`), patched by the N64Recomp-browser tag its `lib/N64Recomp-browser`
 pins, and carries no patches of its own to them, so CI has no job for it. Perfect Dark runs its lib segment at
@@ -318,7 +318,7 @@ and a section a solo mission (21), recorded by `tools/record_shaders.sh`, where 
 mission as mission select's Accept does, plus 74 the plans' plays, the publish's boot check, a minute in each
 mission and a route through 12 of them missed afterwards. Its docs/building.md and docs/web.md have the rest.
 
-`amazingalek/super-mario-64-recomp` is Super Mario 64 (USA 1.0), not a fork but this project's own recomp, as Rush
+`n64hub/super-mario-64-recomp` is Super Mario 64 (USA 1.0), not a fork but this project's own recomp, as Rush
 2049's and Perfect Dark's are (GPL-3.0), from the n64decomp/sm64 decompilation's symbols, with RecompFrontend's launcher
 and menus. It is on upstream's rt64, N64ModernRuntime and RecompFrontend at the commits Majora's Mask's are on
 (`patches/pins.txt`), patched by the N64Recomp-browser tag its `lib/N64Recomp-browser` pins, and then by its own

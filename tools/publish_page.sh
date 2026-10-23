@@ -8,7 +8,7 @@
 #   bash tools/publish_page.sh <build dir> <name> <owner/repo> [<what it was built from>] [--into <dir>] [--dry-run]
 #   bash tools/publish_page.sh --drop <dir> <owner/repo>
 #
-# e.g. bash lib/N64Recomp-browser/tools/publish_page.sh build-web BanjoRecompiled amazingalek/BanjoRecomp-web "main $(git rev-parse --short HEAD)"
+# e.g. bash lib/N64Recomp-browser/tools/publish_page.sh build-web BanjoRecompiled n64hub/BanjoRecomp-web "main $(git rev-parse --short HEAD)"
 # A page holds the recompiled code, so it is built from the ROM wherever that is (CI has none) and published from
 # there, or copied to a machine with push access first: the script needs only the build's files. Check that the .data
 # holds no game data: it is what the page preloads (assets, a controller database), never the ROM or anything
@@ -66,7 +66,7 @@ case $have in
     0) "${git[@]}" fetch -q "$url" gh-pages
        lease=(--force-with-lease="gh-pages:$("${git[@]}" rev-parse FETCH_HEAD)")
        "${git[@]}" read-tree FETCH_HEAD
-       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" -e '^The moved page' || true)"
+       subject="$("${git[@]}" log --format=%s FETCH_HEAD | grep -m1 -e '^The web page' -e "^The games' page" -e ' plays in the hub at /' || true)"
        lines="$("${git[@]}" log -1 --format=%b FETCH_HEAD | grep -E '^[A-Za-z0-9._-]+/:( |$)' || true)" ;;
     2) subject="" lines="" lease=(-f) ;;
     *) exit $have ;;
