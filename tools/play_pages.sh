@@ -77,7 +77,7 @@ for g in "${selected[@]}"; do
     (cd "$work/$g/shots" && "${queue[@]}" "$node" "$here/play_page.mjs" "$browser" "$hub_url$folder/index.html" "$rom" "$plan" \
         --uncapped --size 3840x2000 --profile "$work/$g/profile" --json "$work/$g/summary.json" \
         --record "$here/../plays.jsonl" --game "$g" --build "$build" ${note:+--note "$note"}) > "$work/$g/play.log" 2>&1 || true
-    result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? s.presents.median : 0;
+    result="$("$node" -e "const s = require(process.argv[1]); const p = s.presents ? Math.round(s.presents.median * 10) / 10 : 0;
         console.log((p > 0 && !s.webgpuErrors.length && !s.exceptions ? 'ok' : 'FAILED') + ': ' + p + ' presents/s, ' +
         s.webgpuErrors.length + ' WebGPU errors, ' + s.exceptions + ' exceptions')" "$work/$g/summary.json" 2> /dev/null ||
         echo "FAILED: no summary")"
