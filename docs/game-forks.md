@@ -361,11 +361,13 @@ at the desktop's defaults (Hi-res Font Original, Draw Distance High), which cost
 off: the game never reads a frame it drew. IDO narrows a char or short argument in the function that takes it, so a
 patch replacing a game function whose caller passes a wider value takes it as a word. Its `tools/build_web.sh` runs a
 Docker image of its own, so `publish_pages.sh` runs it on the build host and not in rush-2049-recomp's image. Its list
-is 189 shaders, 141 pipelines: the boot (the launcher, the logo, the title's Mario head, the file select, 29) and 33
+is 198 shaders, 147 pipelines: the boot (the launcher, the logo, the title's Mario head, the file select, 29) and 33
 sections (the castle grounds, the castle's floors, the courtyard, the 15 courses at each act, the secret and Bowser
 stages, the ending), recorded by `tools/record_shaders.sh` and `tools/shader_plan.json`, which warps Mario into each
-from the castle grounds through the survey in `patches/shader_survey.c`. Its README, CLAUDE.md and docs/web.md have the
-rest.
+from the castle grounds through the survey in `patches/shader_survey.c`, with the misses of the plays added by hand,
+those of `tools/play_plan_full.json` among them: a play of the whole game (every act's star, the three Bowsers, the
+ending and the credits) in about 56 minutes, for what the regular plans never reach. Its README, CLAUDE.md and
+docs/web.md have the rest.
 
 ## The games' own frame rates
 
