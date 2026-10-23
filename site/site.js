@@ -12,19 +12,15 @@ const README = location.hostname === 'localhost' ? 'README.md'
   : 'https://raw.githubusercontent.com/amazingalek/N64Recomp-browser/main/README.md';
 
 // The table's columns, found by their headers: Game, Recomp (the upstream recomp, "[name](url) by owner"), Repo,
-// Page, the two Intel UHD columns, Played (not shown).
+// Page; the frame rates and Played aren't shown (the page's header says how the games play).
 function parseGames(markdown) {
   const lines = markdown.split('\n');
   const start = lines.findIndex((l) => l.trim() === '## Games');
   const games = [];
-  let legend = '';
   let header = null;
   for (let i = start + 1; i < lines.length && !lines[i].startsWith('## '); i++) {
     const line = lines[i].trim();
-    if (!line.startsWith('|')) {
-      if (games.length && line) legend += (legend ? ' ' : '') + line;
-      continue;
-    }
+    if (!line.startsWith('|')) continue;
     const cells = line.slice(1, -1).split('|').map((c) => c.trim());
     if (!header) { header = cells; continue; }
     if (/^-+$/.test(cells[0])) continue;
@@ -33,26 +29,10 @@ function parseGames(markdown) {
     const repo = col(/^Repo$/);
     games.push({
       name: col(/^Game$/), recomp: col(/^Recomp$/), repoName: repo.replace(/^\[(.*?)\].*$/, '$1'), repo: link(repo),
-      page: localPage(link(col(/^Page$/))), chrome: col(/Chrome/), firefox: col(/Firefox/),
+      page: localPage(link(col(/^Page$/))),
     });
   }
-  const named = (re, fallback) => (header || []).find((h) => re.test(h)) || fallback;
-  return { games, legend, columns: { chrome: named(/Chrome/, 'Chrome'), firefox: named(/Firefox/, 'Firefox') } };
-}
-
-// A cell is "58; 312*", "30†; 269*", "173*" or words: its laptop number and its stand-in's (the one with *), each with
-// what follows it ("10-30† in later worlds"), or undefined.
-function splitCell(cell) {
-  const parts = cell.split(';').map((p) => p.trim()).filter((p) => /^\d/.test(p));
-  const desktop = parts.find((p) => /^[\d.-]+†?\*/.test(p));
-  return { laptop: parts.find((p) => p !== desktop), desktop };
-}
-
-// A laptop's number against the goal of 60; † (the game's own rate) is neither good nor bad.
-function laptopClass(value) {
-  if (/^[\d.-]+†/.test(value)) return 'own';
-  const n = parseFloat(value);
-  return n >= 55 ? 'good' : n >= 30 ? 'fair' : 'poor';
+  return games;
 }
 
 function el(tag, props, ...children) {
@@ -61,26 +41,13 @@ function el(tag, props, ...children) {
   return e;
 }
 
-function tile(game, columns, index) {
+function tile(game, index) {
   // Its colour: the golden angle on from the tile before's, so neighbours never share one.
   const h = Math.round(index * 137.5) % 360;
-  // A row a machine, a column a browser, the numbers only ("10-30† in later worlds" shows "10-30†"); the cell on hover.
-  const browsers = [[columns.chrome, game.chrome], [columns.firefox, game.firefox]];
-  const value = (label, cell, number, className) => el('span', {
-    className: 'value ' + (number ? className(number) : 'none'), title: `${label}: ${cell}`,
-    textContent: number ? number.replace('*', '').replace(/\s+[a-z][a-z ]*$/i, '') : '–' });
-  const row = (machine, key, className) => [el('span', { className: 'machine', textContent: machine }),
-    ...browsers.map(([label, cell]) => value(label, cell, splitCell(cell)[key], className))];
-  const measured = browsers.some(([, cell]) => /\d/.test(cell));
-  const stats = measured
-    ? el('div', { className: 'stats' }, el('span'), el('span', { className: 'browser', textContent: 'Chrome' }),
-      el('span', { className: 'browser', textContent: 'Firefox' }),
-      ...row('Laptop', 'laptop', laptopClass), ...row('Desktop', 'desktop', () => 'desktop'))
-    : el('p', { className: 'stats unmeasured', textContent: 'Not measured yet' });
   const play = el('button', { className: 'play', type: 'button', textContent: 'Play' });
   play.addEventListener('click', () => openGame(game));
-  // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher is
-  // no art of its own has none, and shows a title card: its name on a colour of its own.
+  // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher has no
+  // art of its own has none, and shows a title card: its name on a colour of its own.
   const art = el('img', { src: `img/${game.repoName}.webp`, alt: '', loading: 'lazy' });
   art.addEventListener('error', () => art.remove());
   const cover = el('div', { className: 'art', style: `--h:${h}` },
@@ -90,8 +57,7 @@ function tile(game, columns, index) {
     el('div', { className: 'body' },
       el('div', { className: 'head' },
         el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
-      el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp)),
-      stats));
+      el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp))));
 }
 
 // A title card's text: "The Legend of Zelda: Majora's Mask" as the series, small, over "Majora's Mask".
@@ -193,23 +159,18 @@ frame.addEventListener('load', () => frame.focus());
 
 async function main() {
   const grid = document.getElementById('grid');
-  let table;
   try {
     const response = await fetch(README, { cache: 'no-cache' });
     if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
-    table = parseGames(await response.text());
+    games = parseGames(await response.text());
   } catch (error) {
     grid.replaceChildren(el('p', { className: 'note' }, 'The games table could not be read: ' + error.message));
     return;
   }
   const title = (g) => g.name.replace(/^The /, '');
-  const sorted = [...table.games].sort((a, b) => title(a).localeCompare(title(b)));
-  grid.replaceChildren(...sorted.map((g, i) => tile(g, table.columns, i)));
-  document.getElementById('count').textContent = `${table.games.length} games`;
-  document.getElementById('legend').textContent = "Frames a second. Laptop: a laptop's Intel UHD graphics, where the "
-    + 'goal is 60. Desktop: a desktop GPU, uncapped, so higher means more to spare. From the Games table: '
-    + table.legend;
-  games = table.games;
+  const sorted = [...games].sort((a, b) => title(a).localeCompare(title(b)));
+  grid.replaceChildren(...sorted.map((g, i) => tile(g, i)));
+  document.getElementById('count').textContent = `${games.length} games`;
   const game = gameFromHash();
   if (game && window.crossOriginIsolated) openGame(game, false);  // not before coi_serviceworker.js's reload
 }
