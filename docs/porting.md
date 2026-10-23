@@ -65,6 +65,14 @@ What a recomp's code needed for wasm, besides N64ModernRuntime-0003 and N64Recom
   float-to-int conversions round (Rush 2049's attract race walked off RDRAM after 40 s). Float to int out of range
   saturates in wasm and gives 0x80000000 on x86; nothing has hit it yet.
 - RDRAM has no guard pages: a stray access corrupts memory rather than faulting, unless it lands past the heap.
+- A game's main that declares `recomp::Configuration cfg;` without an initialiser and never sets `window_handle`
+  (Zelda64Recomp's and the mains built on it) leaves that handle, a bare `SDL_Window*` on Emscripten as on Linux, as
+  whatever was in that memory. `recomp::start` makes the window only when the handle equals `WindowHandle{}`, so a
+  non-zero leftover skips `create_window` and reaches RT64 as its window. Every page boots with it zero, and the code
+  before `main` runs the same way on each boot, so a build that picks up a leftover fails to boot every time, at the
+  renderer's start: look there first, and give that game's main `recomp::Configuration cfg{};` (GoldenEye64Recomp's
+  has it). A default initialiser in N64ModernRuntime's patch can't apply to ca568b6, which Banjo-Kazooie and Rush 2 pin:
+  it has no `Configuration`, and `recomp::start` takes the handle as an argument.
 - A tail call is a call and a return in the C, which natively becomes a jump and in wasm stays a call: N64Recomp
   8038212 forces a `return_call` with `-mtail-call` (Conker ran out of stack minutes in without it).
 - A wait that polls memory or the clock without an OS call never ends, or starves every other game thread: ultramodern
