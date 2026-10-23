@@ -111,6 +111,21 @@ none failed, and presented more: Firefox 175-181 a second (133-150 before), Chro
 fps, so uncapped it reuses the targets every game frame), its plan, played in the same hour beside its page from Pages
 (v0.58.0): Firefox 236 (165), the GPU process ending at 2.1 GB (2.7); Chrome 308 (228); no WebGPU errors either way.
 
+RT64's tile copies grew it too, from rt64 a8bfc93 to dd2fd23: a triangle with a vertex at w <= 0 or projected 4096 pixels
+out covered its scissor, so a pass of triangles wholly behind the camera or off one side wrote its whole framebuffer,
+threw its tile copy cache away, and the next texture read of it made a new full-screen copy, each kept. Banjo-Kazooie's
+page, its regular plan uncapped at 3840x2000: at the title, about 30 s in as its 35-pipeline section builds, ~100
+copies of 4160x2176 rgba8unorm (36 MB) were made in 10 s (tools/webgpu_census.js), and its GPU process held 5.0 GB from
+then on in Chrome (1.5 GB at v0.85.0, before it) and 8.9 GB in Firefox 158 (2.4 GB), its adapter 9.7 GB. It isn't
+Firefox's: Chrome makes the same copies and keeps them at about half Firefox's cost. On an RTX 2070 (8 GB) with 2.7 GB
+of it held by the desktop's other apps, Firefox lost its device to "Out of Memory" there in 3 of 3 runs, the page Pages
+served and a branch build alike, then presented 40 a second of no game frames; Chrome's adapter reached 7.4 GB and it
+played on. An idle 8 GB card can't hold Firefox's 9.7 GB either; the copies are the game frame at Auto's scale, so a
+1920x1000 window makes them about a quarter of the size (~0.9 GB in Chrome, by their size, not played). With a8bfc93
+reverted, or with dd2fd23 (a triangle wholly behind the camera draws nothing, one wholly in front has a box clamped to
+8192 pixels, only one crossing the plane covers its scissor), no such copy is made: Chrome 1.37 GB, Firefox 2.4 GB, its
+adapter 3.3 GB, no WebGPU errors (RTX 5080, shared GPU turns, 2026-10-23).
+
 A worker that traps in `free()` has found the heap already corrupt (`tools/wasm_offset.mjs` names it: dlmalloc
 unlinking a chunk whose links were overwritten). Mario Kart 64's page from Pages (v0.67.0) did that once in 5 runs on a
 laptop (Intel UHD, Firefox 158 on screen, a 1920x947 canvas), at the title screen, 0.3 s after RT64 asked for a texture
