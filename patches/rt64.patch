@@ -1,4 +1,4 @@
-rt64: https://github.com/n64hub/rt64-web 505e43eb1e61d47d496598f2a281d63160d12145
+rt64: https://github.com/n64hub/rt64-web 35ef200022ee8b04757863d9281bb06f1b8a26b9
 on upstream 5473732a822a4423b5696e7cb18fecc425a59875 (tools/export_patches.sh)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -966,7 +966,7 @@ index 7b38b8e..2a5c6c0 100644
          std::unique_ptr<FramebufferReadChangesDescriptorChangesSet> readChangesSet;
          bool used;
 diff --git a/src/hle/rt64_framebuffer_manager.cpp b/src/hle/rt64_framebuffer_manager.cpp
-index d7caa12..1f545eb 100644
+index d7caa12..91cbe4d 100644
 --- a/src/hle/rt64_framebuffer_manager.cpp
 +++ b/src/hle/rt64_framebuffer_manager.cpp
 @@ -778,25 +778,33 @@ namespace RT64 {
@@ -1023,6 +1023,64 @@ index d7caa12..1f545eb 100644
          tileCopy.usedWidth = width;
          tileCopy.usedHeight = height;
          tileCopy.usedTimestamp = usedTimestamp;
+@@ -1001,16 +1013,46 @@ namespace RT64 {
+             tileCopyBeforeBarriers.clear();
+             tileCopyAfterBarriers.clear();
+ 
++#       if defined(__EMSCRIPTEN__)
++            // On the web each region is a texture copy instead of a draw. A draw into a tile copy's own framebuffer is
++            // a render pass of its own in WebGPU, and a browser spends far more of its CPU on a pass than on a copy: a
++            // game that reads its framebuffer back line by line made ~200 passes a present this way. WebGPU orders its
++            // copies itself, so the drivers' synchronization quirks the draws avoid (below) don't arise. The source
++            // and the tile copy are both colorBufferFormat and the draw loads each texel 1:1, so a copy writes the same.
++            const RenderTextureLayout dstLayout = RenderTextureLayout::COPY_DEST;
++            const RenderTextureLayout srcLayout = RenderTextureLayout::COPY_SOURCE;
++            const RenderBarrierStages copyStage = RenderBarrierStage::COPY;
++#       else
++            const RenderTextureLayout dstLayout = RenderTextureLayout::COLOR_WRITE;
++            const RenderTextureLayout srcLayout = RenderTextureLayout::SHADER_READ;
++            const RenderBarrierStages copyStage = RenderBarrierStage::GRAPHICS;
++#       endif
+             for (const CommandListCopyRegion &copy : cmdListCopies.cmdListCopyRegions) {
+-                tileCopyBeforeBarriers.push_back(RenderTextureBarrier(copy.dstTexture, RenderTextureLayout::COLOR_WRITE));
++                tileCopyBeforeBarriers.push_back(RenderTextureBarrier(copy.dstTexture, dstLayout));
+                 tileCopyAfterBarriers.push_back(RenderTextureBarrier(copy.dstTexture, RenderTextureLayout::SHADER_READ));
+             }
+ 
+             for (RenderTarget *renderTarget : cmdListCopies.copyRegionTargets) {
+-                tileCopyBeforeBarriers.emplace_back(RenderTextureBarrier(renderTarget->getResolvedTexture(), RenderTextureLayout::SHADER_READ));
++                tileCopyBeforeBarriers.emplace_back(RenderTextureBarrier(renderTarget->getResolvedTexture(), srcLayout));
+             }
+ 
+-            renderWorker->commandList->barriers(RenderBarrierStage::GRAPHICS, tileCopyBeforeBarriers);
++            renderWorker->commandList->barriers(copyStage, tileCopyBeforeBarriers);
++
++#       if defined(__EMSCRIPTEN__)
++            for (const CommandListCopyRegion &copy : cmdListCopies.cmdListCopyRegions) {
++                // A tile that starts past the target's edge has nothing to copy: its size wrapped below zero.
++                const float width = copy.pushConstants.uvScale.x;
++                const float height = copy.pushConstants.uvScale.y;
++                if ((width < 1.0f) || (height < 1.0f) || (width > float(RenderTarget::MaxDimension)) || (height > float(RenderTarget::MaxDimension))) {
++                    continue;
++                }
++
++                const int32_t left = int32_t(copy.pushConstants.uvScroll.x);
++                const int32_t top = int32_t(copy.pushConstants.uvScroll.y);
++                const RenderBox srcBox(left, top, left + int32_t(std::lround(width)), top + int32_t(std::lround(height)));
++                renderWorker->commandList->copyTextureRegion(RenderTextureCopyLocation::Subresource(copy.dstTexture), RenderTextureCopyLocation::Subresource(copy.srcTexture), 0, 0, 0, &srcBox);
++            }
++#       else
+ 
+             // Use the rasterization pipeline to copy the texture regions. Using the dedicated transfer commands does not behave consistently
+             // enough across hardware to use it directly when it comes to synchronization due to unknown reasons found during testing (probably
+@@ -1033,6 +1075,7 @@ namespace RT64 {
+                 renderWorker->commandList->setGraphicsPushConstants(0, &copy.pushConstants);
+                 renderWorker->commandList->drawInstanced(3, 1, 0, 0);
+             }
++#       endif
+ 
+             renderWorker->commandList->barriers(RenderBarrierStage::GRAPHICS_AND_COMPUTE, tileCopyAfterBarriers);
+         }
 diff --git a/src/hle/rt64_framebuffer_manager.h b/src/hle/rt64_framebuffer_manager.h
 index 8d36b51..14b08e3 100644
 --- a/src/hle/rt64_framebuffer_manager.h
@@ -3102,7 +3160,7 @@ index 69a82ac..1dd31f7 100644
              dstNorm = builder.addReadWriteStructuredBuffer(9);
              dstVel = builder.addReadWriteStructuredBuffer(10);
 diff --git a/src/render/rt64_framebuffer_renderer.cpp b/src/render/rt64_framebuffer_renderer.cpp
-index 9fae0d4..924406b 100644
+index 9fae0d4..3f01d0f 100644
 --- a/src/render/rt64_framebuffer_renderer.cpp
 +++ b/src/render/rt64_framebuffer_renderer.cpp
 @@ -151,6 +151,7 @@ namespace RT64 {
@@ -3327,7 +3385,7 @@ index 9fae0d4..924406b 100644
                          triangles.vertexTestZ = (vertexTestZCallIndex >= 0);
                          triangles.postBlendDitherNoise = false;
  
-@@ -1760,7 +1838,205 @@ namespace RT64 {
+@@ -1760,7 +1838,215 @@ namespace RT64 {
          checkRasterScene(rasterScene);
      }
  
@@ -3342,7 +3400,10 @@ index 9fae0d4..924406b 100644
 +    }
 +
 +    // Without descriptor indexing: finds the texture at every texture cache index that changed, and writes the TMEM of
-+    // the entries that are only TMEM into the pool, uploading the range that changed. An entry the cache emptied keeps
++    // the entries that are only TMEM into the pool, uploading the runs of entries that changed. Not the range from the
++    // first to the last: a scene that makes new TMEM textures every frame (a framebuffer read back line by line, ~200 a
++    // frame) has them all over the cache, and that range was most of a pool of thousands, 10 MB a frame or more. Runs
++    // closer than TMEMPoolRunGap entries go as one upload, each run being a write and a copy. An entry the cache emptied keeps
 +    // its version (eviction doesn't change it), so indexTextures can still hold its deleted texture: only an index the
 +    // cache has a texture at this workload is read from it (updateDrawTextureSets).
 +    void FramebufferRenderer::updateIndexTextures(std::vector<BufferUploader::Upload> &shaderUploads) {
@@ -3359,8 +3420,8 @@ index 9fae0d4..924406b 100644
 +            tmemPoolBytes.resize(std::max(cacheTextureCount, 1U) * TMEMBytes, 0);
 +        }
 +
-+        uint32_t tmemFirst = UINT32_MAX;
-+        uint32_t tmemLast = 0;
++        const uint32_t TMEMPoolRunGap = 16;
++        tmemPoolRuns.clear();
 +        if (descriptorTextureGlobalVersion != textureCacheGlobalVersion) {
 +            for (uint32_t i = 0; i < cacheTextureCount; i++) {
 +                if (textureCacheVersions[i] == descriptorTextureVersions[i]) {
@@ -3386,8 +3447,12 @@ index 9fae0d4..924406b 100644
 +                    const size_t byteCount = std::min(cacheTexture->bytesTMEM.size(), size_t(TMEMBytes));
 +                    memcpy(poolBytes, cacheTexture->bytesTMEM.data(), byteCount);
 +                    memset(poolBytes + byteCount, 0, TMEMBytes - byteCount);
-+                    tmemFirst = std::min(tmemFirst, i);
-+                    tmemLast = std::max(tmemLast, i);
++                    if (!tmemPoolRuns.empty() && (i <= tmemPoolRuns.back().second + TMEMPoolRunGap)) {
++                        tmemPoolRuns.back().second = i + 1;
++                    }
++                    else {
++                        tmemPoolRuns.emplace_back(i, i + 1);
++                    }
 +                }
 +
 +                indexTexture.stamp = ++drawTextureStampCounter;
@@ -3396,13 +3461,16 @@ index 9fae0d4..924406b 100644
 +            descriptorTextureGlobalVersion = textureCacheGlobalVersion;
 +        }
 +
-+        // The pool must exist to be bound, even with no TMEM in it.
-+        if (tmemPoolBuffer.defaultBuffer == nullptr) {
-+            tmemFirst = std::min(tmemFirst, 0U);
++        // The pool must exist to be bound, even with no TMEM in it. A pool made anew (a first or a larger one) gets
++        // everything up to the last change in one upload, which the uploader starts from the pool's first entry.
++        const uint32_t tmemEnd = tmemPoolRuns.empty() ? 1 : tmemPoolRuns.back().second;
++        if ((tmemPoolBuffer.defaultBuffer == nullptr) || (tmemPoolBuffer.allocatedSize < (uint64_t(tmemEnd) * TMEMBytes))) {
++            shaderUploads.push_back({ tmemPoolBytes.data(), { 0, tmemEnd }, TMEMBytes, RenderBufferFlag::STORAGE, { }, &tmemPoolBuffer });
 +        }
-+
-+        if (tmemFirst <= tmemLast) {
-+            shaderUploads.push_back({ tmemPoolBytes.data(), { tmemFirst, tmemLast + 1 }, TMEMBytes, RenderBufferFlag::STORAGE, { }, &tmemPoolBuffer });
++        else {
++            for (const std::pair<uint32_t, uint32_t> &run : tmemPoolRuns) {
++                shaderUploads.push_back({ tmemPoolBytes.data(), run, TMEMBytes, RenderBufferFlag::STORAGE, { }, &tmemPoolBuffer });
++            }
 +        }
 +    }
 +
@@ -3534,7 +3602,7 @@ index 9fae0d4..924406b 100644
          bool shaderViewRtEnabled = false;
          std::vector<BufferUploader::Upload> shaderUploads = {
              { renderIndicesVector.data(), { 0, renderIndicesVector.size() }, sizeof(interop::RenderIndices), RenderBufferFlag::STORAGE, { }, &renderIndicesBuffer},
-@@ -1816,8 +2092,16 @@ namespace RT64 {
+@@ -1816,8 +2102,16 @@ namespace RT64 {
          }
  #   endif
  
@@ -3552,10 +3620,10 @@ index 9fae0d4..924406b 100644
  
      void FramebufferRenderer::advanceFrame(bool rtEnabled) {
 diff --git a/src/render/rt64_framebuffer_renderer.h b/src/render/rt64_framebuffer_renderer.h
-index 3add9c3..4efd5c4 100644
+index 3add9c3..9827392 100644
 --- a/src/render/rt64_framebuffer_renderer.h
 +++ b/src/render/rt64_framebuffer_renderer.h
-@@ -98,6 +98,41 @@ namespace RT64 {
+@@ -98,6 +98,42 @@ namespace RT64 {
          std::vector<uint32_t> descriptorTextureVersions;
          uint32_t descriptorTextureGlobalVersion = 0;
          bool descriptorTextureReplacementMapEnabled = false;
@@ -3581,6 +3649,7 @@ index 3add9c3..4efd5c4 100644
 +        std::vector<DrawTexture> indexTextures;
 +        std::unordered_map<uint32_t, DrawTexture> dynamicIndexTextures;
 +        std::vector<uint8_t> tmemPoolBytes;
++        std::vector<std::pair<uint32_t, uint32_t>> tmemPoolRuns;
 +        BufferPair tmemPoolBuffer;
 +        const RenderBuffer *tmemPoolBufferBound = nullptr;
 +        std::unique_ptr<FramebufferRendererDescriptorTMEMSet> descTMEMSet;
@@ -3597,7 +3666,7 @@ index 3add9c3..4efd5c4 100644
          std::unique_ptr<RSPSmoothNormalDescriptorSet> smoothDescSet;
          std::unique_ptr<RSPVertexTestZDescriptorSet> vertexTestZSet;
          interop::FrameParams frameParams;
-@@ -144,6 +179,7 @@ namespace RT64 {
+@@ -144,6 +180,7 @@ namespace RT64 {
              uint64_t submissionFrame;
              float deltaTimeMs;
              bool ubershadersOnly;
@@ -3605,7 +3674,7 @@ index 3add9c3..4efd5c4 100644
              bool postBlendNoise;
              bool postBlendNoiseNegative;
              uint32_t maxGameCall;
-@@ -166,7 +202,9 @@ namespace RT64 {
+@@ -166,7 +203,9 @@ namespace RT64 {
          bool submitDepthAccess(RenderWorker *worker, RenderFramebufferStorage *fbStorage, bool readOnly, bool &depthState);
          void submitRasterScene(RenderWorker *worker, const Framebuffer &framebuffer, RenderFramebufferStorage *fbStorage, const RasterScene &rasterScene, bool &depthState);
          void addFramebuffer(const DrawParams &p);
