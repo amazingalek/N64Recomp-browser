@@ -1134,6 +1134,25 @@ time, at the display's rate (64 Hz): plays.jsonl's lines of that date noted "lap
   for the main thread costs 50-120 µs from a pthread in a race, behind whatever is queued before it (RT64 asking at
   each VI whether the late copy could land spent 2.3 s of 13 there in GoldenEye's Dam), a queued one ~0.4 µs, and a
   100 µs sleep there ~1.9 ms.
+- A framebuffer the game reads back as textures line by line costs a render pass a line in the browser's CPU, not
+  its GPU. Perfect Dark's *Area 51 - Infiltration* opening cutscene is drawn through `bview_draw_film_interlace`
+  (its look on a console too): each of the view's ~220 lines is loaded from the back buffer as a texture and drawn
+  back. RT64 makes a tile copy of each region read, a draw into a texture of its own (`FramebufferManager::
+  recordOperations` sets each copy's framebuffer), plume's WebGPU backend begins a render pass for each framebuffer,
+  and every interpolated present redoes them: 204-226 passes a present there, ~180 of them 1312x32 tile copies at the
+  page's 1854x960 and 15-33 at the game's 320x32, one draw each, against 2-6 a present once Joanna is in control. The
+  GPU takes 0.25-0.34 ms a present for all of them (Chrome 155, `pass_probe.js`). Firefox 158 presents 59-110 a
+  second for the ~55 s (60-75 most of it, sound short up to 4,560 frames in 5 s) against 240 after, with the page's
+  threads waiting and its GPU process's CanvasRenderer thread, which carries out every WebGPU call, busy 0.62-0.73 of
+  a core against 0.36. A Gecko profile puts 279 ms a second of that thread in wgpu's `CommandEncoder::finish`, 107 of
+  them its texture tracker sized and cleared for each pass over every texture alive (`TextureStateSet::set_size`,
+  `TextureUsageScope::clear`; 3,900-4,100 alive in the cutscene against ~1,200 after, `webgpu_census.js`), 143 ms in
+  `writeBuffer`, each mapping a staging buffer of its own (2,100-2,700 calls and 260-340 MB a second), and ~55 ms
+  freeing D3D12 allocations: the page also makes and destroys 700-1,000 small textures a second there (4096x1
+  `r8uint`, a `copyBufferToTexture` each). Chrome 155 presents 137-183 a second there against 229-235 after. All of it
+  on an RTX 5080, an idle host, 1256x645, the page from N64 Hub (perfect-dark-recomp main afe1faf), plays.jsonl's pd
+  runs of 2026-10-23 noted "Area 51 - Infiltration's opening cutscene". The desktop build's rate there isn't measured:
+  it reaches the mission only from a game file that has it unlocked.
 
 ## A page's thread in Chrome, throttled
 
