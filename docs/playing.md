@@ -258,11 +258,12 @@ collapse) shows on a desktop as `shader missed:` lines.
 
 ## The games page
 
-`site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card, its Recomp
-credit and Play, which runs the game's page in a frame. It shows no frame rates: its header says, in a sentence, how
-the games play in Chrome and Firefox (every one smoothly but Firefox on a laptop's built-in graphics), and links the
-README for the numbers; a retest that finds otherwise changes that sentence. It is the top of the hub, amazingalek/n64hub's GitHub Pages, whose
-folders are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
+`site/` is a page of every game in the Games table: a tile each with its launcher's image or a title card and Play on
+it, which runs the game's page in a frame, and under it the Recomp credit and a link to the game's repo; the art
+names the game, so no line does. It shows no frame rates: every game plays smoothly but in Firefox on a laptop's
+built-in graphics, so only there does the header warn (`site.js`), and it links the README for the numbers; a retest
+that finds otherwise changes that warning. It is the top of the hub, amazingalek/n64hub's GitHub Pages, whose folders
+are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
 a change to `site/` merges, and a change to the Games table needs no publish. Its `import.html` takes a player's saves
 from a game's old address (site/import.js). Served locally by `tools/serve_site.mjs`. Keep
 it current in the same work as what changes it:
@@ -274,7 +275,8 @@ it current in the same work as what changes it:
   gets its tile's image, `site/img/<repo>.webp` named as its Repo cell: its launcher captured in headless Chrome at
   1280x720 without a ROM (the art its recomp ships, nothing of the game's), shrunk to a 640x360 WebP. Clear
   `sessionStorage` between two game pages in one tab, or the second can show the isolation notice
-  (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a title card, which needs nothing.
-- `node tools/serve_site.mjs` serves it at `http://localhost:8742/N64Recomp-browser/` and passes every other path to
+  (`coi_serviceworker.js`'s reload flag). Without an image a tile shows a title card, which needs nothing. Art that
+  doesn't show the game's name goes into `site.js`'s `ART_WITHOUT_NAME`, which puts the name over it.
+- `node tools/serve_site.mjs` serves it at `http://localhost:8742/n64hub/` and passes every other path to
   GitHub Pages. `site.js` says how the frame stays cross-origin isolated, why it is navigated by `location.replace`
   (Back returns to the grid) and why fullscreen is the game page's own document.

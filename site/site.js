@@ -44,21 +44,24 @@ function el(tag, props, ...children) {
 function tile(game, index) {
   // Its colour: the golden angle on from the tile before's, so neighbours never share one.
   const h = Math.round(index * 137.5) % 360;
-  const play = el('button', { className: 'play', type: 'button', textContent: 'Play' });
-  play.addEventListener('click', () => openGame(game));
+  const play = el('button', { className: 'play', type: 'button', textContent: 'Play', ariaLabel: 'Play ' + game.name });
   // The game's launcher, captured from its page without a ROM (img/, docs/playing.md). A game whose launcher has no
-  // art of its own has none, and shows a title card: its name on a colour of its own.
-  const art = el('img', { src: `img/${game.repoName}.webp`, alt: '', loading: 'lazy' });
+  // art of its own has none, and shows a title card: its name on a colour of its own. The tile has no name line: the
+  // art or the card shows it, and art that doesn't gets the name over it.
+  const art = el('img', { src: `img/${game.repoName}.webp`, alt: game.name, loading: 'lazy' });
   art.addEventListener('error', () => art.remove());
-  const cover = el('div', { className: 'art', style: `--h:${h}` },
+  const cover = el('div', { className: 'art', style: `--h:${h}`, title: game.name },
     el('span', { className: 'card-title' }, ...titleCard(game.name)), art);
+  if (ART_WITHOUT_NAME.has(game.repoName)) cover.append(el('span', { className: 'art-name', textContent: game.name }));
+  cover.append(play);  // in the art's corner: a click anywhere on the art plays
   cover.addEventListener('click', () => openGame(game));
-  return el('article', { className: 'tile' }, cover,
+  return el('article', { className: 'tile', ariaLabel: game.name }, cover,
     el('div', { className: 'body' },
-      el('div', { className: 'head' },
-        el('h2', {}, el('a', { href: game.repo, title: game.repoName, textContent: game.name })), play),
       el('p', { className: 'recomp', title: game.recomp.replace(/\[(.*?)\]\(.*?\)/, '$1') }, ...credit(game.recomp, game.repo))));
 }
+
+// The launchers whose art doesn't show the game's name (img/, by the Repo cell).
+const ART_WITHOUT_NAME = new Set(['pilotwings-64-recomp-web', 'wave-race-64-recomp-web']);
 
 // A title card's text: "The Legend of Zelda: Majora's Mask" as the series, small, over "Majora's Mask".
 function titleCard(name) {
@@ -66,12 +69,13 @@ function titleCard(name) {
   return title ? [el('small', { textContent: series }), title] : [name];
 }
 
-// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp"; a cell without a
-// link ("this project's own recomp") links the game's repo.
+// "[Banjo: Recompiled](url) by BanjoRecomp" as "Based on <a>Banjo: Recompiled</a> by BanjoRecomp · <a>web port</a>",
+// the last the game's repo; a cell without a link ("this project's own recomp") is the link to it.
 function credit(cell, repo) {
   const m = cell.match(/^\[(.*?)\]\((.*?)\)(.*)$/);
   if (!m) return cell ? [el('a', { href: repo, textContent: cell[0].toUpperCase() + cell.slice(1) })] : [];
-  return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3]];
+  return ['Based on ', el('a', { href: m[2], textContent: m[1] }), m[3] + ' ',
+    el('span', { className: 'port' }, '· ', el('a', { href: repo, textContent: 'web port' }))];
 }
 
 // A game's page in the hub, at either of its addresses, is played from the folder beside this page: the same one on
