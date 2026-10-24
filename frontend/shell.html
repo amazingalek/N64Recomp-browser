@@ -11,7 +11,8 @@
      so on the status line, over the last frame, which stands still from then on while the game runs behind it: nothing
      in plume or RT64 asks for a new device, which would mean making again everything RT64 made on the old one, and a
      reload is the one recovery. The page itself never destroys its device.
-     Pointer lock asks for the mouse's raw counts (below). -->
+     Pointer lock asks for the mouse's raw counts (below). On a phone or tablet the page goes fullscreen in landscape at
+     the first tap, and #turn asks for the phone to be turned where it stays in portrait (below). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -27,6 +28,9 @@
          background: #222d; color: #ddd; border-radius: 6px; font: 14px/1.4 system-ui, sans-serif; }
   #gpu code { font-size: 13px; }
   #gpu[hidden], #shaders[hidden] { display: none; }
+  #turn { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 24px;
+          background: #000c; color: #ddd; text-align: center; font: 18px/1.4 system-ui, sans-serif; pointer-events: none; }
+  @media (pointer: coarse) and (orientation: portrait) { #turn { display: flex; } }
   #shaders { position: fixed; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
              background: #0009; color: #bbb; border-radius: 4px; font: 12px/1 system-ui, sans-serif;
              font-variant-numeric: tabular-nums; pointer-events: none; }
@@ -43,6 +47,7 @@
 <div id="status">Loading…</div>
 <template id="program">{{{ SCRIPT }}}</template>
 <div id="shaders" hidden><span class="spin"></span><span>Preparing graphics</span><span class="figures"></span></div>
+<div id="turn">Turn your phone sideways to play.</div>
 <div id="gpu" hidden><span>Firefox runs this at half speed on Intel graphics. Either play in Chrome or Edge, or set
   <code>gfx.webrender.compositor</code> to false in <code>about:config</code>. If this PC also has a graphics card,
   setting Firefox to High performance in Windows' Graphics settings works too.</span><button title="Close" onclick="this.parentNode.hidden = true">×</button></div>
@@ -161,6 +166,19 @@
       };
     }
   }
+  // A game is laid out for a wide window, and on a phone held upright the launcher's buttons fall off its narrow one.
+  // So where the pointer is a finger (a phone or tablet, not a laptop's touch screen, whose pointer is its mouse), each
+  // tap while the page isn't fullscreen asks for fullscreen and then for landscape: a browser locks the orientation
+  // only in fullscreen (Chrome on Android), and grants fullscreen only from a tap, which pointerup is for a finger and
+  // pointerdown isn't. The game's own page goes fullscreen inside the hub's frame too, as its fullscreen button does it
+  // (site/site.js). Leaving fullscreen unlocks it. Fullscreen takes the tap's activation, so a first tap on Load ROM
+  // gets the picker's own button (file_picker.cpp). Where either is refused (an iPhone has neither) #turn says to turn
+  // the phone, in CSS: it shows on a finger's screen while it is upright.
+  addEventListener('pointerup', () => {
+    if (!matchMedia('(pointer: coarse)').matches || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+    document.documentElement.requestFullscreen().then(() => screen.orientation?.lock?.('landscape'))
+      .catch((e) => console.log(`fullscreen or landscape refused: ${e.name}: ${e.message}`));
+  }, { capture: true });
   // The program (its script, in #program) starts only on a page that is cross-origin isolated, which it needs anyway.
   // A first visit to a host that can't send the headers isn't, and coi_serviceworker.js reloads it: started there, the
   // program fetched its .wasm and .data only for the reload to cut them off, and in Firefox (158, from GitHub Pages)
