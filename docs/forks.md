@@ -395,7 +395,7 @@ N64ModernRuntime       a0d35b6's way back to the launcher only when no ROM is lo
 e4c932f                of Time keeps no stored ROM, hands the runtime the player's file with set_rom_contents before
                        Start Game and finds no stored one every time, and with a0d35b6 its page never started the game
 N64ModernRuntime       Module.gameStarted called on the page's thread as the game's entrypoint starts, past the
-4746426                launcher: the shell shows its on-screen controller for phones from there, plugged in as a
+4746426                launcher: the shell's on-screen controller for phones shows from there, plugged in as a
                        gamepad after SDL has started (SDL opens only a pad that connects later)
 rt64 dd2fd23,          a triangle covers its scissor only where it crosses the camera plane, on every build: one wholly
 baa3753                behind it draws nothing, and one wholly in front has its box from its vertices held to 8192

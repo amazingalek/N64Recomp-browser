@@ -97,6 +97,6 @@ button:hover { background: #343b4e; }
 /* Over the game's top-right corner, faint until the pointer is over them. */
 .player .controls { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0.35; transition: opacity 0.2s; }
 .player .controls:hover, .player .controls:focus-within { opacity: 1; }
-/* On a phone the top's corners are the game page's L and R (frontend/shell.html's #pad). */
+/* On a phone the top's corners are the game page's L and R (touch_pad.js's #pad). */
 @media (pointer: coarse) { .player .controls { right: auto; left: 50%; transform: translateX(-50%); } }
 .player .controls button { width: 34px; height: 34px; padding: 0; background: rgb(0 0 0 / 0.6); border-color: rgb(255 255 255 / 0.25); }

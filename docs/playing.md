@@ -74,8 +74,10 @@ A change is played by what it can break, before it merges (CLAUDE.md, Changing i
 (docs/publishing.md, The retest). A change that could be two kinds is played as the one that risks more.
 
 - Can't change a page's bytes (`*.md`, `plays.jsonl`, `site/`, the tools that play, serve, read and publish pages):
-  nothing is played. A new or changed plan is the exception: it is played as a smoke play is, once in each browser, to
-  show that it reaches its levels.
+  nothing is played. `site/touch_pad.js` is the exception: every game's page runs it on a phone, so a change to it
+  is checked in Chrome's phone emulation (touch, a phone's size) on one game's page served with the branch's `site/`
+  (`tools/serve_site.mjs`), the controller driving the game. A new or changed plan is another: it is played as a
+  smoke play is, once in each browser, to show that it reaches its levels.
 - Changes a page but can't move its speed or timing (the launcher's or a notice's text, a patch merge that builds the
   same code, an entry in a shader list): the smoke play. Its own game's build plays its plan once in Chrome and once in
   Firefox, read for a page that boots and plays, WebGPU errors and exceptions (`failed`, `webgpuErrors` and
@@ -266,7 +268,9 @@ and whose the recomps are, and a line under the games that it is written with AI
 shows no frame rates: every game plays smoothly but in Firefox on a laptop's built-in graphics, so only there does
 the header warn (`site.js`); a retest that finds otherwise changes that warning. It is the top of the hub, the n64hub org's GitHub Pages site (n64hub/n64hub.github.io), whose folders
 are every game's page, so they are one origin; `tools/publish_site.sh` publishes it (its header says how) after
-a change to `site/` merges, and a change to the Games table needs no publish. Served locally by `tools/serve_site.mjs`. Keep
+a change to `site/` merges, and a change to the Games table needs no publish. Its top also serves every game's page
+its on-screen controller on a phone, `site/touch_pad.js` (the header says why there), so that publish is what takes a
+change to the controller to every game. Served locally by `tools/serve_site.mjs`. Keep
 it current in the same work as what changes it:
 
 - It reads the table from main's README.md each visit (served locally, the checkout's), finding the columns by header
