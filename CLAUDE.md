@@ -39,6 +39,10 @@ sentence. Keep that word on the line above.
 A change here is one PR on this repo. It merges once CI is green and what it changes has been played (Changing it).
 Work found while doing other work is filed and not started, unless it is a critical fix (The pins).
 
+A request that a rule here turns away is asked about, never answered no and closed: say which rule and what it would
+mean to do it anyway, and let whoever asked decide. The rule may be what is wrong, and if so it changes in the same
+work.
+
 Priority is by what it breaks: high for a crash, med for an issue that affects every game, low for one game's. Work
 without one gets one from whoever first can tell, before anything else they do on it, and a priority found wrong (the
 cause known, a second game showing it, a crash, a cause that is one game's own) is changed at once, in the same work.
@@ -64,12 +68,16 @@ branches only: upstream's others are deleted when it is made.
 - Work that is started: a critical fix, a new port, and work whose likely cause is shared code, measured on two games
   or more. One game's polish (one browser's sound in one game, 100 ms gaps at one screen change) is filed and waits
   until asked for.
-- A game fork is its recomp plus web support and nothing else: no new features (mouse aim, controls, enhancements) and
-  no fix the page doesn't need. A request for one is answered that way, not filed. The exceptions are a change that
-  runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame rates), and
-  GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for weapons,
-  keys for reload and crouch), since a page is played with keyboard and mouse: all of it in GoldenEye64Recomp-web's own
-  code and none in the forks.
+- A game fork is its recomp plus web support, and takes the recomp's fixes and features from upstream: a merge of its
+  main, or of a better-kept fork of it (GoldenEye64Recomp-web merges podulator's). A player blames the page for
+  whatever it does wrong, whoever's code it is, so a bug in the recomp that the page shows and upstream isn't fixing
+  (no fix under way, an upstream nobody keeps up) is fixed in the game fork's own code and offered upstream where it
+  takes one (GoldenEye64Recomp-web's, docs/game-forks.md). New features of its own (mouse aim, controls,
+  enhancements) are asked about first, as any request a rule turns away is (How work lands). The two it has are a
+  change that runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame
+  rates), and GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for
+  weapons, keys for reload and crouch), since a page is played with keyboard and mouse: all of it in
+  GoldenEye64Recomp-web's own code and none in the forks.
 - Every page interpolates to the display's rate and draws at the canvas's size: RT64's Framerate Display and resolution
   Auto, in every game fork and new port, whatever its recomp's desktop build defaults to (README, The recomp's own
   code). A page held to its game's own rate reads that rate uncapped whatever a change costs or saves (DKR-R 29.8-30.0,
