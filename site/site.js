@@ -127,13 +127,29 @@ function showFrame(url) {
   frame.contentWindow.location.replace(url);
 }
 
+// On a phone or tablet a game plays fullscreen in landscape, as it is laid out: the tap that opens it fullscreens this
+// page and then locks it to landscape, before the frame loads, so the game starts at that size. Chrome on Android locks
+// only in fullscreen and grants that only from a tap, and here, at the top, neither depends on what a frame may do. A
+// phone is where the pointer is a finger: never a computer, a laptop's touch screen included, whose pointer is its
+// mouse. Where either is refused (an iPhone has neither) the game's page asks for the phone to be turned
+// (frontend/shell.html, whose own tap does the same on a page opened on its own). Closing the game leaves fullscreen.
+const phone = matchMedia('(pointer: coarse)');
+const refused = (e) => console.log(`fullscreen or landscape refused: ${e.name}: ${e.message}`);
+function landscape() {
+  if (!phone.matches || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  document.documentElement.requestFullscreen().then(() => screen.orientation?.lock?.('landscape')).catch(refused);
+}
+
 async function openGame(game, push = true) {
   const folder = sameOriginFolder(game.page);
   if (!folder || !window.crossOriginIsolated) {
     location.assign(game.page);
     return;
   }
-  if (push) history.pushState({ game: game.repoName }, '', '#' + encodeURIComponent(game.repoName));
+  if (push) {
+    landscape();
+    history.pushState({ game: game.repoName }, '', '#' + encodeURIComponent(game.repoName));
+  }
   frame.title = game.name;
   player.hidden = false;
   document.body.classList.add('playing');
@@ -150,6 +166,7 @@ async function openGame(game, push = true) {
 
 function hideGame() {
   if (frame.contentDocument?.fullscreenElement) frame.contentDocument.exitFullscreen();
+  else if (document.fullscreenElement) document.exitFullscreen();  // a phone's (landscape()); it unlocks the orientation
   showFrame('about:blank');  // ends the game: its threads and sound go with the document
   player.hidden = true;
   document.body.classList.remove('playing');
@@ -177,7 +194,8 @@ window.addEventListener('popstate', () => {
 document.getElementById('player-close').addEventListener('click', closeGame);
 // The game's own page fullscreens, as on its own: a fullscreen element around the frame only resized it from outside,
 // and Banjo froze there (the picture, not the sound). The click's activation reaches a same-origin frame.
-document.getElementById('player-full').addEventListener('click', () => frame.contentDocument.documentElement.requestFullscreen());
+document.getElementById('player-full').addEventListener('click', () => frame.contentDocument.documentElement.requestFullscreen()
+  .then(() => phone.matches && screen.orientation?.lock?.('landscape')).catch(refused));
 frame.addEventListener('load', () => frame.focus());
 
 // Firefox on built-in graphics holds every game to 30-45 (its compositor), so those players get the header's warning:
