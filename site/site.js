@@ -7,6 +7,8 @@
 // coi_serviceworker.js). A game's page gets its headers from its own coi_serviceworker.js, which on a first visit
 // registers and then reloads it; inside this page that first load has no headers yet, so the frame would be refused.
 // So Play registers the game's worker for its folder first, and the frame's first load is already isolated.
+//
+// Signing in with Google (below, and frontend/save_sync.js) keeps the player's saves in their own Google Drive.
 'use strict';
 
 // Served locally (tools/serve_site.mjs), the checkout's own README.md, so a change to the table shows before it lands.
@@ -146,6 +148,12 @@ async function openGame(game, push = true) {
     location.assign(game.page);
     return;
   }
+  // A token with less than a quarter of an hour left is renewed first, and the game opens on the way back (#<repo>).
+  const record = SaveSync.stored();
+  if (GOOGLE_CLIENT_ID && record?.token && record.expires < Date.now() + 15 * 60000 && !triedLately()) {
+    signIn(hub + '#' + encodeURIComponent(game.repoName), true);
+    return;
+  }
   if (push) {
     landscape();
     history.pushState({ game: game.repoName }, '', '#' + encodeURIComponent(game.repoName));
@@ -214,7 +222,122 @@ function webglRenderer() {
 document.getElementById('firefox-note').hidden = !/\bFirefox\//.test(navigator.userAgent)
   || !builtInGraphics(webglRenderer());
 
+// Signing in keeps the player's saves in their own Google Drive (frontend/save_sync.js, loaded before this). The hub's
+// OAuth client, a Google Cloud project's client of the Web application type, with this page's address (https://n64hub.com/,
+// and http://localhost:8742/ to try it locally) as an authorized redirect URI: empty, the hub offers no sign-in.
+// Sign-in goes to Google and back here, not in a popup: a popup's answer reaches the page that opened it through
+// window.opener, which Cross-Origin-Opener-Policy: same-origin (coi_serviceworker.js) cuts. Google sends the token
+// back in the address's fragment with the state it was given, the same-origin address to return to.
+const GOOGLE_CLIENT_ID = '';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const hub = location.origin + location.pathname;
+
+// To Google, which asks the player (or, silent, answers at once with a new token or an error) and comes back here. A
+// silent one is tried at most once a minute, so a refused one never loops.
+function signIn(back, silent) {
+  SaveSync.store({ ...SaveSync.stored(), tried: Date.now() });
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: hub, response_type: 'token', scope: DRIVE_SCOPE, include_granted_scopes: 'true', state: back,
+    ...(silent && { prompt: 'none' }) });
+  silent ? location.replace(url) : location.assign(url);
+}
+const triedLately = () => Date.now() - (SaveSync.stored()?.tried || 0) < 60000;
+
+// Google's answer, a page asking for a new token (#sync-refresh=<its address>, frontend/shell.html), or an old token:
+// true when this goes elsewhere, and the hub isn't drawn.
+function syncStart() {
+  if (!GOOGLE_CLIENT_ID) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const sameOrigin = (url) => {
+    try { return new URL(url).origin === location.origin ? url : hub; } catch { return hub; }
+  };
+  if (params.has('access_token') || params.has('error')) {
+    const back = sameOrigin(params.get('state'));
+    if (params.get('scope')?.split(' ').includes(DRIVE_SCOPE)) {
+      SaveSync.store({ ...SaveSync.stored(), token: params.get('access_token'),
+        expires: Date.now() + Number(params.get('expires_in')) * 1000, hub });
+      sessionStorage.setItem('save-sync-upload', '1');
+    } else if (params.has('error')) {
+      console.log('Google sign-in: ' + params.get('error'));
+    }
+    if (new URL(back).pathname !== location.pathname) {
+      location.replace(back);
+      return true;
+    }
+    history.replaceState(null, '', back);
+    return false;
+  }
+  if (params.has('sync-refresh')) {
+    const back = sameOrigin(params.get('sync-refresh'));
+    if (SaveSync.stored()?.token && !triedLately()) signIn(back, true);
+    else location.replace(back);
+    return true;
+  }
+  const record = SaveSync.stored();
+  if (record?.token && record.expires < Date.now() + 15 * 60000 && !triedLately()) {
+    signIn(location.href, true);
+    return true;
+  }
+  return false;
+}
+
+// The saves this browser holds, in every game's database on this origin (frontend/persistent_home.js), uploaded where
+// the Drive has none, after a sign-in. One the Drive has another of is settled when its game next starts.
+async function uploadSaves() {
+  const home = '/home/web_user/', ask = (request) => new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const local = new Map();
+  for (const { name } of (await indexedDB.databases?.()) ?? []) {
+    if (!name?.startsWith(home.slice(0, -1))) continue;
+    const open = indexedDB.open(name);
+    open.onupgradeneeded = () => open.transaction.abort();  // gone since it was listed
+    const db = await ask(open).catch(() => null);
+    if (!db?.objectStoreNames.contains('FILE_DATA')) { db?.close(); continue; }
+    const files = () => db.transaction('FILE_DATA').objectStore('FILE_DATA');
+    for (const key of await ask(files().getAllKeys())) {
+      const path = String(key).slice(home.length);
+      if (!String(key).startsWith(home) || !SaveSync.isSave(path, 0)) continue;
+      const entry = await ask(files().get(key));
+      const time = new Date(entry?.timestamp).getTime();
+      if (entry?.contents && SaveSync.isSave(path, entry.contents.byteLength) && !(local.get(path)?.time >= time)) {
+        local.set(path, { data: entry.contents, time });
+      }
+    }
+    db.close();
+  }
+  await SaveSync.sync(local);
+}
+
+function showSync() {
+  const line = document.getElementById('sync');
+  if (!GOOGLE_CLIENT_ID) return;
+  const record = SaveSync.stored(), signedIn = !!record?.token;
+  const button = (text, click) => {
+    const b = el('button', { type: 'button', textContent: text });
+    b.addEventListener('click', click);
+    return b;
+  };
+  const signInButton = button(signedIn ? 'Sign in again' : 'Sign in with Google', () => signIn(location.href, false));
+  const signOut = button('Sign out', () => {
+    if (record.token) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(record.token), { method: 'POST' })
+      .catch(() => {});
+    SaveSync.store(null);
+    showSync();
+  });
+  line.replaceChildren(...(!signedIn ? [signInButton, ' to keep your saves in your Google Drive and play on with them anywhere.']
+    : SaveSync.token() ? ['Your saves are kept in your Google Drive. ', signOut]
+    : ['Your saves sync with your Google Drive while you are signed in. ', signInButton, ' ', signOut]));
+  line.hidden = false;
+}
+
 async function main() {
+  showSync();
+  if (sessionStorage.getItem('save-sync-upload')) {
+    sessionStorage.removeItem('save-sync-upload');
+    uploadSaves().catch((error) => console.error('Save sync: could not upload this browser\'s saves: ' + error.message));
+  }
   const grid = document.getElementById('grid');
   try {
     const response = await fetch(README, { cache: 'no-cache' });
@@ -231,4 +354,4 @@ async function main() {
   if (game && window.crossOriginIsolated) openGame(game, false);  // not before coi_serviceworker.js's reload
 }
 
-main();
+if (!syncStart()) main();
