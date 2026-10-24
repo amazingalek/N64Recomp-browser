@@ -100,6 +100,12 @@ const SaveSync = (() => {
       const record = stored();
       if (record) store({ ...record, synced: { ...record.synced, [path]: hash } });
     };
+    // A file pulled is recorded by what it holds, not the hash its properties say: one written to the Drive by another
+    // client has none.
+    const took = async (path, data) => {
+      pulled.set(path, data);
+      agreed(path, await hex(data));
+    };
     for (const path of new Set([...local.keys(), ...remote.keys()])) {
       if (!isSave(path, local.get(path)?.data.byteLength ?? 0)) continue;
       const mine = local.get(path), theirs = remote.get(path), last = synced[path];
@@ -109,8 +115,7 @@ const SaveSync = (() => {
       } else if (!mine || last === hash) {
         // Only the Drive's changed.
         if (!pull) continue;
-        pulled.set(path, await download(auth, theirs.id, signal));
-        agreed(path, theirs.hash);
+        await took(path, await download(auth, theirs.id, signal));
         done.down++;
       } else if (!theirs || last === theirs.hash) {
         // Only this browser's changed.
@@ -130,8 +135,7 @@ const SaveSync = (() => {
       } else {
         // The Drive's is newer, or this browser never synced the file: this browser's is kept beside it.
         await put(auth, path + '.conflict-' + new Date(mine.time).toISOString(), mine.data, hash, null, signal);
-        pulled.set(path, await download(auth, theirs.id, signal));
-        agreed(path, theirs.hash);
+        await took(path, await download(auth, theirs.id, signal));
         done.down++, done.conflicts++;
       }
     }
