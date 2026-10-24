@@ -72,8 +72,10 @@ branches only: upstream's others are deleted when it is made.
   main, or of a better-kept fork of it (GoldenEye64Recomp-web merges podulator's). A player blames the page for
   whatever it does wrong, whoever's code it is, so a bug in the recomp that the page shows and upstream isn't fixing
   (no fix under way, an upstream nobody keeps up) is fixed in the game fork's own code and offered upstream where it
-  takes one (GoldenEye64Recomp-web's, docs/game-forks.md). New features of its own (mouse aim, controls,
-  enhancements) are asked about first, as any request a rule turns away is (How work lands). The two it has are a
+  takes one (GoldenEye64Recomp-web's, docs/game-forks.md). What a kept-up upstream has under way or on its roadmap
+  (Jet Force Gemini's HUD at a widescreen picture's edges) is left to it for a while, out of respect, and done in the
+  game fork if it doesn't come. New features of its own (mouse aim, controls, enhancements) are asked about first,
+  as any request a rule turns away is (How work lands). The two it has are a
   change that runs its game faster when that makes the page play better (docs/game-forks.md, The games' own frame
   rates), and GoldenEye's keyboard and mouse as the PC ports play it (mouse look and aim, click to fire, the wheel for
   weapons, keys for reload and crouch), since a page is played with keyboard and mouse: all of it in
