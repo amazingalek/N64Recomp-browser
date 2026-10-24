@@ -41,8 +41,8 @@
   #gpu button { position: absolute; right: 6px; top: 4px; border: 0; background: none; color: #aaa; font-size: 18px;
                 cursor: pointer; }
   /* Sized by the screen's height (vmin, in landscape): the stick, L and Z at the left, the C buttons at the right with
-     A and B under them and R and a second Z above, below the hub's buttons in the top right corner (site/), all at the
-     sides, where a game's 4:3 or 16:9 picture leaves a phone's wider screen bare. */
+     A and B under them and R and a second Z above, all at the sides, where a game's 4:3 or 16:9 picture leaves a
+     phone's wider screen bare (the hub's own buttons go to the top's middle on a phone: site/site.css). */
   #pad, #pad-toggle { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none;
                       font: bold 4.5vmin/1 system-ui, sans-serif; }
   #pad { position: fixed; inset: 0; pointer-events: none; }
@@ -52,22 +52,23 @@
   #pad > div.held { background: #fff6; }
   #pad .stick { left: 5vmin; bottom: 5vmin; width: 42vmin; height: 42vmin; }
   #pad .knob { width: 18vmin; height: 18vmin; border-radius: 50%; background: #fff5; pointer-events: none; }
-  #pad .shoulder { top: 13vmin; width: 28vmin; height: 10vmin; border-radius: 4vmin; }
-  #pad .z { top: 26vmin; width: 20vmin; }
+  #pad .shoulder { top: 3vmin; width: 28vmin; height: 10vmin; border-radius: 4vmin; }
+  #pad .z { top: 16vmin; width: 20vmin; }
   #pad .left { left: 3vmin; }
   #pad .right { right: 3vmin; }
   #pad .a { right: 6vmin; bottom: 4vmin; width: 19vmin; height: 19vmin; background: #3a6cff55; }
-  #pad .b { right: 30vmin; bottom: 9vmin; width: 16vmin; height: 16vmin; background: #2db45055; }
+  #pad .b { right: 27vmin; bottom: 17vmin; width: 19vmin; height: 19vmin; background: #2db45055; }
   #pad .c { width: 12vmin; height: 12vmin; background: #f5c80040; font-size: 3.5vmin; }
   #pad .a.held, #pad .b.held, #pad .c.held { filter: brightness(1.8); }
-  #pad .c-up { right: 14vmin; bottom: 49vmin; }
-  #pad .c-down { right: 14vmin; bottom: 25vmin; }
-  #pad .c-left { right: 26vmin; bottom: 37vmin; }
-  #pad .c-right { right: 2vmin; bottom: 37vmin; }
+  #pad .c-up { right: 13vmin; bottom: 54.5vmin; }
+  #pad .c-down { right: 13vmin; bottom: 33.5vmin; }
+  #pad .c-left { right: 23.5vmin; bottom: 44vmin; }
+  #pad .c-right { right: 2.5vmin; bottom: 44vmin; }
+  #pad .c-label { position: absolute; right: 16vmin; bottom: 47vmin; width: 6vmin; text-align: center; color: #f5c800aa; }
   #pad .start, #pad .menu { bottom: 3vmin; height: 8vmin; border-radius: 4vmin; font-size: 3.2vmin; }
   #pad .start { left: calc(50% - 9vmin); width: 18vmin; }
   #pad .menu { left: calc(50% - 30vmin); width: 16vmin; }
-  #pad-toggle { position: fixed; left: 50%; top: 2vmin; transform: translateX(-50%); padding: 1.5vmin 3vmin;
+  #pad-toggle { position: fixed; left: calc(50% + 12vmin); bottom: 3vmin; padding: 2.4vmin 3vmin;
                 border: 0.4vmin solid #fff3; border-radius: 4vmin; background: #0004; color: #fff8; font-size: 3vmin; }
 </style>
 <script src="coi_serviceworker.js"></script>
@@ -81,8 +82,9 @@
   <div class="stick" data-stick><span class="knob"></span></div>
   <div class="shoulder left" data-button="4">L</div><div class="shoulder z left" data-button="6">Z</div>
   <div class="shoulder right" data-button="7">R</div><div class="shoulder z right" data-button="6">Z</div>
-  <div class="c c-up" data-axis="3 -1">C▲</div><div class="c c-down" data-axis="3 1">C▼</div>
-  <div class="c c-left" data-axis="2 -1">C◀</div><div class="c c-right" data-axis="2 1">C▶</div>
+  <div class="c c-up" data-axis="3 -1">▲</div><div class="c c-down" data-axis="3 1">▼</div>
+  <div class="c c-left" data-axis="2 -1">◀</div><div class="c c-right" data-axis="2 1">▶</div>
+  <span class="c-label">C</span>
   <div class="a" data-button="0">A</div><div class="b" data-button="2">B</div>
   <div class="menu" data-button="8">MENU</div><div class="start" data-button="9">START</div>
 </div>
